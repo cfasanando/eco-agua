@@ -12,7 +12,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class CashflowService {
@@ -51,6 +55,7 @@ public class CashflowService {
 
         Map<LocalDate, CashflowItem> map = new LinkedHashMap<>();
         LocalDate current = start;
+
         while (!current.isAfter(end)) {
             CashflowItem item = new CashflowItem();
             item.setDate(current);
@@ -58,13 +63,11 @@ public class CashflowService {
             current = current.plusDays(1);
         }
 
-        // Sales incomes (paid orders)
-        List<SaleOrder> paidOrders =
-                orderService.findOrdersBetweenDatesAndStatus(start, end, OrderStatus.PAID);
-
+        List<SaleOrder> paidOrders = orderService.findOrdersBetweenDatesAndStatus(start, end, OrderStatus.PAID);
         for (SaleOrder order : paidOrders) {
-            LocalDate d = order.getOrderDate();
-            CashflowItem item = map.get(d);
+            LocalDate date = order.getOrderDate();
+            CashflowItem item = map.get(date);
+
             if (item == null) {
                 continue;
             }
@@ -74,41 +77,77 @@ public class CashflowService {
             item.setTotalIncome(item.getTotalIncome().add(amount));
         }
 
-        // Other incomes
         List<OtherIncome> otherIncomes = otherIncomeService.findByDateRange(start, end);
-        for (OtherIncome oi : otherIncomes) {
-            LocalDate d = oi.getIncomeDate();
-            CashflowItem item = map.get(d);
+        for (OtherIncome income : otherIncomes) {
+            LocalDate date = income.getIncomeDate();
+            CashflowItem item = map.get(date);
+
             if (item == null) {
                 continue;
             }
 
-            BigDecimal amount = nvl(oi.getAmount());
+            BigDecimal amount = nvl(income.getAmount());
             item.setOtherIncome(item.getOtherIncome().add(amount));
             item.setTotalIncome(item.getTotalIncome().add(amount));
         }
 
-        // Expenses (using expense_date as effective date)
         List<Expense> expenses = expenseService.findByDateRange(start, end);
-        for (Expense exp : expenses) {
-            LocalDate d = exp.getExpenseDate();
-            CashflowItem item = map.get(d);
+        for (Expense expense : expenses) {
+            LocalDate date = expense.getExpenseDate();
+            CashflowItem item = map.get(date);
+
             if (item == null) {
                 continue;
             }
 
-            BigDecimal amount = nvl(exp.getAmount());
+            BigDecimal amount = nvl(expense.getAmount());
             item.setTotalExpense(item.getTotalExpense().add(amount));
         }
 
-        // Net result per day
         for (CashflowItem item : map.values()) {
-            item.setNetResult(
-                    item.getTotalIncome().subtract(item.getTotalExpense())
-            );
+            item.setNetResult(item.getTotalIncome().subtract(item.getTotalExpense()));
         }
 
         return new ArrayList<>(map.values());
+    }
+
+    @Transactional(readOnly = true)
+    public CashflowDayDetail getDayDetail(LocalDate date) {
+        if (date == null) {
+            throw new IllegalArgumentException("Date is required.");
+        }
+
+        List<SaleOrder> sales = orderService.findOrdersForDateAndStatus(date, OrderStatus.PAID);
+        List<OtherIncome> otherIncomes = otherIncomeService.findByDateRange(date, date);
+        List<Expense> expenses = expenseService.findByDateRange(date, date);
+
+        BigDecimal salesTotal = sales.stream()
+                .map(SaleOrder::getTotalAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal otherIncomeTotal = otherIncomes.stream()
+                .map(OtherIncome::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal expenseTotal = expenses.stream()
+                .map(Expense::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        CashflowDayDetail detail = new CashflowDayDetail();
+        detail.setDate(date);
+        detail.setSales(sales);
+        detail.setOtherIncomes(otherIncomes);
+        detail.setExpenses(expenses);
+        detail.setSalesTotal(salesTotal);
+        detail.setOtherIncomeTotal(otherIncomeTotal);
+        detail.setTotalIncome(salesTotal.add(otherIncomeTotal));
+        detail.setExpenseTotal(expenseTotal);
+        detail.setNetResult(detail.getTotalIncome().subtract(expenseTotal));
+
+        return detail;
     }
 
     private BigDecimal nvl(BigDecimal value) {
@@ -119,6 +158,7 @@ public class CashflowService {
         if (items == null || items.isEmpty()) {
             return BigDecimal.ZERO;
         }
+
         return items.stream()
                 .map(CashflowItem::getTotalIncome)
                 .filter(Objects::nonNull)
@@ -129,6 +169,7 @@ public class CashflowService {
         if (items == null || items.isEmpty()) {
             return BigDecimal.ZERO;
         }
+
         return items.stream()
                 .map(CashflowItem::getTotalExpense)
                 .filter(Objects::nonNull)
@@ -139,6 +180,7 @@ public class CashflowService {
         if (items == null || items.isEmpty()) {
             return BigDecimal.ZERO;
         }
+
         return items.stream()
                 .map(CashflowItem::getNetResult)
                 .filter(Objects::nonNull)

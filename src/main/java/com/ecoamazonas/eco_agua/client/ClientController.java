@@ -6,6 +6,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,21 +46,37 @@ public class ClientController {
     public String save(
             @RequestParam(required = false) Long id,
             @RequestParam String name,
-            @RequestParam("docType") DocumentType docType,
-            @RequestParam("docNumber") String docNumber,
+            @RequestParam(required = false) DocumentType docType,
+            @RequestParam(required = false) String docNumber,
             @RequestParam(required = false) String phone,
             @RequestParam(required = false) String address,
             @RequestParam(required = false) String reference,
             @RequestParam("profileId") Long profileId,
             @RequestParam(value = "promotionIds", required = false) List<Long> promotionIds,
+            @RequestParam(required = false) BigDecimal latitude,
+            @RequestParam(required = false) BigDecimal longitude,
             RedirectAttributes redirectAttributes
     ) {
         try {
             clientService.saveFromForm(
-                    id, name, docType, docNumber, phone, address, reference, profileId, promotionIds
+                    id,
+                    name,
+                    docType,
+                    docNumber,
+                    phone,
+                    address,
+                    reference,
+                    profileId,
+                    promotionIds,
+                    latitude,
+                    longitude
             );
+
             redirectAttributes.addFlashAttribute("message", "Cliente guardado correctamente.");
             redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("message", ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "error");
         } catch (Exception ex) {
             redirectAttributes.addFlashAttribute("message", "Error al guardar el cliente.");
             redirectAttributes.addFlashAttribute("messageType", "error");
@@ -101,10 +118,7 @@ public class ClientController {
 
         return "redirect:/admin/clients";
     }
-    
-    /**
-     * Geocode address + reference and return JSON with lat/lng.
-     */
+
     @PostMapping("/geocode")
     @ResponseBody
     public Map<String, Object> geocode(
@@ -114,8 +128,7 @@ public class ClientController {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            Optional<GeocodingService.LatLng> result =
-                    geocodingService.geocode(address, reference);
+            Optional<GeocodingService.LatLng> result = geocodingService.geocode(address, reference);
 
             if (result.isEmpty()) {
                 response.put("status", "NOT_FOUND");
@@ -126,11 +139,9 @@ public class ClientController {
                 response.put("lng", latLng.getLng());
             }
         } catch (Exception e) {
-            // You could log the error here
             response.put("status", "ERROR");
         }
 
         return response;
     }
-
 }

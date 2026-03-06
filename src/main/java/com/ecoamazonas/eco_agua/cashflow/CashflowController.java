@@ -16,8 +16,7 @@ public class CashflowController {
 
     private final CashflowService cashflowService;
 
-    private static final DateTimeFormatter LABEL_FORMATTER =
-            DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final DateTimeFormatter LABEL_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     public CashflowController(CashflowService cashflowService) {
         this.cashflowService = cashflowService;
@@ -41,7 +40,6 @@ public class CashflowController {
 
         LocalDate start;
         LocalDate end;
-
         String normalizedMode = (mode != null ? mode.toUpperCase() : "BY_DAY");
 
         switch (normalizedMode) {
@@ -67,8 +65,7 @@ public class CashflowController {
         if (start.equals(end)) {
             periodLabel = "del " + start.format(LABEL_FORMATTER);
         } else {
-            periodLabel = "del " + start.format(LABEL_FORMATTER)
-                    + " al " + end.format(LABEL_FORMATTER);
+            periodLabel = "del " + start.format(LABEL_FORMATTER) + " al " + end.format(LABEL_FORMATTER);
         }
 
         List<CashflowItem> items;
@@ -81,7 +78,6 @@ public class CashflowController {
             totalIncomes = cashflowService.calculateTotalIncomes(items);
             totalExpenses = cashflowService.calculateTotalExpenses(items);
             netResult = cashflowService.calculateNetResult(items);
-
             model.addAttribute("errorMessage", null);
         } catch (Exception ex) {
             System.out.println("[CashflowController] Error building cashflow: " + ex.getMessage());
@@ -91,8 +87,8 @@ public class CashflowController {
             totalIncomes = BigDecimal.ZERO;
             totalExpenses = BigDecimal.ZERO;
             netResult = BigDecimal.ZERO;
-            model.addAttribute("errorMessage",
-                    "Error al calcular el flujo de caja: " + ex.getMessage());
+
+            model.addAttribute("errorMessage", "Error al calcular el flujo de caja: " + ex.getMessage());
         }
 
         model.addAttribute("activePage", "cashflow");
@@ -101,12 +97,23 @@ public class CashflowController {
         model.addAttribute("fromDate", start);
         model.addAttribute("toDate", end);
         model.addAttribute("periodLabel", periodLabel);
-
         model.addAttribute("cashflowItems", items);
         model.addAttribute("totalIncomes", totalIncomes);
         model.addAttribute("totalExpenses", totalExpenses);
         model.addAttribute("netResult", netResult);
 
         return "cashflow/cashflow";
+    }
+
+    @GetMapping("/cashflow/day-detail")
+    public String cashflowDayDetail(
+            @RequestParam("date")
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            Model model
+    ) {
+        CashflowDayDetail detail = cashflowService.getDayDetail(date);
+        model.addAttribute("dayDetail", detail);
+
+        return "cashflow/day_detail_modal :: dayDetailModalContent";
     }
 }

@@ -3,12 +3,15 @@
 <head th:replace="fragments/head_admin :: adminHead('Flujo de caja - Eco Agua')"></head>
 
 <body>
+
 <div class="app-layout" th:with="activePage='cashflow'">
+
     <!-- Sidebar -->
     <aside th:replace="fragments/sidebar :: sidebar"></aside>
 
     <!-- Main -->
     <div class="main-content">
+
         <!-- Topbar -->
         <header th:replace="fragments/topbar :: topbar"></header>
 
@@ -139,6 +142,7 @@
             <!-- Detalle por día -->
             <div class="card shadow-sm">
                 <div class="card-body">
+
                     <div th:if="${cashflowItems != null and !#lists.isEmpty(cashflowItems)}">
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
@@ -154,42 +158,100 @@
                                 </thead>
                                 <tbody>
                                 <tr th:each="item : ${cashflowItems}">
-                                    <td th:text="${#temporals.format(item.date, 'dd/MM/yyyy')}">01/01/2025</td>
-                                    <td class="text-end"
-                                        th:text="${#numbers.formatDecimal(item.salesIncome,1,'POINT',2,'POINT')}">
-                                        0.00
+                                    <td>
+                                        <button type="button"
+                                                class="btn btn-link btn-sm p-0 text-decoration-none js-cashflow-day-detail"
+                                                th:attr="data-date=${item.date}"
+                                                th:text="${#temporals.format(item.date, 'dd/MM/yyyy')}">
+                                            01/01/2025
+                                        </button>
                                     </td>
-                                    <td class="text-end"
-                                        th:text="${#numbers.formatDecimal(item.otherIncome,1,'POINT',2,'POINT')}">
-                                        0.00
+
+                                    <td class="text-end">
+                                        <button type="button"
+                                                class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail"
+                                                th:attr="data-date=${item.date}">
+                                            <span th:text="${#numbers.formatDecimal(item.salesIncome,1,'POINT',2,'POINT')}">
+                                                0.00
+                                            </span>
+                                        </button>
                                     </td>
-                                    <td class="text-end"
-                                        th:text="${#numbers.formatDecimal(item.totalIncome,1,'POINT',2,'POINT')}">
-                                        0.00
+
+                                    <td class="text-end">
+                                        <button type="button"
+                                                class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail"
+                                                th:attr="data-date=${item.date}">
+                                            <span th:text="${#numbers.formatDecimal(item.otherIncome,1,'POINT',2,'POINT')}">
+                                                0.00
+                                            </span>
+                                        </button>
                                     </td>
-                                    <td class="text-end"
-                                        th:text="${#numbers.formatDecimal(item.totalExpense,1,'POINT',2,'POINT')}">
-                                        0.00
+
+                                    <td class="text-end">
+                                        <button type="button"
+                                                class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail"
+                                                th:attr="data-date=${item.date}">
+                                            <span th:text="${#numbers.formatDecimal(item.totalIncome,1,'POINT',2,'POINT')}">
+                                                0.00
+                                            </span>
+                                        </button>
                                     </td>
+
+                                    <td class="text-end">
+                                        <button type="button"
+                                                class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail"
+                                                th:attr="data-date=${item.date}">
+                                            <span th:text="${#numbers.formatDecimal(item.totalExpense,1,'POINT',2,'POINT')}">
+                                                0.00
+                                            </span>
+                                        </button>
+                                    </td>
+
                                     <td class="text-end"
-                                        th:classappend="${item.netResult != null and item.netResult < 0} ? ' text-danger' : ' text-success'"
-                                        th:text="${#numbers.formatDecimal(item.netResult,1,'POINT',2,'POINT')}">
-                                        0.00
+                                        th:classappend="${item.netResult != null and item.netResult < 0} ? ' text-danger' : ' text-success'">
+                                        <button type="button"
+                                                class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail"
+                                                th:attr="data-date=${item.date}"
+                                                th:classappend="${item.netResult != null and item.netResult < 0} ? ' link-danger' : ' link-success'">
+                                            <span th:text="${#numbers.formatDecimal(item.netResult,1,'POINT',2,'POINT')}">
+                                                0.00
+                                            </span>
+                                        </button>
                                     </td>
                                 </tr>
                                 </tbody>
                             </table>
                         </div>
+
+                        <div class="small text-muted mt-3">
+                            Haz clic en la fecha o en cualquier monto del día para ver el detalle de ventas, otros ingresos y gastos.
+                        </div>
                     </div>
 
-                    <div class="alert alert-light mb-0 text-center"
-                         th:if="${cashflowItems == null or #lists.isEmpty(cashflowItems)}">
+                    <div th:if="${cashflowItems == null or #lists.isEmpty(cashflowItems)}"
+                         class="text-center text-muted py-4">
                         No hay datos de flujo de caja para el período seleccionado.
                     </div>
                 </div>
             </div>
-
         </main>
+    </div>
+</div>
+
+<!-- Day detail modal -->
+<div class="modal fade" id="cashflowDayDetailModal" tabindex="-1" aria-labelledby="cashflowDayDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cashflowDayDetailModalLabel">Detalle del día</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body" id="cashflowDayDetailContent">
+                <div class="text-center py-4 text-muted">
+                    Selecciona un día para ver el detalle.
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -208,6 +270,7 @@
             if (!modeSelect) {
                 return;
             }
+
             const mode = modeSelect.value;
 
             if (mode === 'BY_PERIOD') {
@@ -225,6 +288,59 @@
             modeSelect.addEventListener('change', updateDateFieldsVisibility);
             updateDateFieldsVisibility();
         }
+
+        const modalElement = document.getElementById('cashflowDayDetailModal');
+        const modalContent = document.getElementById('cashflowDayDetailContent');
+        const detailTriggers = document.querySelectorAll('.js-cashflow-day-detail');
+
+        if (!modalElement || !modalContent || typeof bootstrap === 'undefined') {
+            return;
+        }
+
+        const detailModal = new bootstrap.Modal(modalElement);
+
+        async function loadDayDetail(date) {
+            if (!date) {
+                return;
+            }
+
+            modalContent.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
+                    <span class="text-muted">Cargando detalle...</span>
+                </div>
+            `;
+
+            detailModal.show();
+
+            try {
+                const response = await fetch(`/cashflow/day-detail?date=${encodeURIComponent(date)}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Unable to load cashflow day detail.');
+                }
+
+                modalContent.innerHTML = await response.text();
+            } catch (error) {
+                modalContent.innerHTML = `
+                    <div class="alert alert-danger mb-0">
+                        No se pudo cargar el detalle del día.
+                    </div>
+                `;
+                console.error(error);
+            }
+        }
+
+        detailTriggers.forEach(function (trigger) {
+            trigger.addEventListener('click', function () {
+                const date = this.getAttribute('data-date');
+                loadDayDetail(date);
+            });
+        });
     });
 </script>
 </body>

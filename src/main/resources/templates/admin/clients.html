@@ -6,15 +6,11 @@
 <body>
 
 <div class="app-layout" th:with="activePage='clients'">
-    <!-- Sidebar -->
     <aside th:replace="fragments/sidebar :: sidebar"></aside>
 
-    <!-- Main -->
     <div class="main-content">
-        <!-- Topbar -->
         <header th:replace="fragments/topbar :: topbar"></header>
 
-        <!-- Content -->
         <main class="content-wrapper">
 
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -44,11 +40,10 @@
                             <th><input type="checkbox" id="checkAll"/></th>
                             <th>#</th>
                             <th>Nombre o razón social</th>
-                            <th>Tipo doc.</th>
-                            <th>Nro doc.</th>
+                            <th>Documento</th>
                             <th>Celular / teléfono</th>
+                            <th>Dirección</th>
                             <th>Perfil</th>
-                            <th>Promociones</th>
                             <th class="text-center">Acciones</th>
                         </tr>
                         </thead>
@@ -59,22 +54,109 @@
                                        class="row-check"
                                        th:value="${client.id}"/>
                             </td>
+
                             <td th:text="${stat.index + 1}">1</td>
+
                             <td th:text="${client.name}">Vecino Soplin</td>
-                            <td th:text="${client.docType}">DNI</td>
-                            <td th:text="${client.docNumber}">00000000</td>
-                            <td th:text="${client.phone}">999999999</td>
+
+                            <td th:text="${
+                                    client.docType == null
+                                    || client.docNumber == null
+                                    || #strings.isEmpty(client.docNumber)
+                                    || client.docNumber == 'S/N'
+                                    || #strings.toString(client.docType) == 'NONE'
+                                        ? 'S/N'
+                                        : (
+                                            (#strings.toString(client.docType) == 'OTHER'
+                                                ? 'Otro'
+                                                : (#strings.toString(client.docType) == 'CE'
+                                                    ? 'CE'
+                                                    : #strings.toString(client.docType)))
+                                            + ': ' + client.docNumber
+                                          )
+                                }">
+                                DNI: 41676622
+                            </td>
+
+                            <td th:text="${client.phone != null && !#strings.isEmpty(client.phone) ? client.phone : 'Sin teléfono'}">
+                                999999999
+                            </td>
+
+                            <td>
+                                <div th:if="${client.address != null && !#strings.isEmpty(client.address)}"
+                                     th:text="${client.address}">
+                                    Vargas Guerra cdra 15
+                                </div>
+                                <div th:if="${client.reference != null && !#strings.isEmpty(client.reference)}"
+                                     class="small text-muted"
+                                     th:text="${client.reference}">
+                                    Frente al mercado
+                                </div>
+                                <span th:if="${(client.address == null || #strings.isEmpty(client.address)) && (client.reference == null || #strings.isEmpty(client.reference))}"
+                                      class="text-muted">
+                                    Sin dirección
+                                </span>
+                            </td>
+
                             <td th:text="${client.profile != null ? client.profile.name : '-'}">
                                 Bodega
                             </td>
-                            <td>
-                                <span class="badge-promo"
-                                      th:each="promo : ${client.promotions}"
-                                      th:text="${promo.name}">
-                                    Promo
-                                </span>
-                            </td>
+
                             <td class="text-center">
+                                <div th:id="'promo-content-' + ${client.id}" class="d-none">
+                                    <div th:if="${#sets.isEmpty(client.promotions)}">
+                                        <p class="text-muted mb-0">Este cliente no tiene promociones asignadas.</p>
+                                    </div>
+
+                                    <div th:each="promo : ${client.promotions}"
+                                         class="border rounded p-3 mb-2">
+                                        <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                            <strong th:text="${promo.name}">Promo especial</strong>
+                                            <span class="badge text-bg-light"
+                                                  th:if="${promo.promoNumber != null}"
+                                                  th:text="'#' + ${promo.promoNumber}">
+                                                #101
+                                            </span>
+                                        </div>
+
+                                        <div th:if="${promo.description != null && !#strings.isEmpty(promo.description)}"
+                                             class="small text-muted mb-2"
+                                             th:text="${promo.description}">
+                                            Descripción de promoción
+                                        </div>
+
+                                        <div class="small">
+                                            <div th:if="${promo.startDate != null || promo.endDate != null}">
+                                                <strong>Vigencia:</strong>
+                                                <span th:text="${promo.startDate != null ? promo.startDate : '-'}">2025-01-01</span>
+                                                -
+                                                <span th:text="${promo.endDate != null ? promo.endDate : '-'}">2025-12-31</span>
+                                            </div>
+
+                                            <div th:if="${promo.maxCounter != null}">
+                                                <strong>Límite:</strong>
+                                                <span th:text="${promo.maxCounter}">3</span>
+                                            </div>
+
+                                            <div>
+                                                <strong>Estado:</strong>
+                                                <span th:text="${promo.enabled ? 'Activa' : 'Inactiva'}">Activa</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-info me-1"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#promotionInfoModal"
+                                        th:if="${!#sets.isEmpty(client.promotions)}"
+                                        th:attr="data-client-name=${client.name},
+                                                 data-promo-source='promo-content-' + ${client.id}"
+                                        title="Ver promociones">
+                                    <i class="bi bi-gift"></i>
+                                </button>
+
                                 <button type="button"
                                         class="btn btn-sm btn-outline-primary me-1"
                                         data-bs-toggle="modal"
@@ -94,8 +176,11 @@
                                 </button>
 
                                 <form th:action="@{'/admin/clients/' + ${client.id} + '/delete'}"
-                                      method="post" class="d-inline delete-form-single">
-                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                      method="post"
+                                      class="d-inline delete-form-single">
+                                    <input type="hidden"
+                                           th:name="${_csrf.parameterName}"
+                                           th:value="${_csrf.token}"/>
                                     <button type="submit"
                                             class="btn btn-sm btn-outline-danger">
                                         <i class="bi bi-trash"></i>
@@ -125,7 +210,6 @@
                 <div class="modal-body">
                     <input type="hidden" name="id" id="clientId"/>
 
-                    <!-- hidden fields for coordinates -->
                     <input type="hidden" name="latitude" id="clientLatitude"/>
                     <input type="hidden" name="longitude" id="clientLongitude"/>
 
@@ -138,6 +222,7 @@
                         <div class="col-md-3">
                             <label class="form-label">Tipo doc.</label>
                             <select class="form-select" name="docType" id="clientDocType" required>
+                                <option value="NONE">Sin documento por ahora</option>
                                 <option value="DNI">DNI</option>
                                 <option value="RUC">RUC</option>
                                 <option value="CE">Carné extranjería</option>
@@ -147,12 +232,19 @@
 
                         <div class="col-md-3">
                             <label class="form-label">Nro documento</label>
-                            <input class="form-control" name="docNumber" id="clientDocNumber" required>
+                            <input class="form-control" name="docNumber" id="clientDocNumber">
                         </div>
 
                         <div class="col-md-3">
                             <label class="form-label">Celular / teléfono</label>
                             <input class="form-control" name="phone" id="clientPhone">
+                        </div>
+
+                        <div class="col-12">
+                            <small id="clientDocHelp" class="form-text text-muted">
+                                Puedes guardar el cliente sin documento o sin teléfono y completarlo más adelante.
+                                Para registrar una factura después, el cliente deberá tener RUC válido.
+                            </small>
                         </div>
 
                         <div class="col-md-3">
@@ -198,7 +290,14 @@
                         </div>
 
                         <div class="col-12">
-                            <label class="form-label">Promociones asignadas</label>
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                                <label class="form-label mb-0">Promociones asignadas</label>
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        id="btnClearPromotions">
+                                    <i class="bi bi-eraser"></i> Quitar todas
+                                </button>
+                            </div>
                             <select class="form-select" name="promotionIds"
                                     id="clientPromotions" multiple size="4">
                                 <option th:each="promo : ${promotions}"
@@ -208,7 +307,7 @@
                                 </option>
                             </select>
                             <div class="form-text">
-                                Mantén presionada la tecla Ctrl (o Cmd en Mac) para seleccionar varias promociones.
+                                Puedes dejar este campo sin selección. Usa Ctrl (o Cmd en Mac) para seleccionar varias promociones.
                             </div>
                         </div>
 
@@ -226,10 +325,28 @@
     </div>
 </div>
 
-<!-- Scripts comunes -->
+<!-- Modal promotions info -->
+<div class="modal fade" id="promotionInfoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    Promociones del cliente:
+                    <span id="promotionInfoClientName" class="fw-semibold"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="promotionInfoBody">
+                    <p class="text-muted mb-0">Sin promociones registradas.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
 
-<!-- Leaflet (map) -->
 <link rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
@@ -238,15 +355,11 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
         crossorigin=""></script>
 
-<!-- JS específico de la vista -->
 <script th:inline="javascript">
     document.addEventListener('DOMContentLoaded', function () {
         'use strict';
 
-        // Init DataTable
-        window.ecoAdmin.initStandardDataTable('#clientsTable', [0, 8]);
-
-        // Check-all, delete, bulk delete
+        window.ecoAdmin.initStandardDataTable('#clientsTable', [0, 7]);
         window.ecoAdmin.registerCheckAll('#checkAll', '.row-check');
         window.ecoAdmin.registerSingleDelete('.delete-form-single', '¿Eliminar este cliente?');
 
@@ -263,11 +376,13 @@
             }
         });
 
-        // Modal + map references
         const clientModal = document.getElementById('clientModal');
         const clientForm = document.getElementById('clientForm');
         const promotionsSelect = document.getElementById('clientPromotions');
-
+        const clearPromotionsBtn = document.getElementById('btnClearPromotions');
+        const docTypeSelect = document.getElementById('clientDocType');
+        const docNumberInput = document.getElementById('clientDocNumber');
+        const docHelp = document.getElementById('clientDocHelp');
         const mapContainer = document.getElementById('clientMapContainer');
         const latInput = document.getElementById('clientLatitude');
         const lngInput = document.getElementById('clientLongitude');
@@ -275,20 +390,16 @@
         const addressHelp = document.getElementById('clientAddressHelp');
         const addrInput = document.getElementById('clientAddress');
 
-        // Not used anymore for backend geocoding, but kept to avoid breaking anything
-        const geocodeUrl = /*[[@{/admin/clients/geocode}]]*/ '';
-        const csrfParam = /*[[${_csrf.parameterName}]]*/ '_csrf';
-        const csrfToken = /*[[${_csrf.token}]]*/ '';
+        const promotionInfoModal = document.getElementById('promotionInfoModal');
+        const promotionInfoClientName = document.getElementById('promotionInfoClientName');
+        const promotionInfoBody = document.getElementById('promotionInfoBody');
 
-        // Public Nominatim endpoint (client-side only)
         const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org/search';
 
         let clientMap = null;
         let clientMarker = null;
-
-        // --- Suggestions dropdown (auto-complete) ---
-
         let suggestionsContainer = null;
+        let suggestTimeout = null;
 
         if (addrInput) {
             const parent = addrInput.parentElement;
@@ -337,9 +448,6 @@
                 btn.addEventListener('click', function (e) {
                     e.preventDefault();
 
-                    // IMPORTANT: keep user-typed address as-is.
-                    // We only update coordinates and map based on the suggestion.
-
                     if (latInput) {
                         latInput.value = item.lat.toFixed(7);
                     }
@@ -367,8 +475,8 @@
             if (!addressHelp) {
                 return;
             }
-            addressHelp.textContent = message;
 
+            addressHelp.textContent = message;
             addressHelp.classList.remove('text-muted', 'text-success', 'text-warning', 'text-danger');
 
             if (state === 'success') {
@@ -382,13 +490,70 @@
             }
         }
 
-        // --- Leaflet helpers ---
+        function clearPromotionSelection() {
+            if (!promotionsSelect) {
+                return;
+            }
 
-        // Helper: set marker and center map
+            Array.from(promotionsSelect.options).forEach(function (opt) {
+                opt.selected = false;
+            });
+        }
+
+        function updateDocumentUi() {
+            if (!docTypeSelect || !docNumberInput || !docHelp) {
+                return;
+            }
+
+            const selectedType = docTypeSelect.value || 'NONE';
+
+            docNumberInput.disabled = selectedType === 'NONE';
+            docNumberInput.placeholder = '';
+            docNumberInput.removeAttribute('inputmode');
+            docNumberInput.removeAttribute('maxlength');
+
+            if (selectedType === 'NONE') {
+                docNumberInput.value = '';
+                docHelp.textContent = 'El cliente se guardará temporalmente sin documento (S/N). Puedes completarlo más adelante.';
+                docHelp.className = 'form-text text-muted';
+                return;
+            }
+
+            if (selectedType === 'DNI') {
+                docNumberInput.placeholder = 'Ejemplo: 12345678';
+                docNumberInput.setAttribute('inputmode', 'numeric');
+                docNumberInput.setAttribute('maxlength', '8');
+                docHelp.textContent = 'Si aún no tienes el DNI, puedes guardar este cliente y completar el dato más adelante.';
+                docHelp.className = 'form-text text-muted';
+                return;
+            }
+
+            if (selectedType === 'RUC') {
+                docNumberInput.placeholder = 'Ejemplo: 20123456789';
+                docNumberInput.setAttribute('inputmode', 'numeric');
+                docNumberInput.setAttribute('maxlength', '11');
+                docHelp.textContent = 'Si el cliente aún no te da su RUC, puedes guardarlo. Para emitir factura luego sí necesitarás el RUC correcto.';
+                docHelp.className = 'form-text text-warning';
+                return;
+            }
+
+            if (selectedType === 'CE') {
+                docNumberInput.placeholder = 'Número de carné o dato provisional';
+                docHelp.textContent = 'Puedes registrar el número exacto o un valor provisional mientras confirmas el dato.';
+                docHelp.className = 'form-text text-muted';
+                return;
+            }
+
+            docNumberInput.placeholder = 'Dato provisional o documento alternativo';
+            docHelp.textContent = 'Puedes usar un dato provisional si el cliente todavía no comparte su documento.';
+            docHelp.className = 'form-text text-muted';
+        }
+
         function setMarkerLatLng(lat, lng) {
             if (!clientMap) {
                 return;
             }
+
             const latLng = [lat, lng];
             clientMap.setView(latLng, 16);
 
@@ -399,14 +564,11 @@
             }
         }
 
-        // Initialize Leaflet map once
         function initClientMap() {
-            // Avoid creating the map multiple times
             if (!mapContainer || clientMap) {
                 return;
             }
 
-            // Default center (Iquitos example)
             const defaultLat = -3.743673;
             const defaultLng = -73.251632;
 
@@ -417,7 +579,6 @@
                 attribution: '&copy; OpenStreetMap'
             }).addTo(clientMap);
 
-            // Click handler to place marker and update hidden fields
             clientMap.on('click', function (e) {
                 const lat = e.latlng.lat;
                 const lng = e.latlng.lng;
@@ -433,7 +594,6 @@
             });
         }
 
-        // Read hidden inputs and move marker accordingly
         function setMarkerFromInputs() {
             if (!clientMap || !latInput || !lngInput) {
                 return;
@@ -444,16 +604,11 @@
 
             if (!isNaN(latVal) && !isNaN(lngVal)) {
                 setMarkerLatLng(latVal, lngVal);
-            } else {
-                // No coords: remove marker if exists
-                if (clientMarker) {
-                    clientMap.removeLayer(clientMarker);
-                    clientMarker = null;
-                }
+            } else if (clientMarker) {
+                clientMap.removeLayer(clientMarker);
+                clientMarker = null;
             }
         }
-
-        // --- Client-side geocoding (Nominatim) ---
 
         function fetchGeocode(address, limit) {
             const url = NOMINATIM_BASE_URL
@@ -469,11 +624,11 @@
                 if (!res.ok) {
                     throw new Error('Geocoding request failed');
                 }
+
                 return res.json();
             });
         }
 
-        // Button + blur geocoding
         function geocodeClientAddress() {
             const address = addrInput ? addrInput.value.trim() : '';
 
@@ -505,10 +660,7 @@
                     const lng = parseFloat(first.lon);
 
                     if (isNaN(lat) || isNaN(lng)) {
-                        setAddressHelp(
-                            'Respuesta de geocodificación inválida.',
-                            'error'
-                        );
+                        setAddressHelp('Respuesta de geocodificación inválida.', 'error');
                         window.ecoAdmin.showFlashMessage(
                             'Respuesta de geocodificación inválida.',
                             'error'
@@ -529,17 +681,11 @@
                     }, 150);
 
                     const formatted = first.display_name || address;
-                    setAddressHelp(
-                        'Ubicación encontrada: ' + formatted,
-                        'success'
-                    );
+                    setAddressHelp('Ubicación encontrada: ' + formatted, 'success');
                 })
                 .catch(function (err) {
                     console.error(err);
-                    setAddressHelp(
-                        'Error al contactar el servicio de mapas.',
-                        'error'
-                    );
+                    setAddressHelp('Error al contactar el servicio de mapas.', 'error');
                     window.ecoAdmin.showFlashMessage(
                         'Error al contactar el servicio de mapas.',
                         'error'
@@ -547,32 +693,12 @@
                 });
         }
 
-        if (geocodeBtn) {
-            geocodeBtn.addEventListener('click', function () {
-                geocodeClientAddress();
-            });
-        }
-
-        // Auto geocode on blur (if user typed a full address)
-        if (addrInput) {
-            addrInput.addEventListener('blur', function () {
-                if (this.value.trim().length >= 6) {
-                    geocodeClientAddress();
-                }
-            });
-        }
-
-        // --- Live suggestions while typing ---
-
-        let suggestTimeout = null;
-
         function scheduleSuggestions() {
             if (!addrInput) {
                 return;
             }
 
             const query = addrInput.value.trim();
-
             clearSuggestions();
 
             if (query.length < 4) {
@@ -609,7 +735,31 @@
             }, 400);
         }
 
+        if (clearPromotionsBtn) {
+            clearPromotionsBtn.addEventListener('click', function () {
+                clearPromotionSelection();
+            });
+        }
+
+        if (docTypeSelect) {
+            docTypeSelect.addEventListener('change', function () {
+                updateDocumentUi();
+            });
+        }
+
+        if (geocodeBtn) {
+            geocodeBtn.addEventListener('click', function () {
+                geocodeClientAddress();
+            });
+        }
+
         if (addrInput) {
+            addrInput.addEventListener('blur', function () {
+                if (this.value.trim().length >= 6) {
+                    geocodeClientAddress();
+                }
+            });
+
             addrInput.addEventListener('input', function () {
                 scheduleSuggestions();
             });
@@ -627,8 +777,6 @@
             clearSuggestions();
         });
 
-        // --- Modal fill on edit / reset on create ---
-
         if (clientModal) {
             clientModal.addEventListener('show.bs.modal', function (event) {
                 const button = event.relatedTarget;
@@ -637,29 +785,20 @@
                 }
 
                 const id = button.getAttribute('data-id');
-
                 clearSuggestions();
 
                 if (id) {
                     clientModal.querySelector('.modal-title').textContent = 'Editar cliente';
 
                     document.getElementById('clientId').value = id;
-                    document.getElementById('clientName').value =
-                        button.getAttribute('data-name') || '';
-                    document.getElementById('clientDocType').value =
-                        button.getAttribute('data-doc-type') || 'DNI';
-                    document.getElementById('clientDocNumber').value =
-                        button.getAttribute('data-doc-number') || '';
-                    document.getElementById('clientPhone').value =
-                        button.getAttribute('data-phone') || '';
-                    document.getElementById('clientAddress').value =
-                        button.getAttribute('data-address') || '';
-                    document.getElementById('clientReference').value =
-                        button.getAttribute('data-reference') || '';
-                    document.getElementById('clientProfileId').value =
-                        button.getAttribute('data-profile-id') || '';
+                    document.getElementById('clientName').value = button.getAttribute('data-name') || '';
+                    document.getElementById('clientDocType').value = button.getAttribute('data-doc-type') || 'NONE';
+                    document.getElementById('clientDocNumber').value = button.getAttribute('data-doc-number') || '';
+                    document.getElementById('clientPhone').value = button.getAttribute('data-phone') || '';
+                    document.getElementById('clientAddress').value = button.getAttribute('data-address') || '';
+                    document.getElementById('clientReference').value = button.getAttribute('data-reference') || '';
+                    document.getElementById('clientProfileId').value = button.getAttribute('data-profile-id') || '';
 
-                    // Coordinates from data attributes
                     if (latInput) {
                         latInput.value = button.getAttribute('data-latitude') || '';
                     }
@@ -680,7 +819,8 @@
                         });
                     }
 
-                    // Reset help text based on existing coords
+                    updateDocumentUi();
+
                     if (latInput && lngInput && latInput.value && lngInput.value) {
                         setAddressHelp('Ubicación guardada para este cliente.', 'success');
                     } else {
@@ -690,13 +830,10 @@
                     clientModal.querySelector('.modal-title').textContent = 'Nuevo cliente';
                     clientForm.reset();
                     document.getElementById('clientId').value = '';
-                    document.getElementById('clientDocType').value = 'DNI';
+                    document.getElementById('clientDocType').value = 'NONE';
 
-                    if (promotionsSelect) {
-                        Array.from(promotionsSelect.options).forEach(function (opt) {
-                            opt.selected = false;
-                        });
-                    }
+                    clearPromotionSelection();
+                    updateDocumentUi();
 
                     if (latInput) {
                         latInput.value = '';
@@ -710,10 +847,8 @@
             });
 
             clientModal.addEventListener('shown.bs.modal', function () {
-                // Initialize map after modal is visible
                 initClientMap();
 
-                // Delay marker adjustment a bit so map has dimensions
                 setTimeout(function () {
                     if (clientMap) {
                         clientMap.invalidateSize();
@@ -722,6 +857,24 @@
                 }, 200);
             });
         }
+
+        if (promotionInfoModal) {
+            promotionInfoModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                if (!button) {
+                    return;
+                }
+
+                const clientName = button.getAttribute('data-client-name') || '';
+                const sourceId = button.getAttribute('data-promo-source') || '';
+                const source = sourceId ? document.getElementById(sourceId) : null;
+
+                promotionInfoClientName.textContent = clientName;
+                promotionInfoBody.innerHTML = source ? source.innerHTML : '<p class="text-muted mb-0">Sin promociones registradas.</p>';
+            });
+        }
+
+        updateDocumentUi();
 
         const flashMessage = /*[[${message}]]*/ null;
         const flashType = /*[[${messageType}]]*/ null;

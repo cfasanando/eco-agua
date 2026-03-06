@@ -6,6 +6,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -42,7 +43,9 @@ public class ClientService {
             String address,
             String reference,
             Long profileId,
-            List<Long> promotionIds
+            List<Long> promotionIds,
+            BigDecimal latitude,
+            BigDecimal longitude
     ) {
         Client client;
 
@@ -53,21 +56,29 @@ public class ClientService {
                     .orElseThrow(() -> new IllegalArgumentException("Client not found with id " + id));
         }
 
-        client.setName(name);
-        client.setDocType(docType);
-        client.setDocNumber(docNumber);
-        client.setPhone(phone);
-        client.setAddress(address);
-        client.setReference(reference);
+        String normalizedName = normalizeRequired(name, "El nombre del cliente es obligatorio.");
+        DocumentType normalizedDocType = docType != null ? docType : DocumentType.NONE;
+        String normalizedDocNumber = normalizeDocNumber(normalizedDocType, docNumber);
+
+        client.setName(normalizedName);
+        client.setDocType(normalizedDocType);
+        client.setDocNumber(normalizedDocNumber);
+        client.setPhone(normalizeNullable(phone));
+        client.setAddress(normalizeNullable(address));
+        client.setReference(normalizeNullable(reference));
+        client.setLatitude(latitude);
+        client.setLongitude(longitude);
 
         ClientProfile profile = clientProfileRepository.findById(profileId)
                 .orElseThrow(() -> new IllegalArgumentException("Client profile not found with id " + profileId));
+
         client.setProfile(profile);
 
         Set<Promotion> promotions = new HashSet<>();
         if (promotionIds != null && !promotionIds.isEmpty()) {
             promotions.addAll(promotionRepository.findAllById(promotionIds));
         }
+
         client.setPromotions(promotions);
 
         clientRepository.save(client);
@@ -82,11 +93,41 @@ public class ClientService {
     public void deleteBulk(List<Long> ids) {
         clientRepository.deleteAllById(ids);
     }
-    
+
     @Transactional(readOnly = true)
     public Client findById(Long id) {
         return clientRepository.findById(id)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("Client not found with id " + id));
+                .orElseThrow(() -> new IllegalArgumentException("Client not found with id " + id));
+    }
+
+    private String normalizeRequired(String value, String message) {
+        String normalized = normalizeNullable(value);
+        if (normalized == null) {
+            throw new IllegalArgumentException(message);
+        }
+
+        return normalized;
+    }
+
+    private String normalizeNullable(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String normalizeDocNumber(DocumentType docType, String docNumber) {
+        if (docType == DocumentType.NONE) {
+            return "S/N";
+        }
+
+        String normalized = normalizeNullable(docNumber);
+        if (normalized == null) {
+            return "PENDIENTE";
+        }
+
+        return normalized.toUpperCase();
     }
 }

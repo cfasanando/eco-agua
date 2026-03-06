@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Blog / artículos')}"></head>
+
+<body>
+<div class="app-layout">
+
+    <!-- Sidebar -->
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <!-- Main content -->
+    <main class="app-content">
+        <div class="container-fluid py-3">
+
+            <!-- Breadcrumb + título -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-1 small">
+                            <li class="breadcrumb-item">
+                                <a th:href="@{/home}">Inicio</a>
+                            </li>
+                            <li class="breadcrumb-item active" aria-current="page">
+                                Blog / consejos
+                            </li>
+                        </ol>
+                    </nav>
+                    <h1 class="h4 mb-0">Blog & consejos de hidratación</h1>
+                    <p class="text-muted small mb-0">
+                        Gestiona los artículos informativos que se mostrarán en la web.
+                    </p>
+                </div>
+
+                <div>
+                    <a class="btn btn-primary btn-sm"
+                       th:href="@{/admin/blog/new}">
+                        <i class="bi bi-plus-circle me-1"></i>
+                        Nuevo artículo
+                    </a>
+                </div>
+            </div>
+
+            <!-- Tabla de posts -->
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div th:if="${#lists.isEmpty(posts)}" class="p-3 text-muted small">
+                        No hay artículos creados todavía. Crea el primero con el botón
+                        <strong>Nuevo artículo</strong>.
+                    </div>
+
+                    <div th:if="${!#lists.isEmpty(posts)}" class="table-responsive">
+                        <table class="table table-sm table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th style="width: 60px;">ID</th>
+                                <th>Título</th>
+                                <th class="d-none d-md-table-cell">Slug</th>
+                                <th style="width: 120px;">Estado</th>
+                                <th style="width: 160px;" class="d-none d-md-table-cell">
+                                    Publicado
+                                </th>
+                                <th style="width: 120px;"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="post : ${posts}">
+                                <td th:text="${post.id}">1</td>
+                                <td>
+                                    <div class="fw-semibold"
+                                         th:text="${post.title}">Título</div>
+                                    <div class="small text-muted d-md-none">
+                                        <span th:text="${post.slug}">slug-ejemplo</span>
+                                    </div>
+                                </td>
+                                <td class="small text-muted d-none d-md-table-cell"
+                                    th:text="${post.slug}">
+                                    slug-ejemplo
+                                </td>
+                                <td>
+                                    <span class="badge text-bg-secondary"
+                                          th:if="${post.status.name() == 'DRAFT'}">
+                                        Borrador
+                                    </span>
+                                    <span class="badge text-bg-success"
+                                          th:if="${post.status.name() == 'PUBLISHED'}">
+                                        Publicado
+                                    </span>
+                                    <span class="badge text-bg-warning text-dark"
+                                          th:if="${post.status.name() == 'SCHEDULED'}">
+                                        Programado
+                                    </span>
+                                </td>
+                                <td class="small text-muted d-none d-md-table-cell"
+                                    th:text="${post.publishedAt != null ? #temporals.format(post.publishedAt, 'dd/MM/yyyy HH:mm') : '-'}">
+                                    01/01/2025 10:00
+                                </td>
+                                <td class="text-end">
+                                    <a class="btn btn-outline-secondary btn-sm"
+                                       th:href="@{|/admin/blog/${post.id}/edit|}">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<script th:src="@{/js/bootstrap.bundle.min.js}"></script>
+</body>
+</html>

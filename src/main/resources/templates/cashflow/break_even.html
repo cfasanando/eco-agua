@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Punto de equilibrio')"></head>
+
+<body>
+<div class="app-layout" th:with="activePage='cashflow'">
+    <!-- Sidebar -->
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <!-- Main -->
+    <div class="main-content">
+        <!-- Topbar -->
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <!-- Content -->
+        <main class="content-wrapper">
+
+            <style>
+                .be-filters-card {
+                    margin-bottom: 16px;
+                }
+
+                .be-main-number {
+                    font-size: 2.4rem;
+                    font-weight: 700;
+                }
+
+                .be-subtitle {
+                    font-size: 0.9rem;
+                    color: #6b7280;
+                }
+
+                .be-status-pill {
+                    display: inline-block;
+                    padding: 4px 10px;
+                    border-radius: 999px;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                }
+
+                .be-status-before {
+                    background: #fef2f2;
+                    color: #b91c1c;
+                }
+
+                .be-status-at {
+                    background: #ecfeff;
+                    color: #0e7490;
+                }
+
+                .be-status-after {
+                    background: #ecfdf5;
+                    color: #15803d;
+                }
+
+                .be-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 0.9rem;
+                }
+
+                .be-table th,
+                .be-table td {
+                    border: 1px solid #e5e7eb;
+                    padding: 6px 10px;
+                    vertical-align: middle;
+                }
+
+                .be-table thead th {
+                    background: #f9fafb;
+                    font-weight: 600;
+                }
+            </style>
+
+            <!-- Título + botón -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Punto de equilibrio</h1>
+                    <p class="text-muted mb-0" style="font-size: 0.9rem;">
+                        Analiza si tus ventas cubren los costos fijos y variables del periodo
+                        para cada producto.
+                    </p>
+                </div>
+                <div>
+                    <a th:href="@{/expenses/fixed-costs}" class="btn btn-outline-secondary btn-sm">
+                        ← Ver costos fijos mensuales
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="card shadow-sm be-filters-card">
+                <div class="card-body">
+                    <form class="row g-3" method="get" th:action="@{/cashflow/break-even}">
+                        <!-- Producto -->
+                        <div class="col-md-4">
+                            <label class="form-label">Producto</label>
+                            <select name="productId" class="form-select" required>
+                                <option th:each="p : ${products}"
+                                        th:value="${p.id}"
+                                        th:selected="${p.id == selectedProductId}"
+                                        th:text="${p.name}">
+                                    Producto
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Año -->
+                        <div class="col-md-2">
+                            <label class="form-label">Año</label>
+                            <input type="number"
+                                   name="year"
+                                   class="form-control"
+                                   min="2000"
+                                   max="2100"
+                                   th:value="${year}">
+                        </div>
+
+                        <!-- Mes (opciones fijas) -->
+                        <div class="col-md-3">
+                            <label class="form-label">Mes</label>
+                            <select name="month" class="form-select" required>
+                                <option value="">-- Selecciona --</option>
+                                <option value="1"  th:selected="${month == 1}">Enero</option>
+                                <option value="2"  th:selected="${month == 2}">Febrero</option>
+                                <option value="3"  th:selected="${month == 3}">Marzo</option>
+                                <option value="4"  th:selected="${month == 4}">Abril</option>
+                                <option value="5"  th:selected="${month == 5}">Mayo</option>
+                                <option value="6"  th:selected="${month == 6}">Junio</option>
+                                <option value="7"  th:selected="${month == 7}">Julio</option>
+                                <option value="8"  th:selected="${month == 8}">Agosto</option>
+                                <option value="9"  th:selected="${month == 9}">Septiembre</option>
+                                <option value="10" th:selected="${month == 10}">Octubre</option>
+                                <option value="11" th:selected="${month == 11}">Noviembre</option>
+                                <option value="12" th:selected="${month == 12}">Diciembre</option>
+                            </select>
+                        </div>
+
+                        <!-- Botón buscar -->
+                        <div class="col-md-3 d-flex align-items-end justify-content-end">
+                            <button type="submit" class="btn btn-primary">
+                                Buscar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Si no hay productos -->
+            <div th:if="${#lists.isEmpty(products)}" class="alert alert-warning">
+                No hay productos activos para calcular el punto de equilibrio.
+            </div>
+
+            <!-- Contenido principal: solo si hay productos y resultado -->
+            <div th:if="${!#lists.isEmpty(products) and result != null}">
+
+                <div class="row mb-3">
+                    <!-- Card punto de equilibrio -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title mb-2">Punto de equilibrio</h5>
+                                <div class="be-subtitle mb-2">
+                                    <span th:text="${result.product.name}">Producto</span>
+                                    &nbsp;|&nbsp;
+                                    <span th:text="${#temporals.format(result.periodStart, 'dd/MM/yyyy')}">
+                                        01/11/2025
+                                    </span>
+                                    &nbsp;al&nbsp;
+                                    <span th:text="${#temporals.format(result.periodEnd, 'dd/MM/yyyy')}">
+                                        30/11/2025
+                                    </span>
+                                </div>
+
+                                <div class="be-main-number mb-1"
+                                     th:text="${#numbers.formatDecimal(result.breakEvenUnitsRounded, 0, 'COMMA', 0, 'POINT')}">
+                                    0
+                                </div>
+
+                                <div class="be-subtitle">
+                                    Unidades mínimas que debes vender en el periodo para cubrir
+                                    <strong th:text="${#numbers.formatDecimal(result.fixedCosts, 1, 'COMMA', 2, 'POINT')}">
+                                        0,00
+                                    </strong>
+                                    de costos fijos.
+                                </div>
+
+                                <p class="mt-3 mb-0 text-muted" style="font-size: 0.8rem;">
+                                    El cálculo usa: punto de equilibrio = costos fijos ÷ (precio de venta - costo variable unitario).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card estado actual -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title mb-2">Estado actual de ventas</h5>
+
+                                <!-- Píldora de estado (texto + clase calculados) -->
+                                <div class="mb-2">
+                                    <span class="be-status-pill"
+                                          th:classappend="${
+                                            result.status.name() == 'BEFORE_BREAK_EVEN' ? ' be-status-before' :
+                                            (result.status.name() == 'AT_BREAK_EVEN' ? ' be-status-at' : ' be-status-after')
+                                          }">
+                                        <span th:text="${
+                                            result.status.name() == 'BEFORE_BREAK_EVEN' ?
+                                                'Aún no alcanzas el punto de equilibrio' :
+                                            (result.status.name() == 'AT_BREAK_EVEN' ?
+                                                'Estás justo en el punto de equilibrio' :
+                                                'Ya superaste el punto de equilibrio')
+                                        }">
+                                            Estado
+                                        </span>
+                                    </span>
+                                </div>
+
+                                <table class="be-table mt-2">
+                                    <tbody>
+                                    <tr>
+                                        <th style="width: 55%">Unidades vendidas en el periodo</th>
+                                        <td class="text-end"
+                                            th:text="${#numbers.formatDecimal(result.unitsSold, 0, 'COMMA', 0, 'POINT')}">
+                                            0
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Unidades de equilibrio (exactas)</th>
+                                        <td class="text-end"
+                                            th:text="${#numbers.formatDecimal(result.breakEvenUnitsExact, 1, 'COMMA', 2, 'POINT')}">
+                                            0,00
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Unidades de equilibrio (redondeadas)</th>
+                                        <td class="text-end"
+                                            th:text="${#numbers.formatDecimal(result.breakEvenUnitsRounded, 0, 'COMMA', 0, 'POINT')}">
+                                            0
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Margen de seguridad (unidades)</th>
+                                        <td class="text-end"
+                                            th:text="${#numbers.formatDecimal(result.safetyMarginUnits, 0, 'COMMA', 0, 'POINT')}">
+                                            0
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Margen de seguridad (%)</th>
+                                        <td class="text-end"
+                                            th:text="${#numbers.formatDecimal(result.safetyMarginPercent, 1, 'COMMA', 2, 'POINT')}">
+                                            0,00
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+
+                                <p class="mt-3 mb-0 text-muted" style="font-size: 0.8rem;">
+                                    El margen de seguridad indica cuántas unidades por encima del punto de equilibrio
+                                    estás vendiendo (o cuántas te faltan si es negativo).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de parámetros usados -->
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">Datos usados en el cálculo</h5>
+
+                        <div class="table-responsive">
+                            <table class="be-table">
+                                <thead>
+                                <tr>
+                                    <th>Concepto</th>
+                                    <th class="text-end">Valor</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr>
+                                    <td>Costos fijos del periodo</td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(result.fixedCosts, 1, 'COMMA', 2, 'POINT')}">
+                                        0,00
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Costo variable unitario (CVU)</td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(result.variableUnitCost, 1, 'COMMA', 4, 'POINT')}">
+                                        0,0000
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Precio de venta</td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(result.sellingPrice, 1, 'COMMA', 2, 'POINT')}">
+                                        0,00
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Margen de contribución por unidad</td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(result.contributionMargin, 1, 'COMMA', 4, 'POINT')}">
+                                        0,0000
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <p class="mt-3 text-muted" style="font-size: 0.8rem;">
+                            Para cambiar los costos fijos, registra y clasifica los egresos en el módulo de gastos.
+                            Para cambiar el costo variable unitario, ajusta los insumos del producto en la sección de costos variables.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+</body>
+</html>

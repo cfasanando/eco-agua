@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Costos variables – ' + ${detail.product.name})"></head>
+
+<body>
+<div class="app-layout" th:with="activePage='products'">
+    <!-- Sidebar -->
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <!-- Main -->
+    <div class="main-content">
+        <!-- Topbar -->
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <!-- Content -->
+        <main class="content-wrapper">
+
+            <style>
+                .cost-card {
+                    max-width: 1100px;
+                    margin: 0 auto;
+                }
+
+                .cost-header-title {
+                    font-weight: 700;
+                    font-size: 1.4rem;
+                }
+
+                .cost-subtitle {
+                    color: #6b7280;
+                    font-size: 0.9rem;
+                }
+
+                .cost-table-wrapper {
+                    overflow-x: auto;
+                }
+
+                .cost-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 0.9rem;
+                }
+
+                .cost-table th,
+                .cost-table td {
+                    border: 1px solid #e5e7eb;
+                    padding: 6px 8px;
+                    vertical-align: middle;
+                }
+
+                .cost-table thead th {
+                    background: #f3f4f6;
+                    font-weight: 600;
+                    text-align: center;
+                }
+
+                .cost-table .group-row {
+                    background: #06b6d4;
+                    color: white;
+                    font-weight: 600;
+                }
+
+                .cost-table .group-row td {
+                    border-color: #06b6d4;
+                }
+
+                .cost-footer-row td {
+                    font-weight: 700;
+                    background: #fef9c3;
+                }
+
+                .cost-summary-box {
+                    background: #ecfeff;
+                    border-radius: 8px;
+                    padding: 12px 16px;
+                    margin-top: 20px;
+                    display: inline-block;
+                }
+
+                .cost-summary-box table {
+                    margin: 0;
+                }
+
+                .cost-summary-box td {
+                    padding: 4px 8px;
+                }
+
+                .badge-back {
+                    font-size: 0.85rem;
+                }
+            </style>
+
+            <div class="cost-card">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <div class="cost-header-title">
+                            Costos variables unitarios
+                        </div>
+                        <div class="cost-subtitle" th:text="${detail.product.name}">
+                            Nombre del producto
+                        </div>
+                    </div>
+                    <div>
+                        <a th:href="@{/admin/products}" class="btn btn-outline-secondary btn-sm badge-back">
+                            ← Volver a productos
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="cost-table-wrapper">
+                            <table class="cost-table">
+                                <thead>
+                                <tr>
+                                    <th style="width: 35%">Concepto</th>
+                                    <th style="width: 10%">U.M</th>
+                                    <th style="width: 15%">Cantidad</th>
+                                    <th style="width: 20%">Valor unitario S/.</th>
+                                    <th style="width: 20%">Total S/.</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <!-- Empty state -->
+                                <tr th:if="${#lists.isEmpty(detail.lines)}">
+                                    <td colspan="5" class="text-center text-muted">
+                                        No hay insumos configurados para este producto.
+                                    </td>
+                                </tr>
+
+                                <!-- Cost rows grouped by groupLabel -->
+                                <th:block th:each="line, stat : ${detail.lines}">
+                                    <!-- Group header row (only when group changes) -->
+                                    <tr class="group-row"
+                                        th:if="${stat.index == 0 or detail.lines[stat.index - 1].groupLabel != line.groupLabel}">
+                                        <td colspan="5" th:text="${line.groupLabel}">SERVICIOS</td>
+                                    </tr>
+
+                                    <!-- Detail row -->
+                                    <tr>
+                                        <td th:text="${line.supplyName}">Agua</td>
+                                        <td class="text-center" th:text="${line.unit}">m3</td>
+
+                                        <!-- Quantity: 4 decimals -->
+                                        <td class="text-end"
+                                            th:text="${#numbers.formatDecimal(line.quantityUsed, 1, 'COMMA', 4, 'POINT')}">
+                                            0,0000
+                                        </td>
+
+                                        <!-- Unit cost: 4 decimals -->
+                                        <td class="text-end"
+                                            th:text="${#numbers.formatDecimal(line.unitCost, 1, 'COMMA', 4, 'POINT')}">
+                                            0,0000
+                                        </td>
+
+                                        <!-- Total: 4 decimals -->
+                                        <td class="text-end"
+                                            th:text="${#numbers.formatDecimal(line.totalCost, 1, 'COMMA', 4, 'POINT')}">
+                                            0,0000
+                                        </td>
+                                    </tr>
+                                </th:block>
+
+                                <!-- Total CVU row -->
+                                <tr class="cost-footer-row" th:if="${!#lists.isEmpty(detail.lines)}">
+                                    <td colspan="4" class="text-end">
+                                        Total costo variable unitario (CVU)
+                                    </td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(detail.cvu, 1, 'COMMA', 4, 'POINT')}">
+                                        0,0000
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Price box -->
+                        <div class="cost-summary-box" th:if="${!#lists.isEmpty(detail.lines)}">
+                            <table>
+                                <tr>
+                                    <td><strong>Precio de producción:</strong></td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(detail.cvu, 1, 'COMMA', 4, 'POINT')}">
+                                        0,0000
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Incremento en %:</strong></td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(detail.marginPercent, 1, 'COMMA', 2, 'POINT')}">
+                                        0,00
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Precio de venta sugerido:</strong></td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(detail.suggestedPrice, 1, 'COMMA', 2, 'POINT')}">
+                                        0,00
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <!-- Dentro del card, después del cuadro de precio de producción / PV sugerido -->
+                        <div class="mt-3">
+                            <a class="btn btn-outline-primary btn-sm"
+                               th:href="@{|/cashflow/break-even?productId=${detail.product.id}|}">
+                                Ver punto de equilibrio de este producto
+                            </a>
+                        </div>
+
+
+                        <p class="mt-3 text-muted" style="font-size: 0.8rem;">
+                            Este cálculo considera únicamente los costos variables configurados como insumos del producto.
+                            Los costos fijos se analizan en la sección correspondiente.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<!-- Scripts comunes -->
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!-- templates/fragments/topbar.html -->
+<header class="topbar d-flex align-items-center justify-content-between"
+        xmlns:th="http://www.thymeleaf.org"
+        th:fragment="topbar">
+    <div class="topbar-date">
+        <span id="currentDate">Hoy</span>
+        &nbsp;|&nbsp;
+        <span id="currentTime">00:00:00</span>
+    </div>
+
+    <div class="topbar-user">
+        <span th:text="${#authentication.name}">Usuario</span>
+        <div class="topbar-avatar"
+             th:text="${#authentication.name != null ? #authentication.name.substring(0,1).toUpperCase() : 'U'}">
+            U
+        </div>
+
+        <form th:action="@{/logout}" method="post" class="d-inline">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                Cerrar sesión
+            </button>
+        </form>
+    </div>
+</header>

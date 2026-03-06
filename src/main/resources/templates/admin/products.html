@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="fragments/head_admin :: adminHead('Productos - Eco Agua')"></head>
+
+<body>
+
+<div class="app-layout" th:with="activePage='products'">
+    <!-- Sidebar -->
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <!-- Main -->
+    <div class="main-content">
+        <!-- Topbar -->
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <!-- Content -->
+        <main class="content-wrapper">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="h5 mb-0">Productos</h1>
+
+                <div class="d-flex gap-2">
+                    <button id="btnBulkDelete"
+                            class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-trash"></i> Eliminar seleccionados
+                    </button>
+
+                    <button class="btn btn-primary btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#productModal">
+                        <i class="bi bi-plus-lg"></i> Agregar
+                    </button>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <table id="productsTable"
+                           class="table table-striped table-sm align-middle"
+                           style="width:100%">
+                        <thead class="table-light">
+                        <tr>
+                            <th><input type="checkbox" id="checkAll"/></th>
+                            <th>#</th>
+                            <th>Nombre</th>
+                            <th>Imagen</th>
+                            <th>Categoría</th>
+                            <th>Descripción</th>
+                            <th class="text-end">Precio S/.</th>
+                            <th class="text-end">Costo insumos S/.</th>
+                            <th class="text-end">Margen vs insumos</th>
+                            <th>Insumos</th>
+                            <th>Destacado</th>
+                            <th>Activo</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="product, stat : ${products}">
+                            <td>
+                                <input type="checkbox"
+                                       class="row-check"
+                                       th:value="${product.id}"/>
+                            </td>
+                            <td th:text="${stat.index + 1}">1</td>
+                            <td th:text="${product.name}">Agua 20L</td>
+                            <td>
+                                <img th:if="${product.imagePath != null}"
+                                     th:src="${product.imagePath}"
+                                     alt="Imagen del producto"
+                                     class="img-thumbnail"
+                                     style="max-height: 40px;">
+                                <span th:if="${product.imagePath == null}" class="text-muted small">
+                                    Sin imagen
+                                </span>
+                            </td>
+                            <td th:text="${product.category != null ? product.category.name : '-'}">Categoria</td>
+                            <td>
+                                <div class="product-description-preview"
+                                     th:utext="${product.description}">
+                                    Descripción
+                                </div>
+                            </td>
+
+                            <td class="text-end"
+                                th:text="${#numbers.formatDecimal(product.price,1,'POINT',2,'POINT')}">
+                                0.00
+                            </td>
+
+                            <!-- Costo total de insumos -->
+                            <td class="text-end"
+                                th:text="${#numbers.formatDecimal(product.suppliesCost,1,'POINT',2,'POINT')}">
+                                0.00
+                            </td>
+
+                            <!-- Margen: monto + % -->
+                            <td class="text-end">
+                                <span th:if="${product.marginAmountFromSupplies != null}">
+                                    <span th:text="${#numbers.formatDecimal(product.marginAmountFromSupplies,1,'POINT',2,'POINT')}">
+                                        0.00
+                                    </span>
+                                    <span>
+                                        (
+                                        <span th:text="${#numbers.formatDecimal(product.marginPercentFromSupplies,1,'POINT',1,'POINT')}">
+                                            0.0
+                                        </span>%
+                                        )
+                                    </span>
+                                </span>
+                                <span th:if="${product.marginAmountFromSupplies == null}" class="text-muted">
+                                    -
+                                </span>
+                            </td>
+
+                            <!-- Número de insumos -->
+                            <td>
+                                <span class="badge bg-info-subtle text-info"
+                                      th:text="${#lists.size(product.suppliesComposition)} + ' insumo(s)'">
+                                    0 insumo(s)
+                                </span>
+                            </td>
+
+                            <!-- Destacado -->
+                            <td>
+                                <span th:if="${product.featured}"
+                                      class="badge bg-warning-subtle text-warning">Destacado</span>
+                                <span th:if="${!product.featured}"
+                                      class="badge bg-secondary-subtle text-muted">No</span>
+                            </td>
+
+                            <!-- Activo -->
+                            <td>
+                                <span th:if="${product.active}" class="badge bg-success-subtle text-success">Activo</span>
+                                <span th:if="${!product.active}" class="badge bg-secondary-subtle text-muted">Inactivo</span>
+                            </td>
+
+                            <!-- Acciones -->
+                            <td class="text-center">
+                                <!-- Botón configurar insumos -->
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary me-1"
+                                        title="Configurar insumos"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#productSuppliesModal"
+                                        th:attr="data-id=${product.id},
+                                                 data-name=${product.name},
+                                                 data-config=${#strings.listJoin(product.suppliesComposition.![supply.id + ':' + quantityUsed], ';')}">
+                                    <i class="bi bi-list-check"></i>
+                                </button>
+
+                                <!-- Botón ver costos (detalle CVU) -->
+                                <a th:href="@{'/admin/products/' + ${product.id} + '/cost'}"
+                                   class="btn btn-sm btn-outline-info me-1"
+                                   title="Ver detalle de costos">
+                                    <i class="bi bi-cash-coin"></i>
+                                </a>
+
+                                <!-- Botón editar producto -->
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary me-1"
+                                        title="Editar producto"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#productModal"
+                                        th:attr="data-id=${product.id},
+                                                 data-name=${product.name},
+                                                 data-description=${product.description},
+                                                 data-price=${product.price},
+                                                 data-active=${product.active},
+                                                 data-featured=${product.featured},
+                                                 data-category-id=${product.category != null ? product.category.id : null},
+                                                 data-image-path=${product.imagePath}">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+
+                                <!-- Botón eliminar -->
+                                <form th:action="@{'/admin/products/' + ${product.id} + '/delete'}"
+                                      method="post" class="d-inline delete-form-single">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button type="submit"
+                                            class="btn btn-sm btn-outline-danger"
+                                            title="Eliminar producto">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<!-- Modal create/edit product -->
+<div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form id="productForm"
+                  th:action="@{/admin/products/save}"
+                  method="post"
+                  enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title">Nuevo producto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="productId"/>
+
+                    <div class="row g-3">
+                        <!-- Columna imagen -->
+                        <div class="col-md-4">
+                            <div class="border rounded d-flex flex-column align-items-center justify-content-center mb-2"
+                                 style="height: 220px;">
+                                <img id="productImagePreview"
+                                     src="#"
+                                     alt="Previsualización de imagen"
+                                     class="img-fluid"
+                                     style="max-height: 200px; display: none;">
+                                <div id="productImagePlaceholder" class="text-center text-muted">
+                                    <i class="bi bi-image" style="font-size: 2rem;"></i>
+                                    <div>No image</div>
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Imagen</label>
+                                <input class="form-control form-control-sm"
+                                       type="file"
+                                       name="imageFile"
+                                       id="productImageFile"
+                                       accept="image/*">
+                                <small class="text-muted">
+                                    Opcional. Se usará en catálogos y reportes.
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Columna datos -->
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label class="form-label">Nombre</label>
+                                <input class="form-control" name="name" id="productName" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Descripción</label>
+                                <textarea class="form-control js-rich-text" name="description"
+                                          id="productDescription" rows="4"></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Categoría</label>
+                                <select class="form-select" name="categoryId" id="productCategoryId">
+                                    <option value="">Sin categoría</option>
+                                    <option th:each="cat : ${productCategories}"
+                                            th:value="${cat.id}"
+                                            th:text="${cat.name}">
+                                        Categoria
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Precio S/.</label>
+                                <input class="form-control" type="number" step="0.01" min="0"
+                                       name="price" id="productPrice" required>
+                            </div>
+
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" value="true"
+                                       id="productActive" name="active" checked>
+                                <label class="form-check-label" for="productActive">
+                                    Producto activo
+                                </label>
+                            </div>
+
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="true"
+                                       id="productFeatured" name="featured">
+                                <label class="form-check-label" for="productFeatured">
+                                    Mostrar como producto destacado en la página de inicio
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary btn-sm"
+                            data-bs-dismiss="modal">Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal configurar insumos del producto -->
+<div class="modal fade" id="productSuppliesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <form id="productSuppliesForm"
+                  th:action="@{/admin/products/configure-supplies}"
+                  method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title">Insumos del producto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="productId" id="psProductId"/>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th style="width: 36px;">
+                                    <input type="checkbox" id="psCheckAll"/>
+                                </th>
+                                <th>Nombre del insumo</th>
+                                <th style="width: 120px;">Unidad</th>
+                                <th style="width: 110px;" class="text-end">Base qty</th>
+                                <th style="width: 120px;" class="text-end">Base cost S/.</th>
+                                <th style="width: 140px;">Cantidad usada</th>
+                            </tr>
+                            </thead>
+                            <tbody id="psTableBody">
+                            <tr th:each="supply : ${supplies}"
+                                th:attr="data-supply-id=${supply.id}">
+                                <td>
+                                    <input type="checkbox" class="ps-row-check">
+                                </td>
+                                <td>
+                                    <span th:text="${supply.name}">Insumo</span>
+                                    <small class="text-muted d-block"
+                                           th:text="${supply.description}">Descripción</small>
+                                </td>
+                                <td th:text="${supply.unit}">unidad</td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(supply.baseQuantity,1,'POINT',4,'POINT')}">
+                                    0.0000
+                                </td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(supply.baseCost,1,'POINT',2,'POINT')}">
+                                    0.00
+                                </td>
+                                <td>
+                                    <input type="number" min="0" step="0.0001"
+                                           class="form-control form-control-sm ps-qty"
+                                           name="quantityUsed">
+                                    <input type="hidden" name="supplyId">
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="form-text">
+                        Marca los insumos que se usan en el producto y define la cantidad usada
+                        en la unidad del insumo.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary btn-sm"
+                            data-bs-dismiss="modal">Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary btn-sm">Guardar insumos</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts comunes -->
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<!-- TinyMCE para descripción de producto (sin API key) -->
+<script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"
+        referrerpolicy="origin"></script>
+
+<!-- JS específico de la vista -->
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        // Init TinyMCE rich text editor for product description
+        if (window.tinymce) {
+            tinymce.init({
+                selector: 'textarea.js-rich-text',
+                menubar: false,
+                plugins: 'lists link',
+                toolbar: 'bold italic | bullist numlist | link removeformat',
+                branding: false,
+                height: 260,
+                language: 'es'
+            });
+        }
+
+        // DataTable estándar (no ordenar: checkbox (0) y acciones (12))
+        window.ecoAdmin.initStandardDataTable('#productsTable', [0, 12]);
+
+        // Check-all, delete simple, bulk delete
+        window.ecoAdmin.registerCheckAll('#checkAll', '.row-check');
+        window.ecoAdmin.registerSingleDelete('.delete-form-single', '¿Eliminar este producto?');
+
+        window.ecoAdmin.registerBulkDelete({
+            triggerSelector: '#btnBulkDelete',
+            checkboxSelector: '.row-check',
+            deleteUrl: /*[[@{/admin/products/bulk-delete}]]*/ '',
+            csrfParam: /*[[${_csrf.parameterName}]]*/ '_csrf',
+            csrfToken: /*[[${_csrf.token}]]*/ '',
+            emptyMessage: 'Selecciona al menos un producto para eliminar.',
+            confirmTitle: '¿Eliminar productos seleccionados?',
+            confirmTextBuilder: function (count) {
+                return 'Se eliminarán ' + count + ' productos.';
+            }
+        });
+
+        // Modal create / edit producto
+        const productModal = document.getElementById('productModal');
+        const productForm = document.getElementById('productForm');
+        const categorySelect = document.getElementById('productCategoryId');
+
+        const imageInput = document.getElementById('productImageFile');
+        const imagePreview = document.getElementById('productImagePreview');
+        const imagePlaceholder = document.getElementById('productImagePlaceholder');
+
+        const descriptionTextarea = document.getElementById('productDescription');
+
+        function updateImagePreview(path) {
+            if (!imagePreview || !imagePlaceholder) {
+                return;
+            }
+            if (path && path !== '') {
+                imagePreview.src = path;
+                imagePreview.style.display = 'block';
+                imagePlaceholder.style.display = 'none';
+            } else {
+                imagePreview.src = '';
+                imagePreview.style.display = 'none';
+                imagePlaceholder.style.display = 'block';
+            }
+        }
+
+        function updateImagePreviewFromFile(file) {
+            if (!file || !imagePreview || !imagePlaceholder) {
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                imagePreview.src = e.target.result;
+                imagePreview.style.display = 'block';
+                imagePlaceholder.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setDescriptionContent(value) {
+            const val = value || '';
+            if (descriptionTextarea) {
+                descriptionTextarea.value = val;
+            }
+            if (window.tinymce && tinymce.get('productDescription')) {
+                tinymce.get('productDescription').setContent(val);
+            }
+        }
+
+        if (imageInput) {
+            imageInput.addEventListener('change', function () {
+                const file = this.files && this.files[0];
+                if (file) {
+                    updateImagePreviewFromFile(file);
+                } else {
+                    updateImagePreview(null);
+                }
+            });
+        }
+
+        if (productForm) {
+            productForm.addEventListener('submit', function () {
+                if (window.tinymce) {
+                    tinymce.triggerSave(); // sync TinyMCE content to textarea
+                }
+            });
+        }
+
+        if (productModal) {
+            productModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                if (!button) {
+                    return;
+                }
+
+                const id = button.getAttribute('data-id');
+
+                if (id) {
+                    productModal.querySelector('.modal-title').textContent = 'Editar producto';
+                    document.getElementById('productId').value = id;
+                    document.getElementById('productName').value =
+                        button.getAttribute('data-name') || '';
+
+                    setDescriptionContent(button.getAttribute('data-description') || '');
+
+                    document.getElementById('productPrice').value =
+                        button.getAttribute('data-price') || '';
+                    const activeAttr = button.getAttribute('data-active');
+                    const featuredAttr = button.getAttribute('data-featured');
+
+                    const productActiveCheckbox = document.getElementById('productActive');
+                    const productFeaturedCheckbox = document.getElementById('productFeatured');
+
+                    if (productActiveCheckbox) {
+                        productActiveCheckbox.checked =
+                            activeAttr === 'true' || activeAttr === '1';
+                    }
+
+                    if (productFeaturedCheckbox) {
+                        productFeaturedCheckbox.checked =
+                            featuredAttr === 'true' || featuredAttr === '1';
+                    }
+
+                    const categoryId = button.getAttribute('data-category-id') || '';
+                    if (categorySelect) {
+                        categorySelect.value = categoryId;
+                    }
+
+                    const imagePath = button.getAttribute('data-image-path') || '';
+                    updateImagePreview(imagePath);
+                    if (imageInput) {
+                        imageInput.value = '';
+                    }
+                } else {
+                    productModal.querySelector('.modal-title').textContent = 'Nuevo producto';
+                    if (productForm) {
+                        productForm.reset();
+                    }
+                    document.getElementById('productId').value = '';
+
+                    const productActiveCheckbox = document.getElementById('productActive');
+                    const productFeaturedCheckbox = document.getElementById('productFeatured');
+
+                    if (productActiveCheckbox) {
+                        productActiveCheckbox.checked = true;
+                    }
+                    if (productFeaturedCheckbox) {
+                        productFeaturedCheckbox.checked = false;
+                    }
+
+                    if (categorySelect) {
+                        categorySelect.value = '';
+                    }
+                    if (imageInput) {
+                        imageInput.value = '';
+                    }
+                    updateImagePreview(null);
+                    setDescriptionContent('');
+                }
+            });
+        }
+
+        // Modal configurar insumos
+        const psModal = document.getElementById('productSuppliesModal');
+        const psForm = document.getElementById('productSuppliesForm');
+        const psTableBody = document.getElementById('psTableBody');
+        const psCheckAll = document.getElementById('psCheckAll');
+
+        if (psModal && psForm && psTableBody) {
+            psModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                if (!button) {
+                    return;
+                }
+
+                const productId = button.getAttribute('data-id');
+                const productName = button.getAttribute('data-name') || '';
+                const configRaw = button.getAttribute('data-config') || '';
+
+                psModal.querySelector('.modal-title').textContent =
+                    'Insumos del producto: ' + productName;
+
+                document.getElementById('psProductId').value = productId;
+
+                const configMap = new Map();
+                if (configRaw !== '') {
+                    configRaw.split(';').forEach(function (item) {
+                        const parts = item.split(':');
+                        if (parts.length >= 2) {
+                            configMap.set(parts[0], parts[1]);
+                        }
+                    });
+                }
+
+                const rows = psTableBody.querySelectorAll('tr[data-supply-id]');
+                rows.forEach(function (row) {
+                    const supplyId = row.getAttribute('data-supply-id');
+                    const checkbox = row.querySelector('.ps-row-check');
+                    const qtyInput = row.querySelector('.ps-qty');
+                    const hiddenSupply = row.querySelector('input[name="supplyId"]');
+
+                    const cfgQty = configMap.get(supplyId);
+
+                    if (cfgQty !== undefined) {
+                        checkbox.checked = true;
+                        qtyInput.value = cfgQty;
+                    } else {
+                        checkbox.checked = false;
+                        qtyInput.value = '';
+                    }
+
+                    hiddenSupply.value = supplyId;
+                });
+
+                if (psCheckAll) {
+                    psCheckAll.checked = false;
+                }
+            });
+        }
+
+        if (psCheckAll) {
+            psCheckAll.addEventListener('change', function () {
+                const checked = this.checked;
+                document.querySelectorAll('.ps-row-check').forEach(function (chk) {
+                    chk.checked = checked;
+                });
+            });
+        }
+
+        if (psForm && psTableBody) {
+            psForm.addEventListener('submit', function () {
+                const rows = psTableBody.querySelectorAll('tr[data-supply-id]');
+                rows.forEach(function (row) {
+                    const checkbox = row.querySelector('.ps-row-check');
+                    if (!checkbox.checked) {
+                        row.querySelectorAll('input[name="supplyId"], input[name="quantityUsed"]')
+                            .forEach(function (input) {
+                                input.disabled = true;
+                            });
+                    }
+                });
+            });
+        }
+
+        // Flash message
+        const flashMessage = /*[[${message}]]*/ null;
+        const flashType = /*[[${messageType}]]*/ null;
+        if (flashMessage && flashMessage !== 'null' && flashMessage !== '') {
+            window.ecoAdmin.showFlashMessage(flashMessage, flashType);
+        }
+    });
+</script>
+
+</body>
+</html>

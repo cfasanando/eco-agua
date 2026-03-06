@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="fragments/head_admin :: adminHead('Simulador de precio - Eco Agua')"></head>
+
+<body>
+<div class="app-layout" th:with="activePage='price_simulator'">
+    <!-- Sidebar -->
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <!-- Main -->
+    <div class="main-content">
+        <!-- Topbar -->
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <!-- Content -->
+        <main class="content-wrapper">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="h5 mb-0">Simulador de precio por cliente</h1>
+            </div>
+
+            <!-- Formulario de selección -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <form th:action="@{/admin/price-simulator}" method="get" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Cliente</label>
+                            <select class="form-select" name="clientId" required>
+                                <option value="">Seleccione un cliente</option>
+                                <option th:each="c : ${clients}"
+                                        th:value="${c.id}"
+                                        th:selected="${c.id == selectedClientId}"
+                                        th:text="${c.name}">
+                                    Cliente
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Producto</label>
+                            <select class="form-select" name="productId" required>
+                                <option value="">Seleccione un producto</option>
+                                <option th:each="p : ${products}"
+                                        th:value="${p.id}"
+                                        th:selected="${p.id == selectedProductId}"
+                                        th:text="${p.name}">
+                                    Producto
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Promoción (opcional)</label>
+                            <select class="form-select" name="promotionId"
+                                    th:disabled="${#lists.isEmpty(availablePromotions)}">
+                                <option th:if="${#lists.isEmpty(availablePromotions)}"
+                                        value="">
+                                    No hay promociones disponibles
+                                </option>
+                                <option th:if="${!#lists.isEmpty(availablePromotions)}"
+                                        value="">
+                                    Sin promoción
+                                </option>
+                                <option th:each="promo : ${availablePromotions}"
+                                        th:value="${promo.id}"
+                                        th:selected="${promo.id == selectedPromotionId}"
+                                        th:text="${promo.name}">
+                                    Promoción
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="col-12 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-primary btn-sm mt-2">
+                                <i class="bi bi-calculator"></i> Simular
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Resultados -->
+            <div th:if="${simulation != null}">
+                <div class="row g-3">
+                    <!-- Producto base -->
+                    <div class="col-md-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title mb-2">Producto base</h5>
+                                <p class="mb-1">
+                                    <strong th:text="${simulation.product.name}">Producto</strong>
+                                </p>
+                                <p class="mb-1">
+                                    Precio venta:
+                                    <strong>S/ <span th:text="${#numbers.formatDecimal(simulation.basePrice,1,'POINT',2,'POINT')}">0.00</span></strong>
+                                </p>
+                                <p class="mb-1">
+                                    Costo insumos:
+                                    <strong>S/ <span th:text="${#numbers.formatDecimal(simulation.totalCost,1,'POINT',2,'POINT')}">0.00</span></strong>
+                                </p>
+                                <p class="mb-1">
+                                    Margen:
+                                    <strong>
+                                        S/ <span th:text="${#numbers.formatDecimal(simulation.baseMarginAmount,1,'POINT',2,'POINT')}">0.00</span>
+                                        (<span th:text="${simulation.baseMarginPercent != null ?
+                                                         #numbers.formatDecimal(simulation.baseMarginPercent,1,'POINT',1,'POINT') : '0.0'}">0.0</span>%)
+                                    </strong>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Perfil del cliente -->
+                    <div class="col-md-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title mb-2">Perfil del cliente</h5>
+                                <p th:if="${simulation.client != null}">
+                                    Cliente:
+                                    <strong th:text="${simulation.client.name}">Cliente</strong><br>
+                                    Perfil:
+                                    <strong th:text="${simulation.client.profile != null ? simulation.client.profile.name : '-'}">Perfil</strong>
+                                </p>
+
+                                <div th:if="${simulation.clientSuggestedPrice != null}">
+                                    <p class="mb-1">
+                                        Precio sugerido perfil:
+                                        <strong>S/ <span th:text="${#numbers.formatDecimal(simulation.clientSuggestedPrice,1,'POINT',2,'POINT')}">0.00</span></strong>
+                                    </p>
+                                    <p class="mb-1">
+                                        Margen:
+                                        <strong>
+                                            S/ <span th:text="${#numbers.formatDecimal(simulation.clientMarginAmount,1,'POINT',2,'POINT')}">0.00</span>
+                                            (<span th:text="${simulation.clientMarginPercent != null ?
+                                                             #numbers.formatDecimal(simulation.clientMarginPercent,1,'POINT',1,'POINT') : '0.0'}">0.0</span>%)
+                                        </strong>
+                                    </p>
+                                </div>
+                                <p th:if="${simulation.clientSuggestedPrice == null}" class="text-muted mb-0">
+                                    Este perfil no tiene precio sugerido configurado.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Promoción -->
+                    <div class="col-md-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title mb-2">Promoción seleccionada</h5>
+
+                                <div th:if="${simulation.promotion != null}">
+                                    <p class="mb-1">
+                                        Promoción:
+                                        <strong th:text="${simulation.promotion.name}">Promo</strong>
+                                    </p>
+                                    <p class="mb-1" th:if="${simulation.promotionProduct != null}">
+                                        Pack:
+                                        <span th:text="${simulation.promotionProduct.quantity}">0</span>
+                                        unidad(es) por
+                                        S/
+                                        <span th:text="${#numbers.formatDecimal(simulation.promotionProduct.amount,1,'POINT',2,'POINT')}">0.00</span>
+                                    </p>
+                                    <p class="mb-1" th:if="${simulation.promoUnitPrice != null}">
+                                        Precio unitario promo:
+                                        <strong>S/ <span th:text="${#numbers.formatDecimal(simulation.promoUnitPrice,1,'POINT',2,'POINT')}">0.00</span></strong>
+                                    </p>
+                                    <p class="mb-1" th:if="${simulation.promoMarginAmount != null}">
+                                        Margen:
+                                        <strong>
+                                            S/ <span th:text="${#numbers.formatDecimal(simulation.promoMarginAmount,1,'POINT',2,'POINT')}">0.00</span>
+                                            (<span th:text="${simulation.promoMarginPercent != null ?
+                                                             #numbers.formatDecimal(simulation.promoMarginPercent,1,'POINT',1,'POINT') : '0.0'}">0.0</span>%)
+                                        </strong>
+                                    </p>
+                                </div>
+
+                                <p th:if="${simulation.promotion == null}" class="text-muted mb-0">
+                                    No se ha seleccionado ninguna promoción.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<!-- Scripts comunes -->
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+</body>
+</html>

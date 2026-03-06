@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Ventas por fecha - Eco Agua')"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='income_sales'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <h1 class="h5 mb-3">Listado de ingresos por período</h1>
+
+            <!-- Filtros -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <strong>Filtros :</strong>
+                </div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" th:action="@{/income/sales}" method="get">
+
+                        <div class="col-md-3">
+                            <label class="form-label">Tipo de filtro</label>
+                            <select class="form-select" name="mode">
+                                <option value="DAY"
+                                        th:selected="${mode} == 'DAY'">
+                                    Por día
+                                </option>
+                                <option value="PERIOD"
+                                        th:selected="${mode} == 'PERIOD'">
+                                    Por período
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3" th:if="${mode} == 'DAY'">
+                            <label class="form-label">Fecha</label>
+                            <input type="date"
+                                   class="form-control"
+                                   name="date"
+                                   th:value="${date != null} ? ${date} : ${startDate}">
+                        </div>
+
+                        <div class="col-md-3" th:if="${mode} == 'PERIOD'">
+                            <label class="form-label">Desde</label>
+                            <input type="date"
+                                   class="form-control"
+                                   name="startDate"
+                                   th:value="${startDate}">
+                        </div>
+
+                        <div class="col-md-3" th:if="${mode} == 'PERIOD'">
+                            <label class="form-label">Hasta</label>
+                            <input type="date"
+                                   class="form-control"
+                                   name="endDate"
+                                   th:value="${endDate}">
+                        </div>
+
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Buscar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Resultados -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <span><strong>Ventas</strong> (pagados)</span>
+                    <span class="small text-muted" th:text="${summaryRange}">rango</span>
+                </div>
+                <div class="card-body">
+
+                    <div class="table-responsive mb-2">
+                        <table class="table table-striped table-sm align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Fecha</th>
+                                <th>Cliente</th>
+                                <th>Repartidor</th>
+                                <th class="text-end">Total S/.</th>
+                                <th>Estado</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="o, stat : ${orders}">
+                                <td th:text="${stat.count}">1</td>
+                                <td th:text="${#temporals.format(o.orderDate,'dd/MM/yyyy')}">23/11/2025</td>
+                                <td th:text="${o.client != null ? o.client.name : '-'}">Cliente</td>
+                                <td th:text="${o.deliveryPerson}">Repartidor</td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(o.totalAmount,1,'POINT',2,'POINT')}">
+                                    0.00
+                                </td>
+                                <td th:text="${o.status}">PAID</td>
+                                <td class="text-center">
+                                    <a th:href="@{|/orders/${o.id}|}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        Ver
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(orders)}">
+                                <td colspan="7" class="text-center text-muted">
+                                    No hay ventas en el período seleccionado (pagados).
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <div class="fw-bold">
+                            Total del período:&nbsp;
+                            <span th:text="${#numbers.formatDecimal(totalAmount,1,'POINT',2,'POINT')}">0.00</span> S/.
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+</body>
+</html>

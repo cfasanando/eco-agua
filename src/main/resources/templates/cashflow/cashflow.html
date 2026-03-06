@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Flujo de caja - Eco Agua')"></head>
+
+<body>
+<div class="app-layout" th:with="activePage='cashflow'">
+    <!-- Sidebar -->
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <!-- Main -->
+    <div class="main-content">
+        <!-- Topbar -->
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <!-- Content -->
+        <main class="content-wrapper">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-0">Flujo de caja</h1>
+                    <div class="small text-muted">
+                        Resumen de ingresos y gastos
+                        <span th:text="${periodLabel}">del 01/01/2025 al 01/01/2025</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header bg-light">
+                    <strong>Filtros</strong>
+                </div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end"
+                          method="get"
+                          th:action="@{/cashflow}">
+
+                        <div class="col-md-3">
+                            <label for="mode" class="form-label">Modo</label>
+                            <select id="mode"
+                                    name="mode"
+                                    class="form-select">
+                                <option value="BY_DAY"
+                                        th:selected="${mode}=='BY_DAY'">Por día</option>
+                                <option value="BY_PERIOD"
+                                        th:selected="${mode}=='BY_PERIOD'">Por período</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3" id="singleDateWrapper">
+                            <label for="filterDate" class="form-label">Fecha</label>
+                            <input type="date"
+                                   id="filterDate"
+                                   name="date"
+                                   class="form-control"
+                                   th:value="${date}">
+                        </div>
+
+                        <div class="col-md-3 d-none" id="fromDateWrapper">
+                            <label for="fromDate" class="form-label">Desde</label>
+                            <input type="date"
+                                   id="fromDate"
+                                   name="fromDate"
+                                   class="form-control"
+                                   th:value="${fromDate}">
+                        </div>
+
+                        <div class="col-md-3 d-none" id="toDateWrapper">
+                            <label for="toDate" class="form-label">Hasta</label>
+                            <input type="date"
+                                   id="toDate"
+                                   name="toDate"
+                                   class="form-control"
+                                   th:value="${toDate}">
+                        </div>
+
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search me-1"></i> Buscar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Errores -->
+            <div th:if="${errorMessage != null}"
+                 class="alert alert-danger">
+                <strong>Error:</strong>
+                <span th:text="${errorMessage}">Mensaje de error</span>
+            </div>
+
+            <!-- Resumen -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-success">
+                        <div class="card-body">
+                            <div class="text-muted small">Ingresos totales</div>
+                            <div class="fs-5 text-success fw-bold">
+                                S/.
+                                <span th:text="${#numbers.formatDecimal(totalIncomes,1,'POINT',2,'POINT')}">
+                                    0.00
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-danger">
+                        <div class="card-body">
+                            <div class="text-muted small">Gastos totales</div>
+                            <div class="fs-5 text-danger fw-bold">
+                                S/.
+                                <span th:text="${#numbers.formatDecimal(totalExpenses,1,'POINT',2,'POINT')}">
+                                    0.00
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-primary">
+                        <div class="card-body">
+                            <div class="text-muted small">Resultado neto</div>
+                            <div class="fs-5 fw-bold"
+                                 th:classappend="${netResult != null and netResult < 0} ? ' text-danger' : ' text-success'">
+                                S/.
+                                <span th:text="${#numbers.formatDecimal(netResult,1,'POINT',2,'POINT')}">
+                                    0.00
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detalle por día -->
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div th:if="${cashflowItems != null and !#lists.isEmpty(cashflowItems)}">
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th class="text-end">Ventas S/.</th>
+                                    <th class="text-end">Otros ingresos S/.</th>
+                                    <th class="text-end">Total ingresos S/.</th>
+                                    <th class="text-end">Gastos S/.</th>
+                                    <th class="text-end">Resultado neto S/.</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="item : ${cashflowItems}">
+                                    <td th:text="${#temporals.format(item.date, 'dd/MM/yyyy')}">01/01/2025</td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(item.salesIncome,1,'POINT',2,'POINT')}">
+                                        0.00
+                                    </td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(item.otherIncome,1,'POINT',2,'POINT')}">
+                                        0.00
+                                    </td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(item.totalIncome,1,'POINT',2,'POINT')}">
+                                        0.00
+                                    </td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(item.totalExpense,1,'POINT',2,'POINT')}">
+                                        0.00
+                                    </td>
+                                    <td class="text-end"
+                                        th:classappend="${item.netResult != null and item.netResult < 0} ? ' text-danger' : ' text-success'"
+                                        th:text="${#numbers.formatDecimal(item.netResult,1,'POINT',2,'POINT')}">
+                                        0.00
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-light mb-0 text-center"
+                         th:if="${cashflowItems == null or #lists.isEmpty(cashflowItems)}">
+                        No hay datos de flujo de caja para el período seleccionado.
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        const modeSelect = document.getElementById('mode');
+        const singleDateWrapper = document.getElementById('singleDateWrapper');
+        const fromDateWrapper = document.getElementById('fromDateWrapper');
+        const toDateWrapper = document.getElementById('toDateWrapper');
+
+        function updateDateFieldsVisibility() {
+            if (!modeSelect) {
+                return;
+            }
+            const mode = modeSelect.value;
+
+            if (mode === 'BY_PERIOD') {
+                singleDateWrapper.classList.add('d-none');
+                fromDateWrapper.classList.remove('d-none');
+                toDateWrapper.classList.remove('d-none');
+            } else {
+                singleDateWrapper.classList.remove('d-none');
+                fromDateWrapper.classList.add('d-none');
+                toDateWrapper.classList.add('d-none');
+            }
+        }
+
+        if (modeSelect) {
+            modeSelect.addEventListener('change', updateDateFieldsVisibility);
+            updateDateFieldsVisibility();
+        }
+    });
+</script>
+</body>
+</html>

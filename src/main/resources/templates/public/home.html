@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_public :: publicHead('Eco Agua - Agua purificada a domicilio')}"></head>
+
+<body>
+
+<!-- Top bar with quick contact -->
+<div class="top-bar text-white py-1">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center small">
+        <span>
+            <i class="bi bi-geo-alt-fill me-1"></i>
+            <span th:text="${topbarLocation} ?: 'Reparto en Iquitos y alrededores'">
+                Reparto en la ciudad y alrededores
+            </span>
+        </span>
+        <span class="d-flex align-items-center">
+            <i class="bi bi-telephone-fill me-1"></i>
+            <span class="me-3">
+                Central:
+                <span th:text="${topbarPhone} ?: '(065) 000000'">
+                    (065) 000000
+                </span>
+            </span>
+            <i class="bi bi-whatsapp me-1"></i>
+            <a class="text-white text-decoration-none fw-semibold"
+               th:href="'https://wa.me/' + ${whatsappNumber}"
+               target="_blank">
+                <span th:text="${topbarWhatsappLabel} ?: 'Pedidos por WhatsApp'">
+                    Pedidos por WhatsApp
+                </span>
+            </a>
+        </span>
+    </div>
+</div>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm sticky-top">
+    <div class="container">
+        <a class="navbar-brand fw-bold d-flex align-items-center" th:href="@{/}">
+            <img th:src="${platformLogo} != null ? @{${platformLogo}} : @{/img/logo3-transparente.png}"
+                 alt="Eco Agua" height="40" class="me-2">
+            <span>
+                <span class="d-block brand-title"
+                      th:text="${platformName} ?: 'Eco del Amazonas'">
+                    Eco del Amazonas
+                </span>
+                <span class="d-block brand-subtitle"
+                      th:text="${platformTagline} ?: 'Agua de mesa'">
+                    Agua de mesa
+                </span>
+            </span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#mainNavbar" aria-controls="mainNavbar"
+                aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNavbar">
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
+                <li class="nav-item">
+                    <a class="nav-link active" th:href="@{/}">Inicio</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/catalogo}">Catálogo</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/blog}">Blog & consejos</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link"
+                       th:href="'https://wa.me/' + ${whatsappNumber}"
+                       target="_blank">
+                        Pedir por WhatsApp
+                    </a>
+                </li>
+                <li class="nav-item mt-2 mt-lg-0">
+                    <a class="btn btn-outline-primary btn-sm ms-lg-3"
+                       th:href="@{/login}">
+                        Acceso colaboradores
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<main class="bg-light">
+
+    <!-- Hero section with background banner -->
+    <section class="hero-section text-white">
+        <div class="hero-overlay"></div>
+        <div class="container position-relative">
+            <div class="row align-items-center g-4 py-5">
+                <div class="col-lg-6">
+                    <span class="hero-pill mb-3">
+                        <i class="bi bi-droplet-half me-2"></i>
+                        <span th:text="${heroPill} ?: 'Agua purificada, segura y confiable'">
+                            Agua purificada, segura y confiable
+                        </span>
+                    </span>
+
+                    <h1 class="display-5 fw-bold mb-3"
+                        th:text="${heroTitle} ?: 'Refresca tu vida con agua de mesa Eco del Amazonas'">
+                        Refresca tu vida con agua de mesa Eco del Amazonas
+                    </h1>
+
+                    <p class="lead mb-3"
+                       th:text="${heroSubtitle} ?: 'Llevamos bidones y botellas de agua purificada hasta tu hogar u oficina, con reparto programado y atención personalizada.'">
+                        Llevamos bidones y botellas de agua purificada hasta tu hogar u oficina,
+                        con reparto programado y atención personalizada.
+                    </p>
+
+                    <ul class="list-unstyled mb-4 hero-bullets">
+                        <li>
+                            <i class="bi bi-check-circle-fill me-2"></i>
+                            <span th:text="${heroBullet1} ?: 'Proceso de purificación certificado.'">
+                                Proceso de purificación certificado.
+                            </span>
+                        </li>
+                        <li>
+                            <i class="bi bi-check-circle-fill me-2"></i>
+                            <span th:text="${heroBullet2} ?: 'Entrega puntual en los horarios acordados.'">
+                                Entrega puntual en los horarios acordados.
+                            </span>
+                        </li>
+                        <li>
+                            <i class="bi bi-check-circle-fill me-2"></i>
+                            <span th:text="${heroBullet3} ?: 'Atención por WhatsApp, fácil y rápido.'">
+                                Atención por WhatsApp, fácil y rápido.
+                            </span>
+                        </li>
+                    </ul>
+
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <a class="btn btn-success btn-lg"
+                           th:href="'https://wa.me/' + ${whatsappNumber}"
+                           target="_blank">
+                            <i class="bi bi-whatsapp me-2"></i>
+                            <span th:text="${heroPrimaryCtaLabel} ?: 'Pedir ahora por WhatsApp'">
+                                Pedir ahora por WhatsApp
+                            </span>
+                        </a>
+                        <a class="btn btn-outline-light btn-lg"
+                           th:href="@{/catalogo}">
+                            <span th:text="${heroSecondaryCtaLabel} ?: 'Ver catálogo de productos'">
+                                Ver catálogo de productos
+                            </span>
+                        </a>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-3 hero-stats small mt-2">
+                        <span>
+                            <i class="bi bi-people-fill me-1"></i>
+                            <span th:text="${heroStat1} ?: '+500 familias atendidas'">
+                                +500 familias atendidas
+                            </span>
+                        </span>
+                        <span>
+                            <i class="bi bi-truck-front-fill me-1"></i>
+                            <span th:text="${heroStat2} ?: 'Reparto diario en Iquitos'">
+                                Reparto diario en Iquitos
+                            </span>
+                        </span>
+                        <span>
+                            <i class="bi bi-shield-check me-1"></i>
+                            <span th:text="${heroStat3} ?: 'Calidad y confianza'">
+                                Calidad y confianza
+                            </span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="col-lg-6 text-center">
+                    <div class="hero-card shadow-lg">
+                        <img th:src="@{/img/banner02.jpg}"
+                             alt="Bidones de agua Eco Agua"
+                             class="img-fluid rounded-4 mb-3 hero-main-image">
+                        <div class="d-flex justify-content-between align-items-center small">
+                            <div>
+                                <span class="fw-semibold d-block"
+                                      th:text="${heroCardTitle} ?: 'Agua de mesa Eco del Amazonas'">
+                                    Agua de mesa Eco del Amazonas
+                                </span>
+                                <span class="text-muted"
+                                      th:text="${heroCardSubtitle} ?: 'Bidones, botellas y planes para empresas'">
+                                    Bidones, botellas y planes para empresas
+                                </span>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge rounded-pill text-bg-success mb-1">
+                                    <i class="bi bi-star-fill me-1"></i>
+                                    <span th:text="${heroBadgeLabel} ?: 'Servicio destacado'">
+                                        Servicio destacado
+                                    </span>
+                                </span>
+                                <div class="text-warning">
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-fill"></i>
+                                    <i class="bi bi-star-half"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="hero-mini-images mt-3 d-flex justify-content-center gap-3">
+                        <img th:src="@{/img/banner01.jpg}" alt="Eco Agua"
+                             class="rounded-3 hero-thumb d-none d-md-block">
+                        <img th:src="@{/img/bienvenida.png}" alt="Eco Agua"
+                             class="rounded-3 hero-thumb d-none d-md-block">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Trust bar / value proposition -->
+    <section class="py-4 bg-white border-bottom">
+        <div class="container">
+            <div class="row text-center g-3">
+                <div class="col-6 col-md-3">
+                    <div class="info-pill">
+                        <i class="bi bi-droplet-half fs-4 mb-2"></i>
+                        <h3 class="h6 mb-0">Agua purificada</h3>
+                        <p class="small text-muted mb-0">Tratamiento y filtrado profesional.</p>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="info-pill">
+                        <i class="bi bi-truck-front fs-4 mb-2"></i>
+                        <h3 class="h6 mb-0">Delivery puntual</h3>
+                        <p class="small text-muted mb-0">Horarios de reparto programados.</p>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="info-pill">
+                        <i class="bi bi-whatsapp fs-4 mb-2"></i>
+                        <h3 class="h6 mb-0">Pide por WhatsApp</h3>
+                        <p class="small text-muted mb-0">Resolvemos tus dudas en línea.</p>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="info-pill">
+                        <i class="bi bi-shield-check fs-4 mb-2"></i>
+                        <h3 class="h6 mb-0">Empresa confiable</h3>
+                        <p class="small text-muted mb-0">Comprometidos con tu bienestar.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Promotions section -->
+    <section class="py-4 bg-white border-bottom">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h2 class="section-title mb-1">Promociones del mes</h2>
+                    <p class="section-subtitle mb-0">Aprovecha los precios especiales por volumen y recarga frecuente.</p>
+                </div>
+
+                <!-- Empty state -->
+                <span class="text-muted small"
+                      th:if="${#lists.isEmpty(promotions)}">
+                    No hay promociones activas por ahora.
+                </span>
+
+                <!-- Active promotions counter -->
+                <span class="promo-badge-count d-none d-sm-inline-flex align-items-center gap-1"
+                      th:if="${!#lists.isEmpty(promotions)}">
+                    <i class="bi bi-collection"></i>
+                    <span th:text="${#lists.size(promotions)}">1</span>
+                    <span th:text="${#lists.size(promotions) == 1 ? 'promoción activa' : 'promociones activas'}">
+                        promociones activas
+                    </span>
+                </span>
+            </div>
+
+            <div th:if="${!#lists.isEmpty(promotions)}"
+                 id="promoCarousel"
+                 class="carousel slide" data-bs-ride="carousel">
+
+                <!-- Indicators -->
+                <div class="carousel-indicators"
+                     th:if="${#lists.size(promotions) > 1}">
+                    <button type="button"
+                            th:each="promo, iter : ${promotions}"
+                            data-bs-target="#promoCarousel"
+                            th:attr="data-bs-slide-to=${iter.index},
+                                     aria-current=${iter.index == 0} ? 'true' : null,
+                                     aria-label=${'Promoción ' + (iter.index + 1)}"
+                            th:classappend="${iter.index == 0} ? ' active' : ''">
+                    </button>
+                </div>
+
+                <div class="carousel-inner">
+                    <div class="carousel-item"
+                         th:each="promo, iter : ${promotions}"
+                         th:classappend="${iter.index == 0} ? ' active'">
+                        <div class="row justify-content-center">
+                            <div class="col-md-10 col-lg-7 col-xl-6">
+                                <button type="button"
+                                        class="card shadow-sm border-0 promo-card text-start w-100"
+                                        th:styleappend="${promo.colorBorder != null} ? ';border-left: 6px solid ' + promo.colorBorder : ''"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#promoDetailModal"
+                                        th:attr="data-name=${promo.name},
+                                                 data-description=${promo.description},
+                                                 data-code=${promo.promoNumber},
+                                                 data-banner=${promo.bannerImagePath}">
+                                    <div class="card-body d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <h3 class="h5 mb-2" th:text="${promo.name}">Promo</h3>
+
+                                            <p class="mb-1 text-muted small"
+                                               th:if="${promo.promoNumber != null}">
+                                                Código promo: <span th:text="${promo.promoNumber}">123</span>
+                                            </p>
+
+                                            <p class="mb-0" th:text="${promo.description}">
+                                                Descripción de la promo...
+                                            </p>
+                                        </div>
+
+                                        <div class="ms-3 promo-thumb-wrapper d-none d-md-block"
+                                             th:if="${promo.bannerImagePath != null}">
+                                            <div class="ratio ratio-4x3 promo-thumb-ratio">
+                                                <img class="img-fluid rounded-3 promo-thumb-img"
+                                                     th:src="@{${promo.bannerImagePath}}"
+                                                     th:alt="'Banner de ' + ${promo.name}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </button>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="promo-carousel-nav mt-3"
+                     th:if="${#lists.size(promotions) > 1}">
+                    <div class="d-flex justify-content-center align-items-center gap-2">
+                        <button class="btn btn-outline-primary btn-sm rounded-circle"
+                                type="button"
+                                data-bs-target="#promoCarousel"
+                                data-bs-slide="prev">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+
+                        <span class="small text-muted">
+                           Promo <span id="promoCarouselCurrent">1</span>
+                           de <span th:text="${#lists.size(promotions)}">1</span>
+                       </span>
+
+                        <button class="btn btn-outline-primary btn-sm rounded-circle"
+                                type="button"
+                                data-bs-target="#promoCarousel"
+                                data-bs-slide="next">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Modal detalle promoción -->
+    <div class="modal fade" id="promoDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="promoDetailTitle">Promoción</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                            aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-1" id="promoDetailCode"></p>
+                    <p class="mb-3" id="promoDetailDescription"></p>
+
+                    <div id="promoDetailBannerWrapper" style="display:none;">
+                        <img id="promoDetailBanner"
+                             src=""
+                             alt="Banner promoción"
+                             class="img-fluid rounded-3 shadow-sm">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary btn-sm"
+                            data-bs-dismiss="modal">Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Featured products section -->
+    <section class="py-5 bg-light">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h2 class="section-title mb-1">Productos destacados</h2>
+                    <p class="section-subtitle mb-0">Los productos más pedidos por nuestros clientes.</p>
+                </div>
+                <a class="btn btn-sm btn-outline-primary" th:href="@{/catalogo}">
+                    Ver catálogo completo »
+                </a>
+            </div>
+
+            <div th:if="${#lists.isEmpty(featuredProducts)}" class="text-muted">
+                No hay productos destacados configurados.
+            </div>
+
+            <div class="row g-4" th:if="${!#lists.isEmpty(featuredProducts)}">
+                <div class="col-6 col-md-4 col-lg-3"
+                     th:each="product : ${featuredProducts}">
+                    <div class="card h-100 shadow-sm product-card d-flex flex-column">
+                        <div class="ratio ratio-4x3 bg-light d-flex align-items-center justify-content-center product-image-wrapper">
+                            <img th:if="${product.imagePath != null}"
+                                 th:src="@{${product.imagePath}}"
+                                 th:alt="${product.name}"
+                                 class="img-fluid">
+                            <span th:if="${product.imagePath == null}"
+                                  class="text-muted small">
+                                Sin imagen
+                            </span>
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <h3 class="h6 mb-1" th:text="${product.name}">Producto</h3>
+                            <p class="text-muted small mb-2"
+                               th:text="${product.category != null ? product.category.name : 'Sin categoría'}">
+                                Categoría
+                            </p>
+                            <p class="fw-bold mb-3">
+                                S/. <span th:text="${#numbers.formatDecimal(product.price, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </p>
+
+                            <div class="mt-auto">
+                                <button type="button"
+                                        class="btn btn-primary w-100 btn-sm"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#orderModal"
+                                        th:attr="data-id=${product.id},
+                                                 data-name=${product.name},
+                                                 data-price=${#numbers.formatDecimal(product.price, 1, 'COMMA', 2, 'POINT')}">
+                                    <i class="bi bi-whatsapp me-1"></i>
+                                    Pedir por WhatsApp
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Modal: formulario de pedido (igual patrón que catálogo) -->
+    <div class="modal fade" id="orderModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="orderForm" onsubmit="sendWhatsappOrderFromHome(event)">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            Pedido por WhatsApp
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+
+                        <input type="hidden" name="productId" id="orderProductId"/>
+
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">Producto</label>
+                            <input type="text" class="form-control" id="orderProductName" readonly>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">Precio referencial (S/.)</label>
+                            <input type="text" class="form-control" id="orderProductPrice" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Cantidad</label>
+                            <input type="number"
+                                   class="form-control"
+                                   name="quantity"
+                                   id="orderQuantity"
+                                   min="1"
+                                   value="1"
+                                   required>
+                        </div>
+
+                        <hr>
+
+                        <p class="small text-muted mb-2">
+                            Para coordinar la entrega, por favor completa tus datos:
+                        </p>
+
+                        <div class="mb-2">
+                            <label class="form-label">Soy...</label>
+                            <select name="customerType" class="form-select" required>
+                                <option value="NEW">Cliente nuevo</option>
+                                <option value="EXISTING">Ya soy cliente</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Nombre y apellido</label>
+                            <input type="text"
+                                   class="form-control"
+                                   name="customerName"
+                                   placeholder="Ej: Juan Pérez"
+                                   required>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Celular</label>
+                            <input type="tel"
+                                   class="form-control"
+                                   name="customerPhone"
+                                   placeholder="Ej: 987654321"
+                                   required>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label">Dirección (incluye distrito y referencia)</label>
+                            <textarea class="form-control"
+                                      name="customerAddress"
+                                      rows="2"
+                                      placeholder="Ej: Jr. Los Olivos 123, Iquitos, ref: cerca al mercado"
+                                      required></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Notas para el reparto (opcional)</label>
+                            <textarea class="form-control"
+                                      name="extraNotes"
+                                      rows="2"
+                                      placeholder="Ej: Prefiero entrega por la tarde"></textarea>
+                        </div>
+
+                        <p class="small text-muted mb-0">
+                            Al hacer clic en <strong>Enviar por WhatsApp</strong> se abrirá la conversación
+                            con nuestro número, con el pedido ya redactado.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button"
+                                class="btn btn-secondary btn-sm"
+                                data-bs-dismiss="modal">Cancelar
+                        </button>
+                        <button type="submit"
+                                class="btn btn-success btn-sm">
+                            <i class="bi bi-whatsapp"></i> Enviar por WhatsApp
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- How it works section -->
+    <section class="py-5 bg-white border-top border-bottom">
+        <div class="container">
+            <div class="text-center mb-4">
+                <h2 class="section-title mb-1">¿Cómo funciona el servicio?</h2>
+                <p class="section-subtitle mb-0">
+                    Pedir tu agua Eco del Amazonas es muy sencillo. Solo sigue estos pasos.
+                </p>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="step-card h-100">
+                        <div class="icon-circle mb-3">
+                            <span>1</span>
+                        </div>
+                        <h3 class="h5 mb-2">Realiza tu pedido</h3>
+                        <p class="small text-muted mb-0">
+                            Elige tus productos desde el catálogo o escríbenos por WhatsApp con tu dirección y horario preferido.
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="step-card h-100">
+                        <div class="icon-circle mb-3">
+                            <span>2</span>
+                        </div>
+                        <h3 class="h5 mb-2">Confirmamos el reparto</h3>
+                        <p class="small text-muted mb-0">
+                            Nuestro equipo coordina contigo el día y franja horaria de entrega para que siempre tengas agua disponible.
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="step-card h-100">
+                        <div class="icon-circle mb-3">
+                            <span>3</span>
+                        </div>
+                        <h3 class="h5 mb-2">Recibe y disfruta</h3>
+                        <p class="small text-muted mb-0">
+                            Llevamos los bidones hasta tu puerta. Pagas contra entrega y puedes programar tus próximas recargas.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Service zones & map section -->
+    <section class="py-5 service-section">
+        <div class="container">
+            <div class="row g-4 align-items-center">
+                <div class="col-lg-5">
+                    <h2 class="section-title mb-1">Zonas de reparto</h2>
+                    <p class="section-subtitle">
+                        Consulta si ya llegamos a tu zona o coordina con nosotros por WhatsApp.
+                    </p>
+
+                    <ul id="delivery-map-zones" class="list-unstyled mb-3 small">
+                        <li th:each="zone : ${deliveryZones}"
+                            th:attr="data-lat=${zone.latitude},
+                                     data-lng=${zone.longitude},
+                                     data-radius=${zone.radiusMeters}">
+                            <i class="bi bi-geo-alt-fill text-primary me-2"></i>
+                            <span th:text="${zone.name}">Zona</span>
+                            <small class="text-muted d-block"
+                                   th:if="${zone.note != null}"
+                                   th:text="${zone.note}">
+                                Nota
+                            </small>
+                        </li>
+
+                        <li th:if="${#lists.isEmpty(deliveryZones)}">
+                            <i class="bi bi-info-circle text-primary me-2"></i>
+                            <span>Aún no se han configurado zonas de reparto. Consulta por WhatsApp.</span>
+                        </li>
+                    </ul>
+
+                    <p class="small text-muted">
+                        También podemos atender empresas, oficinas, colegios y negocios de comida.
+                        Escríbenos y armamos un plan a tu medida.
+                    </p>
+                    <a class="btn btn-outline-primary btn-sm"
+                       th:href="'https://wa.me/' + ${whatsappNumber}"
+                       target="_blank">
+                        Consultar mi zona »
+                    </a>
+                </div>
+                <div class="col-lg-7">
+                    <div id="delivery-map"
+                         class="lifestyle-banner rounded-4 overflow-hidden"
+                         style="min-height: 280px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Blog / tips section -->
+    <section id="blog" class="py-5 bg-white border-top">
+        <div class="container">
+            <div class="text-center mb-4">
+                <h2 class="section-title mb-1">Blog & consejos de hidratación</h2>
+                <p class="section-subtitle mb-0">
+                    Información simple y útil para cuidar tu salud y la de tu familia.
+                </p>
+            </div>
+
+            <div class="row g-4" th:if="${!#lists.isEmpty(latestBlogPosts)}">
+                <div class="col-md-4"
+                     th:each="post : ${latestBlogPosts}">
+                    <article class="blog-card h-100">
+                        <div class="blog-image-wrapper">
+                            <img th:if="${post.coverImagePath != null}"
+                                 th:src="@{${post.coverImagePath}}"
+                                 th:alt="${post.title}"
+                                 class="img-fluid">
+                            <div th:if="${post.coverImagePath == null}"
+                                 class="d-flex align-items-center justify-content-center bg-light"
+                                 style="height: 180px; border-radius: 1.25rem 1.25rem 0 0;">
+                                <span class="small text-muted">Sin imagen</span>
+                            </div>
+                        </div>
+                        <div class="blog-body">
+                            <h3 class="h6 mb-1" th:text="${post.title}">Título</h3>
+                            <p class="small text-muted mb-2"
+                               th:text="${post.summary}">
+                                Resumen del artículo.
+                            </p>
+                            <a href="#" class="blog-link small text-decoration-none"
+                               th:href="@{|/blog/${post.slug}|}">
+                                Leer más »
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+
+            <p class="text-muted small text-center mb-0"
+               th:if="${#lists.isEmpty(latestBlogPosts)}">
+                Próximamente publicaremos consejos y artículos sobre hidratación.
+            </p>
+        </div>
+    </section>
+
+    <!-- Testimonials & final CTA -->
+    <section class="py-5 bg-light border-top">
+        <div class="container">
+            <div class="row g-4 align-items-start">
+                <div class="col-lg-6">
+                    <h2 class="section-title mb-1">Lo que dicen nuestros clientes</h2>
+                    <p class="section-subtitle mb-3">
+                        Nos esforzamos por brindar siempre un servicio amable, puntual y de calidad.
+                    </p>
+
+                    <div>
+                        <div class="testimonial-card mb-3"
+                             th:each="t : ${testimonials}">
+                            <p class="mb-2" th:text="${t.content}">Texto del testimonio</p>
+                            <span class="small fw-semibold">
+                                <span th:text="${t.authorName}">Nombre</span>
+                                <span th:if="${t.authorTitle != null and !#strings.isEmpty(t.authorTitle)}"
+                                      th:text="', ' + ${t.authorTitle}">
+                                    , Ciudad / empresa
+                                </span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="final-cta p-4 rounded-4 text-white">
+                        <h3 class="h4 mb-2">¿Listo para tu próxima recarga?</h3>
+                        <p class="small mb-3">
+                            Escríbenos por WhatsApp, cuéntanos cuántos bidones necesitas y coordinamos el horario.
+                            Nos encargamos del resto.
+                        </p>
+                        <a class="btn btn-light btn-lg w-100 w-md-auto"
+                           th:href="'https://wa.me/' + ${whatsappNumber}"
+                           target="_blank">
+                            <i class="bi bi-whatsapp me-2"></i>
+                            <span th:text="${finalCtaButtonLabel} ?: 'Pedir recarga ahora'">
+                                Pedir recarga ahora
+                            </span>
+                        </a>
+                        <p class="small mt-2 mb-0"
+                           th:text="${finalCtaSchedule} ?: 'Atención de lunes a sábado, de 8:00 a.m. a 8:00 p.m.'">
+                            Atención de lunes a sábado, de 8:00 a.m. a 8:00 p.m.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<footer class="border-top py-3 bg-white">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center small text-muted">
+        <span>
+            © <span th:text="${#temporals.format(#temporals.createNow(), 'yyyy')}">2024</span>
+            <span th:text="${platformName} ?: 'Eco del Amazonas'">Eco del Amazonas</span>
+            -
+            <span th:text="${platformTagline} ?: 'Agua de mesa'">Agua de mesa</span>
+        </span>
+        <span th:text="${footerRight} ?: 'Servicio de agua purificada a domicilio - Iquitos, Perú'">
+            Servicio de agua purificada a domicilio - Iquitos, Perú
+        </span>
+    </div>
+</footer>
+
+<!-- Igual que en catalog.html: bootstrap bundle directo -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script th:inline="javascript">
+    const ADMIN_WHATSAPP = /*[[${whatsappNumber} ?: '51999999999']]*/ '51999999999';
+
+    // Build WhatsApp message from home order modal
+    function sendWhatsappOrderFromHome(event) {
+        event.preventDefault();
+
+        const productName = document.getElementById('orderProductName').value.trim();
+        const productPrice = document.getElementById('orderProductPrice').value.trim();
+        const quantity = document.getElementById('orderQuantity').value.trim();
+
+        const form = event.target;
+        const customerTypeSelect = form.querySelector('[name="customerType"]');
+        const customerName = form.querySelector('[name="customerName"]').value.trim();
+        const customerPhone = form.querySelector('[name="customerPhone"]').value.trim();
+        const customerAddress = form.querySelector('[name="customerAddress"]').value.trim();
+        const extraNotes = form.querySelector('[name="extraNotes"]').value.trim();
+
+        if (!productName || !quantity || !customerName || !customerPhone || !customerAddress) {
+            alert('Por favor completa todos los campos obligatorios.');
+            return;
+        }
+
+        let customerTypeLabel = '';
+        if (customerTypeSelect) {
+            const selectedOption = customerTypeSelect.options[customerTypeSelect.selectedIndex];
+            customerTypeLabel = selectedOption ? selectedOption.text : '';
+        }
+
+        const lines = [
+            'Hola, deseo hacer un pedido de producto destacado 💧',
+            '',
+            '🧊 Producto: ' + productName,
+            '💰 Precio referencial: S/ ' + (productPrice || '-'),
+            '🔢 Cantidad: ' + quantity,
+            '',
+            (customerTypeLabel ? '🙋‍♂️ Tipo de cliente: ' + customerTypeLabel : ''),
+            '👤 Nombre: ' + customerName,
+            '📞 Celular: ' + customerPhone,
+            '📍 Dirección / referencia: ' + customerAddress
+        ];
+
+        if (extraNotes) {
+            lines.push('📝 Notas: ' + extraNotes);
+        }
+
+        const message = lines.join('\n');
+        const url = 'https://wa.me/' + ADMIN_WHATSAPP + '?text=' + encodeURIComponent(message);
+
+        window.open(url, '_blank');
+
+        const orderModalEl = document.getElementById('orderModal');
+        if (orderModalEl && window.bootstrap && bootstrap.Modal) {
+            const modalInstance = bootstrap.Modal.getInstance(orderModalEl);
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+        }
+    }
+
+    // Google Maps callback
+    function initDeliveryMap() {
+        const zones = /*[[${deliveryZones}]]*/ [];
+        const mapElement = document.getElementById("delivery-map");
+        if (!mapElement || !zones || zones.length === 0 || !window.google) {
+            return;
+        }
+
+        const first = zones[0];
+        const mapCenter = { lat: first.latitude, lng: first.longitude };
+
+        const map = new google.maps.Map(mapElement, {
+            center: mapCenter,
+            zoom: 12,
+        });
+
+        zones.forEach(function (zone) {
+            const center = { lat: zone.latitude, lng: zone.longitude };
+
+            new google.maps.Marker({
+                position: center,
+                map: map,
+                title: zone.name,
+            });
+
+            new google.maps.Circle({
+                map: map,
+                center: center,
+                radius: zone.radiusMeters || 2000,
+                strokeColor: "#1E88E5",
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                fillOpacity: 0.15,
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const promoDetailModal = document.getElementById('promoDetailModal');
+
+        if (promoDetailModal) {
+            promoDetailModal.addEventListener('show.bs.modal', function (event) {
+                const source = event.relatedTarget;
+                if (!source) {
+                    return;
+                }
+
+                const name = source.getAttribute('data-name') || '';
+                const description = source.getAttribute('data-description') || '';
+                const code = source.getAttribute('data-code') || '';
+                const banner = source.getAttribute('data-banner');
+
+                const titleEl = document.getElementById('promoDetailTitle');
+                const descEl = document.getElementById('promoDetailDescription');
+                const codeEl = document.getElementById('promoDetailCode');
+                const bannerWrapper = document.getElementById('promoDetailBannerWrapper');
+                const bannerImg = document.getElementById('promoDetailBanner');
+
+                if (titleEl) {
+                    titleEl.textContent = name;
+                }
+                if (descEl) {
+                    descEl.textContent = description;
+                }
+                if (codeEl) {
+                    if (code) {
+                        codeEl.textContent = 'Código promo: ' + code;
+                        codeEl.style.display = 'block';
+                    } else {
+                        codeEl.textContent = '';
+                        codeEl.style.display = 'none';
+                    }
+                }
+
+                if (banner && banner.trim() !== '' && bannerImg && bannerWrapper) {
+                    bannerImg.src = banner;
+                    bannerWrapper.style.display = 'block';
+                } else if (bannerWrapper) {
+                    bannerWrapper.style.display = 'none';
+                }
+            });
+        }
+
+        const promoCarouselEl = document.getElementById('promoCarousel');
+        const promoCurrentEl = document.getElementById('promoCarouselCurrent');
+
+        if (promoCarouselEl && promoCurrentEl && window.bootstrap) {
+            promoCarouselEl.addEventListener('slid.bs.carousel', function (event) {
+                const index = typeof event.to === 'number' ? event.to : 0;
+                promoCurrentEl.textContent = (index + 1).toString();
+            });
+        }
+
+        // Fill order modal for featured products
+        const orderModal = document.getElementById('orderModal');
+        if (orderModal) {
+            orderModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                if (!button) {
+                    return;
+                }
+
+                const productId = button.getAttribute('data-id');
+                const productName = button.getAttribute('data-name');
+                const productPrice = button.getAttribute('data-price');
+
+                const form = document.getElementById('orderForm');
+                if (form) {
+                    form.reset();
+                }
+
+                document.getElementById('orderProductId').value = productId;
+                document.getElementById('orderProductName').value = productName;
+                document.getElementById('orderProductPrice').value = productPrice;
+                document.getElementById('orderQuantity').value = 1;
+            });
+        }
+    });
+</script>
+
+<!-- Google Maps API -->
+<script th:if="${googleMapsApiKey != null and !#strings.isEmpty(googleMapsApiKey)}"
+        th:src="@{|https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&callback=initDeliveryMap&loading=async|}"
+        async defer>
+</script>
+
+</body>
+</html>

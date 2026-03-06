@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Detalle de pedido - Eco Agua')"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='home'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="h5 mb-0">
+                    Pedido #
+                    <span th:text="${order.orderNumber}">1</span>
+                </h1>
+                <div class="small text-muted">
+                    Fecha:
+                    <span th:text="${#temporals.format(order.orderDate,'dd/MM/yyyy')}">23/11/2025</span>
+                    &nbsp;|&nbsp;
+                    Estado:
+                    <span th:text="${order.status}">REQUESTED</span>
+                </div>
+            </div>
+
+            <!-- Info cliente -->
+            <div class="row g-3 mb-3">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light">
+                            Cliente
+                        </div>
+                        <div class="card-body small">
+                            <p class="mb-1">
+                                <strong>Nombre:</strong>
+                                <span th:text="${order.client != null ? order.client.name : '-'}">Cliente</span>
+                            </p>
+                            <p class="mb-1">
+                                <strong>Dirección:</strong>
+                                <span th:text="${order.client != null ? order.client.address : '-'}">Dirección</span>
+                            </p>
+                            <p class="mb-1">
+                                <strong>Teléfono:</strong>
+                                <span th:text="${order.client != null ? order.client.phone : '-'}">Teléfono</span>
+                            </p>
+                            <p class="mb-1">
+                                <strong>Perfil:</strong>
+                                <span th:text="${order.client != null && order.client.profile != null ? order.client.profile.name : '-'}">Perfil</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light">
+                            Detalle general
+                        </div>
+                        <div class="card-body small">
+                            <p class="mb-1">
+                                <strong>Repartidor:</strong>
+                                <span th:text="${order.deliveryPerson}">Repartidor</span>
+                            </p>
+                            <p class="mb-1">
+                                <strong>Botellones prestados:</strong>
+                                <span th:text="${order.borrowedBottles}">0</span>
+                            </p>
+                            <p class="mb-1">
+                                <strong>Comentario:</strong>
+                                <span th:text="${order.comment}">-</span>
+                            </p>
+                            <p class="mb-1">
+                                <strong>Total:</strong>
+                                S/.
+                                <span th:text="${#numbers.formatDecimal(order.totalAmount,1,'POINT',2,'POINT')}">0.00</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Items -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    Detalle de productos
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Producto</th>
+                                <th class="text-end">Cantidad</th>
+                                <th class="text-end">Precio S/.</th>
+                                <th class="text-end">Importe S/.</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="item, stat : ${order.items}">
+                                <td th:text="${stat.count}">1</td>
+                                <td th:text="${item.description}">Producto</td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(item.quantity,1,'POINT',2,'POINT')}">
+                                    0.00
+                                </td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(item.unitPrice,1,'POINT',2,'POINT')}">
+                                    0.00
+                                </td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(item.total,1,'POINT',2,'POINT')}">
+                                    0.00
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(order.items)}">
+                                <td colspan="5" class="text-center text-muted">
+                                    No hay ítems en este pedido.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones de estado -->
+            <div class="d-flex flex-wrap gap-2">
+                <form th:action="@{|/orders/${order.id}/pay|}" method="post">
+                    <input type="hidden"
+                           th:name="${_csrf.parameterName}"
+                           th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn btn-primary">
+                        Marcar como pagado
+                    </button>
+                </form>
+
+                <form th:action="@{|/orders/${order.id}/credit|}" method="post">
+                    <input type="hidden"
+                           th:name="${_csrf.parameterName}"
+                           th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn btn-warning">
+                        Marcar como fiado
+                    </button>
+                </form>
+
+                <form th:action="@{|/orders/${order.id}/cancel|}" method="post"
+                      onsubmit="return confirm('¿Seguro que deseas anular este pedido?');">
+                    <input type="hidden"
+                           th:name="${_csrf.parameterName}"
+                           th:value="${_csrf.token}"/>
+                    <button type="submit" class="btn btn-danger">
+                        Anular
+                    </button>
+                </form>
+
+                <a th:href="@{/income/sales}" class="btn btn-outline-secondary">
+                    Volver a ingresos
+                </a>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+</body>
+</html>

@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Nuevo pedido - Eco Agua')"></head>
+
+<body>
+
+<div class="app-layout" th:with="activePage='home'">
+    <!-- Sidebar -->
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <!-- Main -->
+    <div class="main-content">
+        <!-- Topbar -->
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <!-- Content -->
+        <main class="content-wrapper">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="h5 mb-0">Nuevo pedido</h1>
+                <div class="small text-muted">
+                    Fecha:
+                    <span th:text="${today}">2025-11-23</span>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <!-- Columna izquierda: Pedido -->
+                <div class="col-lg-7">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-info text-white">
+                            Pedido
+                        </div>
+                        <div class="card-body">
+
+                            <form id="orderForm"
+                                  th:action="@{/orders}"
+                                  method="post">
+
+                                <input type="hidden"
+                                       name="orderDate"
+                                       th:value="${today}"/>
+
+                                <input type="hidden"
+                                       th:name="${_csrf.parameterName}"
+                                       th:value="${_csrf.token}"/>
+
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Repartidor</label>
+                                        <!-- Delivery person select (only registered employees with job 'Repartidor') -->
+                                        <select class="form-select"
+                                                name="deliveryPerson"
+                                                required>
+                                            <option value="">Seleccione un repartidor</option>
+                                            <option th:each="emp : ${deliveryEmployees}"
+                                                    th:value="${emp.firstName + ' ' + emp.lastName}"
+                                                    th:text="${emp.firstName + ' ' + emp.lastName}">
+                                                Repartidor
+                                            </option>
+                                        </select>
+                                        <small class="text-muted small">
+                                            Solo se muestran colaboradores activos con cargo de repartidor.
+                                        </small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Cliente</label>
+
+                                        <!-- Input con autocomplete -->
+                                        <input type="text"
+                                               class="form-control mb-1"
+                                               id="clientSearch"
+                                               list="clientDatalist"
+                                               placeholder="Escriba el nombre del cliente...">
+                                        <small class="text-muted d-block mb-1" id="clientSearchHelp">
+                                            Seleccione un cliente de la lista sugerida.
+                                        </small>
+
+                                        <!-- Opciones para el autocomplete -->
+                                        <datalist id="clientDatalist">
+                                            <option th:each="c : ${clients}"
+                                                    th:value="${c.name}"
+                                                    th:data-id="${c.id}"
+                                                    th:data-doc-number="${c.docNumber}"
+                                                    th:data-phone="${c.phone}"
+                                                    th:data-address="${c.address}"
+                                                    th:data-profile="${c.profile != null ? c.profile.name : ''}"
+                                                    th:data-suggested-price="${c.profile != null ? c.profile.suggestedPrice : 0}">
+                                            </option>
+                                        </datalist>
+
+                                        <!-- Select real (oculto) que usa Spring -->
+                                        <select class="form-select d-none"
+                                                id="clientSelect"
+                                                name="clientId"
+                                                required>
+                                            <option value="">Seleccione un cliente</option>
+                                            <option th:each="c : ${clients}"
+                                                    th:value="${c.id}"
+                                                    th:text="${c.name}"
+                                                    th:data-doc-number="${c.docNumber}"
+                                                    th:data-phone="${c.phone}"
+                                                    th:data-address="${c.address}"
+                                                    th:data-profile="${c.profile != null ? c.profile.name : ''}"
+                                                    th:data-suggested-price="${c.profile != null ? c.profile.suggestedPrice : 0}">
+                                                Cliente
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Datos del cliente -->
+                                <div class="border rounded p-2 mb-3 bg-light">
+                                    <div class="row small">
+                                        <div class="col-md-4">
+                                            <strong>DNI / RUC:</strong>
+                                            <span id="clDocNumber">-</span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>Teléfono:</strong>
+                                            <span id="clPhone">-</span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>Perfil:</strong>
+                                            <span id="clProfile">-</span>
+                                        </div>
+                                    </div>
+                                    <div class="row small mt-1">
+                                        <div class="col-md-8">
+                                            <strong>Dirección:</strong>
+                                            <span id="clAddress">-</span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>Precio sugerido:</strong>
+                                            <span id="clSuggestedPrice">0.00</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Botellones prestados</label>
+                                        <input type="number"
+                                               class="form-control"
+                                               name="borrowedBottles"
+                                               min="0"
+                                               step="1"
+                                               value="0">
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label">Comentario</label>
+                                        <textarea class="form-control"
+                                                  name="comment"
+                                                  rows="2"></textarea>
+                                    </div>
+                                </div>
+
+                                <!-- Detalle del pedido -->
+                                <div class="mb-2 d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">Detalle</h6>
+                                    <small class="text-muted">
+                                        Haga clic en un producto (derecha) o promoción para agregarlo al pedido.
+                                    </small>
+                                </div>
+
+                                <div class="table-responsive mb-2">
+                                    <table class="table table-sm align-middle" id="orderItemsTable">
+                                        <thead class="table-light">
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th style="width: 110px;">Precio S/.</th>
+                                            <th style="width: 110px;">Cantidad</th>
+                                            <th style="width: 120px;">Importe S/.</th>
+                                            <th style="width: 70px;" class="text-center">Acción</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody id="orderItemsBody">
+                                        <tr id="orderEmptyRow">
+                                            <td colspan="5" class="text-center text-muted small">
+                                                No hay productos en el pedido.
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Totales -->
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-4 offset-md-4">
+                                        <div class="d-flex justify-content-between small">
+                                            <span>Sub total:</span>
+                                            <strong id="subtotalDisplay">0.00</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between small">
+                                            <span>IGV:</span>
+                                            <strong id="taxDisplay">0.00</strong>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="d-flex justify-content-between">
+                                            <span class="fw-bold">TOTAL:</span>
+                                            <span class="fw-bold fs-5" id="totalDisplay">0.00</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Botones -->
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button type="submit"
+                                            class="btn btn-info"
+                                            name="action"
+                                            value="REQUESTED">
+                                        Pedir
+                                    </button>
+
+                                    <button type="submit"
+                                            class="btn btn-warning"
+                                            name="action"
+                                            value="CREDIT">
+                                        Fiado
+                                    </button>
+
+                                    <button type="submit"
+                                            class="btn btn-primary"
+                                            name="action"
+                                            value="PAID">
+                                        Pagar
+                                    </button>
+
+                                    <a th:href="@{/home}"
+                                       class="btn btn-outline-secondary">
+                                        Cancelar
+                                    </a>
+                                </div>
+
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Columna derecha: Productos + Promociones -->
+                <div class="col-lg-5">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-primary text-white">
+                            Productos
+                        </div>
+                        <div class="card-body">
+
+                            <!-- Filtros por categoría -->
+                            <div class="mb-2">
+                                <div class="mb-1 small text-muted">Categorías:</div>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary active"
+                                            data-category-filter="ALL">
+                                        Todos
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary"
+                                            th:each="cat : ${productCategories}"
+                                            th:text="${cat.name}"
+                                            th:data-category-filter="${cat.id}">
+                                        Cat
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Búsqueda -->
+                            <div class="mb-2">
+                                <label class="form-label small mb-1">Búsqueda:</label>
+                                <input type="text"
+                                       class="form-control form-control-sm"
+                                       id="productSearch"
+                                       placeholder="Escriba para filtrar productos...">
+                            </div>
+
+                            <!-- Lista de productos -->
+                            <div class="table-responsive" style="max-height: 430px; overflow-y: auto;">
+                                <table class="table table-sm align-middle" id="productsTable">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Descripción</th>
+                                        <th style="width: 70px;">Stock</th>
+                                        <th style="width: 70px;">S/.</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="p : ${products}"
+                                        class="product-row"
+                                        th:data-product-id="${p.id}"
+                                        th:data-product-name="${p.name}"
+                                        th:data-product-price="${p.price}"
+                                        th:data-product-stock="${p.stock}"
+                                        th:data-category-id="${p.category != null ? p.category.id : 0}">
+                                        <td th:text="${p.name}">Producto</td>
+                                        <td th:text="${#numbers.formatDecimal(p.stock,1,'POINT',0,'POINT')}">
+                                            0
+                                        </td>
+                                        <td th:text="${#numbers.formatDecimal(p.price,1,'POINT',2,'POINT')}">
+                                            0.00
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Promociones -->
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-success text-white">
+                            Promociones del cliente
+                        </div>
+                        <div class="card-body">
+                            <div id="promotionsContainer">
+                                <p class="small text-muted mb-0">
+                                    Seleccione un cliente para ver sus promociones.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<!-- Scripts comunes -->
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<!-- JS específico -->
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        const clientSearchInput = document.getElementById('clientSearch');
+        const clientDatalist = document.getElementById('clientDatalist');
+        const clientSelect = document.getElementById('clientSelect');
+        const clDocNumber = document.getElementById('clDocNumber');
+        const clPhone = document.getElementById('clPhone');
+        const clAddress = document.getElementById('clAddress');
+        const clProfile = document.getElementById('clProfile');
+        const clSuggestedPrice = document.getElementById('clSuggestedPrice');
+
+        const orderItemsBody = document.getElementById('orderItemsBody');
+        const emptyRow = document.getElementById('orderEmptyRow');
+
+        const subtotalDisplay = document.getElementById('subtotalDisplay');
+        const taxDisplay = document.getElementById('taxDisplay');
+        const totalDisplay = document.getElementById('totalDisplay');
+
+        const productRows = document.querySelectorAll('.product-row');
+        const categoryButtons = document.querySelectorAll('[data-category-filter]');
+        const productSearch = document.getElementById('productSearch');
+
+        const promotionsContainer = document.getElementById('promotionsContainer');
+        let currentClientPromotions = [];
+
+        function updateClientInfo() {
+            const opt = clientSelect ? clientSelect.options[clientSelect.selectedIndex] : null;
+            if (!opt || !opt.value) {
+                clDocNumber.textContent = '-';
+                clPhone.textContent = '-';
+                clAddress.textContent = '-';
+                clProfile.textContent = '-';
+                clSuggestedPrice.textContent = '0.00';
+                return;
+            }
+
+            clDocNumber.textContent = opt.getAttribute('data-doc-number') || '-';
+            clPhone.textContent = opt.getAttribute('data-phone') || '-';
+            clAddress.textContent = opt.getAttribute('data-address') || '-';
+            clProfile.textContent = opt.getAttribute('data-profile') || '-';
+
+            const sug = opt.getAttribute('data-suggested-price') || '0';
+            clSuggestedPrice.textContent = parseFloat(sug).toFixed(2);
+        }
+
+                // Sync client selection from autocomplete input
+        function syncClientSelectionFromSearch(triggerSource) {
+            if (!clientSearchInput || !clientDatalist || !clientSelect) {
+                return;
+            }
+
+            const typedName = clientSearchInput.value || '';
+            const help = document.getElementById('clientSearchHelp');
+
+            if (!typedName) {
+                // Empty input → reset selection and info
+                clientSelect.value = '';
+                updateClientInfo();
+                loadPromotionsForClient(null);
+
+                if (help) {
+                    help.textContent = 'Seleccione un cliente de la lista sugerida.';
+                    help.classList.remove('text-danger');
+                    help.classList.add('text-muted');
+                }
+                return;
+            }
+
+            const options = clientDatalist.querySelectorAll('option');
+            let matchedId = null;
+            options.forEach(function (opt) {
+                if (opt.value === typedName) {
+                    matchedId = opt.getAttribute('data-id');
+                }
+            });
+
+            if (matchedId) {
+                // Exact match → select client immediately
+                clientSelect.value = matchedId;
+                updateClientInfo();
+                loadPromotionsForClient(matchedId);
+
+                if (help) {
+                    help.textContent = 'Cliente seleccionado correctamente.';
+                    help.classList.remove('text-danger');
+                    help.classList.add('text-muted');
+                }
+            } else {
+                // No exact match
+                clientSelect.value = '';
+                updateClientInfo();
+                loadPromotionsForClient(null);
+
+                if (help) {
+                    // Only show error when user leaves the field or confirms the value
+                    if (triggerSource === 'blur' || triggerSource === 'change') {
+                        help.textContent = 'No se encontró un cliente exacto con ese nombre.';
+                        help.classList.add('text-danger');
+                        help.classList.remove('text-muted');
+                    } else {
+                        // While typing (input), keep neutral helper text
+                        help.textContent = 'Seleccione un cliente de la lista sugerida.';
+                        help.classList.remove('text-danger');
+                        help.classList.add('text-muted');
+                    }
+                }
+            }
+        }
+
+        if (clientSearchInput) {
+            // Fires when user types OR selects an option from the datalist
+            clientSearchInput.addEventListener('input', function () {
+                syncClientSelectionFromSearch('input');
+            });
+            clientSearchInput.addEventListener('change', function () {
+                syncClientSelectionFromSearch('change');
+            });
+            clientSearchInput.addEventListener('blur', function () {
+                syncClientSelectionFromSearch('blur');
+            });
+        }
+
+        function ensureEmptyRowVisibility() {
+            const hasRows = orderItemsBody.querySelectorAll('tr[data-item-product-id]').length > 0;
+            if (emptyRow) {
+                emptyRow.style.display = hasRows ? 'none' : '';
+            }
+        }
+
+        function recalcTotals() {
+            let subtotal = 0.0;
+
+            orderItemsBody.querySelectorAll('tr[data-item-product-id]').forEach(function (row) {
+                const qtyInput = row.querySelector('.item-qty');
+                const priceInput = row.querySelector('.item-price');
+                const totalCell = row.querySelector('.item-total');
+                const hiddenTotal = row.querySelector('.item-total-hidden');
+
+                const promoTotalAttr = row.getAttribute('data-promo-total');
+                let lineTotal;
+
+                if (promoTotalAttr !== null && promoTotalAttr !== '') {
+                    // Promotion rows keep a fixed bundle total.
+                    lineTotal = parseFloat(promoTotalAttr) || 0;
+                } else {
+                    const qty = parseFloat(qtyInput ? qtyInput.value : '0') || 0;
+                    const price = parseFloat(priceInput ? priceInput.value : '0') || 0;
+                    lineTotal = qty * price;
+                }
+
+                const lineTotalFixed = lineTotal.toFixed(2);
+
+                if (totalCell) {
+                    totalCell.textContent = lineTotalFixed;
+                }
+                if (hiddenTotal) {
+                    hiddenTotal.value = lineTotalFixed;
+                }
+
+                subtotal += parseFloat(lineTotalFixed);
+            });
+
+            const tax = 0.0; // tax not implemented
+            const total = subtotal + tax;
+
+            subtotalDisplay.textContent = subtotal.toFixed(2);
+            taxDisplay.textContent = tax.toFixed(2);
+            totalDisplay.textContent = total.toFixed(2);
+
+            // Always refresh right-side stock after totals are recalculated
+            refreshProductsStockDisplay();
+        }
+
+        // Enforce that a row quantity does not exceed product stock
+        function enforceMaxStockForRow(row) {
+            const productId = row.getAttribute('data-item-product-id');
+            const productRow = document.querySelector('.product-row[data-product-id="' + productId + '"]');
+            if (!productRow) {
+                return;
+            }
+
+            const originalStock = parseFloat(productRow.getAttribute('data-product-stock') || '0');
+            if (isNaN(originalStock)) {
+                return;
+            }
+
+            const qtyInput = row.querySelector('.item-qty');
+            let qty = parseFloat(qtyInput.value || '0');
+            if (isNaN(qty)) {
+                qty = 0;
+            }
+
+            if (qty > originalStock) {
+                qty = originalStock;
+                qtyInput.value = qty.toFixed(0);
+                if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
+                    window.ecoAdmin.showFlashMessage(
+                        'No hay stock suficiente. Stock disponible: ' + originalStock + '.',
+                        'warning'
+                    );
+                }
+            }
+
+            if (qty < 0) {
+                qty = 0;
+                qtyInput.value = '0';
+            }
+        }
+        
+        // Returns the total quantity reserved for a given product in the order details.
+        function getReservedQuantityForProduct(productId) {
+            let total = 0;
+
+            orderItemsBody
+                .querySelectorAll('tr[data-item-product-id="' + productId + '"]')
+                .forEach(function (row) {
+                    const qtyInput = row.querySelector('.item-qty');
+                    const raw = qtyInput ? qtyInput.value : '0';
+                    const qty = parseFloat(raw || '0');
+                    if (!isNaN(qty)) {
+                        total += qty;
+                    }
+                });
+
+            return total;
+        }
+
+        // Update right-side stock column based on current order details
+        function refreshProductsStockDisplay() {
+            if (!productRows || !productRows.length) {
+                return;
+            }
+
+            productRows.forEach(function (row) {
+                const productId = row.getAttribute('data-product-id');
+                if (!productId) {
+                    return;
+                }
+
+                const originalStockStr = row.getAttribute('data-product-stock') || '0';
+                let originalStock = parseFloat(originalStockStr);
+                if (isNaN(originalStock)) {
+                    originalStock = 0;
+                }
+
+                // How many units of this product are already in the order detail
+                const reservedQty = getReservedQuantityForProduct(productId);
+
+                let remaining = originalStock - reservedQty;
+                if (remaining < 0) {
+                    remaining = 0;
+                }
+
+                const stockCell = row.querySelector('td:nth-child(2)');
+                if (stockCell) {
+                    stockCell.textContent = remaining.toFixed(0);
+                }
+            });
+        }
+
+        // Adds product to order. If promoTotal is provided, the row is treated as a
+        // promotion bundle where promoTotal is the fixed total amount for the whole quantity.
+        function addOrIncrementItem(productId, name, price, quantityToAdd, promoTotal) {
+            const productRow = document.querySelector('.product-row[data-product-id="' + productId + '"]');
+
+            let maxStock = null;
+            if (productRow) {
+                const stockStr = productRow.getAttribute('data-product-stock') || '0';
+                const stock = parseFloat(stockStr);
+                if (!isNaN(stock)) {
+                    maxStock = stock;
+                }
+            }
+
+            const qtyToAdd = (quantityToAdd && quantityToAdd > 0) ? quantityToAdd : 1;
+            const isPromo = typeof promoTotal === 'number' && !isNaN(promoTotal);
+
+            // No stock → do not add
+            if (maxStock !== null && maxStock <= 0) {
+                if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
+                    window.ecoAdmin.showFlashMessage('No hay stock disponible para este producto.', 'warning');
+                } else {
+                    alert('No hay stock disponible para este producto.');
+                }
+                return;
+            }
+
+            // Low stock warning
+            if (maxStock !== null && maxStock > 0 && maxStock <= 5) {
+                if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
+                    window.ecoAdmin.showFlashMessage(
+                        'Atención: stock bajo para este producto (' + maxStock + ').',
+                        'warning'
+                    );
+                }
+            }
+
+            let row = orderItemsBody.querySelector('tr[data-item-product-id="' + productId + '"]');
+
+            if (row) {
+                const qtyInput = row.querySelector('.item-qty');
+                const priceInput = row.querySelector('.item-price');
+
+                const currentQty = parseFloat(qtyInput.value || '0');
+                let newQty = currentQty + qtyToAdd;
+
+                if (maxStock !== null && newQty > maxStock) {
+                    newQty = maxStock;
+                    if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
+                        window.ecoAdmin.showFlashMessage(
+                            'No hay stock suficiente. Stock disponible: ' + maxStock + '.',
+                            'warning'
+                        );
+                    }
+                }
+
+                qtyInput.value = newQty.toFixed(0);
+
+                if (isPromo) {
+                    // Accumulate bundle total when the same promotion is applied multiple times
+                    const currentPromoTotal = parseFloat(row.getAttribute('data-promo-total') || '0') || 0;
+                    const newPromoTotal = currentPromoTotal + promoTotal;
+                    row.setAttribute('data-promo-total', newPromoTotal.toFixed(2));
+
+                    // Effective unit price = bundle total / total quantity
+                    if (priceInput) {
+                        const effectiveUnitPrice = newPromoTotal / newQty;
+                        priceInput.value = effectiveUnitPrice.toFixed(2);
+                    }
+                }
+
+                recalcTotals();
+                refreshProductsStockDisplay();
+                return;
+            }
+
+            // New row
+            let initialQty = qtyToAdd;
+            if (maxStock !== null && initialQty > maxStock) {
+                initialQty = maxStock;
+                if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
+                    window.ecoAdmin.showFlashMessage(
+                        'No hay stock suficiente. Stock disponible: ' + maxStock + '.',
+                        'warning'
+                    );
+                }
+            }
+
+            row = document.createElement('tr');
+            row.setAttribute('data-item-product-id', productId);
+
+            if (isPromo) {
+                row.setAttribute('data-promo-total', promoTotal.toFixed(2));
+            }
+
+            const colName = document.createElement('td');
+            colName.textContent = name;
+            row.appendChild(colName);
+
+            const colPrice = document.createElement('td');
+            const priceInput = document.createElement('input');
+            priceInput.type = 'number';
+            priceInput.name = 'unitPrice';
+            priceInput.className = 'form-control form-control-sm text-end item-price';
+            priceInput.min = '0';
+            priceInput.step = '0.01';
+            priceInput.required = true;
+            priceInput.value = parseFloat(price).toFixed(2);
+            priceInput.addEventListener('input', function () {
+                // If user edits a promotion row, remove the fixed promo total and behave as a normal item.
+                if (row.hasAttribute('data-promo-total')) {
+                    row.removeAttribute('data-promo-total');
+                }
+                recalcTotals();
+                refreshProductsStockDisplay();
+            });
+            if (isPromo) {
+                priceInput.readOnly = true; // keep promo price fixed
+                priceInput.classList.add('bg-light');
+            }
+            colPrice.appendChild(priceInput);
+            row.appendChild(colPrice);
+
+            const colQty = document.createElement('td');
+            const qtyInput = document.createElement('input');
+            qtyInput.type = 'number';
+            qtyInput.name = 'quantity';
+            qtyInput.className = 'form-control form-control-sm text-end item-qty';
+            qtyInput.min = '0';
+            qtyInput.step = '1';
+            qtyInput.required = true;
+            qtyInput.value = initialQty.toFixed(0);
+            qtyInput.addEventListener('input', function () {
+                enforceMaxStockForRow(row);
+                if (row.hasAttribute('data-promo-total')) {
+                    row.removeAttribute('data-promo-total');
+                }
+                recalcTotals();
+                refreshProductsStockDisplay();
+            });
+            if (isPromo) {
+                qtyInput.readOnly = true; // keep promo quantity fixed
+                qtyInput.classList.add('bg-light');
+            }
+            colQty.appendChild(qtyInput);
+            row.appendChild(colQty);
+
+            const colTotal = document.createElement('td');
+            colTotal.className = 'text-end item-total';
+            row.appendChild(colTotal);
+
+            const colActions = document.createElement('td');
+            colActions.className = 'text-center';
+
+            const hiddenProduct = document.createElement('input');
+            hiddenProduct.type = 'hidden';
+            hiddenProduct.name = 'productId';
+            hiddenProduct.value = productId;
+            colActions.appendChild(hiddenProduct);
+
+            const hiddenTotal = document.createElement('input');
+            hiddenTotal.type = 'hidden';
+            hiddenTotal.name = 'lineTotal';
+            hiddenTotal.className = 'item-total-hidden';
+            colActions.appendChild(hiddenTotal);
+
+            const btnRemove = document.createElement('button');
+            btnRemove.type = 'button';
+            btnRemove.className = 'btn btn-sm btn-outline-danger';
+            btnRemove.textContent = 'X';
+            btnRemove.addEventListener('click', function () {
+                row.remove();
+                ensureEmptyRowVisibility();
+                recalcTotals();
+                refreshProductsStockDisplay();
+            });
+            colActions.appendChild(btnRemove);
+
+            row.appendChild(colActions);
+
+            orderItemsBody.appendChild(row);
+            ensureEmptyRowVisibility();
+            recalcTotals();
+            refreshProductsStockDisplay();
+        }
+
+        function applyCategoryFilter() {
+            const activeButton = document.querySelector('[data-category-filter].active');
+            const activeCategory = activeButton ? activeButton.getAttribute('data-category-filter') : 'ALL';
+            const query = (productSearch.value || '').toLowerCase();
+
+            productRows.forEach(function (row) {
+                const rowCatId = row.getAttribute('data-category-id');
+                const name = (row.getAttribute('data-product-name') || '').toLowerCase();
+
+                let visible = true;
+
+                if (activeCategory !== 'ALL' && rowCatId !== activeCategory) {
+                    visible = false;
+                }
+
+                if (query && !name.includes(query)) {
+                    visible = false;
+                }
+
+                row.style.display = visible ? '' : 'none';
+            });
+        }
+
+        function loadPromotionsForClient(clientId) {
+            if (!promotionsContainer) {
+                return;
+            }
+
+            if (!clientId) {
+                promotionsContainer.innerHTML =
+                    '<p class="small text-muted mb-0">Seleccione un cliente para ver sus promociones.</p>';
+                currentClientPromotions = [];
+                return;
+            }
+
+            promotionsContainer.innerHTML =
+                '<p class="small text-muted mb-0">Cargando promociones...</p>';
+            currentClientPromotions = [];
+
+            fetch('/orders/client/' + clientId + '/promotions')
+                .then(function (resp) {
+                    if (!resp.ok) {
+                        throw new Error('HTTP ' + resp.status);
+                    }
+                    return resp.json();
+                })
+                .then(function (data) {
+                    currentClientPromotions = Array.isArray(data) ? data : [];
+                    renderPromotions();
+                })
+                .catch(function (err) {
+                    promotionsContainer.innerHTML =
+                        '<p class="small text-danger mb-0">Error al cargar promociones.</p>';
+                    console.error('Error loading promotions', err);
+                });
+        }
+
+        function renderPromotions() {
+            if (!promotionsContainer) {
+                return;
+            }
+
+            if (!currentClientPromotions.length) {
+                promotionsContainer.innerHTML =
+                    '<p class="small text-muted mb-0">Este cliente no tiene promociones activas.</p>';
+                return;
+            }
+
+            promotionsContainer.innerHTML = '';
+
+            currentClientPromotions.forEach(function (promo) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'border rounded p-2 mb-2';
+
+                const header = document.createElement('div');
+                header.className = 'd-flex justify-content-between align-items-start';
+
+                const info = document.createElement('div');
+                const title = document.createElement('strong');
+                title.textContent = promo.name || 'Promoción';
+                info.appendChild(title);
+
+                if (promo.description) {
+                    const desc = document.createElement('div');
+                    desc.className = 'text-muted small';
+                    desc.textContent = promo.description;
+                    info.appendChild(desc);
+                }
+
+                header.appendChild(info);
+
+                const btnApply = document.createElement('button');
+                btnApply.type = 'button';
+                btnApply.className = 'btn btn-sm btn-success';
+                btnApply.textContent = 'Aplicar';
+                btnApply.addEventListener('click', function () {
+                    if (!promo.items || !promo.items.length) {
+                        return;
+                    }
+
+                    promo.items.forEach(function (item) {
+                        const qty = parseFloat(item.quantity || 0);
+                        const bundleTotal = parseFloat(item.unitPrice || 0); // here unitPrice = total amount of the bundle
+
+                        if (!qty || !bundleTotal) {
+                            return;
+                        }
+
+                        const effectiveUnitPrice = bundleTotal / qty;
+
+                        addOrIncrementItem(
+                            item.productId,
+                            item.productName,
+                            effectiveUnitPrice,
+                            qty,
+                            bundleTotal // promoTotal (fixed bundle amount)
+                        );
+                    });
+                });
+
+                header.appendChild(btnApply);
+                wrapper.appendChild(header);
+
+                if (promo.items && promo.items.length) {
+                    const list = document.createElement('ul');
+                    list.className = 'small mb-0 mt-2';
+
+                    promo.items.forEach(function (item) {
+                        const qty = parseFloat(item.quantity || 0);
+                        const amount = parseFloat(item.unitPrice || 0);
+                        const li = document.createElement('li');
+                        li.textContent =
+                            qty.toFixed(0) + ' x ' + (item.productName || '') +
+                            ' (S/ ' + amount.toFixed(2) + ' total)';
+                        list.appendChild(li);
+                    });
+
+                    wrapper.appendChild(list);
+                }
+
+                promotionsContainer.appendChild(wrapper);
+            });
+        }
+
+        if (clientSelect) {
+            clientSelect.addEventListener('change', function () {
+                updateClientInfo();
+                const clientId = clientSelect.value || null;
+                loadPromotionsForClient(clientId);
+            });
+        }
+
+        categoryButtons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                categoryButtons.forEach(function (b) {
+                    b.classList.remove('active');
+                });
+                btn.classList.add('active');
+                applyCategoryFilter();
+            });
+        });
+
+        if (productSearch) {
+            productSearch.addEventListener('input', applyCategoryFilter);
+        }
+
+        productRows.forEach(function (row) {
+            row.style.cursor = 'pointer';
+            row.addEventListener('click', function () {
+                const id = row.getAttribute('data-product-id');
+                const name = row.getAttribute('data-product-name');
+                const price = row.getAttribute('data-product-price');
+                addOrIncrementItem(id, name, price);
+            });
+        });
+
+        // Initial state
+        updateClientInfo();
+        ensureEmptyRowVisibility();
+        recalcTotals();
+        refreshProductsStockDisplay();
+        loadPromotionsForClient(null);
+
+        const flashMessage = /*[[${message}]]*/ null;
+        const flashType = /*[[${messageType}]]*/ null;
+        if (flashMessage && flashMessage !== 'null' && flashMessage !== '') {
+            if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
+                window.ecoAdmin.showFlashMessage(flashMessage, flashType);
+            } else {
+                alert(flashMessage);
+            }
+        }
+    });
+</script>
+
+</body>
+</html>

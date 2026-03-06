@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Costos fijos mensuales - Eco Agua')"></head>
+
+<body>
+<div class="app-layout" th:with="activePage='expenses_fixed_costs'">
+    <!-- Sidebar -->
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <!-- Main content -->
+    <div class="main-content">
+        <!-- Topbar -->
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <!-- Page content -->
+        <main class="content-wrapper">
+
+            <!-- Page title + link to price simulator -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-0">Costos fijos mensuales</h1>
+                    <div class="small text-muted">
+                        Resumen de gastos fijos por categoría para analizar tu estructura de costos.
+                    </div>
+                </div>
+
+                <a th:href="@{/admin/price-simulator}"
+                   class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-graph-up-arrow me-1"></i>
+                    Ir al simulador de precio
+                </a>
+            </div>
+
+            <!-- Filters card -->
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header bg-light">
+                    <strong>Filtros</strong>
+                </div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end"
+                          method="get"
+                          th:action="@{/expenses/fixed-costs}">
+                        <!-- Year -->
+                        <div class="col-md-3">
+                            <label for="year" class="form-label">Año</label>
+                            <input type="number"
+                                   id="year"
+                                   name="year"
+                                   class="form-control"
+                                   min="2020"
+                                   max="2100"
+                                   th:value="${year}">
+                        </div>
+
+                        <!-- Month -->
+                        <div class="col-md-3">
+                            <label for="month" class="form-label">Mes</label>
+                            <select id="month"
+                                    name="month"
+                                    class="form-select">
+                                <option value="1"  th:selected="${month} == 1">Enero</option>
+                                <option value="2"  th:selected="${month} == 2">Febrero</option>
+                                <option value="3"  th:selected="${month} == 3">Marzo</option>
+                                <option value="4"  th:selected="${month} == 4">Abril</option>
+                                <option value="5"  th:selected="${month} == 5">Mayo</option>
+                                <option value="6"  th:selected="${month} == 6">Junio</option>
+                                <option value="7"  th:selected="${month} == 7">Julio</option>
+                                <option value="8"  th:selected="${month} == 8">Agosto</option>
+                                <option value="9"  th:selected="${month} == 9">Setiembre</option>
+                                <option value="10" th:selected="${month} == 10">Octubre</option>
+                                <option value="11" th:selected="${month} == 11">Noviembre</option>
+                                <option value="12" th:selected="${month} == 12">Diciembre</option>
+                            </select>
+                        </div>
+
+                        <!-- Period info (read-only) -->
+                        <div class="col-md-4">
+                            <label class="form-label">Periodo analizado</label>
+                            <div class="form-control-plaintext">
+                                <span th:if="${fromDate != null}"
+                                      th:text="${#temporals.format(fromDate, 'dd/MM/yyyy')}">
+                                    01/11/2025
+                                </span>
+                                <span th:if="${fromDate != null and toDate != null}">&nbsp;al&nbsp;</span>
+                                <span th:if="${toDate != null}"
+                                      th:text="${#temporals.format(toDate, 'dd/MM/yyyy')}">
+                                    30/11/2025
+                                </span>
+                                <span th:if="${fromDate == null or toDate == null}">
+                                    Selecciona año y mes y haz clic en Buscar.
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Search button -->
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search me-1"></i>
+                                Buscar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Summary cards -->
+            <div class="row g-3 mb-3">
+                <!-- Total fixed costs -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="text-muted text-uppercase small mb-1">Total costos fijos del periodo</div>
+                            <div class="display-6 fw-bold mb-1"
+                                 th:text="'S/ ' + ${#numbers.formatDecimal(totalFixedCosts != null ? totalFixedCosts : 0, 1, 'COMMA', 2, 'POINT')}">
+                                S/ 0.00
+                            </div>
+                            <p class="small text-muted mb-0">
+                                Basado en las categorías de tipo “EXPENSES” registradas en el módulo de egresos.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Helper text -->
+                <div class="col-md-8">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <h2 class="h6 mb-2">¿Cómo se calcula?</h2>
+                            <ul class="small mb-2">
+                                <li>Se consideran todos los egresos cuyo tipo de categoría es <strong>EXPENSES</strong>.</li>
+                                <li>Solo se toman en cuenta los gastos dentro del mes seleccionado.</li>
+                                <li>Los montos se agrupan por nombre de categoría (luz, alquiler, planillas, etc.).</li>
+                            </ul>
+                            <p class="small mb-0 text-muted">
+                                Usa este resumen como base para tu punto de equilibrio y decisiones de precios.
+                                Desde aquí puedes ir directo al simulador de precio para proyectar ventas mínimas.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Breakdown table -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <span><strong>Detalle por categoría</strong></span>
+                    <span class="small text-muted"
+                          th:if="${breakdown != null and !#maps.isEmpty(breakdown)}"
+                          th:text="'Total categorías: ' + ${#maps.size(breakdown)}">
+                        Total categorías: 0
+                    </span>
+                </div>
+                <div class="card-body">
+
+                    <!-- When there is data -->
+                    <div th:if="${breakdown != null and !#maps.isEmpty(breakdown)}" class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Categoría</th>
+                                <th class="text-end">Monto S/.</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="entry : ${breakdown}">
+                                <td th:text="${entry.key}">Categoría</td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(entry.value, 1, 'COMMA', 2, 'POINT')}">
+                                    0.00
+                                </td>
+                            </tr>
+                            </tbody>
+                            <tfoot>
+                            <tr>
+                                <th class="text-end">TOTAL</th>
+                                <th class="text-end"
+                                    th:text="${#numbers.formatDecimal(totalFixedCosts != null ? totalFixedCosts : 0, 1, 'COMMA', 2, 'POINT')}">
+                                    0.00
+                                </th>
+                            </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- When there is no data -->
+                    <div class="alert alert-light mb-0 text-center"
+                         th:if="${breakdown == null or #maps.isEmpty(breakdown)}">
+                        No hay costos fijos registrados en el periodo seleccionado.
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<!-- Common admin scripts -->
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<!-- Flash messages helper -->
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        var flashMessage = /*[[${message}]]*/ null;
+        var flashType = /*[[${messageType}]]*/ null;
+
+        if (flashMessage && flashMessage !== 'null' && flashMessage !== '') {
+            if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
+                window.ecoAdmin.showFlashMessage(flashMessage, flashType);
+            } else {
+                alert(flashMessage);
+            }
+        }
+    });
+</script>
+
+</body>
+</html>

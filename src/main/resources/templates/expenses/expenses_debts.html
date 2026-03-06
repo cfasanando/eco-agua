@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Cuentas por pagar - Eco Agua')"></head>
+
+<body>
+<div class="app-layout" th:with="activePage='expenses_debts'">
+    <!-- Sidebar -->
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <!-- Main -->
+    <div class="main-content">
+        <!-- Topbar -->
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <!-- Content -->
+        <main class="content-wrapper">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-0">Cuentas x pagar (Deudas)</h1>
+                    <div class="small text-muted">Deudas por pagar</div>
+                </div>
+
+                <!-- Botón futuro para registrar nueva deuda -->
+                <button type="button"
+                        class="btn btn-outline-primary"
+                        disabled
+                        title="Próximamente">
+                    <i class="bi bi-plus-circle me-1"></i>
+                    Agregar deuda
+                </button>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <strong>Filtros :</strong>
+                </div>
+                <div class="card-body">
+                    <!-- Placeholder de filtros; listo para que luego agregues fecha, proveedor, estado, etc. -->
+                    <div class="alert alert-secondary mb-0 small">
+                        Filtros de búsqueda para deudas pendientes (fecha, proveedor, estado) se
+                        implementarán más adelante.
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                   
+                    <div class="table-responsive mt-3">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Proveedor</th>
+                                <th>Categoría</th>
+                                <th>Descripción</th>
+                                <th class="text-end">Monto total S/.</th>
+                                <th class="text-end">Saldo S/.</th>
+                                <th>Vencimiento</th>
+                                <th>Estado</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="d : ${debts}">
+                                <td th:text="${d.supplier.name}">Proveedor</td>
+                                <td th:text="${d.category != null ? d.category.name : '-'}">Categoría</td>
+                                <td th:text="${d.description}">Descripción</td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(d.totalAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(d.remainingAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                <td th:text="${#temporals.format(d.dueDate,'dd/MM/yyyy')}">23/11/2025</td>
+                                <td th:text="${d.status}">Pendiente</td>
+                                <td class="text-center">
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-success">
+                                        Registrar pago
+                                    </button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        const flashMessage = /*[[${message}]]*/ null;
+        const flashType = /*[[${messageType}]]*/ null;
+        if (flashMessage && flashMessage !== 'null' && flashMessage !== '') {
+            if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
+                window.ecoAdmin.showFlashMessage(flashMessage, flashType);
+            } else {
+                alert(flashMessage);
+            }
+        }
+    });
+</script>
+</body>
+</html>

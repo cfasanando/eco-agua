@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Registro de ventas e ingresos')}"></head>
+
+<body>
+<div class="app-layout" th:with="activePage=${activePage}">
+    <!-- Sidebar -->
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <!-- Main -->
+    <div class="main-content">
+        <!-- Topbar -->
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <!-- Content -->
+        <main class="content-wrapper">
+
+            <style>
+                /* Filters card spacing */
+                .sr-filters-card {
+                    margin-bottom: 16px;
+                }
+
+                .sr-summary-label {
+                    font-size: 0.9rem;
+                    color: #6b7280;
+                }
+
+                .sr-summary-value {
+                    font-size: 1.2rem;
+                    font-weight: 600;
+                }
+
+                .sr-summary-value span {
+                    margin-right: 4px;
+                }
+
+                .sr-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 0.85rem;
+                }
+
+                .sr-table th,
+                .sr-table td {
+                    border: 1px solid #e5e7eb;
+                    padding: 4px 8px;
+                    vertical-align: middle;
+                    white-space: nowrap;
+                }
+
+                .sr-table thead th {
+                    background: #f9fafb;
+                    font-weight: 600;
+                }
+
+                .sr-badge-status {
+                    display: inline-block;
+                    padding: 2px 8px;
+                    border-radius: 999px;
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                }
+
+                .sr-badge-valid {
+                    background: #ecfdf5;
+                    color: #15803d;
+                }
+
+                .sr-badge-canceled {
+                    background: #fef2f2;
+                    color: #b91c1c;
+                }
+
+                .sr-badge-draft {
+                    background: #eff6ff;
+                    color: #1d4ed8;
+                }
+            </style>
+
+            <!-- Title + breadcrumb -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Registro de ventas e ingresos</h1>
+                    <p class="text-muted mb-0" style="font-size: 0.9rem;">
+                        Resumen mensual de comprobantes emitidos (ventas y otros ingresos)
+                        en un formato similar al registro de ventas SUNAT.
+                    </p>
+                </div>
+                <div>
+                    <a th:href="@{/}" class="btn btn-outline-secondary btn-sm">
+                        ← Inicio
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="card shadow-sm sr-filters-card">
+                <div class="card-body">
+                    <form class="row g-3 align-items-end" method="get"
+                          th:action="@{/accounting/sales-registry}">
+
+                        <!-- Año -->
+                        <div class="col-md-3">
+                            <label class="form-label">Año</label>
+                            <select name="year" class="form-select">
+                                <option th:each="y : ${years}"
+                                        th:value="${y}"
+                                        th:selected="${y == selectedYear}"
+                                        th:text="${y}">
+                                    2025
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Mes -->
+                        <div class="col-md-3">
+                            <label class="form-label">Mes</label>
+                            <select name="month" class="form-select">
+                                <option th:each="m : ${months}"
+                                        th:value="${m}"
+                                        th:text="${monthNames.get(m)}"
+                                        th:selected="${selectedMonth == m}">
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Tipo de comprobante -->
+                        <div class="col-md-3">
+                            <label class="form-label">Tipo de comprobante</label>
+                            <select name="docType" class="form-select">
+                                <option th:each="dt : ${docTypes}"
+                                        th:value="${dt}"
+                                        th:selected="${dt == selectedDocType}"
+                                        th:text="${dt == 'ALL' ? 'Todos' : dt}">
+                                    Todos
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Estado -->
+                        <div class="col-md-3">
+                            <label class="form-label">Estado</label>
+                            <select name="status" class="form-select">
+                                <option th:each="st : ${statusOptions}"
+                                        th:value="${st}"
+                                        th:selected="${st == selectedStatus}"
+                                        th:text="${st == 'ALL' ? 'Todos' : (st == 'VALIDO' ? 'Válido' : (st == 'ANULADO' ? 'Anulado' : 'Borrador'))}">
+                                    Todos
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Botón Filtrar -->
+                        <div class="col-12 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search"></i> Filtrar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Summary totals -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="sr-summary-label">Base imponible total</div>
+                            <div class="sr-summary-value">
+                                <span>S/.</span>
+                                <span th:text="${#numbers.formatDecimal(totalBase, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="sr-summary-label">IGV total</div>
+                            <div class="sr-summary-value">
+                                <span>S/.</span>
+                                <span th:text="${#numbers.formatDecimal(totalIgv, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="sr-summary-label">Total ventas del mes</div>
+                            <div class="sr-summary-value">
+                                <span>S/.</span>
+                                <span th:text="${#numbers.formatDecimal(totalAmount, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detail table -->
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Detalle de comprobantes del mes</h5>
+
+                    <div th:if="${#lists.isEmpty(rows)}" class="alert alert-info mb-0">
+                        No se encontraron comprobantes para los filtros seleccionados.
+                    </div>
+
+                    <div th:if="${!#lists.isEmpty(rows)}" class="table-responsive">
+                        <table class="sr-table">
+                            <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Fecha</th>
+                                <th>Tipo</th>
+                                <th>Serie</th>
+                                <th>Número</th>
+                                <th>Tipo doc.</th>
+                                <th>N° doc.</th>
+                                <th>Cliente</th>
+                                <th class="text-end">Base S/.</th>
+                                <th class="text-end">IGV S/.</th>
+                                <th class="text-end">Total S/.</th>
+                                <th>Estado</th>
+                                <th>Origen</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row, iter : ${rows}">
+                                <td th:text="${iter.index + 1}">1</td>
+
+                                <!-- Fecha -->
+                                <td th:text="${#temporals.format(row.emissionDate, 'dd/MM/yyyy')}">
+                                    01/01/2025
+                                </td>
+
+                                <!-- Tipo de comprobante (map simple 01/03) -->
+                                <td>
+                                    <span th:switch="${row.docType}">
+                                        <span th:case="'01'">Factura</span>
+                                        <span th:case="'03'">Boleta</span>
+                                        <span th:case="*"
+                                              th:text="${row.docType}">
+                                            OTRO
+                                        </span>
+                                    </span>
+                                </td>
+
+                                <!-- Serie y número -->
+                                <td th:text="${row.docSeries}">F001</td>
+                                <td th:text="${row.docNumber}">000001</td>
+
+                                <!-- Cliente: doc y nombre (por ahora doc puede ser nulo) -->
+                                <td th:text="${row.clientDocType}">DNI</td>
+                                <td th:text="${row.clientDocNumber}">00000000</td>
+                                <td th:text="${row.clientName}">Cliente ejemplo</td>
+
+                                <!-- Importes -->
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(row.taxBase, 1, 'COMMA', 2, 'POINT')}">
+                                    0.00
+                                </td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(row.taxIgv, 1, 'COMMA', 2, 'POINT')}">
+                                    0.00
+                                </td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(row.total, 1, 'COMMA', 2, 'POINT')}">
+                                    0.00
+                                </td>
+
+                                <!-- Estado -->
+                                <td>
+                                    <span class="sr-badge-status"
+                                          th:classappend="${row.status == 'VALIDO'} ? ' sr-badge-valid' :
+                                                          (${row.status == 'ANULADO'} ? ' sr-badge-canceled' : ' sr-badge-draft')"
+                                          th:text="${row.status}">
+                                        VÁLIDO
+                                    </span>
+                                </td>
+
+                                <!-- Origen -->
+                                <td th:text="${row.origin == 'SALE_ORDER' ? 'Venta' :
+                                             (row.origin == 'OTHER_INCOME' ? 'Otro ingreso' : row.origin)}">
+                                    Venta
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/scripts_admin :: adminScripts}"></th:block>
+</body>
+</html>

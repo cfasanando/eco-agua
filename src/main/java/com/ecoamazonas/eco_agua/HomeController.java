@@ -1,8 +1,5 @@
 package com.ecoamazonas.eco_agua;
 
-import com.ecoamazonas.eco_agua.category.Category;
-import com.ecoamazonas.eco_agua.category.CategoryRepository;
-import com.ecoamazonas.eco_agua.category.CategoryType;
 import com.ecoamazonas.eco_agua.expense.Expense;
 import com.ecoamazonas.eco_agua.expense.ExpenseService;
 import com.ecoamazonas.eco_agua.order.OrderService;
@@ -21,16 +18,13 @@ public class HomeController {
 
     private final OrderService orderService;
     private final ExpenseService expenseService;
-    private final CategoryRepository categoryRepository;
 
     public HomeController(
             OrderService orderService,
-            ExpenseService expenseService,
-            CategoryRepository categoryRepository
+            ExpenseService expenseService
     ) {
         this.orderService = orderService;
         this.expenseService = expenseService;
-        this.categoryRepository = categoryRepository;
     }
 
     @GetMapping("/home")
@@ -59,10 +53,6 @@ public class HomeController {
                 .filter(amount -> amount != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Expense categories (supporting legacy EXPENSE and current EXPENSES)
-        List<Category> expenseCategories =
-                categoryRepository.findByTypeInAndActiveTrueOrderByNameAsc(CategoryType.expenseTypes());
-
         model.addAttribute("activePage", "home");
         model.addAttribute("today", today);
 
@@ -75,8 +65,11 @@ public class HomeController {
         model.addAttribute("dailyExpenses", dailyExpenses);
         model.addAttribute("expensesToday", dailyExpenses);
         model.addAttribute("totalExpensesToday", totalExpensesToday);
-        model.addAttribute("expenseCategories", expenseCategories);
-        model.addAttribute("categories", expenseCategories);
+        model.addAttribute("expenseCategories", expenseService.findExpenseCategories());
+        model.addAttribute("categories", expenseService.findExpenseCategories());
+        model.addAttribute("suppliers", expenseService.findActiveSuppliers());
+        model.addAttribute("supplies", expenseService.findActiveSupplies());
+        model.addAttribute("employees", expenseService.findActiveEmployees());
 
         return "home";
     }

@@ -5,11 +5,16 @@ import com.ecoamazonas.eco_agua.category.CategoryRepository;
 import com.ecoamazonas.eco_agua.category.CategoryType;
 import com.ecoamazonas.eco_agua.supplier.Supplier;
 import com.ecoamazonas.eco_agua.supplier.SupplierRepository;
+import com.ecoamazonas.eco_agua.supply.Supply;
+import com.ecoamazonas.eco_agua.supply.SupplyRepository;
+import com.ecoamazonas.eco_agua.user.Employee;
+import com.ecoamazonas.eco_agua.user.EmployeeRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,21 +25,33 @@ import java.util.stream.Collectors;
 @Service
 public class ExpenseService {
 
+    private enum ExpenseInputContext {
+        SUPPLIER,
+        SUPPLY,
+        PERSONNEL
+    }
+
     private final ExpenseRepository expenseRepository;
     private final ExpensePaymentRepository paymentRepository;
     private final CategoryRepository categoryRepository;
     private final SupplierRepository supplierRepository;
+    private final SupplyRepository supplyRepository;
+    private final EmployeeRepository employeeRepository;
 
     public ExpenseService(
             ExpenseRepository expenseRepository,
             ExpensePaymentRepository paymentRepository,
             CategoryRepository categoryRepository,
-            SupplierRepository supplierRepository
+            SupplierRepository supplierRepository,
+            SupplyRepository supplyRepository,
+            EmployeeRepository employeeRepository
     ) {
         this.expenseRepository = expenseRepository;
         this.paymentRepository = paymentRepository;
         this.categoryRepository = categoryRepository;
         this.supplierRepository = supplierRepository;
+        this.supplyRepository = supplyRepository;
+        this.employeeRepository = employeeRepository;
     }
 
     // -------------------------------------------------------------------------
@@ -51,7 +68,7 @@ public class ExpenseService {
         expense.setTaxIgv(BigDecimal.ZERO);
         expense.setTaxRate(BigDecimal.ZERO);
     }
-    
+
     private String trimToNull(String value) {
         if (value == null) {
             return null;
@@ -61,25 +78,112 @@ public class ExpenseService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private String buildObservationWithSupplierReference(
+    private String normalizeText(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase()
+                .trim();
+    }
+
+    private boolean containsAny(String value, String... tokens) {
+        for (String token : tokens) {
+            if (value.contains(token)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private ExpenseInputContext resolveExpenseInputContext(Category category) {
+        String normalizedCategoryName = normalizeText(category != null ? category.getName() : null);
+
+        if (normalizedCategoryName.contains("insumo")) {
+            return ExpenseInputContext.SUPPLY;
+        }
+
+        if (containsAny(normalizedCategoryName, "personal", "repartidor", "llenador", "lavador")) {
+            return ExpenseInputContext.PERSONNEL;
+        }
+
+        return ExpenseInputContext.SUPPLIER;
+    }
+
+    private String buildEmployeeDisplayName(Employee employee) {
+        if (employee == null) {
+            return null;
+        }
+
+        String firstName = trimToNull(employee.getFirstName());
+        String lastName = trimToNull(employee.getLastName());
+
+        if (firstName == null && lastName == null) {
+            return null;
+        }
+        if (firstName == null) {
+            return lastName;
+        }
+        if (lastName == null) {
+            return firstName;
+        }
+
+        return firstName + " " + lastName;
+    }
+
+    private String mapEmployeePaymentTypeLabel(String employeePaymentType) {
+        String value = trimToNull(employeePaymentType);
+        if (value == null) {
+            return null;
+        }
+
+        return switch (value.toUpperCase()) {
+            case "SALARY" -> "Salario";
+            case "ADVANCE" -> "Adelanto";
+            case "DISCOUNT" -> "Descuento";
+            default -> value;
+        };
+    }
+
+    private String buildObservationWithContext(
             String observation,
             Supplier supplier,
-            String manualSupplierName
+            String manualSupplierName,
+            Supply supply,
+            Employee employee,
+            String employeePaymentType
     ) {
+        List<String> prefixes = new ArrayList<>();
         String cleanObservation = trimToNull(observation);
+        String cleanManualSupplier = trimToNull(manualSupplierName);
+        String employeeName = buildEmployeeDisplayName(employee);
+        String paymentTypeLabel = mapEmployeePaymentTypeLabel(employeePaymentType);
 
         if (supplier != null) {
-            String prefix = "Proveedor: " + supplier.getName();
-            return cleanObservation == null ? prefix : prefix + ". " + cleanObservation;
+            prefixes.add("Proveedor: " + supplier.getName());
         }
-
-        String cleanManualSupplier = trimToNull(manualSupplierName);
         if (cleanManualSupplier != null) {
-            String prefix = "Referencia: " + cleanManualSupplier;
-            return cleanObservation == null ? prefix : prefix + ". " + cleanObservation;
+            prefixes.add("Referencia: " + cleanManualSupplier);
+        }
+        if (supply != null) {
+            prefixes.add("Insumo: " + supply.getName());
+        }
+        if (employeeName != null) {
+            prefixes.add("Personal: " + employeeName);
+        }
+        if (paymentTypeLabel != null) {
+            prefixes.add("Tipo pago: " + paymentTypeLabel);
         }
 
-        return cleanObservation;
+        if (prefixes.isEmpty()) {
+            return cleanObservation;
+        }
+
+        String prefix = String.join(". ", prefixes);
+        return cleanObservation == null ? prefix : prefix + ". " + cleanObservation;
     }
 
     // -------------------------------------------------------------------------
@@ -99,6 +203,9 @@ public class ExpenseService {
                 categoryId,
                 null,
                 null,
+                null,
+                null,
+                null,
                 observation,
                 voucherNumber,
                 amount
@@ -111,6 +218,33 @@ public class ExpenseService {
             Long categoryId,
             Long supplierId,
             String manualSupplierName,
+            String observation,
+            String voucherNumber,
+            BigDecimal amount
+    ) {
+        return registerSimpleExpense(
+                expenseDate,
+                categoryId,
+                supplierId,
+                manualSupplierName,
+                null,
+                null,
+                null,
+                observation,
+                voucherNumber,
+                amount
+        );
+    }
+
+    @Transactional
+    public Expense registerSimpleExpense(
+            LocalDate expenseDate,
+            Long categoryId,
+            Long supplierId,
+            String manualSupplierName,
+            Long supplyId,
+            Long employeeId,
+            String employeePaymentType,
             String observation,
             String voucherNumber,
             BigDecimal amount
@@ -131,11 +265,46 @@ public class ExpenseService {
                     .orElseThrow(() -> new IllegalArgumentException("Supplier not found."));
         }
 
+        Supply supply = null;
+        if (supplyId != null) {
+            supply = supplyRepository.findById(supplyId)
+                    .orElseThrow(() -> new IllegalArgumentException("Supply not found."));
+        }
+
+        Employee employee = null;
+        if (employeeId != null) {
+            employee = employeeRepository.findById(employeeId)
+                    .orElseThrow(() -> new IllegalArgumentException("Employee not found."));
+        }
+
+        ExpenseInputContext context = resolveExpenseInputContext(category);
+
+        if (context == ExpenseInputContext.SUPPLY && supply == null) {
+            throw new IllegalArgumentException("Supply is required for this category.");
+        }
+
+        if (context == ExpenseInputContext.PERSONNEL) {
+            if (employee == null) {
+                throw new IllegalArgumentException("Employee is required for this category.");
+            }
+
+            if (trimToNull(employeePaymentType) == null) {
+                throw new IllegalArgumentException("Payment type is required for this category.");
+            }
+        }
+
         Expense expense = new Expense();
         expense.setCategory(category);
         expense.setSupplier(supplier);
         expense.setObservation(
-                buildObservationWithSupplierReference(observation, supplier, manualSupplierName)
+                buildObservationWithContext(
+                        observation,
+                        supplier,
+                        manualSupplierName,
+                        supply,
+                        employee,
+                        employeePaymentType
+                )
         );
         expense.setVoucherNumber(trimToNull(voucherNumber));
         expense.setAmount(amount);
@@ -149,7 +318,7 @@ public class ExpenseService {
 
         return expenseRepository.save(expense);
     }
-    
+
     @Transactional
     public Expense createSimpleExpense(Long categoryId,
                                        BigDecimal amount,
@@ -158,6 +327,9 @@ public class ExpenseService {
         return registerSimpleExpense(
                 expenseDate,
                 categoryId,
+                null,
+                null,
+                null,
                 null,
                 null,
                 observation,
@@ -272,13 +444,29 @@ public class ExpenseService {
     @Transactional(readOnly = true)
     public List<Expense> findOpenDebts(LocalDate start, LocalDate end) {
         Set<ExpenseStatus> statuses = EnumSet.of(ExpenseStatus.OPEN, ExpenseStatus.PARTIAL);
+
         // NOTE: currently using only date range, not statuses
         return expenseRepository.findByDebtTrueAndExpenseDateBetweenOrderByExpenseDateAsc(start, end);
     }
 
     @Transactional(readOnly = true)
     public List<Category> findExpenseCategories() {
-        return categoryRepository.findByTypeAndActiveTrueOrderByNameAsc(CategoryType.EXPENSES);
+        return categoryRepository.findByTypeInAndActiveTrueOrderByNameAsc(CategoryType.expenseTypes());
+    }
+
+    @Transactional(readOnly = true)
+    public List<Supplier> findActiveSuppliers() {
+        return supplierRepository.findByActiveTrueOrderByNameAsc();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Supply> findActiveSupplies() {
+        return supplyRepository.findByActiveTrueOrderByNameAsc();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Employee> findActiveEmployees() {
+        return employeeRepository.findByActiveTrueOrderByFirstNameAscLastNameAsc();
     }
 
     // >>> Existing helper for cashflow (only real cash expenses, no open debts)
@@ -306,6 +494,7 @@ public class ExpenseService {
 
         LocalDate from = start;
         LocalDate to = end;
+
         if (to.isBefore(from)) {
             // Swap to keep a valid range
             LocalDate tmp = from;
@@ -343,6 +532,7 @@ public class ExpenseService {
 
         LocalDate from = start;
         LocalDate to = end;
+
         if (to.isBefore(from)) {
             LocalDate tmp = from;
             from = to;

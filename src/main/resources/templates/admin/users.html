@@ -1,21 +1,23 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
+
 <head th:replace="fragments/head_admin :: adminHead('Usuarios')"></head>
+
 <body>
+
 <div class="app-layout" th:with="activePage='admin_users'">
-    <!-- Sidebar -->
+
     <aside th:replace="fragments/sidebar :: sidebar"></aside>
 
-    <!-- Main content -->
     <div class="main-content">
-        <!-- Topbar -->
+
         <header th:replace="fragments/topbar :: topbar"></header>
 
-        <!-- Page content -->
         <main class="content-wrapper">
 
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h1 class="h5 mb-0">Usuarios</h1>
+
                 <button type="button"
                         class="btn btn-primary"
                         data-bs-toggle="modal"
@@ -39,6 +41,7 @@
                                 <th class="text-center">Acciones</th>
                             </tr>
                             </thead>
+
                             <tbody>
                             <tr th:each="u : ${users}" th:attr="data-user-id=${u.id}">
                                 <td th:text="${u.id}">1</td>
@@ -58,6 +61,7 @@
                                 <td class="text-center">
                                     <button type="button"
                                             class="btn btn-sm btn-outline-primary js-edit-user"
+                                            th:attr="data-user-id=${u.id}"
                                             data-bs-toggle="modal"
                                             data-bs-target="#userModal">
                                         <i class="bi bi-pencil-square"></i>
@@ -71,27 +75,29 @@
             </div>
 
         </main>
+
     </div>
+
 </div>
 
-<!-- Common scripts -->
 <th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
 
-<!-- Modal de usuario -->
 <div class="modal fade" id="userModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
             <form th:action="@{/admin/users/save}" method="post">
+
                 <div class="modal-header">
-                    <h5 class="modal-title">Datos del usuario</h5>
+                    <h5 class="modal-title" id="userModalTitle">Datos del usuario</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
+
                 <div class="modal-body">
 
                     <input type="hidden" name="userId" id="userId"/>
 
                     <div class="row">
-                        <!-- Datos de acceso -->
+
                         <div class="col-md-4 border-end">
                             <h6 class="mb-3">
                                 <i class="bi bi-person-badge me-1"></i>Datos de acceso
@@ -110,6 +116,9 @@
                             <div class="mb-3">
                                 <label class="form-label">Confirma la clave</label>
                                 <input class="form-control" type="password" name="confirmPassword" id="confirmPassword">
+                                <div class="form-text" id="passwordHelpText">
+                                    En edición, deja ambas claves vacías si no deseas cambiarlas.
+                                </div>
                             </div>
 
                             <div class="mb-3">
@@ -124,7 +133,6 @@
                             </div>
                         </div>
 
-                        <!-- Datos personales -->
                         <div class="col-md-4 border-end">
                             <h6 class="mb-3">
                                 <i class="bi bi-person-lines-fill me-1"></i>Datos personales
@@ -132,12 +140,12 @@
 
                             <div class="mb-3">
                                 <label class="form-label">Nombres</label>
-                                <input class="form-control" name="firstName" id="firstName">
+                                <input class="form-control" name="firstName" id="firstName" required>
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label">Apellidos</label>
-                                <input class="form-control" name="lastName" id="lastName">
+                                <input class="form-control" name="lastName" id="lastName" required>
                             </div>
 
                             <div class="mb-3">
@@ -176,7 +184,6 @@
                             </div>
                         </div>
 
-                        <!-- Datos laborales -->
                         <div class="col-md-4">
                             <h6 class="mb-3">
                                 <i class="bi bi-briefcase me-1"></i>Datos laborales
@@ -205,69 +212,128 @@
                                 </label>
                             </div>
                         </div>
+
                     </div>
 
                 </div>
+
                 <div class="modal-footer">
                     <button type="button"
                             class="btn btn-outline-secondary"
                             data-bs-dismiss="modal">
                         Cancelar
                     </button>
+
                     <button type="submit"
                             class="btn btn-primary">
                         Guardar
                     </button>
                 </div>
+
             </form>
         </div>
     </div>
 </div>
 
 <script th:inline="javascript">
-    // Small helper for modal behavior
     window.ecoUsers = (function () {
+        const userApiBaseUrl = /*[[@{/admin/users/}]]*/ '/admin/users/';
+
         function clearForm() {
             const form = document.querySelector('#userModal form');
-            if (!form) return;
-            form.reset();
-            const idInput = document.getElementById('userId');
-            if (idInput) {
-                idInput.value = '';
+            if (!form) {
+                return;
             }
-            const active = document.getElementById('active');
-            if (active) {
-                active.checked = true;
+
+            form.reset();
+
+            document.getElementById('userModalTitle').textContent = 'Nuevo usuario';
+            document.getElementById('userId').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('confirmPassword').value = '';
+            document.getElementById('active').checked = true;
+
+            const passwordHelpText = document.getElementById('passwordHelpText');
+            if (passwordHelpText) {
+                passwordHelpText.textContent = 'Para usuarios nuevos, la clave es obligatoria.';
             }
         }
 
-        function fillFormFromRow(row) {
-            if (!row) {
+        function setValue(id, value) {
+            const element = document.getElementById(id);
+            if (!element) {
                 return;
             }
-            const id = row.getAttribute('data-user-id');
-            const usernameCell = row.querySelector('td:nth-child(2)');
-            const activeBadge = row.querySelector('td:nth-child(4) .badge');
+            element.value = value == null ? '' : value;
+        }
 
+        async function loadUser(userId) {
+            const response = await fetch(userApiBaseUrl + userId, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Could not load user data');
+            }
+
+            return response.json();
+        }
+
+        async function openEditUserModal(userId) {
             clearForm();
 
-            if (id) {
-                document.getElementById('userId').value = id;
+            document.getElementById('userModalTitle').textContent = 'Editar usuario';
+
+            const passwordHelpText = document.getElementById('passwordHelpText');
+            if (passwordHelpText) {
+                passwordHelpText.textContent = 'En edición, deja ambas claves vacías si no deseas cambiarlas.';
             }
-            if (usernameCell) {
-                document.getElementById('username').value = usernameCell.textContent.trim();
-            }
-            if (activeBadge) {
-                const isActive = activeBadge.classList.contains('bg-success');
-                document.getElementById('active').checked = isActive;
+
+            const data = await loadUser(userId);
+
+            setValue('userId', data.userId);
+            setValue('username', data.username);
+            setValue('roleId', data.roleId);
+            setValue('firstName', data.firstName);
+            setValue('lastName', data.lastName);
+            setValue('gender', data.gender);
+            setValue('birthDate', data.birthDate);
+            setValue('phone', data.phone);
+            setValue('dni', data.dni);
+            setValue('email', data.email);
+            setValue('address', data.address);
+            setValue('jobPositionId', data.jobPositionId);
+            setValue('hireDate', data.hireDate);
+
+            const activeCheckbox = document.getElementById('active');
+            if (activeCheckbox) {
+                activeCheckbox.checked = !!data.active;
             }
         }
 
         function bindEditButtons() {
             document.querySelectorAll('.js-edit-user').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    const row = this.closest('tr');
-                    fillFormFromRow(row);
+                btn.addEventListener('click', async function () {
+                    const userId = this.getAttribute('data-user-id');
+                    if (!userId) {
+                        return;
+                    }
+
+                    try {
+                        await openEditUserModal(userId);
+                    } catch (error) {
+                        if (window.Swal) {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'No se pudo cargar el usuario',
+                                text: 'Ocurrió un problema al obtener los datos para edición.'
+                            });
+                        } else {
+                            alert('No se pudo cargar el usuario.');
+                        }
+                    }
                 });
             });
         }
@@ -278,6 +344,17 @@
 
         document.addEventListener('DOMContentLoaded', function () {
             bindEditButtons();
+
+            if (window.ecoAdmin && typeof window.ecoAdmin.initStandardDataTable === 'function') {
+                window.ecoAdmin.initStandardDataTable('#usersTable', [4]);
+            }
+
+            const flashMessage = /*[[${message}]]*/ null;
+            const flashType = /*[[${messageType}]]*/ null;
+
+            if (flashMessage && window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
+                window.ecoAdmin.showFlashMessage(flashMessage, flashType);
+            }
         });
 
         return {
@@ -285,5 +362,6 @@
         };
     })();
 </script>
+
 </body>
 </html>

@@ -51,29 +51,37 @@
             language: {
                 url: 'https://cdn.datatables.net/plug-ins/1.13.8/i18n/es-ES.json'
             },
-            pageLength: 10,
-            lengthMenu: [5, 10, 25, 50],
+            pageLength: 30,
+            lengthMenu: [
+                [10, 30, 50, 100],
+                [10, 30, 50, 100]
+            ],
             dom: 'Bfrtip',
+            autoWidth: false,
             buttons: [
                 {
                     extend: 'excelHtml5',
                     text: '<i class="bi bi-file-earmark-excel"></i> Excel',
-                    className: 'btn btn-success btn-sm'
+                    className: 'btn btn-success btn-sm dt-action-btn',
+                    titleAttr: 'Exportar a Excel'
                 },
                 {
                     extend: 'pdfHtml5',
                     text: '<i class="bi bi-file-earmark-pdf"></i> PDF',
-                    className: 'btn btn-danger btn-sm'
+                    className: 'btn btn-danger btn-sm dt-action-btn',
+                    titleAttr: 'Exportar a PDF'
                 },
                 {
                     extend: 'print',
                     text: '<i class="bi bi-printer"></i> Imprimir',
-                    className: 'btn btn-secondary btn-sm'
+                    className: 'btn btn-secondary btn-sm dt-action-btn',
+                    titleAttr: 'Imprimir tabla'
                 },
                 {
                     extend: 'colvis',
-                    text: '<i class="bi bi-columns"></i> Columnas',
-                    className: 'btn btn-outline-secondary btn-sm'
+                    text: '<i class="bi bi-layout-three-columns"></i> Columnas',
+                    className: 'btn btn-dark btn-sm dt-action-btn',
+                    titleAttr: 'Mostrar u ocultar columnas'
                 }
             ],
             columnDefs: columnDefs
@@ -92,6 +100,7 @@
     ecoAdmin.registerSingleDelete = function (formSelector, titleText) {
         $(document).on('submit', formSelector, function (e) {
             e.preventDefault();
+
             const form = this;
 
             Swal.fire({
@@ -121,6 +130,7 @@
 
         $(document).on('click', triggerSelector, function () {
             const ids = [];
+
             $(checkboxSelector + ':checked').each(function () {
                 ids.push($(this).val());
             });
@@ -176,8 +186,14 @@
         }
 
         let icon = 'success';
-        if (type === 'info') icon = 'info';
-        if (type === 'error') icon = 'error';
+
+        if (type === 'info') {
+            icon = 'info';
+        }
+
+        if (type === 'error') {
+            icon = 'error';
+        }
 
         Swal.fire({
             icon: icon,
@@ -193,5 +209,4 @@
     });
 
     window.ecoAdmin = ecoAdmin;
-
 })(window, window.jQuery);

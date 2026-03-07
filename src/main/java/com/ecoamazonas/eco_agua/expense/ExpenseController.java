@@ -1,11 +1,13 @@
 package com.ecoamazonas.eco_agua.expense;
 
-import com.ecoamazonas.eco_agua.category.CategoryRepository;
-import com.ecoamazonas.eco_agua.category.CategoryType;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
@@ -17,14 +19,9 @@ import java.util.List;
 public class ExpenseController {
 
     private final ExpenseService expenseService;
-    private final CategoryRepository categoryRepository;
 
-    public ExpenseController(
-            ExpenseService expenseService,
-            CategoryRepository categoryRepository
-    ) {
+    public ExpenseController(ExpenseService expenseService) {
         this.expenseService = expenseService;
-        this.categoryRepository = categoryRepository;
     }
 
     @GetMapping("/by-date")
@@ -75,10 +72,10 @@ public class ExpenseController {
         model.addAttribute("toDate", end);
         model.addAttribute("expenses", expenses);
         model.addAttribute("totalAmount", total);
-        model.addAttribute(
-                "categories",
-                categoryRepository.findByTypeInAndActiveTrueOrderByNameAsc(CategoryType.expenseTypes())
-        );
+        model.addAttribute("categories", expenseService.findExpenseCategories());
+        model.addAttribute("suppliers", expenseService.findActiveSuppliers());
+        model.addAttribute("supplies", expenseService.findActiveSupplies());
+        model.addAttribute("employees", expenseService.findActiveEmployees());
 
         return "expenses/expenses_by_date";
     }
@@ -94,6 +91,11 @@ public class ExpenseController {
     public String saveSimpleExpense(
             @RequestParam("categoryId") Long categoryId,
             @RequestParam("amount") BigDecimal amount,
+            @RequestParam(name = "supplierId", required = false) Long supplierId,
+            @RequestParam(name = "manualSupplierName", required = false) String manualSupplierName,
+            @RequestParam(name = "supplyId", required = false) Long supplyId,
+            @RequestParam(name = "employeeId", required = false) Long employeeId,
+            @RequestParam(name = "employeePaymentType", required = false) String employeePaymentType,
             @RequestParam(name = "observation", required = false) String observation,
             @RequestParam(name = "voucherNumber", required = false) String voucherNumber,
             @RequestParam(name = "expenseDate", required = false)
@@ -107,6 +109,11 @@ public class ExpenseController {
             expenseService.registerSimpleExpense(
                     effectiveDate,
                     categoryId,
+                    supplierId,
+                    manualSupplierName,
+                    supplyId,
+                    employeeId,
+                    employeePaymentType,
                     observation,
                     voucherNumber,
                     amount

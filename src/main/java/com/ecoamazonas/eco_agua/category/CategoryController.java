@@ -24,23 +24,31 @@ public class CategoryController {
     }
 
     @GetMapping
-    public String listCategories(Model model,
-                                 @ModelAttribute("message") String message,
-                                 @ModelAttribute("messageType") String messageType) {
+    public String listCategories(
+            Model model,
+            @ModelAttribute("message") String message,
+            @ModelAttribute("messageType") String messageType
+    ) {
         model.addAttribute("categories", service.findAll());
-        model.addAttribute("types", CategoryType.values());
-        // flash already on model: message, messageType
+        model.addAttribute("types", CategoryType.selectableValues());
+
+        // Flash attributes are already available on the model if present.
+        model.addAttribute("message", message);
+        model.addAttribute("messageType", messageType);
+
         return "admin/categories";
     }
 
     @PostMapping("/save")
-    public String saveCategory(@RequestParam(value = "id", required = false) Long id,
-                               @RequestParam("name") String name,
-                               @RequestParam(value = "description", required = false) String description,
-                               @RequestParam("type") CategoryType type,
-                               RedirectAttributes redirectAttributes) {
-
+    public String saveCategory(
+            @RequestParam(value = "id", required = false) Long id,
+            @RequestParam("name") String name,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam("type") CategoryType type,
+            RedirectAttributes redirectAttributes
+    ) {
         Category category;
+
         if (id != null) {
             category = service.getOrThrow(id);
         } else {
@@ -48,8 +56,12 @@ public class CategoryController {
         }
 
         category.setName(name.trim());
-        category.setDescription((description != null && !description.isBlank()) ? description.trim() : null);
-        category.setType(type);
+        category.setDescription(
+                (description != null && !description.isBlank()) ? description.trim() : null
+        );
+
+        // Always save the canonical expense value going forward.
+        category.setType(type.normalize());
 
         service.save(category);
 
@@ -60,9 +72,10 @@ public class CategoryController {
     }
 
     @PostMapping("/{id}/delete")
-    public String deleteSingle(@PathVariable("id") Long id,
-                               RedirectAttributes redirectAttributes) {
-
+    public String deleteSingle(
+            @PathVariable("id") Long id,
+            RedirectAttributes redirectAttributes
+    ) {
         service.deleteById(id);
 
         redirectAttributes.addFlashAttribute("message", "Categoría eliminada correctamente.");

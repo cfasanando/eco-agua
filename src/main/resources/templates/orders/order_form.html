@@ -64,46 +64,39 @@
                                         </small>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label">Cliente</label>
+                                        <label for="clientSearch" class="form-label">Cliente</label>
 
-                                        <!-- Input con autocomplete -->
-                                        <input type="text"
-                                               class="form-control mb-1"
-                                               id="clientSearch"
-                                               list="clientDatalist"
-                                               placeholder="Escriba el nombre del cliente...">
-                                        <small class="text-muted d-block mb-1" id="clientSearchHelp">
-                                            Seleccione un cliente de la lista sugerida.
+                                        <div class="position-relative">
+                                            <input
+                                                type="text"
+                                                id="clientSearch"
+                                                class="form-control"
+                                                placeholder="Escriba el nombre del cliente..."
+                                                autocomplete="off"
+                                            />
+
+                                            <div
+                                                id="clientSuggestions"
+                                                class="list-group position-absolute w-100 d-none"
+                                                style="z-index: 1050; max-height: 240px; overflow-y: auto;"
+                                            ></div>
+                                        </div>
+
+                                        <small id="clientSearchHelp" class="form-text text-muted">
+                                            Escriba al menos 1 letra para buscar y seleccione una coincidencia.
                                         </small>
 
-                                        <!-- Opciones para el autocomplete -->
-                                        <datalist id="clientDatalist">
-                                            <option th:each="c : ${clients}"
-                                                    th:value="${c.name}"
-                                                    th:data-id="${c.id}"
-                                                    th:data-doc-number="${c.docNumber}"
-                                                    th:data-phone="${c.phone}"
-                                                    th:data-address="${c.address}"
-                                                    th:data-profile="${c.profile != null ? c.profile.name : ''}"
-                                                    th:data-suggested-price="${c.profile != null ? c.profile.suggestedPrice : 0}">
-                                            </option>
-                                        </datalist>
-
-                                        <!-- Select real (oculto) que usa Spring -->
-                                        <select class="form-select d-none"
-                                                id="clientSelect"
-                                                name="clientId"
-                                                required>
+                                        <select id="clientSelect" name="clientId" class="d-none" required>
                                             <option value="">Seleccione un cliente</option>
-                                            <option th:each="c : ${clients}"
-                                                    th:value="${c.id}"
-                                                    th:text="${c.name}"
-                                                    th:data-doc-number="${c.docNumber}"
-                                                    th:data-phone="${c.phone}"
-                                                    th:data-address="${c.address}"
-                                                    th:data-profile="${c.profile != null ? c.profile.name : ''}"
-                                                    th:data-suggested-price="${c.profile != null ? c.profile.suggestedPrice : 0}">
-                                                Cliente
+                                            <option
+                                                th:each="c : ${clients}"
+                                                th:value="${c.id}"
+                                                th:text="${c.name}"
+                                                th:data-doc-number="${c.docNumber != null && !#strings.isEmpty(c.docNumber) ? c.docNumber : '-'}"
+                                                th:data-phone="${c.phone != null && !#strings.isEmpty(c.phone) ? c.phone : '-'}"
+                                                th:data-address="${c.address != null && !#strings.isEmpty(c.address) ? c.address : '-'}"
+                                                th:data-profile="${c.profile != null ? c.profile.name : '-'}"
+                                                th:data-suggested-price="${c.profile != null ? c.profile.suggestedPrice : 0}">
                                             </option>
                                         </select>
                                     </div>
@@ -133,19 +126,29 @@
                                         <div class="col-md-4">
                                             <strong>Precio sugerido:</strong>
                                             <span id="clSuggestedPrice">0.00</span>
+                                            <small class="text-muted d-block mt-1">
+                                                Para el producto principal de agua de mesa, este precio se aplicará automáticamente.
+                                            </small>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div class="row g-2 mb-3">
                                     <div class="col-md-4">
-                                        <label class="form-label">Botellones prestados</label>
-                                        <input type="number"
-                                               class="form-control"
-                                               name="borrowedBottles"
-                                               min="0"
-                                               step="1"
-                                               value="0">
+                                        <label for="borrowedBottles" class="form-label d-flex justify-content-between align-items-center">
+                                            <span>Botellones prestados</span>
+                                            <a href="#" id="borrowedBottlesAutoLink" class="small text-decoration-none">Usar sugerido</a>
+                                        </label>
+
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            class="form-control"
+                                            id="borrowedBottles"
+                                            name="borrowedBottles"
+                                            value="0"
+                                        />
                                     </div>
                                     <div class="col-md-8">
                                         <label class="form-label">Comentario</label>
@@ -291,14 +294,12 @@
                                         th:data-product-name="${p.name}"
                                         th:data-product-price="${p.price}"
                                         th:data-product-stock="${p.stock}"
-                                        th:data-category-id="${p.category != null ? p.category.id : 0}">
+                                        th:data-category-id="${p.category != null ? p.category.id : 0}"
+                                        th:data-use-client-profile-price="${p.usesClientProfilePrice()}"
+                                        th:data-borrowed-bottle-eligible="${p.usesClientProfilePrice()}">
                                         <td th:text="${p.name}">Producto</td>
-                                        <td th:text="${#numbers.formatDecimal(p.stock,1,'POINT',0,'POINT')}">
-                                            0
-                                        </td>
-                                        <td th:text="${#numbers.formatDecimal(p.price,1,'POINT',2,'POINT')}">
-                                            0.00
-                                        </td>
+                                        <td th:text="${#numbers.formatDecimal(p.stock,1,'POINT',0,'POINT')}">0</td>
+                                        <td th:text="${p.usesClientProfilePrice() ? 'Perfil' : #numbers.formatDecimal(p.price,1,'POINT',2,'POINT')}">0.00</td>
                                     </tr>
                                     </tbody>
                                 </table>
@@ -356,6 +357,17 @@
         const productSearch = document.getElementById('productSearch');
 
         const promotionsContainer = document.getElementById('promotionsContainer');
+        const deliveryPersonSelect = document.getElementById('deliveryPerson');
+        const clientSuggestions = document.getElementById('clientSuggestions');
+        const borrowedBottlesInput = document.getElementById('borrowedBottles');
+        const borrowedBottlesAutoLink = document.getElementById('borrowedBottlesAutoLink');
+
+        let borrowedBottlesManualOverride = false;
+        let lastSuggestedBorrowedBottles = 0;
+
+        initSingleDeliveryPerson();
+        setupClientAutocomplete();
+        setupBorrowedBottlesAutoMode();
         let currentClientPromotions = [];
 
         function updateClientInfo() {
@@ -366,6 +378,7 @@
                 clAddress.textContent = '-';
                 clProfile.textContent = '-';
                 clSuggestedPrice.textContent = '0.00';
+                syncAutoPricedRowsWithClientProfile();
                 return;
             }
 
@@ -376,9 +389,74 @@
 
             const sug = opt.getAttribute('data-suggested-price') || '0';
             clSuggestedPrice.textContent = parseFloat(sug).toFixed(2);
+
+            syncAutoPricedRowsWithClientProfile();
         }
 
-                // Sync client selection from autocomplete input
+        function getSelectedClientSuggestedPrice() {
+            const opt = clientSelect ? clientSelect.options[clientSelect.selectedIndex] : null;
+            if (!opt || !opt.value) {
+                return null;
+            }
+
+            const raw = opt.getAttribute('data-suggested-price') || '';
+            const value = parseFloat(raw);
+
+            if (isNaN(value) || value <= 0) {
+                return null;
+            }
+
+            return value;
+        }
+
+        function productUsesClientProfilePrice(productRow) {
+            if (!productRow) {
+                return false;
+            }
+
+            return productRow.getAttribute('data-use-client-profile-price') === 'true';
+        }
+
+        function resolveProductUnitPrice(productRow) {
+            if (!productRow) {
+                return 0;
+            }
+
+            const basePrice = parseFloat(productRow.getAttribute('data-product-price') || '0');
+            const suggestedPrice = getSelectedClientSuggestedPrice();
+
+            if (productUsesClientProfilePrice(productRow) && suggestedPrice !== null) {
+                return suggestedPrice;
+            }
+
+            return isNaN(basePrice) ? 0 : basePrice;
+        }
+
+        function syncAutoPricedRowsWithClientProfile() {
+            orderItemsBody
+                .querySelectorAll('tr[data-item-product-id][data-auto-client-price="true"]')
+                .forEach(function (row) {
+                    if (row.hasAttribute('data-promo-total')) {
+                        return;
+                    }
+
+                    const productId = row.getAttribute('data-item-product-id');
+                    const productRow = document.querySelector('.product-row[data-product-id="' + productId + '"]');
+                    if (!productRow) {
+                        return;
+                    }
+
+                    const priceInput = row.querySelector('.item-price');
+                    if (!priceInput) {
+                        return;
+                    }
+
+                    priceInput.value = resolveProductUnitPrice(productRow).toFixed(2);
+                });
+
+            recalcTotals();
+        }
+
         function syncClientSelectionFromSearch(triggerSource) {
             if (!clientSearchInput || !clientDatalist || !clientSelect) {
                 return;
@@ -388,7 +466,6 @@
             const help = document.getElementById('clientSearchHelp');
 
             if (!typedName) {
-                // Empty input → reset selection and info
                 clientSelect.value = '';
                 updateClientInfo();
                 loadPromotionsForClient(null);
@@ -410,7 +487,6 @@
             });
 
             if (matchedId) {
-                // Exact match → select client immediately
                 clientSelect.value = matchedId;
                 updateClientInfo();
                 loadPromotionsForClient(matchedId);
@@ -421,19 +497,16 @@
                     help.classList.add('text-muted');
                 }
             } else {
-                // No exact match
                 clientSelect.value = '';
                 updateClientInfo();
                 loadPromotionsForClient(null);
 
                 if (help) {
-                    // Only show error when user leaves the field or confirms the value
                     if (triggerSource === 'blur' || triggerSource === 'change') {
                         help.textContent = 'No se encontró un cliente exacto con ese nombre.';
                         help.classList.add('text-danger');
                         help.classList.remove('text-muted');
                     } else {
-                        // While typing (input), keep neutral helper text
                         help.textContent = 'Seleccione un cliente de la lista sugerida.';
                         help.classList.remove('text-danger');
                         help.classList.add('text-muted');
@@ -609,8 +682,10 @@
 
             const qtyToAdd = (quantityToAdd && quantityToAdd > 0) ? quantityToAdd : 1;
             const isPromo = typeof promoTotal === 'number' && !isNaN(promoTotal);
+            const shouldAutoClientPrice = !isPromo && productUsesClientProfilePrice(productRow);
+            const borrowedBottleEligible = productRow
+                && productRow.getAttribute('data-borrowed-bottle-eligible') === 'true';
 
-            // No stock → do not add
             if (maxStock !== null && maxStock <= 0) {
                 if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
                     window.ecoAdmin.showFlashMessage('No hay stock disponible para este producto.', 'warning');
@@ -620,7 +695,6 @@
                 return;
             }
 
-            // Low stock warning
             if (maxStock !== null && maxStock > 0 && maxStock <= 5) {
                 if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
                     window.ecoAdmin.showFlashMessage(
@@ -652,24 +726,25 @@
                 qtyInput.value = newQty.toFixed(0);
 
                 if (isPromo) {
-                    // Accumulate bundle total when the same promotion is applied multiple times
                     const currentPromoTotal = parseFloat(row.getAttribute('data-promo-total') || '0') || 0;
                     const newPromoTotal = currentPromoTotal + promoTotal;
                     row.setAttribute('data-promo-total', newPromoTotal.toFixed(2));
 
-                    // Effective unit price = bundle total / total quantity
                     if (priceInput) {
                         const effectiveUnitPrice = newPromoTotal / newQty;
                         priceInput.value = effectiveUnitPrice.toFixed(2);
                     }
+                } else if (shouldAutoClientPrice && priceInput) {
+                    row.setAttribute('data-auto-client-price', 'true');
+                    priceInput.value = resolveProductUnitPrice(productRow).toFixed(2);
                 }
 
                 recalcTotals();
                 refreshProductsStockDisplay();
+                updateBorrowedBottlesSuggestion();
                 return;
             }
 
-            // New row
             let initialQty = qtyToAdd;
             if (maxStock !== null && initialQty > maxStock) {
                 initialQty = maxStock;
@@ -683,9 +758,14 @@
 
             row = document.createElement('tr');
             row.setAttribute('data-item-product-id', productId);
+            row.setAttribute('data-borrowed-bottle-eligible', borrowedBottleEligible ? 'true' : 'false');
 
             if (isPromo) {
                 row.setAttribute('data-promo-total', promoTotal.toFixed(2));
+            }
+
+            if (shouldAutoClientPrice) {
+                row.setAttribute('data-auto-client-price', 'true');
             }
 
             const colName = document.createElement('td');
@@ -700,19 +780,27 @@
             priceInput.min = '0';
             priceInput.step = '0.01';
             priceInput.required = true;
-            priceInput.value = parseFloat(price).toFixed(2);
+
+            const initialPrice = parseFloat(price);
+            priceInput.value = (isNaN(initialPrice) ? 0 : initialPrice).toFixed(2);
+
             priceInput.addEventListener('input', function () {
-                // If user edits a promotion row, remove the fixed promo total and behave as a normal item.
                 if (row.hasAttribute('data-promo-total')) {
                     row.removeAttribute('data-promo-total');
                 }
+                if (row.hasAttribute('data-auto-client-price')) {
+                    row.removeAttribute('data-auto-client-price');
+                }
                 recalcTotals();
                 refreshProductsStockDisplay();
+                updateBorrowedBottlesSuggestion();
             });
+
             if (isPromo) {
-                priceInput.readOnly = true; // keep promo price fixed
+                priceInput.readOnly = true;
                 priceInput.classList.add('bg-light');
             }
+
             colPrice.appendChild(priceInput);
             row.appendChild(colPrice);
 
@@ -725,18 +813,24 @@
             qtyInput.step = '1';
             qtyInput.required = true;
             qtyInput.value = initialQty.toFixed(0);
+
             qtyInput.addEventListener('input', function () {
                 enforceMaxStockForRow(row);
+
                 if (row.hasAttribute('data-promo-total')) {
                     row.removeAttribute('data-promo-total');
                 }
+
                 recalcTotals();
                 refreshProductsStockDisplay();
+                updateBorrowedBottlesSuggestion();
             });
+
             if (isPromo) {
-                qtyInput.readOnly = true; // keep promo quantity fixed
+                qtyInput.readOnly = true;
                 qtyInput.classList.add('bg-light');
             }
+
             colQty.appendChild(qtyInput);
             row.appendChild(colQty);
 
@@ -768,6 +862,7 @@
                 ensureEmptyRowVisibility();
                 recalcTotals();
                 refreshProductsStockDisplay();
+                updateBorrowedBottlesSuggestion();
             });
             colActions.appendChild(btnRemove);
 
@@ -777,6 +872,7 @@
             ensureEmptyRowVisibility();
             recalcTotals();
             refreshProductsStockDisplay();
+            updateBorrowedBottlesSuggestion();
         }
 
         function applyCategoryFilter() {
@@ -923,6 +1019,236 @@
             });
         }
 
+        function initSingleDeliveryPerson() {
+            if (!deliveryPersonSelect) {
+                return;
+            }
+
+            const availableOptions = Array.from(deliveryPersonSelect.options).filter(function (option) {
+                return option.value && option.value.trim() !== '';
+            });
+
+            if (availableOptions.length === 1 && !deliveryPersonSelect.value) {
+                deliveryPersonSelect.value = availableOptions[0].value;
+            }
+        }
+
+        function normalizeSearchText(value) {
+            return (value || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim();
+        }
+
+        function hideClientSuggestions() {
+            if (!clientSuggestions) {
+                return;
+            }
+
+            clientSuggestions.innerHTML = '';
+            clientSuggestions.classList.add('d-none');
+        }
+
+        function findExactClientOptionByName(name) {
+            const normalizedName = normalizeSearchText(name);
+            if (!normalizedName || !clientSelect) {
+                return null;
+            }
+
+            return Array.from(clientSelect.options).find(function (option) {
+                if (!option.value) {
+                    return false;
+                }
+
+                return normalizeSearchText(option.textContent) === normalizedName;
+            }) || null;
+        }
+
+        function selectClientOption(option) {
+            if (!option || !clientSelect || !clientSearchInput) {
+                return;
+            }
+
+            clientSelect.value = option.value;
+            clientSearchInput.value = option.textContent.trim();
+
+            updateClientInfo();
+            loadPromotionsForClient(option.value);
+            hideClientSuggestions();
+
+            if (clientSearchHelp) {
+                clientSearchHelp.textContent = 'Cliente seleccionado correctamente.';
+                clientSearchHelp.classList.remove('text-danger');
+                clientSearchHelp.classList.add('text-muted');
+            }
+        }
+
+        function renderClientSuggestions(query) {
+            if (!clientSuggestions || !clientSelect) {
+                return;
+            }
+
+            const normalizedQuery = normalizeSearchText(query);
+
+            if (!normalizedQuery) {
+                hideClientSuggestions();
+                return;
+            }
+
+            const matches = Array.from(clientSelect.options)
+                .filter(function (option) {
+                    return option.value && normalizeSearchText(option.textContent).includes(normalizedQuery);
+                })
+                .slice(0, 8);
+
+            if (!matches.length) {
+                hideClientSuggestions();
+                return;
+            }
+
+            clientSuggestions.innerHTML = '';
+
+            matches.forEach(function (option) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'list-group-item list-group-item-action';
+
+                const profile = option.getAttribute('data-profile') || '-';
+                const phone = option.getAttribute('data-phone') || '-';
+
+                button.innerHTML = `
+                    <div class="fw-semibold">${option.textContent}</div>
+                    <small class="text-muted">${profile} · ${phone}</small>
+                `;
+
+                button.addEventListener('click', function () {
+                    selectClientOption(option);
+                });
+
+                clientSuggestions.appendChild(button);
+            });
+
+            clientSuggestions.classList.remove('d-none');
+        }
+
+        function setupClientAutocomplete() {
+            if (!clientSearchInput || !clientSelect) {
+                return;
+            }
+
+            clientSearchInput.addEventListener('input', function () {
+                const typedValue = clientSearchInput.value || '';
+                const exactOption = findExactClientOptionByName(typedValue);
+
+                if (exactOption) {
+                    clientSelect.value = exactOption.value;
+                    updateClientInfo();
+                    loadPromotionsForClient(exactOption.value);
+                } else {
+                    clientSelect.value = '';
+                    updateClientInfo();
+                    loadPromotionsForClient(null);
+                }
+
+                renderClientSuggestions(typedValue);
+
+                if (clientSearchHelp) {
+                    clientSearchHelp.textContent = typedValue
+                        ? 'Seleccione una coincidencia de la lista.'
+                        : 'Escriba al menos 1 letra para buscar y seleccione una coincidencia.';
+                    clientSearchHelp.classList.remove('text-danger');
+                    clientSearchHelp.classList.add('text-muted');
+                }
+            });
+
+            clientSearchInput.addEventListener('focus', function () {
+                if ((clientSearchInput.value || '').trim()) {
+                    renderClientSuggestions(clientSearchInput.value);
+                }
+            });
+
+            clientSearchInput.addEventListener('keydown', function (event) {
+                if (event.key !== 'Enter') {
+                    return;
+                }
+
+                const firstSuggestion = clientSuggestions
+                    ? clientSuggestions.querySelector('.list-group-item')
+                    : null;
+
+                if (firstSuggestion) {
+                    event.preventDefault();
+                    firstSuggestion.click();
+                }
+            });
+
+            clientSearchInput.addEventListener('blur', function () {
+                window.setTimeout(function () {
+                    const exactOption = findExactClientOptionByName(clientSearchInput.value || '');
+
+                    if (exactOption) {
+                        selectClientOption(exactOption);
+                    } else if (clientSearchInput.value && clientSearchHelp) {
+                        clientSearchHelp.textContent = 'No se encontró un cliente exacto. Seleccione una coincidencia válida.';
+                        clientSearchHelp.classList.add('text-danger');
+                        clientSearchHelp.classList.remove('text-muted');
+                    }
+
+                    hideClientSuggestions();
+                }, 180);
+            });
+        }
+
+        function setupBorrowedBottlesAutoMode() {
+            if (!borrowedBottlesInput) {
+                return;
+            }
+
+            borrowedBottlesInput.addEventListener('input', function () {
+                const currentValue = parseInt(borrowedBottlesInput.value || '0', 10) || 0;
+                borrowedBottlesManualOverride = currentValue !== lastSuggestedBorrowedBottles;
+            });
+
+            if (borrowedBottlesAutoLink) {
+                borrowedBottlesAutoLink.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    borrowedBottlesManualOverride = false;
+                    updateBorrowedBottlesSuggestion();
+                });
+            }
+
+            updateBorrowedBottlesSuggestion();
+        }
+
+        function sumBorrowedBottleEligibleQty() {
+            let total = 0;
+
+            orderItemsBody.querySelectorAll('tr[data-item-product-id]').forEach(function (row) {
+                if (row.getAttribute('data-borrowed-bottle-eligible') !== 'true') {
+                    return;
+                }
+
+                const qtyInput = row.querySelector('.item-qty');
+                const qty = parseInt(qtyInput ? qtyInput.value : '0', 10) || 0;
+                total += qty;
+            });
+
+            return total;
+        }
+
+        function updateBorrowedBottlesSuggestion() {
+            if (!borrowedBottlesInput) {
+                return;
+            }
+
+            lastSuggestedBorrowedBottles = sumBorrowedBottleEligibleQty();
+
+            if (!borrowedBottlesManualOverride) {
+                borrowedBottlesInput.value = lastSuggestedBorrowedBottles;
+            }
+        }
+
         if (clientSelect) {
             clientSelect.addEventListener('change', function () {
                 updateClientInfo();
@@ -950,7 +1276,7 @@
             row.addEventListener('click', function () {
                 const id = row.getAttribute('data-product-id');
                 const name = row.getAttribute('data-product-name');
-                const price = row.getAttribute('data-product-price');
+                const price = resolveProductUnitPrice(row);
                 addOrIncrementItem(id, name, price);
             });
         });

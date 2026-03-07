@@ -302,7 +302,6 @@
                            th:name="${_csrf.parameterName}"
                            th:value="${_csrf.token}"/>
 
-                    <!-- Para indicar al controller que debe volver al home -->
                     <input type="hidden" name="redirect" value="HOME"/>
 
                     <div class="mb-3">
@@ -319,45 +318,41 @@
                         </select>
                     </div>
 
-                    <!-- Proveedor genérico -->
-                    <div class="mb-3" id="dailyExpenseProviderGroup">
-                        <label class="form-label">Proveedor</label>
+                    <div class="mb-3">
+                        <label class="form-label">Origen del gasto</label>
+                        <select class="form-select" id="dailyExpenseSupplierMode">
+                            <option value="NONE">Sin proveedor específico</option>
+                            <option value="REGISTERED">Proveedor registrado</option>
+                            <option value="OTHER">Otro / referencia manual</option>
+                        </select>
+                        <small class="text-muted">
+                            Usa proveedor registrado para servicios o compras frecuentes.
+                            Usa "Otro" para cochera, gasolina eventual o pagos sin proveedor fijo.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="dailyExpenseSupplierSelectGroup">
+                        <label class="form-label">Proveedor registrado</label>
+                        <select class="form-select" name="supplierId" id="dailyExpenseSupplierId">
+                            <option value="">- Seleccione -</option>
+                            <option th:each="sup : ${suppliers}"
+                                    th:value="${sup.id}"
+                                    th:text="${sup.name}"
+                                    th:data-category="${sup.category != null ? sup.category.name : ''}">
+                            </option>
+                        </select>
+                        <small class="text-muted" id="dailyExpenseSupplierHelp">
+                            Seleccione un proveedor de la lista.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="dailyExpenseManualSupplierGroup">
+                        <label class="form-label">Otro proveedor / referencia</label>
                         <input type="text"
                                class="form-control"
-                               id="dailyExpenseProvider"
-                               placeholder="Ej: SedaLoreto, banco, grifo, etc.">
-                    </div>
-
-                    <!-- Insumos -->
-                    <div class="mb-3 d-none" id="dailyExpenseSupplyGroup">
-                        <label class="form-label">Insumo</label>
-                        <select class="form-select" id="dailyExpenseSupply">
-                            <option value="">- Seleccione -</option>
-                            <!-- Más adelante se pueden cargar insumos reales -->
-                            <option value="1">Insumo 1</option>
-                            <option value="2">Insumo 2</option>
-                        </select>
-                    </div>
-
-                    <!-- Personal -->
-                    <div class="mb-3 d-none" id="dailyExpensePersonGroup">
-                        <label class="form-label">Personal</label>
-                        <select class="form-select" id="dailyExpensePerson">
-                            <option value="">- Seleccione -</option>
-                            <!-- Más adelante se puede cargar listado real de personal -->
-                            <option value="1">Trabajador 1</option>
-                            <option value="2">Trabajador 2</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3 d-none" id="dailyExpensePersonTypeGroup">
-                        <label class="form-label">Tipo</label>
-                        <select class="form-select" id="dailyExpensePersonType">
-                            <option value="">- Seleccione -</option>
-                            <option value="ADVANCE">Adelanto</option>
-                            <option value="DISCOUNT">Descuento</option>
-                            <option value="SALARY">Salario</option>
-                        </select>
+                               name="manualSupplierName"
+                               id="dailyExpenseManualSupplierName"
+                               placeholder="Ej: Cochera Don Pedro, grifo de la esquina, pago en efectivo, etc.">
                     </div>
 
                     <div class="mb-3">
@@ -517,101 +512,151 @@
             });
         }
 
-        // Daily expense widget: dynamic extra fields
+        // Daily expense widget: supplier handling
         const dailyCategory = document.getElementById('dailyExpenseCategory');
-        const providerGroup = document.getElementById('dailyExpenseProviderGroup');
-        const providerInput = document.getElementById('dailyExpenseProvider');
-        const supplyGroup = document.getElementById('dailyExpenseSupplyGroup');
-        const supplySelect = document.getElementById('dailyExpenseSupply');
-        const personGroup = document.getElementById('dailyExpensePersonGroup');
-        const personSelect = document.getElementById('dailyExpensePerson');
-        const personTypeGroup = document.getElementById('dailyExpensePersonTypeGroup');
-        const personTypeSelect = document.getElementById('dailyExpensePersonType');
-        const observationTextarea = document.getElementById('dailyExpenseObservation');
+        const dailySupplierMode = document.getElementById('dailyExpenseSupplierMode');
+        const dailySupplierSelectGroup = document.getElementById('dailyExpenseSupplierSelectGroup');
+        const dailySupplierId = document.getElementById('dailyExpenseSupplierId');
+        const dailySupplierHelp = document.getElementById('dailyExpenseSupplierHelp');
+        const dailyManualSupplierGroup = document.getElementById('dailyExpenseManualSupplierGroup');
+        const dailyManualSupplierName = document.getElementById('dailyExpenseManualSupplierName');
         const dailyExpenseForm = document.getElementById('dailyExpenseForm');
 
-        function updateDailyExpenseExtraFields() {
-            if (!dailyCategory) {
+        function normalizeLookupText(value) {
+            return (value || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim();
+        }
+
+        function getMeaningfulTokens(value) {
+            const stopWords = ['de', 'del', 'la', 'las', 'el', 'los', 'por', 'con', 'y'];
+            return normalizeLookupText(value)
+                .split(/\s+/)
+                .filter(function (token) {
+                    return token.length >= 3 && !stopWords.includes(token);
+                });
+        }
+
+        function filterDailySuppliersByCategory() {
+            if (!dailySupplierId) {
                 return;
             }
 
-            const option = dailyCategory.options[dailyCategory.selectedIndex];
-            const text = option ? option.text.toLowerCase() : '';
+            const allOptions = Array.from(dailySupplierId.options).filter(function (option) {
+                return option.value;
+            });
 
-            const isPersonal = text.indexOf('personal') !== -1;
-            const isSupply = text.indexOf('insumo') !== -1;
+            allOptions.forEach(function (option) {
+                option.hidden = false;
+                option.disabled = false;
+            });
 
-            if (isPersonal) {
-                personGroup.classList.remove('d-none');
-                personTypeGroup.classList.remove('d-none');
-                supplyGroup.classList.add('d-none');
-                providerGroup.classList.add('d-none');
-            } else if (isSupply) {
-                supplyGroup.classList.remove('d-none');
-                providerGroup.classList.remove('d-none');
-                personGroup.classList.add('d-none');
-                personTypeGroup.classList.add('d-none');
-            } else {
-                providerGroup.classList.remove('d-none');
-                supplyGroup.classList.add('d-none');
-                personGroup.classList.add('d-none');
-                personTypeGroup.classList.add('d-none');
+            const selectedCategoryText =
+                dailyCategory && dailyCategory.selectedIndex >= 0
+                    ? dailyCategory.options[dailyCategory.selectedIndex].text
+                    : '';
+
+            const tokens = getMeaningfulTokens(selectedCategoryText);
+
+            if (!tokens.length) {
+                if (dailySupplierHelp) {
+                    dailySupplierHelp.textContent = 'Seleccione un proveedor de la lista o cambie a "Otro / referencia manual".';
+                }
+                return;
+            }
+
+            let matches = 0;
+
+            allOptions.forEach(function (option) {
+                const haystack = normalizeLookupText(option.getAttribute('data-category')) + ' ' +
+                    normalizeLookupText(option.textContent);
+
+                const matched = tokens.some(function (token) {
+                    return haystack.includes(token);
+                });
+
+                option.hidden = !matched;
+                option.disabled = !matched;
+
+                if (matched) {
+                    matches++;
+                }
+            });
+
+            if (matches === 0) {
+                allOptions.forEach(function (option) {
+                    option.hidden = false;
+                    option.disabled = false;
+                });
+
+                if (dailySupplierHelp) {
+                    dailySupplierHelp.textContent = 'No se encontraron proveedores sugeridos para esta categoría. Puedes elegir cualquiera o usar "Otro / referencia manual".';
+                }
+            } else if (dailySupplierHelp) {
+                dailySupplierHelp.textContent = 'Se muestran proveedores sugeridos según la categoría elegida.';
+            }
+
+            const selectedOption = dailySupplierId.selectedOptions.length
+                ? dailySupplierId.selectedOptions[0]
+                : null;
+
+            if (selectedOption && selectedOption.hidden) {
+                dailySupplierId.value = '';
+            }
+        }
+
+        function updateDailySupplierModeUi() {
+            if (!dailySupplierMode) {
+                return;
+            }
+
+            const mode = dailySupplierMode.value || 'NONE';
+            const showRegistered = mode === 'REGISTERED';
+            const showManual = mode === 'OTHER';
+
+            if (dailySupplierSelectGroup) {
+                dailySupplierSelectGroup.classList.toggle('d-none', !showRegistered);
+            }
+            if (dailyManualSupplierGroup) {
+                dailyManualSupplierGroup.classList.toggle('d-none', !showManual);
+            }
+
+            if (dailySupplierId) {
+                dailySupplierId.required = showRegistered;
+                if (!showRegistered) {
+                    dailySupplierId.value = '';
+                }
+            }
+
+            if (dailyManualSupplierName) {
+                dailyManualSupplierName.required = showManual;
+                if (!showManual) {
+                    dailyManualSupplierName.value = '';
+                }
+            }
+
+            if (showRegistered) {
+                filterDailySuppliersByCategory();
             }
         }
 
         if (dailyCategory) {
-            dailyCategory.addEventListener('change', updateDailyExpenseExtraFields);
-            updateDailyExpenseExtraFields();
+            dailyCategory.addEventListener('change', function () {
+                filterDailySuppliersByCategory();
+                updateDailySupplierModeUi();
+            });
         }
 
-        // Before submit, enrich observation with provider / insumo / personal
+        if (dailySupplierMode) {
+            dailySupplierMode.addEventListener('change', updateDailySupplierModeUi);
+            updateDailySupplierModeUi();
+        }
+
         if (dailyExpenseForm) {
             dailyExpenseForm.addEventListener('submit', function () {
-                let baseObs = observationTextarea ? observationTextarea.value.trim() : '';
-
-                const option = dailyCategory ? dailyCategory.options[dailyCategory.selectedIndex] : null;
-                const categoryText = option ? option.text.toLowerCase() : '';
-                const provider = providerInput ? providerInput.value.trim() : '';
-                const supply =
-                    (supplySelect && supplySelect.selectedIndex > 0)
-                        ? supplySelect.options[supplySelect.selectedIndex].text
-                        : '';
-                const person =
-                    (personSelect && personSelect.selectedIndex > 0)
-                        ? personSelect.options[personSelect.selectedIndex].text
-                        : '';
-                const personType =
-                    (personTypeSelect && personTypeSelect.selectedIndex > 0)
-                        ? personTypeSelect.options[personTypeSelect.selectedIndex].text
-                        : '';
-
-                let prefix = '';
-
-                if (categoryText.indexOf('personal') !== -1) {
-                    if (person) {
-                        prefix += 'Personal: ' + person;
-                    }
-                    if (personType) {
-                        prefix += (prefix ? ' - ' : '') + 'Tipo: ' + personType;
-                    }
-                } else if (categoryText.indexOf('insumo') !== -1) {
-                    if (supply) {
-                        prefix += 'Insumo: ' + supply;
-                    }
-                    if (provider) {
-                        prefix += (prefix ? ' | ' : '') + 'Proveedor: ' + provider;
-                    }
-                } else if (provider) {
-                    prefix += 'Proveedor: ' + provider;
-                }
-
-                if (prefix) {
-                    baseObs = baseObs ? prefix + '. ' + baseObs : prefix;
-                }
-
-                if (observationTextarea) {
-                    observationTextarea.value = baseObs;
-                }
+                updateDailySupplierModeUi();
             });
         }
 

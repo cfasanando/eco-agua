@@ -7,4 +7,6 @@ import java.util.List;
 public interface SupplierRepository extends JpaRepository<Supplier, Long> {
 
     List<Supplier> findAllByOrderByNameAsc();
+
+    List<Supplier> findByActiveTrueOrderByNameAsc();
 }

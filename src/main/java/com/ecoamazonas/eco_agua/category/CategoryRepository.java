@@ -17,4 +17,6 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     List<Category> findByActiveTrueOrderByNameAsc();
 
     List<Category> findByTypeAndActiveTrueOrderByNameAsc(CategoryType type);
+
+    List<Category> findByTypeInAndActiveTrueOrderByNameAsc(List<CategoryType> types);
 }

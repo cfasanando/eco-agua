@@ -23,9 +23,11 @@ public class HomeController {
     private final ExpenseService expenseService;
     private final CategoryRepository categoryRepository;
 
-    public HomeController(OrderService orderService,
-                          ExpenseService expenseService,
-                          CategoryRepository categoryRepository) {
+    public HomeController(
+            OrderService orderService,
+            ExpenseService expenseService,
+            CategoryRepository categoryRepository
+    ) {
         this.orderService = orderService;
         this.expenseService = expenseService;
         this.categoryRepository = categoryRepository;
@@ -51,14 +53,15 @@ public class HomeController {
 
         // Expenses of today (for "Gastos del día" widget)
         List<Expense> dailyExpenses = expenseService.findByDateRange(today, today);
+
         BigDecimal totalExpensesToday = dailyExpenses.stream()
                 .map(Expense::getAmount)
                 .filter(amount -> amount != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Expense categories (type = Gasto)
+        // Expense categories (supporting legacy EXPENSE and current EXPENSES)
         List<Category> expenseCategories =
-                categoryRepository.findByTypeAndActiveTrueOrderByNameAsc(CategoryType.EXPENSES);
+                categoryRepository.findByTypeInAndActiveTrueOrderByNameAsc(CategoryType.expenseTypes());
 
         model.addAttribute("activePage", "home");
         model.addAttribute("today", today);
@@ -70,11 +73,9 @@ public class HomeController {
 
         // Expenses (home widget)
         model.addAttribute("dailyExpenses", dailyExpenses);
-        // Alias if some view still uses this name
         model.addAttribute("expensesToday", dailyExpenses);
         model.addAttribute("totalExpensesToday", totalExpensesToday);
         model.addAttribute("expenseCategories", expenseCategories);
-        // Generic alias
         model.addAttribute("categories", expenseCategories);
 
         return "home";

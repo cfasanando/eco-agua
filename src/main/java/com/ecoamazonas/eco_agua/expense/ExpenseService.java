@@ -51,6 +51,36 @@ public class ExpenseService {
         expense.setTaxIgv(BigDecimal.ZERO);
         expense.setTaxRate(BigDecimal.ZERO);
     }
+    
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String buildObservationWithSupplierReference(
+            String observation,
+            Supplier supplier,
+            String manualSupplierName
+    ) {
+        String cleanObservation = trimToNull(observation);
+
+        if (supplier != null) {
+            String prefix = "Proveedor: " + supplier.getName();
+            return cleanObservation == null ? prefix : prefix + ". " + cleanObservation;
+        }
+
+        String cleanManualSupplier = trimToNull(manualSupplierName);
+        if (cleanManualSupplier != null) {
+            String prefix = "Referencia: " + cleanManualSupplier;
+            return cleanObservation == null ? prefix : prefix + ". " + cleanObservation;
+        }
+
+        return cleanObservation;
+    }
 
     // -------------------------------------------------------------------------
     // Registration methods
@@ -60,6 +90,27 @@ public class ExpenseService {
     public Expense registerSimpleExpense(
             LocalDate expenseDate,
             Long categoryId,
+            String observation,
+            String voucherNumber,
+            BigDecimal amount
+    ) {
+        return registerSimpleExpense(
+                expenseDate,
+                categoryId,
+                null,
+                null,
+                observation,
+                voucherNumber,
+                amount
+        );
+    }
+
+    @Transactional
+    public Expense registerSimpleExpense(
+            LocalDate expenseDate,
+            Long categoryId,
+            Long supplierId,
+            String manualSupplierName,
             String observation,
             String voucherNumber,
             BigDecimal amount
@@ -74,10 +125,19 @@ public class ExpenseService {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new IllegalArgumentException("Category not found."));
 
+        Supplier supplier = null;
+        if (supplierId != null) {
+            supplier = supplierRepository.findById(supplierId)
+                    .orElseThrow(() -> new IllegalArgumentException("Supplier not found."));
+        }
+
         Expense expense = new Expense();
         expense.setCategory(category);
-        expense.setObservation(observation);
-        expense.setVoucherNumber(voucherNumber);
+        expense.setSupplier(supplier);
+        expense.setObservation(
+                buildObservationWithSupplierReference(observation, supplier, manualSupplierName)
+        );
+        expense.setVoucherNumber(trimToNull(voucherNumber));
         expense.setAmount(amount);
         expense.setExpenseDate(expenseDate != null ? expenseDate : LocalDate.now());
         expense.setPaymentType(ExpensePaymentType.CASH);
@@ -85,10 +145,25 @@ public class ExpenseService {
         expense.setPaidAmount(amount);
         expense.setStatus(ExpenseStatus.PAID);
 
-        // New tax fields default
         fillTaxInfoWithoutVat(expense);
 
         return expenseRepository.save(expense);
+    }
+    
+    @Transactional
+    public Expense createSimpleExpense(Long categoryId,
+                                       BigDecimal amount,
+                                       String observation,
+                                       LocalDate expenseDate) {
+        return registerSimpleExpense(
+                expenseDate,
+                categoryId,
+                null,
+                null,
+                observation,
+                null,
+                amount
+        );
     }
 
     @Transactional
@@ -204,39 +279,6 @@ public class ExpenseService {
     @Transactional(readOnly = true)
     public List<Category> findExpenseCategories() {
         return categoryRepository.findByTypeAndActiveTrueOrderByNameAsc(CategoryType.EXPENSES);
-    }
-
-    // Simple creation used by "Expenses of the day" widget
-    @Transactional
-    public Expense createSimpleExpense(Long categoryId,
-                                       BigDecimal amount,
-                                       String observation,
-                                       LocalDate expenseDate) {
-
-        if (categoryId == null) {
-            throw new IllegalArgumentException("Category is required.");
-        }
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Amount must be greater than zero.");
-        }
-
-        Category category = categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new IllegalArgumentException("Category not found: " + categoryId));
-
-        Expense expense = new Expense();
-        expense.setCategory(category);
-        expense.setAmount(amount);
-        expense.setObservation(observation);
-        expense.setExpenseDate(expenseDate != null ? expenseDate : LocalDate.now());
-        expense.setPaymentType(ExpensePaymentType.CASH);
-        expense.setDebt(false);
-        expense.setPaidAmount(amount);
-        expense.setStatus(ExpenseStatus.PAID);
-
-        // New tax fields default
-        fillTaxInfoWithoutVat(expense);
-
-        return expenseRepository.save(expense);
     }
 
     // >>> Existing helper for cashflow (only real cash expenses, no open debts)

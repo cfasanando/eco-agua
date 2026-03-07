@@ -48,16 +48,19 @@ public class OrderController {
     public String newOrderForm(Model model) {
         LocalDate today = LocalDate.now();
 
-        model.addAttribute("activePage", "home"); // highlight Home
+        model.addAttribute("activePage", "home");
         model.addAttribute("today", today);
         model.addAttribute("clients", clientRepository.findByActiveTrueOrderByNameAsc());
-        model.addAttribute("products", productService.findAll());
-        model.addAttribute("productCategories",
-                categoryRepository.findByTypeAndActiveTrueOrderByNameAsc(CategoryType.PRODUCT));
+        model.addAttribute("products", productService.findAllActiveForOrder());
+        model.addAttribute(
+                "productCategories",
+                categoryRepository.findByTypeAndActiveTrueOrderByNameAsc(CategoryType.PRODUCT)
+        );
 
-        // Load only active employees with job position "Repartidor"
-        model.addAttribute("deliveryEmployees",
-                employeeRepository.findActiveByJobPositionName("Repartidor"));
+        model.addAttribute(
+                "deliveryEmployees",
+                employeeRepository.findActiveByJobPositionName("Repartidor")
+        );
 
         return "orders/order_form";
     }

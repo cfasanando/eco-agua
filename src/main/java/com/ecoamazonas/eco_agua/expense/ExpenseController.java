@@ -75,8 +75,10 @@ public class ExpenseController {
         model.addAttribute("toDate", end);
         model.addAttribute("expenses", expenses);
         model.addAttribute("totalAmount", total);
-        model.addAttribute("categories",
-                categoryRepository.findByTypeAndActiveTrueOrderByNameAsc(CategoryType.EXPENSES));
+        model.addAttribute(
+                "categories",
+                categoryRepository.findByTypeInAndActiveTrueOrderByNameAsc(CategoryType.expenseTypes())
+        );
 
         return "expenses/expenses_by_date";
     }
@@ -86,7 +88,7 @@ public class ExpenseController {
      * Used both by the "Expenses by date" page and the "Daily expenses" widget.
      *
      * redirect = "BY_DATE" -> go back to /expenses/by-date
-     * redirect = "HOME"    -> go back to /home
+     * redirect = "HOME" -> go back to /home
      */
     @PostMapping("/save-simple")
     public String saveSimpleExpense(
@@ -99,7 +101,6 @@ public class ExpenseController {
             @RequestParam(name = "redirect", defaultValue = "BY_DATE") String redirect,
             RedirectAttributes redirectAttributes
     ) {
-        // Normalize date: if null, use today
         LocalDate effectiveDate = (expenseDate != null ? expenseDate : LocalDate.now());
 
         try {
@@ -110,6 +111,7 @@ public class ExpenseController {
                     voucherNumber,
                     amount
             );
+
             redirectAttributes.addFlashAttribute("message", "Expense saved successfully.");
             redirectAttributes.addFlashAttribute("messageType", "success");
         } catch (Exception ex) {
@@ -149,10 +151,8 @@ public class ExpenseController {
         model.addAttribute("toDate", end);
         model.addAttribute("debts", debts);
 
-        // 👇 aquí estaba el problema
         return "expenses/expenses_debts";
     }
-
 
     @PostMapping("/{id}/payments")
     public String registerPayment(
@@ -174,7 +174,7 @@ public class ExpenseController {
 
         return "redirect:/expenses/debts";
     }
-    
+
     @GetMapping("/fixed-costs")
     public String fixedCostsSummary(
             @RequestParam(name = "year", required = false) Integer year,
@@ -188,10 +188,7 @@ public class ExpenseController {
         LocalDate start = LocalDate.of(y, m, 1);
         LocalDate end = start.withDayOfMonth(start.lengthOfMonth());
 
-        // Total fixed costs for the selected month
         BigDecimal totalFixedCosts = expenseService.getTotalFixedCosts(start, end);
-
-        // Breakdown by category
         var breakdown = expenseService.getFixedCostsByCategory(start, end);
 
         model.addAttribute("activePage", "expenses_fixed_costs");
@@ -204,5 +201,4 @@ public class ExpenseController {
 
         return "expenses/expenses_fixed_costs";
     }
-
 }

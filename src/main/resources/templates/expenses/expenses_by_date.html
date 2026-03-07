@@ -165,8 +165,7 @@
 <div class="modal fade" id="expenseModal" tabindex="-1" aria-labelledby="expenseModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <!-- IMPORTANTE: aquí cambiamos la acción -->
-            <form th:action="@{/expenses/save-simple}" method="post">
+            <form id="expenseModalForm" th:action="@{/expenses/save-simple}" method="post">
                 <div class="modal-header">
                     <h5 class="modal-title" id="expenseModalLabel">Agrega un gasto</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
@@ -177,7 +176,6 @@
                            th:name="${_csrf.parameterName}"
                            th:value="${_csrf.token}"/>
 
-                    <!-- Para volver a esta misma página después de guardar -->
                     <input type="hidden" name="redirect" value="BY_DATE"/>
 
                     <div class="mb-3">
@@ -192,6 +190,43 @@
                                     th:text="${cat.name}">
                             </option>
                         </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Origen del gasto</label>
+                        <select class="form-select" id="expenseSupplierMode">
+                            <option value="NONE">Sin proveedor específico</option>
+                            <option value="REGISTERED">Proveedor registrado</option>
+                            <option value="OTHER">Otro / referencia manual</option>
+                        </select>
+                        <small class="text-muted">
+                            Usa proveedor registrado para servicios o compras frecuentes.
+                            Usa "Otro" para cochera, gasolina eventual o pagos sin proveedor fijo.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="expenseSupplierSelectGroup">
+                        <label class="form-label">Proveedor registrado</label>
+                        <select class="form-select" name="supplierId" id="expenseSupplierId">
+                            <option value="">- Seleccione -</option>
+                            <option th:each="sup : ${suppliers}"
+                                    th:value="${sup.id}"
+                                    th:text="${sup.name}"
+                                    th:data-category="${sup.category != null ? sup.category.name : ''}">
+                            </option>
+                        </select>
+                        <small class="text-muted" id="expenseSupplierHelp">
+                            Seleccione un proveedor de la lista.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="expenseManualSupplierGroup">
+                        <label class="form-label">Otro proveedor / referencia</label>
+                        <input type="text"
+                               class="form-control"
+                               name="manualSupplierName"
+                               id="expenseManualSupplierName"
+                               placeholder="Ej: cochera del barrio, grifo de la esquina, efectivo, etc.">
                     </div>
 
                     <div class="mb-3">
@@ -245,13 +280,22 @@
         const fromDateWrapper = document.getElementById('fromDateWrapper');
         const toDateWrapper = document.getElementById('toDateWrapper');
 
+        const expenseCategorySelect = document.getElementById('expenseCategoryId');
+        const expenseSupplierMode = document.getElementById('expenseSupplierMode');
+        const expenseSupplierSelectGroup = document.getElementById('expenseSupplierSelectGroup');
+        const expenseSupplierId = document.getElementById('expenseSupplierId');
+        const expenseSupplierHelp = document.getElementById('expenseSupplierHelp');
+        const expenseManualSupplierGroup = document.getElementById('expenseManualSupplierGroup');
+        const expenseManualSupplierName = document.getElementById('expenseManualSupplierName');
+        const expenseForm = document.getElementById('expenseModalForm');
+
         function updateDateFieldsVisibility() {
             if (!modeSelect) {
                 return;
             }
+
             const mode = modeSelect.value;
 
-            // PERIOD usa desde/hasta; el resto usa fecha única
             if (mode === 'PERIOD') {
                 singleDateWrapper.classList.add('d-none');
                 fromDateWrapper.classList.remove('d-none');
@@ -263,12 +307,150 @@
             }
         }
 
+        function normalizeLookupText(value) {
+            return (value || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim();
+        }
+
+        function getMeaningfulTokens(value) {
+            const stopWords = ['de', 'del', 'la', 'las', 'el', 'los', 'por', 'con', 'y'];
+            return normalizeLookupText(value)
+                .split(/\s+/)
+                .filter(function (token) {
+                    return token.length >= 3 && !stopWords.includes(token);
+                });
+        }
+
+        function filterExpenseSuppliersByCategory() {
+            if (!expenseSupplierId) {
+                return;
+            }
+
+            const allOptions = Array.from(expenseSupplierId.options).filter(function (option) {
+                return option.value;
+            });
+
+            allOptions.forEach(function (option) {
+                option.hidden = false;
+                option.disabled = false;
+            });
+
+            const selectedCategoryText =
+                expenseCategorySelect && expenseCategorySelect.selectedIndex >= 0
+                    ? expenseCategorySelect.options[expenseCategorySelect.selectedIndex].text
+                    : '';
+
+            const tokens = getMeaningfulTokens(selectedCategoryText);
+
+            if (!tokens.length) {
+                if (expenseSupplierHelp) {
+                    expenseSupplierHelp.textContent = 'Seleccione un proveedor de la lista o cambie a "Otro / referencia manual".';
+                }
+                return;
+            }
+
+            let matches = 0;
+
+            allOptions.forEach(function (option) {
+                const haystack = normalizeLookupText(option.getAttribute('data-category')) + ' ' +
+                    normalizeLookupText(option.textContent);
+
+                const matched = tokens.some(function (token) {
+                    return haystack.includes(token);
+                });
+
+                option.hidden = !matched;
+                option.disabled = !matched;
+
+                if (matched) {
+                    matches++;
+                }
+            });
+
+            if (matches === 0) {
+                allOptions.forEach(function (option) {
+                    option.hidden = false;
+                    option.disabled = false;
+                });
+
+                if (expenseSupplierHelp) {
+                    expenseSupplierHelp.textContent = 'No se encontraron proveedores sugeridos para esta categoría. Puedes elegir cualquiera o usar "Otro / referencia manual".';
+                }
+            } else if (expenseSupplierHelp) {
+                expenseSupplierHelp.textContent = 'Se muestran proveedores sugeridos según la categoría elegida.';
+            }
+
+            const selectedOption = expenseSupplierId.selectedOptions.length
+                ? expenseSupplierId.selectedOptions[0]
+                : null;
+
+            if (selectedOption && selectedOption.hidden) {
+                expenseSupplierId.value = '';
+            }
+        }
+
+        function updateExpenseSupplierFields() {
+            if (!expenseSupplierMode) {
+                return;
+            }
+
+            const mode = expenseSupplierMode.value || 'NONE';
+            const showRegistered = mode === 'REGISTERED';
+            const showManual = mode === 'OTHER';
+
+            if (expenseSupplierSelectGroup) {
+                expenseSupplierSelectGroup.classList.toggle('d-none', !showRegistered);
+            }
+
+            if (expenseManualSupplierGroup) {
+                expenseManualSupplierGroup.classList.toggle('d-none', !showManual);
+            }
+
+            if (expenseSupplierId) {
+                expenseSupplierId.required = showRegistered;
+                if (!showRegistered) {
+                    expenseSupplierId.value = '';
+                }
+            }
+
+            if (expenseManualSupplierName) {
+                expenseManualSupplierName.required = showManual;
+                if (!showManual) {
+                    expenseManualSupplierName.value = '';
+                }
+            }
+
+            if (showRegistered) {
+                filterExpenseSuppliersByCategory();
+            }
+        }
+
         if (modeSelect) {
             modeSelect.addEventListener('change', updateDateFieldsVisibility);
             updateDateFieldsVisibility();
         }
 
-        // Flash messages
+        if (expenseCategorySelect) {
+            expenseCategorySelect.addEventListener('change', function () {
+                filterExpenseSuppliersByCategory();
+                updateExpenseSupplierFields();
+            });
+        }
+
+        if (expenseSupplierMode) {
+            expenseSupplierMode.addEventListener('change', updateExpenseSupplierFields);
+            updateExpenseSupplierFields();
+        }
+
+        if (expenseForm) {
+            expenseForm.addEventListener('submit', function () {
+                updateExpenseSupplierFields();
+            });
+        }
+
         const flashMessage = /*[[${message}]]*/ null;
         const flashType = /*[[${messageType}]]*/ null;
         if (flashMessage && flashMessage !== 'null' && flashMessage !== '') {

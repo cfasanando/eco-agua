@@ -34,7 +34,7 @@ public class Product {
 
     @Column(nullable = false)
     private boolean active = true;
-    
+
     @Column(name = "featured", nullable = false)
     private boolean featured = false;
 
@@ -47,7 +47,7 @@ public class Product {
     public boolean isFeatured() {
         return featured;
     }
-   
+
     public void setFeatured(boolean featured) {
         this.featured = featured;
     }
@@ -124,7 +124,18 @@ public class Product {
         this.stock = stock;
     }
 
-    // -------- Derived cost & margin helpers --------
+    @Transient
+    public boolean usesClientProfilePrice() {
+        if (category == null || category.getName() == null) {
+            return false;
+        }
+
+        if (!"Agua de mesa".equalsIgnoreCase(category.getName().trim())) {
+            return false;
+        }
+
+        return suppliesComposition != null && !suppliesComposition.isEmpty();
+    }
 
     /**
      * Total cost of supplies for one unit of this product.
@@ -186,7 +197,6 @@ public class Product {
             return null;
         }
 
-        // (margin / price) * 100
         return margin
                 .multiply(BigDecimal.valueOf(100))
                 .divide(price, 1, RoundingMode.HALF_UP);

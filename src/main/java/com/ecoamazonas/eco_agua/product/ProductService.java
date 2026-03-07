@@ -37,6 +37,11 @@ public class ProductService {
         return repository.findAll(Sort.by("name").ascending());
     }
 
+    @Transactional(readOnly = true)
+    public List<Product> findAllActiveForOrder() {
+        return repository.findByActiveTrueOrderByCategoryNameAscNameAsc();
+    }
+
     @Transactional
     public void saveFromForm(
             Long id,
@@ -61,9 +66,8 @@ public class ProductService {
         product.setDescription(description);
         product.setPrice(price);
         product.setActive(active);
-        product.setFeatured(featured); // <-- IMPORTANT: store featured flag
+        product.setFeatured(featured);
 
-        // Category (optional)
         if (categoryId != null) {
             Category category = categoryRepository.findById(categoryId)
                     .orElseThrow(() -> new IllegalArgumentException("Category not found with id " + categoryId));
@@ -72,7 +76,6 @@ public class ProductService {
             product.setCategory(null);
         }
 
-        // Image path: when editing, keep the old one if no new image is provided
         if (imagePath != null && !imagePath.isBlank()) {
             product.setImagePath(imagePath);
         } else if (id == null) {
@@ -92,9 +95,6 @@ public class ProductService {
         repository.deleteAllById(ids);
     }
 
-    /**
-     * Save supplies composition for a product.
-     */
     @Transactional
     public void saveSuppliesConfig(
             Long productId,
@@ -104,7 +104,6 @@ public class ProductService {
         Product product = repository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found with id " + productId));
 
-        // Remove old composition
         productSupplyRepository.deleteAll(product.getSuppliesComposition());
         product.getSuppliesComposition().clear();
 

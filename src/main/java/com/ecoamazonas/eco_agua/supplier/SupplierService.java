@@ -24,6 +24,11 @@ public class SupplierService {
         return repository.findAllByOrderByNameAsc();
     }
 
+    @Transactional(readOnly = true)
+    public List<Supplier> findAllActive() {
+        return repository.findByActiveTrueOrderByNameAsc();
+    }
+
     @Transactional
     public void saveFromForm(
             Long id,

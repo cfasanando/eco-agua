@@ -82,6 +82,7 @@ public class OrderService {
             BigDecimal qty = (quantities != null && quantities.size() > i)
                     ? quantities.get(i)
                     : null;
+
             BigDecimal price = (unitPrices != null && unitPrices.size() > i)
                     ? unitPrices.get(i)
                     : null;
@@ -89,6 +90,7 @@ public class OrderService {
             if (qty == null || price == null) {
                 continue;
             }
+
             if (qty.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
@@ -97,6 +99,7 @@ public class OrderService {
                     .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
 
             BigDecimal availableStock = product.getStock() != null ? product.getStock() : BigDecimal.ZERO;
+
             if (availableStock.compareTo(qty) < 0) {
                 throw new IllegalArgumentException(
                         "Insufficient stock for product: " + product.getName() +
@@ -114,9 +117,11 @@ public class OrderService {
             if (lineTotals != null && lineTotals.size() > i) {
                 lineTotal = lineTotals.get(i);
             }
+
             if (lineTotal == null) {
                 lineTotal = qty.multiply(price);
             }
+
             lineTotal = lineTotal.setScale(2, RoundingMode.HALF_UP);
             item.setTotal(lineTotal);
 
@@ -132,7 +137,6 @@ public class OrderService {
 
         SaleOrder saved = orderRepository.save(order);
 
-        // Decrease stock when order is created
         saved.getItems().forEach(item -> inventoryService.registerProductMovement(
                 item.getProduct().getId(),
                 BigDecimal.ZERO,
@@ -167,7 +171,6 @@ public class OrderService {
             return order;
         }
 
-        // Special handling when canceling an order
         if (newStatus == OrderStatus.CANCELED && order.getStatus() != OrderStatus.CANCELED) {
             boolean effectiveReturn = Boolean.TRUE.equals(returnToStock);
             LocalDate movementDate = (cancelDate != null ? cancelDate : LocalDate.now());
@@ -221,9 +224,11 @@ public class OrderService {
         if (startDate == null) {
             startDate = endDate;
         }
+
         if (endDate == null) {
             endDate = startDate;
         }
+
         if (endDate.isBefore(startDate)) {
             LocalDate tmp = startDate;
             startDate = endDate;
@@ -239,9 +244,19 @@ public class OrderService {
                 .orElseThrow(() -> new IllegalArgumentException("Order not found: " + id));
     }
 
-    // >>> NEW: helper used by cashflow to get paid orders in a period
     @Transactional(readOnly = true)
     public List<SaleOrder> findPaidOrdersBetween(LocalDate startDate, LocalDate endDate) {
         return findOrdersBetweenDatesAndStatus(startDate, endDate, OrderStatus.PAID);
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal getPaidSalesTotalForDate(LocalDate date) {
+        LocalDate effectiveDate = (date != null ? date : LocalDate.now());
+
+        return findOrdersForDateAndStatus(effectiveDate, OrderStatus.PAID).stream()
+                .map(SaleOrder::getTotalAmount)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
     }
 }

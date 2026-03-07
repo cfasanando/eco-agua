@@ -13,9 +13,21 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     List<Employee> findByActiveTrueOrderByFirstNameAscLastNameAsc();
 
-    // Returns active employees with a given job position name
-    @Query("select e from Employee e join e.jobPosition jp " +
-           "where e.active = true and jp.name = :jobName " +
-           "order by e.firstName, e.lastName")
+    @Query("""
+        select e
+        from Employee e
+        left join fetch e.jobPosition jp
+        where e.id = :id
+        """)
+    Optional<Employee> findByIdWithJobPosition(@Param("id") Long id);
+
+    @Query("""
+        select e
+        from Employee e
+        join e.jobPosition jp
+        where e.active = true
+          and jp.name = :jobName
+        order by e.firstName, e.lastName
+        """)
     List<Employee> findActiveByJobPositionName(@Param("jobName") String jobName);
 }

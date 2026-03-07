@@ -392,10 +392,14 @@
                         <label class="form-label">Costo S/.</label>
                         <input type="number"
                                name="amount"
+                               id="dailyExpenseAmount"
                                class="form-control"
                                min="0"
                                step="0.01"
                                required>
+                        <small class="text-muted d-block mt-2" id="dailyExpenseAmountHint">
+                            Ingresa el costo manualmente o deja que el sistema lo sugiera para pagos de personal.
+                        </small>
                     </div>
 
                     <div class="mb-3">
@@ -412,6 +416,7 @@
                         <input type="date"
                                class="form-control"
                                name="expenseDate"
+                               id="dailyExpenseDate"
                                th:value="${today}">
                     </div>
 
@@ -431,6 +436,7 @@
         </div>
     </div>
 </div>
+
 <!-- Cancel order modal -->
 <div class="modal fade" id="cancelOrderModal" tabindex="-1"
      aria-labelledby="cancelOrderModalLabel" aria-hidden="true">
@@ -561,6 +567,10 @@
             const employeeHelp = document.getElementById(config.employeeHelpId);
             const employeePaymentTypeGroup = document.getElementById(config.employeePaymentTypeGroupId);
             const employeePaymentTypeSelect = document.getElementById(config.employeePaymentTypeSelectId);
+            const amountInput = document.getElementById(config.amountInputId);
+            const amountHint = document.getElementById(config.amountHintId);
+            const expenseDateInput = document.getElementById(config.expenseDateInputId);
+            const personnelPreviewUrl = config.personnelPreviewUrl;
 
             if (!form || !categorySelect) {
                 return;
@@ -577,7 +587,7 @@
                 return (value || '')
                     .toLowerCase()
                     .normalize('NFD')
-                    .replace(/[̀-ͯ]/g, '')
+                    .replace(/[\u0300-\u036f]/g, '')
                     .trim();
             }
 
@@ -640,6 +650,41 @@
                     option.hidden = false;
                     option.disabled = false;
                 });
+            }
+
+            function setAmountHint(message, isMuted, isError) {
+                if (!amountHint) {
+                    return;
+                }
+
+                amountHint.textContent = message || '';
+
+                amountHint.classList.remove('text-muted', 'text-danger', 'text-success');
+
+                if (isError) {
+                    amountHint.classList.add('text-danger');
+                    return;
+                }
+
+                if (isMuted) {
+                    amountHint.classList.add('text-muted');
+                    return;
+                }
+
+                amountHint.classList.add('text-success');
+            }
+
+            function parseMoney(value) {
+                const numberValue = Number(value || 0);
+                if (!Number.isFinite(numberValue)) {
+                    return 0;
+                }
+
+                return Math.round(numberValue * 100) / 100;
+            }
+
+            function formatMoney(value) {
+                return parseMoney(value).toFixed(2);
             }
 
             function filterSuppliers(categoryText) {
@@ -770,6 +815,99 @@
                 contextHint.textContent = 'Selecciona una categoría para continuar.';
             }
 
+            async function updatePersonnelPreview(context) {
+                if (!amountInput) {
+                    return;
+                }
+
+                if (context !== 'PERSONNEL') {
+                    setAmountHint('Ingresa el costo manualmente o deja que el sistema lo sugiera para pagos de personal.', true, false);
+                    return;
+                }
+
+                const employeeId = employeeSelect ? employeeSelect.value : '';
+                const paymentType = employeePaymentTypeSelect ? employeePaymentTypeSelect.value : '';
+                const expenseDate = expenseDateInput ? expenseDateInput.value : '';
+
+                if (!employeeId) {
+                    setAmountHint('Selecciona un trabajador para poder sugerir el costo.', true, false);
+                    return;
+                }
+
+                if (!paymentType) {
+                    setAmountHint('Selecciona el tipo de pago para continuar.', true, false);
+                    return;
+                }
+
+                if (paymentType !== 'SALARY') {
+                    setAmountHint('Para adelantos o descuentos, el costo se registra manualmente.', true, false);
+                    return;
+                }
+
+                if (!expenseDate) {
+                    setAmountHint('Selecciona la fecha para calcular el monto sugerido.', true, false);
+                    return;
+                }
+
+                setAmountHint('Calculando costo sugerido según ventas pagadas del día...', true, false);
+
+                try {
+                    const url = new URL(personnelPreviewUrl, window.location.origin);
+                    url.searchParams.set('employeeId', employeeId);
+                    url.searchParams.set('paymentType', paymentType);
+                    url.searchParams.set('expenseDate', expenseDate);
+
+                    const response = await fetch(url.toString(), {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Could not calculate personnel expense preview.');
+                    }
+
+                    const preview = await response.json();
+
+                    if (!preview || !preview.autoFilled) {
+                        setAmountHint(
+                            preview && preview.message
+                                ? preview.message
+                                : 'No se pudo calcular automáticamente el costo para este trabajador.',
+                            false,
+                            true
+                        );
+                        return;
+                    }
+
+                    amountInput.value = formatMoney(preview.suggestedAmount);
+
+                    const totalSales = formatMoney(preview.totalSales);
+                    const fixedComponent = formatMoney(preview.fixedComponent);
+                    const commissionComponent = formatMoney(preview.commissionComponent);
+                    const commissionRate = formatMoney(preview.commissionRate);
+
+                    let detailMessage = 'Costo sugerido: S/ ' + formatMoney(preview.suggestedAmount);
+
+                    if (preview.paymentMode === 'COMMISSION') {
+                        detailMessage += ' = ' + commissionRate + '% de ventas pagadas del día (S/ ' + totalSales + ').';
+                    } else if (preview.paymentMode === 'MIXED') {
+                        detailMessage += ' = fijo S/ ' + fixedComponent + ' + comisión S/ ' + commissionComponent +
+                            ' sobre ventas del día (S/ ' + totalSales + ').';
+                    } else {
+                        detailMessage += ' = monto fijo diario según el cargo.';
+                    }
+
+                    setAmountHint(detailMessage, false, false);
+                } catch (error) {
+                    setAmountHint(
+                        'No se pudo calcular automáticamente el costo. Puedes ingresar el monto manualmente.',
+                        false,
+                        true
+                    );
+                }
+            }
+
             function updateExpenseFormUi() {
                 const categoryText = getSelectedCategoryText();
                 const context = resolveExpenseContext(categoryText);
@@ -820,9 +958,24 @@
                         resetSelect(employeePaymentTypeSelect);
                     }
                 }
+
+                updatePersonnelPreview(context);
             }
 
             categorySelect.addEventListener('change', updateExpenseFormUi);
+
+            if (employeeSelect) {
+                employeeSelect.addEventListener('change', updateExpenseFormUi);
+            }
+
+            if (employeePaymentTypeSelect) {
+                employeePaymentTypeSelect.addEventListener('change', updateExpenseFormUi);
+            }
+
+            if (expenseDateInput) {
+                expenseDateInput.addEventListener('change', updateExpenseFormUi);
+            }
+
             form.addEventListener('submit', updateExpenseFormUi);
             updateExpenseFormUi();
         }
@@ -842,7 +995,11 @@
             employeeSelectId: 'dailyExpenseEmployeeId',
             employeeHelpId: 'dailyExpenseEmployeeHelp',
             employeePaymentTypeGroupId: 'dailyExpenseEmployeePaymentTypeGroup',
-            employeePaymentTypeSelectId: 'dailyExpenseEmployeePaymentType'
+            employeePaymentTypeSelectId: 'dailyExpenseEmployeePaymentType',
+            amountInputId: 'dailyExpenseAmount',
+            amountHintId: 'dailyExpenseAmountHint',
+            expenseDateInputId: 'dailyExpenseDate',
+            personnelPreviewUrl: /*[[@{/expenses/personnel-preview}]]*/ '/expenses/personnel-preview'
         });
 
         // Global flash message (orders + expenses)

@@ -31,19 +31,22 @@ public class ClientController {
     private final PromotionService promotionService;
     private final GeocodingService geocodingService;
     private final ClientAnalyticsService clientAnalyticsService;
+    private final ClientPortfolioService clientPortfolioService;
 
     public ClientController(
             ClientService clientService,
             ClientProfileService clientProfileService,
             PromotionService promotionService,
             GeocodingService geocodingService,
-            ClientAnalyticsService clientAnalyticsService
+            ClientAnalyticsService clientAnalyticsService,
+            ClientPortfolioService clientPortfolioService
     ) {
         this.clientService = clientService;
         this.clientProfileService = clientProfileService;
         this.promotionService = promotionService;
         this.geocodingService = geocodingService;
         this.clientAnalyticsService = clientAnalyticsService;
+        this.clientPortfolioService = clientPortfolioService;
     }
 
     @GetMapping
@@ -53,6 +56,54 @@ public class ClientController {
         model.addAttribute("promotions", promotionService.findAllActive());
 
         return "admin/clients";
+    }
+
+    @GetMapping("/portfolio")
+    public String portfolio(
+            @RequestParam(value = "days", required = false) Integer days,
+            @RequestParam(value = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(value = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            Model model
+    ) {
+        LocalDate today = LocalDate.now();
+        int resolvedDays = (days != null && days > 0) ? days : 30;
+
+        LocalDate fromDate;
+        LocalDate toDate;
+
+        if (from != null || to != null) {
+            fromDate = (from != null ? from : to);
+            toDate = (to != null ? to : from);
+        } else {
+            toDate = today;
+            fromDate = today.minusDays(resolvedDays - 1L);
+        }
+
+        if (fromDate == null) {
+            fromDate = today.minusDays(resolvedDays - 1L);
+        }
+        if (toDate == null) {
+            toDate = today;
+        }
+
+        if (fromDate.isAfter(toDate)) {
+            LocalDate tmp = fromDate;
+            fromDate = toDate;
+            toDate = tmp;
+        }
+
+        ClientPortfolioSnapshot snapshot = clientPortfolioService.buildSnapshot(fromDate, toDate);
+
+        Integer selectedPresetDays = null;
+        if (from == null && to == null && (resolvedDays == 30 || resolvedDays == 60 || resolvedDays == 90)) {
+            selectedPresetDays = resolvedDays;
+        }
+
+        model.addAttribute("snapshot", snapshot);
+        model.addAttribute("selectedPresetDays", selectedPresetDays);
+        model.addAttribute("currentRangeDays", ChronoUnit.DAYS.between(snapshot.getFromDate(), snapshot.getToDate()) + 1);
+
+        return "admin/client_portfolio";
     }
 
     @GetMapping("/{id}/stats")

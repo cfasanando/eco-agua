@@ -1,12 +1,22 @@
 package com.ecoamazonas.eco_agua.client;
 
 import com.ecoamazonas.eco_agua.promotion.PromotionService;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,17 +30,20 @@ public class ClientController {
     private final ClientProfileService clientProfileService;
     private final PromotionService promotionService;
     private final GeocodingService geocodingService;
+    private final ClientAnalyticsService clientAnalyticsService;
 
     public ClientController(
             ClientService clientService,
             ClientProfileService clientProfileService,
             PromotionService promotionService,
-            GeocodingService geocodingService
+            GeocodingService geocodingService,
+            ClientAnalyticsService clientAnalyticsService
     ) {
         this.clientService = clientService;
         this.clientProfileService = clientProfileService;
         this.promotionService = promotionService;
         this.geocodingService = geocodingService;
+        this.clientAnalyticsService = clientAnalyticsService;
     }
 
     @GetMapping
@@ -40,6 +53,60 @@ public class ClientController {
         model.addAttribute("promotions", promotionService.findAllActive());
 
         return "admin/clients";
+    }
+
+    @GetMapping("/{id}/stats")
+    public String stats(
+            @PathVariable Long id,
+            @RequestParam(value = "days", required = false) Integer days,
+            @RequestParam(value = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(value = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            Model model
+    ) {
+        LocalDate today = LocalDate.now();
+        int resolvedDays = (days != null && days > 0) ? days : 30;
+
+        LocalDate fromDate;
+        LocalDate toDate;
+
+        if (from != null || to != null) {
+            fromDate = (from != null ? from : to);
+            toDate = (to != null ? to : from);
+        } else {
+            toDate = today;
+            fromDate = today.minusDays(resolvedDays - 1L);
+        }
+
+        if (fromDate == null) {
+            fromDate = today.minusDays(resolvedDays - 1L);
+        }
+        if (toDate == null) {
+            toDate = today;
+        }
+
+        if (fromDate.isAfter(toDate)) {
+            LocalDate tmp = fromDate;
+            fromDate = toDate;
+            toDate = tmp;
+        }
+
+        ClientAnalyticsSnapshot snapshot;
+        try {
+            snapshot = clientAnalyticsService.buildSnapshot(id, fromDate, toDate);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage(), ex);
+        }
+
+        Integer selectedPresetDays = null;
+        if (from == null && to == null && (resolvedDays == 30 || resolvedDays == 60 || resolvedDays == 90)) {
+            selectedPresetDays = resolvedDays;
+        }
+
+        model.addAttribute("snapshot", snapshot);
+        model.addAttribute("selectedPresetDays", selectedPresetDays);
+        model.addAttribute("currentRangeDays", ChronoUnit.DAYS.between(snapshot.getFromDate(), snapshot.getToDate()) + 1);
+
+        return "admin/client_stats";
     }
 
     @PostMapping("/save")

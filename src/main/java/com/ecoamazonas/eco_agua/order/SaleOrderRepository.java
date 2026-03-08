@@ -54,4 +54,37 @@ public interface SaleOrderRepository extends JpaRepository<SaleOrder, Long> {
             @Param("endDate") LocalDate endDate,
             @Param("statuses") List<OrderStatus> statuses
     );
+
+    @Query("""
+        select distinct o
+        from SaleOrder o
+        join fetch o.client c
+        left join fetch c.profile cp
+        left join fetch o.items i
+        left join fetch i.product p
+        left join fetch p.category pc
+        where c.id = :clientId
+        order by o.orderDate desc, o.id desc
+        """)
+    List<SaleOrder> findDetailedOrdersByClientIdOrderByOrderDateDescIdDesc(
+            @Param("clientId") Long clientId
+    );
+
+    @Query("""
+        select distinct o
+        from SaleOrder o
+        join fetch o.client c
+        left join fetch c.profile cp
+        left join fetch o.items i
+        left join fetch i.product p
+        left join fetch p.category pc
+        where c.id = :clientId
+          and o.orderDate between :startDate and :endDate
+        order by o.orderDate desc, o.id desc
+        """)
+    List<SaleOrder> findDetailedOrdersByClientIdAndOrderDateBetweenOrderByOrderDateDescIdDesc(
+            @Param("clientId") Long clientId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 }

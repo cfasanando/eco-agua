@@ -52,22 +52,129 @@
                         </div>
                     </div>
 
+                    <!-- Possible orders -->
                     <div class="card shadow-sm">
-                        <div class="card-header bg-dark text-white">
-                            Posibles pedidos
+                        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                            <span>Posibles pedidos</span>
+                            <small class="fw-normal">Clientes con mayor probabilidad de compra hoy</small>
                         </div>
-                        <div class="card-body">
-                            <p class="small text-muted mb-0">
-                                Más adelante aquí se podrán mostrar los posibles pedidos del día
-                                y los clientes sin pedidos, según su frecuencia.
-                            </p>
+                        <div class="card-body p-2">
+
+                            <div th:if="${possibleOrders == null or #lists.isEmpty(possibleOrders)}"
+                                 class="small text-muted">
+                                No hay sugerencias de compra por ahora. El sistema mostrará aquí a los clientes
+                                con historial suficiente y mayor probabilidad de volver a comprar hoy.
+                            </div>
+
+                            <div th:if="${possibleOrders != null and !#lists.isEmpty(possibleOrders)}">
+                                <div class="small text-muted mb-2">
+                                    Se consideran clientes activos con historial de compras pagadas o fiadas,
+                                    excluyendo quienes ya tienen pedido registrado hoy.
+                                </div>
+
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped align-middle mb-0">
+                                        <thead class="table-light">
+                                        <tr>
+                                            <th>Cliente</th>
+                                            <th class="text-center">Prob.</th>
+                                            <th class="text-center">Frecuencia</th>
+                                            <th class="text-center">Última</th>
+                                            <th class="text-center">Próx.</th>
+                                            <th class="text-center">Estado</th>
+                                            <th class="text-center">Acción</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="suggestion : ${possibleOrders}">
+                                            <td>
+                                                <div class="fw-semibold" th:text="${suggestion.clientName}">Cliente</div>
+                                                <div class="small text-muted">
+                                                    <span th:text="${suggestion.profileName}">Perfil</span>
+                                                    <span th:if="${suggestion.clientPhone != null and !#strings.isEmpty(suggestion.clientPhone)}">
+                                                        &nbsp;|&nbsp;
+                                                        <span th:text="${suggestion.clientPhone}">999999999</span>
+                                                    </span>
+                                                </div>
+                                            </td>
+
+                                            <td class="text-center">
+                                                <span class="badge rounded-pill"
+                                                      th:classappend="${
+                                                            suggestion.probabilityPercent >= 85 ? ' text-bg-danger' :
+                                                            (suggestion.probabilityPercent >= 70 ? ' text-bg-warning' :
+                                                            (suggestion.probabilityPercent >= 55 ? ' text-bg-info' : ' text-bg-secondary'))
+                                                      }"
+                                                      th:text="${suggestion.probabilityPercent + '%'}">
+                                                    70%
+                                                </span>
+                                            </td>
+
+                                            <td class="text-center">
+                                                <div>
+                                                    Cada
+                                                    <strong th:text="${suggestion.averageIntervalDays}">3</strong>
+                                                    días
+                                                </div>
+                                                <div class="small text-muted">
+                                                    <span th:text="${suggestion.successfulOrderDays}">4</span>
+                                                    compras
+                                                </div>
+                                            </td>
+
+                                            <td class="text-center">
+                                                <div th:text="${#temporals.format(suggestion.lastOrderDate, 'dd/MM/yyyy')}">07/03/2026</div>
+                                                <div class="small text-muted">
+                                                    hace
+                                                    <span th:text="${suggestion.daysSinceLastOrder}">2</span>
+                                                    día(s)
+                                                </div>
+                                            </td>
+
+                                            <td class="text-center">
+                                                <div th:text="${#temporals.format(suggestion.expectedNextOrderDate, 'dd/MM/yyyy')}">09/03/2026</div>
+                                                <div class="small"
+                                                     th:classappend="${suggestion.overdueDays > 0} ? ' text-danger' : ' text-muted'">
+                                                    <span th:if="${suggestion.overdueDays > 0}"
+                                                          th:text="'atrasado ' + ${suggestion.overdueDays} + ' día(s)'">
+                                                        atrasado 1 día
+                                                    </span>
+                                                    <span th:if="${suggestion.overdueDays == 0}">
+                                                        dentro del ciclo esperado
+                                                    </span>
+                                                </div>
+                                            </td>
+
+                                            <td class="text-center">
+                                                <span class="badge rounded-pill"
+                                                      th:classappend="${
+                                                            suggestion.statusClass == 'danger' ? ' text-bg-danger' :
+                                                            (suggestion.statusClass == 'warning' ? ' text-bg-warning text-dark' : ' text-bg-secondary')
+                                                      }"
+                                                      th:text="${suggestion.statusLabel}">
+                                                    Monitorear
+                                                </span>
+                                            </td>
+
+                                            <td class="text-center">
+                                                <a th:href="@{/orders/new(clientId=${suggestion.clientId})}"
+                                                   class="btn btn-sm btn-primary mb-1">
+                                                    <i class="bi bi-telephone me-1"></i>
+                                                    <span th:text="${suggestion.actionLabel}">Llamar hoy</span>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
                 </div>
 
                 <div class="col-lg-4">
 
-                    <!-- Sales of the day -->
                     <div class="card shadow-sm mb-3">
                         <div class="card-header bg-info text-white">
                             Ventas del día
@@ -147,7 +254,6 @@
                         </div>
                     </div>
 
-                    <!-- Expenses of the day -->
                     <div class="card shadow-sm mb-3">
                         <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
                             <span>Gastos del día</span>
@@ -225,7 +331,6 @@
                         </div>
                     </div>
 
-                    <!-- Credit orders -->
                     <div class="card shadow-sm mb-3">
                         <div class="card-header bg-danger text-white">
                             Pedidos fiados
@@ -311,7 +416,6 @@
                         </div>
                     </div>
 
-                    <!-- Orders to deliver -->
                     <div class="card shadow-sm">
                         <div class="card-header bg-warning text-dark">
                             Pedidos del día (x entregar)

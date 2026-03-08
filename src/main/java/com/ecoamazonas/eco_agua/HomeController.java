@@ -4,6 +4,7 @@ import com.ecoamazonas.eco_agua.expense.Expense;
 import com.ecoamazonas.eco_agua.expense.ExpenseService;
 import com.ecoamazonas.eco_agua.order.OrderService;
 import com.ecoamazonas.eco_agua.order.OrderStatus;
+import com.ecoamazonas.eco_agua.order.PossibleOrderSuggestion;
 import com.ecoamazonas.eco_agua.order.SaleOrder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -37,6 +38,7 @@ public class HomeController {
         List<SaleOrder> paidOrders = orderService.findOrdersForDateAndStatus(today, OrderStatus.PAID);
         List<SaleOrder> requestedOrders = orderService.findOrdersForDateAndStatus(today, OrderStatus.REQUESTED);
         List<SaleOrder> creditOrders = orderService.findOrdersByStatus(OrderStatus.CREDIT);
+        List<PossibleOrderSuggestion> possibleOrders = orderService.getPossibleOrderSuggestions(today, 8);
 
         BigDecimal totalSalesToday = paidOrders.stream()
                 .map(SaleOrder::getTotalAmount)
@@ -68,6 +70,7 @@ public class HomeController {
         model.addAttribute("paidOrders", paidOrders);
         model.addAttribute("requestedOrders", requestedOrders);
         model.addAttribute("creditOrders", creditOrders);
+        model.addAttribute("possibleOrders", possibleOrders);
         model.addAttribute("creditDaysByOrderId", creditDaysByOrderId);
         model.addAttribute("totalSalesToday", totalSalesToday);
         model.addAttribute("totalCreditAmount", totalCreditAmount);

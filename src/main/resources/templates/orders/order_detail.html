@@ -16,16 +16,21 @@
                     Pedido #
                     <span th:text="${order.orderNumber}">1</span>
                 </h1>
-                <div class="small text-muted">
-                    Fecha:
-                    <span th:text="${#temporals.format(order.orderDate,'dd/MM/yyyy')}">23/11/2025</span>
-                    &nbsp;|&nbsp;
-                    Estado:
-                    <span th:text="${order.status}">REQUESTED</span>
+                <div class="small text-muted text-end">
+                    <div>
+                        Fecha:
+                        <span th:text="${#temporals.format(order.orderDate,'dd/MM/yyyy')}">23/11/2025</span>
+                        &nbsp;|&nbsp;
+                        Estado:
+                        <span th:text="${order.status}">REQUESTED</span>
+                    </div>
+                    <div th:if="${order.status.name() == 'CREDIT' and daysSinceOrder != null}">
+                        Días de deuda:
+                        <strong th:text="${daysSinceOrder}">0</strong>
+                    </div>
                 </div>
             </div>
 
-            <!-- Info cliente -->
             <div class="row g-3 mb-3">
                 <div class="col-lg-6">
                     <div class="card shadow-sm">
@@ -61,7 +66,7 @@
                         <div class="card-body small">
                             <p class="mb-1">
                                 <strong>Repartidor:</strong>
-                                <span th:text="${order.deliveryPerson}">Repartidor</span>
+                                <span th:text="${order.deliveryPerson} ?: '-'">Repartidor</span>
                             </p>
                             <p class="mb-1">
                                 <strong>Botellones prestados:</strong>
@@ -69,7 +74,7 @@
                             </p>
                             <p class="mb-1">
                                 <strong>Comentario:</strong>
-                                <span th:text="${order.comment}">-</span>
+                                <span th:text="${order.comment} ?: '-'">-</span>
                             </p>
                             <p class="mb-1">
                                 <strong>Total:</strong>
@@ -81,7 +86,6 @@
                 </div>
             </div>
 
-            <!-- Items -->
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-light">
                     Detalle de productos
@@ -126,35 +130,39 @@
                 </div>
             </div>
 
-            <!-- Acciones de estado -->
             <div class="d-flex flex-wrap gap-2">
-                <form th:action="@{|/orders/${order.id}/pay|}" method="post">
-                    <input type="hidden"
-                           th:name="${_csrf.parameterName}"
-                           th:value="${_csrf.token}"/>
+                <form th:if="${order.status.name() != 'PAID' and order.status.name() != 'CANCELED'}"
+                      th:action="@{|/orders/${order.id}/pay|}" method="post">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <input type="hidden" name="redirect" th:value="${backUrl}"/>
                     <button type="submit" class="btn btn-primary">
                         Marcar como pagado
                     </button>
                 </form>
 
-                <form th:action="@{|/orders/${order.id}/credit|}" method="post">
-                    <input type="hidden"
-                           th:name="${_csrf.parameterName}"
-                           th:value="${_csrf.token}"/>
+                <form th:if="${order.status.name() != 'CREDIT' and order.status.name() != 'CANCELED'}"
+                      th:action="@{|/orders/${order.id}/credit|}" method="post">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <input type="hidden" name="redirect" th:value="${backUrl}"/>
                     <button type="submit" class="btn btn-warning">
                         Marcar como fiado
                     </button>
                 </form>
 
-                <form th:action="@{|/orders/${order.id}/cancel|}" method="post"
+                <form th:if="${order.status.name() != 'CANCELED'}"
+                      th:action="@{|/orders/${order.id}/cancel|}" method="post"
                       onsubmit="return confirm('¿Seguro que deseas anular este pedido?');">
-                    <input type="hidden"
-                           th:name="${_csrf.parameterName}"
-                           th:value="${_csrf.token}"/>
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <input type="hidden" name="redirect" th:value="${backUrl}"/>
+                    <input type="hidden" name="returnToStock" value="true"/>
                     <button type="submit" class="btn btn-danger">
                         Anular
                     </button>
                 </form>
+
+                <a th:href="${backUrl}" class="btn btn-outline-secondary">
+                    Volver
+                </a>
 
                 <a th:href="@{/income/sales}" class="btn btn-outline-secondary">
                     Volver a ingresos

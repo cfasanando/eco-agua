@@ -54,14 +54,6 @@ public class ExpenseService {
         this.employeeRepository = employeeRepository;
     }
 
-    // -------------------------------------------------------------------------
-    // Internal helpers
-    // -------------------------------------------------------------------------
-
-    /**
-     * Simple default: full amount is treated as non-taxed cost.
-     * Later you can create another method to split base + IGV if needed.
-     */
     private void fillTaxInfoWithoutVat(Expense expense) {
         BigDecimal amount = expense.getAmount() != null ? expense.getAmount() : BigDecimal.ZERO;
         expense.setTaxBase(amount);
@@ -185,10 +177,6 @@ public class ExpenseService {
         String prefix = String.join(". ", prefixes);
         return cleanObservation == null ? prefix : prefix + ". " + cleanObservation;
     }
-
-    // -------------------------------------------------------------------------
-    // Registration methods
-    // -------------------------------------------------------------------------
 
     @Transactional
     public Expense registerSimpleExpense(
@@ -319,11 +307,81 @@ public class ExpenseService {
         return expenseRepository.save(expense);
     }
 
+    @Transactional(readOnly = true)
+    public Expense findById(Long expenseId) {
+        Expense expense = expenseRepository.findDetailedById(expenseId);
+        if (expense == null) {
+            throw new IllegalArgumentException("Expense not found.");
+        }
+
+        return expense;
+    }
+
+    private void ensureExpenseCanBeModified(Expense expense) {
+        if (expense == null) {
+            throw new IllegalArgumentException("Expense not found.");
+        }
+
+        if (expense.isDebt()) {
+            throw new IllegalArgumentException("Debt expenses cannot be edited or deleted from this screen.");
+        }
+
+        if (expense.getPayments() != null && !expense.getPayments().isEmpty()) {
+            throw new IllegalArgumentException("Expenses with registered payments cannot be edited or deleted.");
+        }
+    }
+
     @Transactional
-    public Expense createSimpleExpense(Long categoryId,
-                                       BigDecimal amount,
-                                       String observation,
-                                       LocalDate expenseDate) {
+    public Expense updateSimpleExpense(
+            Long expenseId,
+            Long categoryId,
+            String observation,
+            BigDecimal amount,
+            LocalDate expenseDate
+    ) {
+        if (expenseId == null) {
+            throw new IllegalArgumentException("Expense id is required.");
+        }
+        if (categoryId == null) {
+            throw new IllegalArgumentException("Category is required.");
+        }
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException("Amount must be greater than zero.");
+        }
+
+        Expense expense = findById(expenseId);
+        ensureExpenseCanBeModified(expense);
+
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new IllegalArgumentException("Category not found."));
+
+        expense.setCategory(category);
+        expense.setObservation(trimToNull(observation));
+        expense.setAmount(amount);
+        expense.setExpenseDate(expenseDate != null ? expenseDate : expense.getExpenseDate());
+        expense.setPaymentType(ExpensePaymentType.CASH);
+        expense.setDebt(false);
+        expense.setPaidAmount(amount);
+        expense.setStatus(ExpenseStatus.PAID);
+
+        fillTaxInfoWithoutVat(expense);
+
+        return expenseRepository.save(expense);
+    }
+
+    @Transactional
+    public void deleteSimpleExpense(Long expenseId) {
+        if (expenseId == null) {
+            throw new IllegalArgumentException("Expense id is required.");
+        }
+
+        Expense expense = findById(expenseId);
+        ensureExpenseCanBeModified(expense);
+        expenseRepository.delete(expense);
+    }
+
+    @Transactional
+    public Expense createSimpleExpense(Long categoryId, BigDecimal amount, String observation, LocalDate expenseDate) {
         return registerSimpleExpense(
                 expenseDate,
                 categoryId,
@@ -378,7 +436,6 @@ public class ExpenseService {
         expense.setDueDate(dueDate);
         expense.setStatus(ExpenseStatus.OPEN);
 
-        // New tax fields default
         fillTaxInfoWithoutVat(expense);
 
         return expenseRepository.save(expense);
@@ -427,10 +484,6 @@ public class ExpenseService {
         return paymentRepository.save(payment);
     }
 
-    // -------------------------------------------------------------------------
-    // Queries
-    // -------------------------------------------------------------------------
-
     @Transactional(readOnly = true)
     public List<Expense> findByDateRange(LocalDate start, LocalDate end) {
         return expenseRepository.findByExpenseDateBetweenOrderByExpenseDateAsc(start, end);
@@ -444,8 +497,6 @@ public class ExpenseService {
     @Transactional(readOnly = true)
     public List<Expense> findOpenDebts(LocalDate start, LocalDate end) {
         Set<ExpenseStatus> statuses = EnumSet.of(ExpenseStatus.OPEN, ExpenseStatus.PARTIAL);
-
-        // NOTE: currently using only date range, not statuses
         return expenseRepository.findByDebtTrueAndExpenseDateBetweenOrderByExpenseDateAsc(start, end);
     }
 
@@ -469,7 +520,6 @@ public class ExpenseService {
         return employeeRepository.findByActiveTrueOrderByFirstNameAscLastNameAsc();
     }
 
-    // >>> Existing helper for cashflow (only real cash expenses, no open debts)
     @Transactional(readOnly = true)
     public List<Expense> findCashflowExpenses(LocalDate start, LocalDate end) {
         List<Expense> all = findByDateRange(start, end);
@@ -478,14 +528,6 @@ public class ExpenseService {
                 .collect(Collectors.toList());
     }
 
-    // -------------------------------------------------------------------------
-    // Fixed costs helpers (to mirror the Excel "costos fijos mensuales" table)
-    // -------------------------------------------------------------------------
-
-    /**
-     * Returns total fixed costs for a given period,
-     * summing all expenses whose category type is EXPENSES.
-     */
     @Transactional(readOnly = true)
     public BigDecimal getTotalFixedCosts(LocalDate start, LocalDate end) {
         if (start == null || end == null) {
@@ -496,7 +538,6 @@ public class ExpenseService {
         LocalDate to = end;
 
         if (to.isBefore(from)) {
-            // Swap to keep a valid range
             LocalDate tmp = from;
             from = to;
             to = tmp;
@@ -509,10 +550,6 @@ public class ExpenseService {
         );
     }
 
-    /**
-     * Convenience method: returns total fixed costs for a full month (year + month).
-     * Example: getMonthlyFixedCosts(2025, 11) -> November 2025.
-     */
     @Transactional(readOnly = true)
     public BigDecimal getMonthlyFixedCosts(int year, int month) {
         LocalDate start = LocalDate.of(year, month, 1);
@@ -520,10 +557,6 @@ public class ExpenseService {
         return getTotalFixedCosts(start, end);
     }
 
-    /**
-     * Returns a breakdown of fixed costs by category name for a given period.
-     * Map key = category name, value = total amount for that category.
-     */
     @Transactional(readOnly = true)
     public Map<String, BigDecimal> getFixedCostsByCategory(LocalDate start, LocalDate end) {
         if (start == null || end == null) {
@@ -548,8 +581,8 @@ public class ExpenseService {
         Map<String, BigDecimal> result = new LinkedHashMap<>();
         for (Object[] row : rows) {
             String categoryName = (String) row[0];
-            BigDecimal total = (BigDecimal) row[1];
-            result.put(categoryName, total);
+            BigDecimal amount = (BigDecimal) row[1];
+            result.put(categoryName, amount != null ? amount : BigDecimal.ZERO);
         }
 
         return result;

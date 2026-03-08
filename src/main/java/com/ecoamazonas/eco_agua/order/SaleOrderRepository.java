@@ -19,9 +19,10 @@ public interface SaleOrderRepository extends JpaRepository<SaleOrder, Long> {
             OrderStatus status
     );
 
-    // New: generic range search used by accounting registry
     List<SaleOrder> findByOrderDateBetween(
             LocalDate startDate,
             LocalDate endDate
     );
+
+    List<SaleOrder> findByStatusOrderByOrderDateAscIdAsc(OrderStatus status);
 }

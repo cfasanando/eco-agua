@@ -97,13 +97,6 @@ public class ExpenseController {
         return "expenses/expenses_by_date";
     }
 
-    /**
-     * Simple expense registration.
-     * Used both by the "Expenses by date" page and the "Daily expenses" widget.
-     *
-     * redirect = "BY_DATE" -> go back to /expenses/by-date
-     * redirect = "HOME" -> go back to /home
-     */
     @PostMapping("/save-simple")
     public String saveSimpleExpense(
             @RequestParam("categoryId") Long categoryId,
@@ -143,11 +136,66 @@ public class ExpenseController {
             redirectAttributes.addFlashAttribute("messageType", "error");
         }
 
-        if ("HOME".equalsIgnoreCase(redirect)) {
-            return "redirect:/home";
+        return "redirect:" + resolveRedirectTarget(redirect, "/expenses/by-date");
+    }
+
+    @GetMapping("/{id}")
+    @ResponseBody
+    public Map<String, Object> getExpenseData(@PathVariable("id") Long expenseId) {
+        Expense expense = expenseService.findById(expenseId);
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("id", expense.getId());
+        payload.put("categoryId", expense.getCategory() != null ? expense.getCategory().getId() : null);
+        payload.put("categoryName", expense.getCategory() != null ? expense.getCategory().getName() : "");
+        payload.put("observation", expense.getObservation() != null ? expense.getObservation() : "");
+        payload.put("amount", normalizeMoney(expense.getAmount()));
+        payload.put("expenseDate", expense.getExpenseDate());
+        payload.put("debt", expense.isDebt());
+        payload.put("hasPayments", expense.getPayments() != null && !expense.getPayments().isEmpty());
+
+        return payload;
+    }
+
+    @PostMapping("/{id}/update")
+    public String updateSimpleExpense(
+            @PathVariable("id") Long expenseId,
+            @RequestParam("categoryId") Long categoryId,
+            @RequestParam("amount") BigDecimal amount,
+            @RequestParam(name = "observation", required = false) String observation,
+            @RequestParam(name = "expenseDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate expenseDate,
+            @RequestParam(name = "redirect", required = false) String redirect,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            expenseService.updateSimpleExpense(expenseId, categoryId, observation, amount, expenseDate);
+            redirectAttributes.addFlashAttribute("message", "Expense updated successfully.");
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute("message", "Error while updating expense: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "error");
         }
 
-        return "redirect:/expenses/by-date";
+        return "redirect:" + resolveRedirectTarget(redirect, "/home");
+    }
+
+    @PostMapping("/{id}/delete")
+    public String deleteSimpleExpense(
+            @PathVariable("id") Long expenseId,
+            @RequestParam(name = "redirect", required = false) String redirect,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            expenseService.deleteSimpleExpense(expenseId);
+            redirectAttributes.addFlashAttribute("message", "Expense deleted successfully.");
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute("message", "Error while deleting expense: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "error");
+        }
+
+        return "redirect:" + resolveRedirectTarget(redirect, "/home");
     }
 
     @GetMapping("/personnel-preview")
@@ -318,6 +366,19 @@ public class ExpenseController {
         model.addAttribute("breakdown", breakdown);
 
         return "expenses/expenses_fixed_costs";
+    }
+
+    private String resolveRedirectTarget(String redirect, String defaultPath) {
+        if (redirect == null || redirect.isBlank()) {
+            return defaultPath;
+        }
+
+        String trimmed = redirect.trim();
+        if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+            return defaultPath;
+        }
+
+        return trimmed;
     }
 
     private BigDecimal resolveDailyFixedAmount(JobPosition position) {

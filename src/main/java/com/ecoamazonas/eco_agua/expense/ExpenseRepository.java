@@ -24,9 +24,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             LocalDate end
     );
 
-    /**
-     * Sum all expenses by category type in a given period.
-     */
     @Query("""
         select coalesce(sum(e.amount), 0)
         from Expense e
@@ -39,9 +36,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             @Param("end") LocalDate end
     );
 
-    /**
-     * Sum expenses grouped by category name for a given category type and period.
-     */
     @Query("""
         select e.category.name, coalesce(sum(e.amount), 0)
         from Expense e
@@ -55,10 +49,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             @Param("start") LocalDate start,
             @Param("end") LocalDate end
     );
-
-    // -------------------------------------------------------------------------
-    // Costs by list of categories (already used by product cost module)
-    // -------------------------------------------------------------------------
 
     @Query("""
         select coalesce(sum(e.amount), 0)
@@ -90,10 +80,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             @Param("end") LocalDate end
     );
 
-    // -------------------------------------------------------------------------
-    // Purchase registry rows (SUNAT style)
-    // -------------------------------------------------------------------------
-
     @Query("""
         select new com.ecoamazonas.eco_agua.accounting.dto.PurchaseRegistryRow(
             e.expenseDate,
@@ -124,4 +110,14 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             @Param("docType") String docType,
             @Param("status") ExpenseStatus status
     );
+
+    @Query("""
+        select distinct e
+        from Expense e
+        left join fetch e.category c
+        left join fetch e.supplier s
+        left join fetch e.payments p
+        where e.id = :expenseId
+        """)
+    Expense findDetailedById(@Param("expenseId") Long expenseId);
 }

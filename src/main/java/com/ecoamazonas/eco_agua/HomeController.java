@@ -11,7 +11,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Controller
 public class HomeController {
@@ -31,21 +34,15 @@ public class HomeController {
     public String home(Model model) {
         LocalDate today = LocalDate.now();
 
-        // Orders paid today (for "Ventas del día")
-        List<SaleOrder> paidOrders =
-                orderService.findOrdersForDateAndStatus(today, OrderStatus.PAID);
+        List<SaleOrder> paidOrders = orderService.findOrdersForDateAndStatus(today, OrderStatus.PAID);
+        List<SaleOrder> requestedOrders = orderService.findOrdersForDateAndStatus(today, OrderStatus.REQUESTED);
+        List<SaleOrder> creditOrders = orderService.findOrdersByStatus(OrderStatus.CREDIT);
 
-        // Orders requested today and still pending delivery
-        List<SaleOrder> requestedOrders =
-                orderService.findOrdersForDateAndStatus(today, OrderStatus.REQUESTED);
-
-        // Total amount of paid orders
         BigDecimal totalSalesToday = paidOrders.stream()
                 .map(SaleOrder::getTotalAmount)
                 .filter(amount -> amount != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Expenses of today (for "Gastos del día" widget)
         List<Expense> dailyExpenses = expenseService.findByDateRange(today, today);
 
         BigDecimal totalExpensesToday = dailyExpenses.stream()
@@ -53,15 +50,28 @@ public class HomeController {
                 .filter(amount -> amount != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        BigDecimal totalCreditAmount = creditOrders.stream()
+                .map(SaleOrder::getTotalAmount)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Map<Long, Long> creditDaysByOrderId = new LinkedHashMap<>();
+        for (SaleOrder order : creditOrders) {
+            LocalDate orderDate = order.getOrderDate();
+            long days = orderDate != null ? ChronoUnit.DAYS.between(orderDate, today) : 0;
+            creditDaysByOrderId.put(order.getId(), Math.max(days, 0));
+        }
+
         model.addAttribute("activePage", "home");
         model.addAttribute("today", today);
 
-        // Sales
         model.addAttribute("paidOrders", paidOrders);
         model.addAttribute("requestedOrders", requestedOrders);
+        model.addAttribute("creditOrders", creditOrders);
+        model.addAttribute("creditDaysByOrderId", creditDaysByOrderId);
         model.addAttribute("totalSalesToday", totalSalesToday);
+        model.addAttribute("totalCreditAmount", totalCreditAmount);
 
-        // Expenses (home widget)
         model.addAttribute("dailyExpenses", dailyExpenses);
         model.addAttribute("expensesToday", dailyExpenses);
         model.addAttribute("totalExpensesToday", totalExpensesToday);

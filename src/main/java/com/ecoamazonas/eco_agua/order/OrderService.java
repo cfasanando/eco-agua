@@ -245,6 +245,11 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public List<SaleOrder> findOrdersByStatus(OrderStatus status) {
+        return orderRepository.findByStatusOrderByOrderDateAscIdAsc(status);
+    }
+
+    @Transactional(readOnly = true)
     public List<SaleOrder> findPaidOrdersBetween(LocalDate startDate, LocalDate endDate) {
         return findOrdersBetweenDatesAndStatus(startDate, endDate, OrderStatus.PAID);
     }

@@ -5,6 +5,9 @@ import com.ecoamazonas.eco_agua.order.SaleOrder;
 import com.ecoamazonas.eco_agua.order.SaleOrderItem;
 import com.ecoamazonas.eco_agua.order.SaleOrderRepository;
 import com.ecoamazonas.eco_agua.product.Product;
+import jakarta.persistence.EntityNotFoundException;
+import org.hibernate.ObjectNotFoundException;
+import org.springframework.orm.jpa.JpaObjectRetrievalFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -381,15 +384,25 @@ public class ClientPortfolioService {
                 continue;
             }
 
-            Product product = item.getProduct();
-            BigDecimal unitCost = product != null && product.getSuppliesCost() != null
-                    ? product.getSuppliesCost()
-                    : BigDecimal.ZERO;
-
+            BigDecimal unitCost = resolveUnitCost(item);
             total = total.add(unitCost.multiply(item.getQuantity()));
         }
 
         return total.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal resolveUnitCost(SaleOrderItem item) {
+        try {
+            Product product = item != null ? item.getProduct() : null;
+            if (product == null) {
+                return BigDecimal.ZERO;
+            }
+
+            BigDecimal suppliesCost = product.getSuppliesCost();
+            return suppliesCost != null ? suppliesCost : BigDecimal.ZERO;
+        } catch (EntityNotFoundException | ObjectNotFoundException | JpaObjectRetrievalFailureException ex) {
+            return BigDecimal.ZERO;
+        }
     }
 
     private int sumBorrowedBottles(List<SaleOrder> orders) {

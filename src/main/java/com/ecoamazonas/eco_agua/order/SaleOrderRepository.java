@@ -61,8 +61,6 @@ public interface SaleOrderRepository extends JpaRepository<SaleOrder, Long> {
         join fetch o.client c
         left join fetch c.profile cp
         left join fetch o.items i
-        left join fetch i.product p
-        left join fetch p.category pc
         where c.id = :clientId
         order by o.orderDate desc, o.id desc
         """)
@@ -76,8 +74,6 @@ public interface SaleOrderRepository extends JpaRepository<SaleOrder, Long> {
         join fetch o.client c
         left join fetch c.profile cp
         left join fetch o.items i
-        left join fetch i.product p
-        left join fetch p.category pc
         where c.id = :clientId
           and o.orderDate between :startDate and :endDate
         order by o.orderDate desc, o.id desc
@@ -94,8 +90,6 @@ public interface SaleOrderRepository extends JpaRepository<SaleOrder, Long> {
         join fetch o.client c
         left join fetch c.profile cp
         left join fetch o.items i
-        left join fetch i.product p
-        left join fetch p.category pc
         order by c.name asc, o.orderDate desc, o.id desc
         """)
     List<SaleOrder> findDetailedOrdersOrderByClientNameAscOrderDateDescIdDesc();
@@ -106,8 +100,6 @@ public interface SaleOrderRepository extends JpaRepository<SaleOrder, Long> {
         join fetch o.client c
         left join fetch c.profile cp
         left join fetch o.items i
-        left join fetch i.product p
-        left join fetch p.category pc
         where o.orderDate between :startDate and :endDate
         order by c.name asc, o.orderDate desc, o.id desc
         """)

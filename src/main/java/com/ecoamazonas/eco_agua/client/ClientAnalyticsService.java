@@ -5,6 +5,9 @@ import com.ecoamazonas.eco_agua.order.SaleOrder;
 import com.ecoamazonas.eco_agua.order.SaleOrderItem;
 import com.ecoamazonas.eco_agua.order.SaleOrderRepository;
 import com.ecoamazonas.eco_agua.product.Product;
+import jakarta.persistence.EntityNotFoundException;
+import org.hibernate.ObjectNotFoundException;
+import org.springframework.orm.jpa.JpaObjectRetrievalFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -257,10 +260,7 @@ public class ClientAnalyticsService {
             if (item == null || item.getQuantity() == null) {
                 continue;
             }
-            Product product = item.getProduct();
-            BigDecimal unitCost = product != null && product.getSuppliesCost() != null
-                    ? product.getSuppliesCost()
-                    : BigDecimal.ZERO;
+            BigDecimal unitCost = resolveUnitCost(item);
             total = total.add(unitCost.multiply(item.getQuantity()));
         }
 
@@ -324,9 +324,7 @@ public class ClientAnalyticsService {
 
                 BigDecimal quantity = item.getQuantity() != null ? item.getQuantity() : BigDecimal.ZERO;
                 BigDecimal revenue = item.getTotal() != null ? item.getTotal() : BigDecimal.ZERO;
-                BigDecimal unitCost = item.getProduct() != null && item.getProduct().getSuppliesCost() != null
-                        ? item.getProduct().getSuppliesCost()
-                        : BigDecimal.ZERO;
+                BigDecimal unitCost = resolveUnitCost(item);
                 BigDecimal estimatedCost = unitCost.multiply(quantity);
 
                 aggregate.quantity = aggregate.quantity.add(quantity);
@@ -508,10 +506,31 @@ public class ClientAnalyticsService {
         if (item.getDescription() != null && !item.getDescription().isBlank()) {
             return item.getDescription().trim();
         }
-        if (item.getProduct() != null && item.getProduct().getName() != null && !item.getProduct().getName().isBlank()) {
-            return item.getProduct().getName().trim();
+
+        try {
+            Product product = item != null ? item.getProduct() : null;
+            if (product != null && product.getName() != null && !product.getName().isBlank()) {
+                return product.getName().trim();
+            }
+        } catch (EntityNotFoundException | ObjectNotFoundException | JpaObjectRetrievalFailureException ex) {
+            return "Producto eliminado";
         }
+
         return "Producto sin nombre";
+    }
+
+    private BigDecimal resolveUnitCost(SaleOrderItem item) {
+        try {
+            Product product = item != null ? item.getProduct() : null;
+            if (product == null) {
+                return BigDecimal.ZERO;
+            }
+
+            BigDecimal suppliesCost = product.getSuppliesCost();
+            return suppliesCost != null ? suppliesCost : BigDecimal.ZERO;
+        } catch (EntityNotFoundException | ObjectNotFoundException | JpaObjectRetrievalFailureException ex) {
+            return BigDecimal.ZERO;
+        }
     }
 
     private String toStatusLabel(OrderStatus status) {

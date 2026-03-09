@@ -13,7 +13,6 @@
 
             <h1 class="h5 mb-3">Listado de ingresos por período</h1>
 
-            <!-- Filtros -->
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-light">
                     <strong>Filtros :</strong>
@@ -23,7 +22,7 @@
 
                         <div class="col-md-3">
                             <label class="form-label">Tipo de filtro</label>
-                            <select class="form-select" name="mode">
+                            <select class="form-select" name="mode" id="salesFilterMode">
                                 <option value="DAY"
                                         th:selected="${mode} == 'DAY'">
                                     Por día
@@ -35,7 +34,9 @@
                             </select>
                         </div>
 
-                        <div class="col-md-3" th:if="${mode} == 'DAY'">
+                        <div class="col-md-3"
+                             id="salesSingleDateGroup"
+                             th:classappend="${mode} == 'PERIOD' ? ' d-none'">
                             <label class="form-label">Fecha</label>
                             <input type="date"
                                    class="form-control"
@@ -43,7 +44,9 @@
                                    th:value="${date != null} ? ${date} : ${startDate}">
                         </div>
 
-                        <div class="col-md-3" th:if="${mode} == 'PERIOD'">
+                        <div class="col-md-3"
+                             id="salesFromDateGroup"
+                             th:classappend="${mode} != 'PERIOD' ? ' d-none'">
                             <label class="form-label">Desde</label>
                             <input type="date"
                                    class="form-control"
@@ -51,7 +54,9 @@
                                    th:value="${startDate}">
                         </div>
 
-                        <div class="col-md-3" th:if="${mode} == 'PERIOD'">
+                        <div class="col-md-3"
+                             id="salesToDateGroup"
+                             th:classappend="${mode} != 'PERIOD' ? ' d-none'">
                             <label class="form-label">Hasta</label>
                             <input type="date"
                                    class="form-control"
@@ -59,7 +64,7 @@
                                    th:value="${endDate}">
                         </div>
 
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <button type="submit" class="btn btn-primary w-100">
                                 <i class="bi bi-search"></i> Buscar
                             </button>
@@ -68,7 +73,6 @@
                 </div>
             </div>
 
-            <!-- Resultados -->
             <div class="card shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
                     <span><strong>Ventas</strong> (pagados)</span>
@@ -131,6 +135,38 @@
 </div>
 
 <th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        const filterMode = document.getElementById('salesFilterMode');
+        const singleDateGroup = document.getElementById('salesSingleDateGroup');
+        const fromDateGroup = document.getElementById('salesFromDateGroup');
+        const toDateGroup = document.getElementById('salesToDateGroup');
+
+        function updateFilterUi() {
+            const isPeriod = filterMode && filterMode.value === 'PERIOD';
+
+            if (singleDateGroup) {
+                singleDateGroup.classList.toggle('d-none', isPeriod);
+            }
+
+            if (fromDateGroup) {
+                fromDateGroup.classList.toggle('d-none', !isPeriod);
+            }
+
+            if (toDateGroup) {
+                toDateGroup.classList.toggle('d-none', !isPeriod);
+            }
+        }
+
+        if (filterMode) {
+            filterMode.addEventListener('change', updateFilterUi);
+            updateFilterUi();
+        }
+    });
+</script>
 
 </body>
 </html>

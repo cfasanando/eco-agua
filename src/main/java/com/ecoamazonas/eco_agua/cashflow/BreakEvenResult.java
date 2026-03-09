@@ -4,6 +4,7 @@ import com.ecoamazonas.eco_agua.product.Product;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Result of a break-even analysis for one product and one period.
@@ -14,19 +15,26 @@ public class BreakEvenResult {
     private final LocalDate periodStart;
     private final LocalDate periodEnd;
 
-    private final BigDecimal fixedCosts;              // Total fixed costs for the period
-    private final BigDecimal variableUnitCost;        // CVU
-    private final BigDecimal sellingPrice;            // Current product price
+    private final BigDecimal fixedCosts;
+    private final BigDecimal variableUnitCost;
+    private final BigDecimal totalUnitsSold;
+    private final BigDecimal totalRevenueInPeriod;
+    private final BigDecimal actualAverageSellingPrice;
 
-    private final BigDecimal contributionMargin;      // sellingPrice - variableUnitCost
-    private final BigDecimal breakEvenUnitsExact;     // Fixed / contributionMargin (with decimals)
-    private final BigDecimal breakEvenUnitsRounded;   // Minimum integer units (ceil)
+    private final boolean usesProfilePricing;
+    private final String primaryScenarioLabel;
 
-    private final BigDecimal unitsSold;               // Units actually sold in period
-    private final BreakEvenStatus status;             // BEFORE / AT / AFTER
+    private final BigDecimal sellingPrice;
+    private final BigDecimal contributionMargin;
+    private final BigDecimal breakEvenUnitsExact;
+    private final BigDecimal breakEvenUnitsRounded;
+    private final BigDecimal unitsSold;
+    private final BreakEvenStatus status;
+    private final BigDecimal safetyMarginUnits;
+    private final BigDecimal safetyMarginPercent;
 
-    private final BigDecimal safetyMarginUnits;       // unitsSold - breakEvenUnitsRounded
-    private final BigDecimal safetyMarginPercent;     // safetyMarginUnits / breakEvenUnitsRounded (%)
+    private final List<BreakEvenScenario> scenarios;
+    private final List<BreakEvenFixedCostLine> fixedCostLines;
 
     public BreakEvenResult(
             Product product,
@@ -34,6 +42,11 @@ public class BreakEvenResult {
             LocalDate periodEnd,
             BigDecimal fixedCosts,
             BigDecimal variableUnitCost,
+            BigDecimal totalUnitsSold,
+            BigDecimal totalRevenueInPeriod,
+            BigDecimal actualAverageSellingPrice,
+            boolean usesProfilePricing,
+            String primaryScenarioLabel,
             BigDecimal sellingPrice,
             BigDecimal contributionMargin,
             BigDecimal breakEvenUnitsExact,
@@ -41,13 +54,20 @@ public class BreakEvenResult {
             BigDecimal unitsSold,
             BreakEvenStatus status,
             BigDecimal safetyMarginUnits,
-            BigDecimal safetyMarginPercent
+            BigDecimal safetyMarginPercent,
+            List<BreakEvenScenario> scenarios,
+            List<BreakEvenFixedCostLine> fixedCostLines
     ) {
         this.product = product;
         this.periodStart = periodStart;
         this.periodEnd = periodEnd;
         this.fixedCosts = fixedCosts;
         this.variableUnitCost = variableUnitCost;
+        this.totalUnitsSold = totalUnitsSold;
+        this.totalRevenueInPeriod = totalRevenueInPeriod;
+        this.actualAverageSellingPrice = actualAverageSellingPrice;
+        this.usesProfilePricing = usesProfilePricing;
+        this.primaryScenarioLabel = primaryScenarioLabel;
         this.sellingPrice = sellingPrice;
         this.contributionMargin = contributionMargin;
         this.breakEvenUnitsExact = breakEvenUnitsExact;
@@ -56,6 +76,8 @@ public class BreakEvenResult {
         this.status = status;
         this.safetyMarginUnits = safetyMarginUnits;
         this.safetyMarginPercent = safetyMarginPercent;
+        this.scenarios = scenarios;
+        this.fixedCostLines = fixedCostLines;
     }
 
     public Product getProduct() {
@@ -76,6 +98,26 @@ public class BreakEvenResult {
 
     public BigDecimal getVariableUnitCost() {
         return variableUnitCost;
+    }
+
+    public BigDecimal getTotalUnitsSold() {
+        return totalUnitsSold;
+    }
+
+    public BigDecimal getTotalRevenueInPeriod() {
+        return totalRevenueInPeriod;
+    }
+
+    public BigDecimal getActualAverageSellingPrice() {
+        return actualAverageSellingPrice;
+    }
+
+    public boolean isUsesProfilePricing() {
+        return usesProfilePricing;
+    }
+
+    public String getPrimaryScenarioLabel() {
+        return primaryScenarioLabel;
     }
 
     public BigDecimal getSellingPrice() {
@@ -108,5 +150,13 @@ public class BreakEvenResult {
 
     public BigDecimal getSafetyMarginPercent() {
         return safetyMarginPercent;
+    }
+
+    public List<BreakEvenScenario> getScenarios() {
+        return scenarios;
+    }
+
+    public List<BreakEvenFixedCostLine> getFixedCostLines() {
+        return fixedCostLines;
     }
 }

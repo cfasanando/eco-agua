@@ -1,15 +1,16 @@
 package com.ecoamazonas.eco_agua.expense;
 
-import com.ecoamazonas.eco_agua.order.OrderService;
 import com.ecoamazonas.eco_agua.user.Employee;
 import com.ecoamazonas.eco_agua.user.EmployeeRepository;
 import com.ecoamazonas.eco_agua.user.JobPosition;
 import com.ecoamazonas.eco_agua.user.PaymentMode;
 import com.ecoamazonas.eco_agua.user.SalaryPeriod;
+import com.ecoamazonas.eco_agua.order.OrderService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,15 +32,18 @@ public class ExpenseController {
     private final ExpenseService expenseService;
     private final OrderService orderService;
     private final EmployeeRepository employeeRepository;
+    private final FixedCostTemplateService fixedCostTemplateService;
 
     public ExpenseController(
             ExpenseService expenseService,
             OrderService orderService,
-            EmployeeRepository employeeRepository
+            EmployeeRepository employeeRepository,
+            FixedCostTemplateService fixedCostTemplateService
     ) {
         this.expenseService = expenseService;
         this.orderService = orderService;
         this.employeeRepository = employeeRepository;
+        this.fixedCostTemplateService = fixedCostTemplateService;
     }
 
     @GetMapping("/by-date")
@@ -351,21 +355,107 @@ public class ExpenseController {
         int y = (year != null ? year : today.getYear());
         int m = (month != null ? month : today.getMonthValue());
 
-        LocalDate start = LocalDate.of(y, m, 1);
-        LocalDate end = start.withDayOfMonth(start.lengthOfMonth());
-
-        BigDecimal totalFixedCosts = expenseService.getTotalFixedCosts(start, end);
-        var breakdown = expenseService.getFixedCostsByCategory(start, end);
+        FixedCostMonthlySummary summary = fixedCostTemplateService.buildMonthlySummary(y, m);
 
         model.addAttribute("activePage", "expenses_fixed_costs");
         model.addAttribute("year", y);
         model.addAttribute("month", m);
-        model.addAttribute("fromDate", start);
-        model.addAttribute("toDate", end);
-        model.addAttribute("totalFixedCosts", totalFixedCosts);
-        model.addAttribute("breakdown", breakdown);
+        model.addAttribute("fromDate", summary.getFromDate());
+        model.addAttribute("toDate", summary.getToDate());
+        model.addAttribute("totalFixedCosts", summary.getActualRegisteredTotal());
+        model.addAttribute("breakdown", summary.getActualBreakdown());
+        model.addAttribute("summary", summary);
+        model.addAttribute("templateForm", new FixedCostTemplateForm());
+        model.addAttribute("categories", fixedCostTemplateService.findAvailableCategories());
 
         return "expenses/expenses_fixed_costs";
+    }
+
+    @PostMapping("/fixed-costs/templates")
+    public String saveFixedCostTemplate(
+            @ModelAttribute FixedCostTemplateForm templateForm,
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            RedirectAttributes redirectAttributes
+    ) {
+        int y = resolveYear(year);
+        int m = resolveMonth(month);
+
+        try {
+            fixedCostTemplateService.saveTemplate(templateForm);
+            redirectAttributes.addFlashAttribute("message", "Fixed cost template saved successfully.");
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute("message", "Error while saving fixed cost template: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "error");
+        }
+
+        return "redirect:/expenses/fixed-costs?year=" + y + "&month=" + m;
+    }
+
+    @PostMapping("/fixed-costs/templates/{id}/toggle")
+    public String toggleFixedCostTemplate(
+            @PathVariable("id") Long templateId,
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            RedirectAttributes redirectAttributes
+    ) {
+        int y = resolveYear(year);
+        int m = resolveMonth(month);
+
+        try {
+            fixedCostTemplateService.toggleTemplate(templateId);
+            redirectAttributes.addFlashAttribute("message", "Template status updated successfully.");
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute("message", "Error while updating template status: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "error");
+        }
+
+        return "redirect:/expenses/fixed-costs?year=" + y + "&month=" + m;
+    }
+
+    @PostMapping("/fixed-costs/templates/{id}/delete")
+    public String deleteFixedCostTemplate(
+            @PathVariable("id") Long templateId,
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            RedirectAttributes redirectAttributes
+    ) {
+        int y = resolveYear(year);
+        int m = resolveMonth(month);
+
+        try {
+            fixedCostTemplateService.deleteTemplate(templateId);
+            redirectAttributes.addFlashAttribute("message", "Template deleted successfully.");
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute("message", "Error while deleting template: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "error");
+        }
+
+        return "redirect:/expenses/fixed-costs?year=" + y + "&month=" + m;
+    }
+
+    @PostMapping("/fixed-costs/generate-month")
+    public String generateFixedCostsForMonth(
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            RedirectAttributes redirectAttributes
+    ) {
+        int y = resolveYear(year);
+        int m = resolveMonth(month);
+
+        try {
+            int created = fixedCostTemplateService.generateMonth(y, m);
+            redirectAttributes.addFlashAttribute("message", "Generated monthly fixed costs successfully. New expenses created: " + created + ".");
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute("message", "Error while generating monthly fixed costs: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "error");
+        }
+
+        return "redirect:/expenses/fixed-costs?year=" + y + "&month=" + m;
     }
 
     private String resolveRedirectTarget(String redirect, String defaultPath) {
@@ -379,6 +469,14 @@ public class ExpenseController {
         }
 
         return trimmed;
+    }
+
+    private int resolveYear(Integer year) {
+        return year != null ? year : LocalDate.now().getYear();
+    }
+
+    private int resolveMonth(Integer month) {
+        return month != null ? month : LocalDate.now().getMonthValue();
     }
 
     private BigDecimal resolveDailyFixedAmount(JobPosition position) {

@@ -4,43 +4,39 @@
 
 <body>
 <div class="app-layout" th:with="activePage='expenses_fixed_costs'">
-    <!-- Sidebar -->
     <aside th:replace="fragments/sidebar :: sidebar"></aside>
 
-    <!-- Main content -->
     <div class="main-content">
-        <!-- Topbar -->
         <header th:replace="fragments/topbar :: topbar"></header>
 
-        <!-- Page content -->
         <main class="content-wrapper">
 
-            <!-- Page title + link to price simulator -->
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
                 <div>
                     <h1 class="h5 mb-0">Costos fijos mensuales</h1>
                     <div class="small text-muted">
-                        Resumen de gastos fijos por categoría para analizar tu estructura de costos.
+                        Define la base mensual de costos fijos, genera los gastos del mes y úsala para tu punto de equilibrio.
                     </div>
                 </div>
 
-                <a th:href="@{/admin/price-simulator}"
-                   class="btn btn-outline-primary btn-sm">
-                    <i class="bi bi-graph-up-arrow me-1"></i>
-                    Ir al simulador de precio
-                </a>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a th:href="@{/cashflow/break-even}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-bullseye me-1"></i>
+                        Ir al punto de equilibrio
+                    </a>
+                    <a th:href="@{/admin/price-simulator}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-graph-up-arrow me-1"></i>
+                        Ir al simulador de precio
+                    </a>
+                </div>
             </div>
 
-            <!-- Filters card -->
             <div class="card mb-3 shadow-sm">
                 <div class="card-header bg-light">
                     <strong>Filtros</strong>
                 </div>
                 <div class="card-body">
-                    <form class="row g-2 align-items-end"
-                          method="get"
-                          th:action="@{/expenses/fixed-costs}">
-                        <!-- Year -->
+                    <form class="row g-2 align-items-end" method="get" th:action="@{/expenses/fixed-costs}">
                         <div class="col-md-3">
                             <label for="year" class="form-label">Año</label>
                             <input type="number"
@@ -52,47 +48,33 @@
                                    th:value="${year}">
                         </div>
 
-                        <!-- Month -->
                         <div class="col-md-3">
                             <label for="month" class="form-label">Mes</label>
-                            <select id="month"
-                                    name="month"
-                                    class="form-select">
-                                <option value="1"  th:selected="${month} == 1">Enero</option>
-                                <option value="2"  th:selected="${month} == 2">Febrero</option>
-                                <option value="3"  th:selected="${month} == 3">Marzo</option>
-                                <option value="4"  th:selected="${month} == 4">Abril</option>
-                                <option value="5"  th:selected="${month} == 5">Mayo</option>
-                                <option value="6"  th:selected="${month} == 6">Junio</option>
-                                <option value="7"  th:selected="${month} == 7">Julio</option>
-                                <option value="8"  th:selected="${month} == 8">Agosto</option>
-                                <option value="9"  th:selected="${month} == 9">Setiembre</option>
+                            <select id="month" name="month" class="form-select">
+                                <option value="1" th:selected="${month} == 1">Enero</option>
+                                <option value="2" th:selected="${month} == 2">Febrero</option>
+                                <option value="3" th:selected="${month} == 3">Marzo</option>
+                                <option value="4" th:selected="${month} == 4">Abril</option>
+                                <option value="5" th:selected="${month} == 5">Mayo</option>
+                                <option value="6" th:selected="${month} == 6">Junio</option>
+                                <option value="7" th:selected="${month} == 7">Julio</option>
+                                <option value="8" th:selected="${month} == 8">Agosto</option>
+                                <option value="9" th:selected="${month} == 9">Setiembre</option>
                                 <option value="10" th:selected="${month} == 10">Octubre</option>
                                 <option value="11" th:selected="${month} == 11">Noviembre</option>
                                 <option value="12" th:selected="${month} == 12">Diciembre</option>
                             </select>
                         </div>
 
-                        <!-- Period info (read-only) -->
                         <div class="col-md-4">
                             <label class="form-label">Periodo analizado</label>
                             <div class="form-control-plaintext">
-                                <span th:if="${fromDate != null}"
-                                      th:text="${#temporals.format(fromDate, 'dd/MM/yyyy')}">
-                                    01/11/2025
-                                </span>
+                                <span th:if="${fromDate != null}" th:text="${#temporals.format(fromDate, 'dd/MM/yyyy')}">01/03/2026</span>
                                 <span th:if="${fromDate != null and toDate != null}">&nbsp;al&nbsp;</span>
-                                <span th:if="${toDate != null}"
-                                      th:text="${#temporals.format(toDate, 'dd/MM/yyyy')}">
-                                    30/11/2025
-                                </span>
-                                <span th:if="${fromDate == null or toDate == null}">
-                                    Selecciona año y mes y haz clic en Buscar.
-                                </span>
+                                <span th:if="${toDate != null}" th:text="${#temporals.format(toDate, 'dd/MM/yyyy')}">31/03/2026</span>
                             </div>
                         </div>
 
-                        <!-- Search button -->
                         <div class="col-md-2">
                             <button type="submit" class="btn btn-primary w-100">
                                 <i class="bi bi-search me-1"></i>
@@ -103,47 +85,285 @@
                 </div>
             </div>
 
-            <!-- Summary cards -->
             <div class="row g-3 mb-3">
-                <!-- Total fixed costs -->
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="card shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <div class="text-muted text-uppercase small mb-1">Total costos fijos del periodo</div>
+                            <div class="text-muted text-uppercase small mb-1">Base esperada del mes</div>
                             <div class="display-6 fw-bold mb-1"
-                                 th:text="'S/ ' + ${#numbers.formatDecimal(totalFixedCosts != null ? totalFixedCosts : 0, 1, 'COMMA', 2, 'POINT')}">
+                                 th:text="'S/ ' + ${#numbers.formatDecimal(summary.expectedTotal, 1, 'COMMA', 2, 'POINT')}">
                                 S/ 0.00
                             </div>
                             <p class="small text-muted mb-0">
-                                Basado en las categorías de tipo “EXPENSES” registradas en el módulo de egresos.
+                                Suma de todas las plantillas activas del mes.
                             </p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Helper text -->
-                <div class="col-md-8">
+                <div class="col-md-3">
                     <div class="card shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <h2 class="h6 mb-2">¿Cómo se calcula?</h2>
-                            <ul class="small mb-2">
-                                <li>Se consideran todos los egresos cuyo tipo de categoría es <strong>EXPENSES</strong>.</li>
-                                <li>Solo se toman en cuenta los gastos dentro del mes seleccionado.</li>
-                                <li>Los montos se agrupan por nombre de categoría (luz, alquiler, planillas, etc.).</li>
-                            </ul>
-                            <p class="small mb-0 text-muted">
-                                Usa este resumen como base para tu punto de equilibrio y decisiones de precios.
-                                Desde aquí puedes ir directo al simulador de precio para proyectar ventas mínimas.
+                            <div class="text-muted text-uppercase small mb-1">Generado en egresos</div>
+                            <div class="display-6 fw-bold mb-1"
+                                 th:text="'S/ ' + ${#numbers.formatDecimal(summary.generatedTotal, 1, 'COMMA', 2, 'POINT')}">
+                                S/ 0.00
+                            </div>
+                            <p class="small text-muted mb-0">
+                                Gastos reales creados desde las plantillas para este mes.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="text-muted text-uppercase small mb-1">Pendiente por generar</div>
+                            <div class="display-6 fw-bold mb-1"
+                                 th:text="'S/ ' + ${#numbers.formatDecimal(summary.pendingTotal, 1, 'COMMA', 2, 'POINT')}">
+                                S/ 0.00
+                            </div>
+                            <p class="small text-muted mb-0">
+                                Lo que falta convertir en gastos del mes con un clic.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="text-muted text-uppercase small mb-1">Base usada para PE</div>
+                            <div class="display-6 fw-bold mb-1"
+                                 th:text="'S/ ' + ${#numbers.formatDecimal(summary.expectedBreakEvenTotal, 1, 'COMMA', 2, 'POINT')}">
+                                S/ 0.00
+                            </div>
+                            <p class="small text-muted mb-0">
+                                Solo plantillas marcadas para entrar al punto de equilibrio.
                             </p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Breakdown table -->
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span><strong>Generación mensual</strong></span>
+                    <form method="post" th:action="@{/expenses/fixed-costs/generate-month}" class="d-flex gap-2">
+                        <input type="hidden" name="year" th:value="${year}">
+                        <input type="hidden" name="month" th:value="${month}">
+                        <button type="submit" class="btn btn-success btn-sm">
+                            <i class="bi bi-magic me-1"></i>
+                            Generar gastos del mes
+                        </button>
+                    </form>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-lg-8">
+                            <h2 class="h6 mb-2">¿Cómo funciona?</h2>
+                            <ul class="small mb-0">
+                                <li>Primero defines tus plantillas fijas: alquiler, luz, agua, cochera, contador, etc.</li>
+                                <li>Luego eliges el mes y haces clic en <strong>Generar gastos del mes</strong>.</li>
+                                <li>El sistema crea gastos reales en egresos para ese mes y evita duplicarlos.</li>
+                                <li>Después el punto de equilibrio ya puede trabajar con una base mensual coherente.</li>
+                            </ul>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="border rounded p-3 bg-light small h-100">
+                                <div class="fw-semibold mb-2">Control rápido del mes</div>
+                                <div class="d-flex justify-content-between"><span>Esperado</span><strong th:text="'S/ ' + ${#numbers.formatDecimal(summary.expectedTotal, 1, 'COMMA', 2, 'POINT')}">S/ 0.00</strong></div>
+                                <div class="d-flex justify-content-between"><span>Generado</span><strong th:text="'S/ ' + ${#numbers.formatDecimal(summary.generatedTotal, 1, 'COMMA', 2, 'POINT')}">S/ 0.00</strong></div>
+                                <div class="d-flex justify-content-between"><span>Pendiente</span><strong th:text="'S/ ' + ${#numbers.formatDecimal(summary.pendingTotal, 1, 'COMMA', 2, 'POINT')}">S/ 0.00</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header bg-light">
+                    <strong>Registrar plantilla mensual</strong>
+                </div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" method="post" th:action="@{/expenses/fixed-costs/templates}">
+                        <input type="hidden" name="year" th:value="${year}">
+                        <input type="hidden" name="month" th:value="${month}">
+
+                        <div class="col-md-3">
+                            <label class="form-label">Descripción</label>
+                            <input type="text" name="description" class="form-control" placeholder="Ej. Luz" required>
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label">Categoría</label>
+                            <select name="categoryId" class="form-select" required>
+                                <option value="">Selecciona...</option>
+                                <option th:each="category : ${categories}"
+                                        th:value="${category.id}"
+                                        th:text="${category.name}">
+                                    Categoría
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-1">
+                            <label class="form-label">U.M.</label>
+                            <input type="text" name="unitOfMeasure" class="form-control" placeholder="Mensual">
+                        </div>
+
+                        <div class="col-md-1">
+                            <label class="form-label">Cant.</label>
+                            <input type="number" step="0.01" min="0.01" name="quantity" class="form-control" value="1" required>
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label">Valor unitario</label>
+                            <input type="number" step="0.01" min="0" name="unitValue" class="form-control" value="0.00" required>
+                        </div>
+
+                        <div class="col-md-2">
+                            <label class="form-label">Notas</label>
+                            <input type="text" name="notes" class="form-control" placeholder="Opcional">
+                        </div>
+
+                        <div class="col-md-1">
+                            <div class="form-check mt-4 pt-2">
+                                <input class="form-check-input" type="checkbox" id="includeInBreakEven" name="includeInBreakEven" checked>
+                                <label class="form-check-label small" for="includeInBreakEven">PE</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-12 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plus-circle me-1"></i>
+                                Guardar plantilla
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <span><strong>Plantillas del mes</strong></span>
+                    <span class="small text-muted" th:text="'Total plantillas: ' + ${#lists.size(summary.rows)}">Total plantillas: 0</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" th:if="${!#lists.isEmpty(summary.rows)}">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Descripción</th>
+                                <th>Categoría</th>
+                                <th>U.M.</th>
+                                <th class="text-end">Cant.</th>
+                                <th class="text-end">V. unit.</th>
+                                <th class="text-end">Total mensual</th>
+                                <th class="text-center">PE</th>
+                                <th class="text-center">Estado</th>
+                                <th class="text-center">Generado</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row : ${summary.rows}">
+                                <td>
+                                    <div class="fw-semibold" th:text="${row.description}">Luz</div>
+                                </td>
+                                <td th:text="${row.categoryName}">Servicios</td>
+                                <td th:text="${row.unitOfMeasure != null ? row.unitOfMeasure : '-'}">Mensual</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.quantity, 1, 'COMMA', 2, 'POINT')}">1.00</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.unitValue, 1, 'COMMA', 2, 'POINT')}">250.00</td>
+                                <td class="text-end fw-semibold" th:text="${#numbers.formatDecimal(row.monthlyTotal, 1, 'COMMA', 2, 'POINT')}">250.00</td>
+                                <td class="text-center">
+                                    <span class="badge"
+                                          th:classappend="${row.includeInBreakEven} ? ' text-bg-success' : ' text-bg-secondary'"
+                                          th:text="${row.includeInBreakEven} ? 'Sí' : 'No'">Sí</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge"
+                                          th:classappend="${row.active} ? ' text-bg-primary' : ' text-bg-secondary'"
+                                          th:text="${row.active} ? 'Activa' : 'Inactiva'">Activa</span>
+                                </td>
+                                <td class="text-center">
+                                    <div th:if="${row.generated}">
+                                        <span class="badge text-bg-success">Sí</span>
+                                        <div class="small text-muted" th:text="'Gasto #' + ${row.generatedExpenseId}">Gasto #1</div>
+                                    </div>
+                                    <div th:if="${!row.generated}">
+                                        <span class="badge text-bg-warning">Pendiente</span>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="d-flex justify-content-center gap-1 flex-wrap">
+                                        <form method="post" th:action="@{|/expenses/fixed-costs/templates/${row.templateId}/toggle|}">
+                                            <input type="hidden" name="year" th:value="${year}">
+                                            <input type="hidden" name="month" th:value="${month}">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary"
+                                                    th:title="${row.active} ? 'Desactivar' : 'Activar'">
+                                                <i class="bi" th:classappend="${row.active} ? ' bi-pause-circle' : ' bi-play-circle'"></i>
+                                            </button>
+                                        </form>
+
+                                        <form method="post"
+                                              th:if="${!row.generated}"
+                                              th:action="@{|/expenses/fixed-costs/templates/${row.templateId}/delete|}"
+                                              onsubmit="return confirm('This template will be deleted. Continue?');">
+                                            <input type="hidden" name="year" th:value="${year}">
+                                            <input type="hidden" name="month" th:value="${month}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="alert alert-light mb-0 text-center" th:if="${#lists.isEmpty(summary.rows)}">
+                        Todavía no has registrado plantillas mensuales.
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <div class="text-muted text-uppercase small mb-1">Costos fijos registrados del periodo</div>
+                            <div class="display-6 fw-bold mb-1"
+                                 th:text="'S/ ' + ${#numbers.formatDecimal(totalFixedCosts != null ? totalFixedCosts : 0, 1, 'COMMA', 2, 'POINT')}">
+                                S/ 0.00
+                            </div>
+                            <p class="small text-muted mb-0">
+                                Este valor sale del módulo de egresos y puede incluir gastos fijos manuales además de los generados.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-body">
+                            <h2 class="h6 mb-2">¿Qué deberías hacer cada mes?</h2>
+                            <ol class="small mb-0 ps-3">
+                                <li>Revisar o ajustar tus plantillas base.</li>
+                                <li>Generar los gastos del mes.</li>
+                                <li>Registrar las variaciones reales si algún costo cambió.</li>
+                                <li>Ir al punto de equilibrio para ver cuánto te falta vender.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="card shadow-sm">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <span><strong>Detalle por categoría</strong></span>
+                    <span><strong>Detalle por categoría registrada</strong></span>
                     <span class="small text-muted"
                           th:if="${breakdown != null and !#maps.isEmpty(breakdown)}"
                           th:text="'Total categorías: ' + ${#maps.size(breakdown)}">
@@ -151,8 +371,6 @@
                     </span>
                 </div>
                 <div class="card-body">
-
-                    <!-- When there is data -->
                     <div th:if="${breakdown != null and !#maps.isEmpty(breakdown)}" class="table-responsive">
                         <table class="table table-sm align-middle mb-0">
                             <thead class="table-light">
@@ -164,27 +382,19 @@
                             <tbody>
                             <tr th:each="entry : ${breakdown}">
                                 <td th:text="${entry.key}">Categoría</td>
-                                <td class="text-end"
-                                    th:text="${#numbers.formatDecimal(entry.value, 1, 'COMMA', 2, 'POINT')}">
-                                    0.00
-                                </td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(entry.value, 1, 'COMMA', 2, 'POINT')}">0.00</td>
                             </tr>
                             </tbody>
                             <tfoot>
                             <tr>
                                 <th class="text-end">TOTAL</th>
-                                <th class="text-end"
-                                    th:text="${#numbers.formatDecimal(totalFixedCosts != null ? totalFixedCosts : 0, 1, 'COMMA', 2, 'POINT')}">
-                                    0.00
-                                </th>
+                                <th class="text-end" th:text="${#numbers.formatDecimal(totalFixedCosts != null ? totalFixedCosts : 0, 1, 'COMMA', 2, 'POINT')}">0.00</th>
                             </tr>
                             </tfoot>
                         </table>
                     </div>
 
-                    <!-- When there is no data -->
-                    <div class="alert alert-light mb-0 text-center"
-                         th:if="${breakdown == null or #maps.isEmpty(breakdown)}">
+                    <div class="alert alert-light mb-0 text-center" th:if="${breakdown == null or #maps.isEmpty(breakdown)}">
                         No hay costos fijos registrados en el periodo seleccionado.
                     </div>
                 </div>
@@ -194,10 +404,8 @@
     </div>
 </div>
 
-<!-- Common admin scripts -->
 <th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
 
-<!-- Flash messages helper -->
 <script th:inline="javascript">
     document.addEventListener('DOMContentLoaded', function () {
         'use strict';

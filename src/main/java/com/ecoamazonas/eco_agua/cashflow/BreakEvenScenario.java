@@ -8,6 +8,12 @@ public class BreakEvenScenario {
     private final String subtitle;
     private final BigDecimal sellingPrice;
     private final BigDecimal realizedAveragePrice;
+    private final BigDecimal baseIndustrialUnitCost;
+    private final BigDecimal fuelVariableUnitCost;
+    private final BigDecimal deliveryCommissionPercent;
+    private final BigDecimal deliveryCommissionUnitCost;
+    private final BigDecimal operationalVariableUnitCost;
+    private final BigDecimal totalVariableUnitCost;
     private final BigDecimal contributionMargin;
     private final BigDecimal breakEvenUnitsExact;
     private final BigDecimal breakEvenUnitsRounded;
@@ -23,6 +29,12 @@ public class BreakEvenScenario {
             String subtitle,
             BigDecimal sellingPrice,
             BigDecimal realizedAveragePrice,
+            BigDecimal baseIndustrialUnitCost,
+            BigDecimal fuelVariableUnitCost,
+            BigDecimal deliveryCommissionPercent,
+            BigDecimal deliveryCommissionUnitCost,
+            BigDecimal operationalVariableUnitCost,
+            BigDecimal totalVariableUnitCost,
             BigDecimal contributionMargin,
             BigDecimal breakEvenUnitsExact,
             BigDecimal breakEvenUnitsRounded,
@@ -37,6 +49,12 @@ public class BreakEvenScenario {
         this.subtitle = subtitle;
         this.sellingPrice = sellingPrice;
         this.realizedAveragePrice = realizedAveragePrice;
+        this.baseIndustrialUnitCost = baseIndustrialUnitCost;
+        this.fuelVariableUnitCost = fuelVariableUnitCost;
+        this.deliveryCommissionPercent = deliveryCommissionPercent;
+        this.deliveryCommissionUnitCost = deliveryCommissionUnitCost;
+        this.operationalVariableUnitCost = operationalVariableUnitCost;
+        this.totalVariableUnitCost = totalVariableUnitCost;
         this.contributionMargin = contributionMargin;
         this.breakEvenUnitsExact = breakEvenUnitsExact;
         this.breakEvenUnitsRounded = breakEvenUnitsRounded;
@@ -62,6 +80,30 @@ public class BreakEvenScenario {
 
     public BigDecimal getRealizedAveragePrice() {
         return realizedAveragePrice;
+    }
+
+    public BigDecimal getBaseIndustrialUnitCost() {
+        return baseIndustrialUnitCost;
+    }
+
+    public BigDecimal getFuelVariableUnitCost() {
+        return fuelVariableUnitCost;
+    }
+
+    public BigDecimal getDeliveryCommissionPercent() {
+        return deliveryCommissionPercent;
+    }
+
+    public BigDecimal getDeliveryCommissionUnitCost() {
+        return deliveryCommissionUnitCost;
+    }
+
+    public BigDecimal getOperationalVariableUnitCost() {
+        return operationalVariableUnitCost;
+    }
+
+    public BigDecimal getTotalVariableUnitCost() {
+        return totalVariableUnitCost;
     }
 
     public BigDecimal getContributionMargin() {

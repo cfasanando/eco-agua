@@ -8,12 +8,14 @@ import com.ecoamazonas.eco_agua.product.Product;
 import com.ecoamazonas.eco_agua.product.ProductRepository;
 import com.ecoamazonas.eco_agua.product.cost.PeriodExpenseLine;
 import com.ecoamazonas.eco_agua.product.cost.ProductCostDetail;
+import com.ecoamazonas.eco_agua.product.cost.ProductCostLine;
 import com.ecoamazonas.eco_agua.product.cost.ProductCostService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -25,12 +27,11 @@ public class BreakEvenService {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
+    private static final BigDecimal DEFAULT_DELIVERY_COMMISSION_PERCENT = BigDecimal.valueOf(25);
 
     /**
      * Fixed-cost categories aligned with the current business model.
-     * Direct variable lines already included inside product_supply (fuel per bottle,
-     * delivery commission, direct treatment inputs, etc.) are intentionally excluded here
-     * to avoid double counting in the break-even point.
+     * Fuel and variable personnel are intentionally excluded.
      */
     private static final List<Long> FIXED_COST_CATEGORY_IDS = List.of(
             17L, // Luz local
@@ -66,9 +67,6 @@ public class BreakEvenService {
         this.clientProfileRepository = clientProfileRepository;
     }
 
-    /**
-     * Calculate break-even point for one product and one period.
-     */
     @Transactional(readOnly = true)
     public BreakEvenResult calculateForProductAndPeriod(
             Long productId,
@@ -80,15 +78,12 @@ public class BreakEvenService {
 
         BigDecimal fixedCosts = expenseRepository
                 .sumAmountByCategoryIdsAndPeriod(FIXED_COST_CATEGORY_IDS, start, end);
-        if (fixedCosts == null) {
-            fixedCosts = ZERO;
-        }
-        fixedCosts = fixedCosts.setScale(2, RoundingMode.HALF_UP);
+        fixedCosts = normalizeScale(fixedCosts, 2);
 
         List<BreakEvenFixedCostLine> fixedCostLines = buildFixedCostLines(start, end);
 
         ProductCostDetail costDetail = productCostService.calculateCostDetail(productId);
-        BigDecimal variableUnitCost = normalizeScale(costDetail.getCvu(), 4);
+        DirectVariableBreakdown variableBreakdown = buildDirectVariableBreakdown(product, costDetail);
 
         BigDecimal totalUnitsSold = normalizeScale(
                 saleOrderItemRepository.sumQuantitySoldByProductAndPeriod(productId, start, end),
@@ -103,6 +98,7 @@ public class BreakEvenService {
         boolean usesProfilePricing = product.usesClientProfilePrice();
 
         List<BreakEvenScenario> scenarios = new ArrayList<>();
+        boolean primaryAssigned = false;
 
         if (usesProfilePricing && actualAverageSellingPrice.compareTo(ZERO) > 0) {
             scenarios.add(createScenario(
@@ -111,11 +107,12 @@ public class BreakEvenService {
                     actualAverageSellingPrice,
                     actualAverageSellingPrice,
                     fixedCosts,
-                    variableUnitCost,
+                    variableBreakdown,
                     totalUnitsSold,
                     totalRevenueInPeriod,
                     true
             ));
+            primaryAssigned = true;
         }
 
         List<ClientProfile> activeProfiles = clientProfileRepository.findAll()
@@ -148,21 +145,29 @@ public class BreakEvenService {
             );
             BigDecimal realizedAverage = calculateAveragePrice(profileRevenue, profileUnitsSold);
 
+            boolean scenarioIsPrimary = !primaryAssigned && profilePrice.compareTo(ZERO) > 0;
+
             scenarios.add(createScenario(
                     profile.getName(),
                     "Precio sugerido por perfil de cliente.",
                     profilePrice,
                     realizedAverage,
                     fixedCosts,
-                    variableUnitCost,
+                    variableBreakdown,
                     profileUnitsSold,
                     profileRevenue,
-                    false
+                    scenarioIsPrimary
             ));
+
+            if (scenarioIsPrimary) {
+                primaryAssigned = true;
+            }
         }
 
         if (!usesProfilePricing || product.getPrice() != null) {
             BigDecimal productPrice = product.getPrice() != null ? product.getPrice() : ZERO;
+            boolean scenarioIsPrimary = !primaryAssigned;
+
             scenarios.add(createScenario(
                     usesProfilePricing ? "Precio actual del producto (legacy)" : "Precio actual del producto",
                     usesProfilePricing
@@ -171,22 +176,25 @@ public class BreakEvenService {
                     productPrice,
                     actualAverageSellingPrice,
                     fixedCosts,
-                    variableUnitCost,
+                    variableBreakdown,
                     totalUnitsSold,
                     totalRevenueInPeriod,
-                    !usesProfilePricing && scenarios.isEmpty()
+                    scenarioIsPrimary
             ));
+
+            if (scenarioIsPrimary) {
+                primaryAssigned = true;
+            }
         }
 
-        final BigDecimal fixedCostsFinal = fixedCosts;
         BreakEvenScenario fallbackScenario = scenarios.isEmpty()
                 ? createScenario(
                         "Sin escenario",
                         "No hay precios disponibles para este producto.",
                         ZERO,
                         ZERO,
-                        fixedCostsFinal,
-                        variableUnitCost,
+                        fixedCosts,
+                        variableBreakdown,
                         ZERO,
                         ZERO,
                         true
@@ -203,7 +211,12 @@ public class BreakEvenService {
                 start,
                 end,
                 fixedCosts,
-                variableUnitCost,
+                variableBreakdown.baseIndustrialUnitCost(),
+                variableBreakdown.fuelVariableUnitCost(),
+                primaryScenario.getDeliveryCommissionPercent(),
+                primaryScenario.getDeliveryCommissionUnitCost(),
+                primaryScenario.getOperationalVariableUnitCost(),
+                primaryScenario.getTotalVariableUnitCost(),
                 totalUnitsSold,
                 totalRevenueInPeriod,
                 actualAverageSellingPrice,
@@ -242,7 +255,7 @@ public class BreakEvenService {
             BigDecimal sellingPrice,
             BigDecimal realizedAveragePrice,
             BigDecimal fixedCosts,
-            BigDecimal variableUnitCost,
+            DirectVariableBreakdown breakdown,
             BigDecimal unitsSold,
             BigDecimal revenueInPeriod,
             boolean primary
@@ -252,15 +265,33 @@ public class BreakEvenService {
         BigDecimal safeUnitsSold = normalizeScale(unitsSold, 2);
         BigDecimal safeRevenue = normalizeScale(revenueInPeriod, 2);
 
-        BigDecimal contributionMargin = safeSellingPrice.subtract(variableUnitCost).setScale(4, RoundingMode.HALF_UP);
-        if (contributionMargin.compareTo(ZERO) < 0) {
-            contributionMargin = ZERO.setScale(4, RoundingMode.HALF_UP);
+        BigDecimal commissionUnitCost = ZERO.setScale(4, RoundingMode.HALF_UP);
+        if (breakdown.deliveryCommissionPercent().compareTo(ZERO) > 0 && safeSellingPrice.compareTo(ZERO) > 0) {
+            commissionUnitCost = safeSellingPrice
+                    .multiply(breakdown.deliveryCommissionPercent())
+                    .divide(ONE_HUNDRED, 4, RoundingMode.HALF_UP);
         }
+
+        BigDecimal operationalVariableUnitCost = breakdown.fuelVariableUnitCost()
+                .add(commissionUnitCost)
+                .setScale(4, RoundingMode.HALF_UP);
+
+        BigDecimal totalVariableUnitCost = breakdown.baseIndustrialUnitCost()
+                .add(operationalVariableUnitCost)
+                .setScale(4, RoundingMode.HALF_UP);
+
+        BigDecimal contributionMargin = safeSellingPrice
+                .subtract(totalVariableUnitCost)
+                .setScale(4, RoundingMode.HALF_UP);
+
+        BigDecimal contributionForBreakEven = contributionMargin.compareTo(ZERO) > 0
+                ? contributionMargin
+                : ZERO.setScale(4, RoundingMode.HALF_UP);
 
         BigDecimal breakEvenExact = ZERO.setScale(4, RoundingMode.HALF_UP);
         BigDecimal breakEvenRounded = ZERO.setScale(0, RoundingMode.HALF_UP);
-        if (contributionMargin.compareTo(ZERO) > 0) {
-            breakEvenExact = fixedCosts.divide(contributionMargin, 4, RoundingMode.HALF_UP);
+        if (contributionForBreakEven.compareTo(ZERO) > 0) {
+            breakEvenExact = fixedCosts.divide(contributionForBreakEven, 4, RoundingMode.HALF_UP);
             breakEvenRounded = breakEvenExact.setScale(0, RoundingMode.CEILING);
         }
 
@@ -290,6 +321,12 @@ public class BreakEvenService {
                 subtitle,
                 safeSellingPrice,
                 safeRealizedAveragePrice,
+                breakdown.baseIndustrialUnitCost(),
+                breakdown.fuelVariableUnitCost(),
+                breakdown.deliveryCommissionPercent(),
+                commissionUnitCost,
+                operationalVariableUnitCost,
+                totalVariableUnitCost,
                 contributionMargin,
                 breakEvenExact,
                 breakEvenRounded,
@@ -300,6 +337,65 @@ public class BreakEvenService {
                 safetyPercent,
                 primary
         );
+    }
+
+    private DirectVariableBreakdown buildDirectVariableBreakdown(Product product, ProductCostDetail costDetail) {
+        BigDecimal baseIndustrialUnitCost = ZERO.setScale(4, RoundingMode.HALF_UP);
+        BigDecimal fuelVariableUnitCost = ZERO.setScale(4, RoundingMode.HALF_UP);
+        BigDecimal legacyCommissionUnitCost = ZERO.setScale(4, RoundingMode.HALF_UP);
+
+        for (ProductCostLine line : costDetail.getLines()) {
+            BigDecimal lineCost = normalizeScale(line.getTotalCost(), 4);
+            String normalizedLabel = normalizeText(line.getSupplyName() + " " + line.getGroupLabel());
+
+            if (isFuelLine(normalizedLabel)) {
+                fuelVariableUnitCost = fuelVariableUnitCost.add(lineCost).setScale(4, RoundingMode.HALF_UP);
+                continue;
+            }
+
+            if (isDeliveryCommissionLine(normalizedLabel)) {
+                legacyCommissionUnitCost = legacyCommissionUnitCost.add(lineCost).setScale(4, RoundingMode.HALF_UP);
+                continue;
+            }
+
+            baseIndustrialUnitCost = baseIndustrialUnitCost.add(lineCost).setScale(4, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal deliveryCommissionPercent = ZERO.setScale(2, RoundingMode.HALF_UP);
+        if (product.usesClientProfilePrice()) {
+            deliveryCommissionPercent = DEFAULT_DELIVERY_COMMISSION_PERCENT.setScale(2, RoundingMode.HALF_UP);
+        } else {
+            baseIndustrialUnitCost = baseIndustrialUnitCost.add(legacyCommissionUnitCost).setScale(4, RoundingMode.HALF_UP);
+        }
+
+        return new DirectVariableBreakdown(
+                baseIndustrialUnitCost,
+                fuelVariableUnitCost,
+                deliveryCommissionPercent
+        );
+    }
+
+    private boolean isFuelLine(String normalizedLabel) {
+        return normalizedLabel.contains("gasolina")
+                || normalizedLabel.contains("combustible")
+                || normalizedLabel.contains("fuel");
+    }
+
+    private boolean isDeliveryCommissionLine(String normalizedLabel) {
+        boolean hasCommissionToken = normalizedLabel.contains("comision") || normalizedLabel.contains("commission");
+        boolean hasDeliveryToken = normalizedLabel.contains("repartidor") || normalizedLabel.contains("delivery");
+        return hasCommissionToken && hasDeliveryToken;
+    }
+
+    private String normalizeText(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase()
+                .trim();
     }
 
     private BigDecimal calculateAveragePrice(BigDecimal revenue, BigDecimal units) {
@@ -315,5 +411,12 @@ public class BreakEvenService {
             return ZERO.setScale(scale, RoundingMode.HALF_UP);
         }
         return value.setScale(scale, RoundingMode.HALF_UP);
+    }
+
+    private record DirectVariableBreakdown(
+            BigDecimal baseIndustrialUnitCost,
+            BigDecimal fuelVariableUnitCost,
+            BigDecimal deliveryCommissionPercent
+    ) {
     }
 }

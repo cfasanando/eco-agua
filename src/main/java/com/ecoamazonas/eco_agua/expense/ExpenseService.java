@@ -3,6 +3,7 @@ package com.ecoamazonas.eco_agua.expense;
 import com.ecoamazonas.eco_agua.category.Category;
 import com.ecoamazonas.eco_agua.category.CategoryRepository;
 import com.ecoamazonas.eco_agua.category.CategoryType;
+import com.ecoamazonas.eco_agua.product.cost.PeriodExpenseLine;
 import com.ecoamazonas.eco_agua.supplier.Supplier;
 import com.ecoamazonas.eco_agua.supplier.SupplierRepository;
 import com.ecoamazonas.eco_agua.supply.Supply;
@@ -24,6 +25,20 @@ import java.util.stream.Collectors;
 
 @Service
 public class ExpenseService {
+
+    private static final List<Long> FIXED_COST_CATEGORY_IDS = List.of(
+            17L, // Luz local
+            18L, // Agua local
+            19L, // Alquiler local
+            20L, // Contador
+            21L, // Sunat
+            22L, // Boletas y facturas
+            28L, // Cochera
+            29L, // Mantenimiento y aceite furgón
+            31L, // Detergente
+            32L, // Escobilla
+            34L  // Declaración IE
+    );
 
     private enum ExpenseInputContext {
         SUPPLIER,
@@ -543,11 +558,13 @@ public class ExpenseService {
             to = tmp;
         }
 
-        return expenseRepository.sumAmountByCategoryTypeAndPeriod(
-                CategoryType.EXPENSES,
+        BigDecimal total = expenseRepository.sumAmountByCategoryIdsAndPeriod(
+                FIXED_COST_CATEGORY_IDS,
                 from,
                 to
         );
+
+        return total != null ? total : BigDecimal.ZERO;
     }
 
     @Transactional(readOnly = true)
@@ -572,17 +589,18 @@ public class ExpenseService {
             to = tmp;
         }
 
-        List<Object[]> rows = expenseRepository.sumAmountByCategoryNameForTypeAndPeriod(
-                CategoryType.EXPENSES,
+        List<PeriodExpenseLine> rows = expenseRepository.sumAmountByCategoryIdsGrouped(
+                FIXED_COST_CATEGORY_IDS,
                 from,
                 to
         );
 
         Map<String, BigDecimal> result = new LinkedHashMap<>();
-        for (Object[] row : rows) {
-            String categoryName = (String) row[0];
-            BigDecimal amount = (BigDecimal) row[1];
-            result.put(categoryName, amount != null ? amount : BigDecimal.ZERO);
+        for (PeriodExpenseLine row : rows) {
+            result.put(
+                    row.getCategoryName(),
+                    row.getTotalAmount() != null ? row.getTotalAmount() : BigDecimal.ZERO
+            );
         }
 
         return result;

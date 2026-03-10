@@ -16,6 +16,11 @@ public class BreakEvenResult {
     private final LocalDate periodEnd;
 
     private final BigDecimal fixedCosts;
+    private final BigDecimal baseIndustrialUnitCost;
+    private final BigDecimal fuelVariableUnitCost;
+    private final BigDecimal deliveryCommissionPercent;
+    private final BigDecimal deliveryCommissionUnitCost;
+    private final BigDecimal operationalVariableUnitCost;
     private final BigDecimal variableUnitCost;
     private final BigDecimal totalUnitsSold;
     private final BigDecimal totalRevenueInPeriod;
@@ -41,6 +46,11 @@ public class BreakEvenResult {
             LocalDate periodStart,
             LocalDate periodEnd,
             BigDecimal fixedCosts,
+            BigDecimal baseIndustrialUnitCost,
+            BigDecimal fuelVariableUnitCost,
+            BigDecimal deliveryCommissionPercent,
+            BigDecimal deliveryCommissionUnitCost,
+            BigDecimal operationalVariableUnitCost,
             BigDecimal variableUnitCost,
             BigDecimal totalUnitsSold,
             BigDecimal totalRevenueInPeriod,
@@ -62,6 +72,11 @@ public class BreakEvenResult {
         this.periodStart = periodStart;
         this.periodEnd = periodEnd;
         this.fixedCosts = fixedCosts;
+        this.baseIndustrialUnitCost = baseIndustrialUnitCost;
+        this.fuelVariableUnitCost = fuelVariableUnitCost;
+        this.deliveryCommissionPercent = deliveryCommissionPercent;
+        this.deliveryCommissionUnitCost = deliveryCommissionUnitCost;
+        this.operationalVariableUnitCost = operationalVariableUnitCost;
         this.variableUnitCost = variableUnitCost;
         this.totalUnitsSold = totalUnitsSold;
         this.totalRevenueInPeriod = totalRevenueInPeriod;
@@ -94,6 +109,26 @@ public class BreakEvenResult {
 
     public BigDecimal getFixedCosts() {
         return fixedCosts;
+    }
+
+    public BigDecimal getBaseIndustrialUnitCost() {
+        return baseIndustrialUnitCost;
+    }
+
+    public BigDecimal getFuelVariableUnitCost() {
+        return fuelVariableUnitCost;
+    }
+
+    public BigDecimal getDeliveryCommissionPercent() {
+        return deliveryCommissionPercent;
+    }
+
+    public BigDecimal getDeliveryCommissionUnitCost() {
+        return deliveryCommissionUnitCost;
+    }
+
+    public BigDecimal getOperationalVariableUnitCost() {
+        return operationalVariableUnitCost;
     }
 
     public BigDecimal getVariableUnitCost() {

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Seguimiento del mes - Eco Agua')}"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='monthly_followup'">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Control gerencial</div>
+                    <h1 class="h4 mb-1">Seguimiento del mes</h1>
+                    <div class="small text-muted">
+                        Junta en una sola vista la base fija del mes, el punto de equilibrio y el ritmo real de venta.
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a th:href="@{/expenses/fixed-costs(year=${year},month=${month})}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-receipt-cutoff"></i> Costos fijos
+                    </a>
+                    <a th:href="@{/cashflow/break-even(productId=${selectedProductId},year=${year},month=${month})}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-graph-up-arrow"></i> Punto de equilibrio
+                    </a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light"><strong>Filtros</strong></div>
+                <div class="card-body">
+                    <form method="get" th:action="@{/dashboard/monthly-followup}" class="row g-2 align-items-end">
+                        <div class="col-lg-4">
+                            <label class="form-label">Producto</label>
+                            <select class="form-select" name="productId">
+                                <option th:each="p : ${products}"
+                                        th:value="${p.id}"
+                                        th:selected="${selectedProductId == p.id}"
+                                        th:text="${p.name}">Producto</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Año</label>
+                            <input type="number" class="form-control" name="year" min="2020" max="2100" th:value="${year}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Mes</label>
+                            <select class="form-select" name="month">
+                                <option value="1" th:selected="${month == 1}">Enero</option>
+                                <option value="2" th:selected="${month == 2}">Febrero</option>
+                                <option value="3" th:selected="${month == 3}">Marzo</option>
+                                <option value="4" th:selected="${month == 4}">Abril</option>
+                                <option value="5" th:selected="${month == 5}">Mayo</option>
+                                <option value="6" th:selected="${month == 6}">Junio</option>
+                                <option value="7" th:selected="${month == 7}">Julio</option>
+                                <option value="8" th:selected="${month == 8}">Agosto</option>
+                                <option value="9" th:selected="${month == 9}">Setiembre</option>
+                                <option value="10" th:selected="${month == 10}">Octubre</option>
+                                <option value="11" th:selected="${month == 11}">Noviembre</option>
+                                <option value="12" th:selected="${month == 12}">Diciembre</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Actualizar lectura
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div th:if="${snapshot == null}" class="alert alert-info shadow-sm">
+                No hay productos activos para mostrar seguimiento mensual.
+            </div>
+
+            <th:block th:if="${snapshot != null}">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6 col-xl-3">
+                        <div class="card shadow-sm h-100 border-primary-subtle">
+                            <div class="card-body">
+                                <div class="small text-muted mb-1">Base fija oficial</div>
+                                <div class="fs-4 fw-semibold">
+                                    S/. <span th:text="${#numbers.formatDecimal(snapshot.baseFixedMonth, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                </div>
+                                <div class="small text-muted">
+                                    Mes analizado:
+                                    <span th:text="${snapshot.periodStart != null ? #temporals.format(snapshot.periodStart, 'MMMM yyyy') : '-'}">marzo 2026</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-xl-3">
+                        <div class="card shadow-sm h-100 border-success-subtle">
+                            <div class="card-body">
+                                <div class="small text-muted mb-1">PE del mes</div>
+                                <div class="fs-4 fw-semibold"
+                                     th:text="${#numbers.formatDecimal(snapshot.breakEvenUnits, 1, 'POINT', 0, 'POINT')}">0</div>
+                                <div class="small text-muted">botellones para cubrir la estructura</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-xl-3">
+                        <div class="card shadow-sm h-100 border-info-subtle">
+                            <div class="card-body">
+                                <div class="small text-muted mb-1">Vendidas acumuladas</div>
+                                <div class="fs-4 fw-semibold"
+                                     th:text="${#numbers.formatDecimal(snapshot.soldUnits, 1, 'POINT', 2, 'POINT')}">0.00</div>
+                                <div class="small text-muted">
+                                    Avance:
+                                    <span th:text="${#numbers.formatDecimal(snapshot.soldProgressPercent, 1, 'POINT', 1, 'POINT')}">0.0</span>% del PE
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-xl-3">
+                        <div class="card shadow-sm h-100 border-warning-subtle">
+                            <div class="card-body">
+                                <div class="small text-muted mb-1">Faltante estructural</div>
+                                <div class="fs-4 fw-semibold"
+                                     th:text="${#numbers.formatDecimal(snapshot.missingUnits, 1, 'POINT', 2, 'POINT')}">0.00</div>
+                                <div class="small text-muted">botellones aún por cubrir</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-lg-8">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <span><strong>Meta del mes</strong></span>
+                                <span class="badge"
+                                      th:classappend="${snapshot.paceBadgeClass}"
+                                      th:text="${snapshot.paceLabel}">En ritmo</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-4">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Esperado a la fecha</div>
+                                            <div class="fw-semibold fs-5"
+                                                 th:text="${#numbers.formatDecimal(snapshot.expectedUnitsByToday, 1, 'POINT', 2, 'POINT')}">0.00</div>
+                                            <div class="small text-muted">según ritmo mensual</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Días restantes</div>
+                                            <div class="fw-semibold fs-5" th:text="${snapshot.remainingDays}">0</div>
+                                            <div class="small text-muted">de <span th:text="${snapshot.daysInMonth}">31</span> días del mes</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Meta diaria restante</div>
+                                            <div class="fw-semibold fs-5"
+                                                 th:text="${#numbers.formatDecimal(snapshot.targetUnitsPerRemainingDay, 1, 'POINT', 2, 'POINT')}">0.00</div>
+                                            <div class="small text-muted">botellones por día</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-secondary mb-2">
+                                    <div class="fw-semibold mb-1">Lectura rápida</div>
+                                    <div th:text="${snapshot.paceSummary}">Resumen</div>
+                                </div>
+
+                                <div class="alert alert-light border mb-0">
+                                    <div class="fw-semibold mb-1">Qué hacer ahora</div>
+                                    <div th:text="${snapshot.mainRecommendation}">Recomendación</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-light"><strong>Lectura comercial</strong></div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="small text-muted">Precio promedio real</div>
+                                    <div class="fw-semibold fs-5">
+                                        S/. <span th:text="${#numbers.formatDecimal(snapshot.averageSellingPrice, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="small text-muted">Ventas brutas acumuladas</div>
+                                    <div class="fw-semibold fs-5">
+                                        S/. <span th:text="${#numbers.formatDecimal(snapshot.totalRevenue, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="small text-muted">Margen de contribución promedio</div>
+                                    <div class="fw-semibold fs-5">
+                                        S/. <span th:text="${#numbers.formatDecimal(snapshot.contributionMarginUnit, 1, 'POINT', 4, 'POINT')}">0.0000</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="small text-muted">Meta de venta diaria</div>
+                                    <div class="fw-semibold fs-5">
+                                        S/. <span th:text="${#numbers.formatDecimal(snapshot.targetSalesPerRemainingDay, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-light"><strong>Lectura operativa real del período</strong></div>
+                            <div class="card-body">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Operativo total acumulado</div>
+                                            <div class="fw-semibold fs-5">
+                                                S/. <span th:text="${#numbers.formatDecimal(snapshot.operationalVariableTotal, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Costo operativo por unidad</div>
+                                            <div class="fw-semibold fs-5">
+                                                S/. <span th:text="${#numbers.formatDecimal(snapshot.operationalVariableUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Gasolina y otros no personales</div>
+                                            <div class="fw-semibold fs-5">
+                                                S/. <span th:text="${#numbers.formatDecimal(snapshot.operationalVariableNonPersonnelTotal, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Personal variable</div>
+                                            <div class="fw-semibold fs-5">
+                                                S/. <span th:text="${#numbers.formatDecimal(snapshot.operationalVariablePersonnelTotal, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Aporte operativo antes de fijos</div>
+                                            <div class="fw-semibold fs-5">
+                                                S/. <span th:text="${#numbers.formatDecimal(snapshot.operationalContributionBeforeFixed, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Resultado del período después de fijos</div>
+                                            <div class="fw-semibold fs-5"
+                                                 th:classappend="${snapshot.operationalResultAfterFixed.signum() >= 0 ? ' text-success' : ' text-danger'}">
+                                                S/. <span th:text="${#numbers.formatDecimal(snapshot.operationalResultAfterFixed, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <span><strong>Detalle operativo acumulado</strong></span>
+                                <span class="badge text-bg-light"
+                                      th:text="${snapshot.operationalVariableByCategory != null ? snapshot.operationalVariableByCategory.size() : 0} + ' rubro(s)'">0</span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div th:if="${snapshot.operationalVariableByCategory == null or #maps.isEmpty(snapshot.operationalVariableByCategory)}"
+                                     class="p-3 text-muted small">
+                                    Todavía no hay egresos operativos acumulados en el período.
+                                </div>
+
+                                <div class="table-responsive"
+                                     th:if="${snapshot.operationalVariableByCategory != null and !#maps.isEmpty(snapshot.operationalVariableByCategory)}">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead class="table-light">
+                                        <tr>
+                                            <th>Rubro</th>
+                                            <th class="text-end">Monto</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="entry : ${snapshot.operationalVariableByCategory}">
+                                            <td th:text="${entry.key}">Gasolina</td>
+                                            <td class="text-end">
+                                                S/. <span th:text="${#numbers.formatDecimal(entry.value, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <span><strong>Base estructural realmente usada</strong></span>
+                        <span class="small text-muted"
+                              th:text="${snapshot.product != null ? 'Producto: ' + snapshot.product.name : 'Producto'}">Producto</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div th:if="${snapshot.breakEvenResult == null or #lists.isEmpty(snapshot.breakEvenResult.fixedCostLines)}"
+                             class="p-3 text-muted small">
+                            No hay líneas de costo fijo estructural registradas para este período.
+                        </div>
+
+                        <div class="table-responsive"
+                             th:if="${snapshot.breakEvenResult != null and !#lists.isEmpty(snapshot.breakEvenResult.fixedCostLines)}">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Rubro fijo</th>
+                                    <th class="text-end">Monto</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="line : ${snapshot.breakEvenResult.fixedCostLines}">
+                                    <td th:text="${line.categoryName}">Luz local</td>
+                                    <td class="text-end">
+                                        S/. <span th:text="${#numbers.formatDecimal(line.totalAmount, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </th:block>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/scripts_admin :: adminScripts}"></th:block>
+</body>
+</html>

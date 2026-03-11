@@ -10,25 +10,36 @@
 
     <div class="sidebar-nav">
         <div class="menu-section-title">Principal</div>
-        <a th:href="@{/home}" class="menu-link"
-           th:classappend="${activePage}=='home' ? ' active'">
+
+        <a th:href="@{/home}"
+           class="menu-link"
+           th:classappend="${activePage == 'home' ? ' active' : ''}">
             <span class="icon"><i class="bi bi-house-door"></i></span>
             <span>Inicio</span>
         </a>
 
-        <a th:href="@{/dashboard/business-overview}" class="menu-link"
-           th:classappend="${activePage}=='business_overview' ? ' active'">
+        <a th:href="@{/dashboard/business-overview}"
+           class="menu-link"
+           th:classappend="${activePage == 'business_overview' ? ' active' : ''}">
             <span class="icon"><i class="bi bi-speedometer2"></i></span>
             <span>Estado del negocio</span>
+        </a>
+
+        <a th:href="@{/dashboard/monthly-followup}"
+           class="menu-link"
+           th:classappend="${activePage == 'monthly_followup' ? ' active' : ''}">
+            <span class="icon"><i class="bi bi-calendar2-week"></i></span>
+            <span>Seguimiento del mes</span>
         </a>
 
         <div class="menu-section-title">Operación diaria</div>
 
         <div class="menu-group"
-             th:with="isCommercialActive=${activePage == 'client-profiles' or
-                                           activePage == 'clients' or
-                                           activePage == 'promotions' or
-                                           activePage == 'delivery_zones'}">
+             th:with="isCommercialActive=${activePage == 'client-profiles'
+                                          or activePage == 'clients'
+                                          or activePage == 'clients_portfolio'
+                                          or activePage == 'promotions'
+                                          or activePage == 'delivery_zones'}">
             <input type="checkbox"
                    id="menu-commercial-toggle"
                    class="menu-toggle"
@@ -39,32 +50,37 @@
                 <span class="caret"><i class="bi bi-chevron-right"></i></span>
             </label>
             <div class="submenu-container">
-                <a th:href="@{/admin/clients}" class="menu-link submenu"
-                   th:classappend="${activePage}=='clients' ? ' active'">
+                <a th:href="@{/admin/clients}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'clients' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-person-lines-fill"></i></span>
                     <span>Clientes</span>
                 </a>
 
-                <a th:href="@{/admin/clients/portfolio}" class="menu-link submenu"
-                   th:classappend="${activePage}=='clients' ? ' active'">
+                <a th:href="@{/admin/clients/portfolio}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'clients_portfolio' or activePage == 'clients' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-bar-chart-line"></i></span>
                     <span>Cartera de clientes</span>
                 </a>
 
-                <a th:href="@{/admin/client-profiles}" class="menu-link submenu"
-                   th:classappend="${activePage}=='client-profiles' ? ' active'">
+                <a th:href="@{/admin/client-profiles}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'client-profiles' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-diagram-3"></i></span>
                     <span>Perfiles de cliente</span>
                 </a>
 
-                <a th:href="@{/admin/promotions}" class="menu-link submenu"
-                   th:classappend="${activePage}=='promotions' ? ' active'">
+                <a th:href="@{/admin/promotions}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'promotions' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-gift"></i></span>
                     <span>Promociones</span>
                 </a>
 
-                <a th:href="@{/admin/delivery-zones}" class="menu-link submenu"
-                   th:classappend="${activePage}=='delivery_zones' ? ' active'">
+                <a th:href="@{/admin/delivery-zones}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'delivery_zones' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-geo-alt-fill"></i></span>
                     <span>Zonas de reparto</span>
                 </a>
@@ -72,7 +88,9 @@
         </div>
 
         <div class="menu-group"
-             th:with="isIncomeActive=${activePage == 'income_sales' or activePage == 'income_credit' or activePage == 'income_others'}">
+             th:with="isIncomeActive=${activePage == 'income_sales'
+                                       or activePage == 'income_credit'
+                                       or activePage == 'income_others'}">
             <input type="checkbox"
                    id="menu-ingresos-toggle"
                    class="menu-toggle"
@@ -85,21 +103,21 @@
             <div class="submenu-container">
                 <a th:href="@{/income/sales}"
                    class="menu-link submenu"
-                   th:classappend="${activePage}=='income_sales' ? ' active'">
+                   th:classappend="${activePage == 'income_sales' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-calendar-range"></i></span>
                     <span>Ventas por fecha</span>
                 </a>
 
                 <a th:href="@{/income/credit}"
                    class="menu-link submenu"
-                   th:classappend="${activePage}=='income_credit' ? ' active'">
+                   th:classappend="${activePage == 'income_credit' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-cash-stack"></i></span>
                     <span>Cuentas por cobrar</span>
                 </a>
 
                 <a th:href="@{/income/others}"
                    class="menu-link submenu"
-                   th:classappend="${activePage}=='income_others' ? ' active'">
+                   th:classappend="${activePage == 'income_others' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-plus-circle"></i></span>
                     <span>Otros ingresos</span>
                 </a>
@@ -107,10 +125,10 @@
         </div>
 
         <div class="menu-group"
-             th:with="isExpensesActive=${activePage == 'expenses_by_date' or
-                                          activePage == 'expenses_debts' or
-                                          activePage == 'expenses_fixed_costs' or
-                                          activePage == 'suppliers'}">
+             th:with="isExpensesActive=${activePage == 'expenses_by_date'
+                                         or activePage == 'expenses_debts'
+                                         or activePage == 'expenses_fixed_costs'
+                                         or activePage == 'suppliers'}">
             <input type="checkbox"
                    id="menu-egresos-toggle"
                    class="menu-toggle"
@@ -123,27 +141,28 @@
             <div class="submenu-container">
                 <a th:href="@{/expenses/by-date}"
                    class="menu-link submenu"
-                   th:classappend="${activePage}=='expenses_by_date' ? ' active'">
+                   th:classappend="${activePage == 'expenses_by_date' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-calendar-range"></i></span>
                     <span>Gastos por fecha</span>
                 </a>
 
                 <a th:href="@{/expenses/debts}"
                    class="menu-link submenu"
-                   th:classappend="${activePage}=='expenses_debts' ? ' active'">
+                   th:classappend="${activePage == 'expenses_debts' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-credit-card-2-back"></i></span>
                     <span>Cuentas por pagar</span>
                 </a>
 
                 <a th:href="@{/expenses/fixed-costs}"
                    class="menu-link submenu"
-                   th:classappend="${activePage}=='expenses_fixed_costs' ? ' active'">
+                   th:classappend="${activePage == 'expenses_fixed_costs' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-receipt-cutoff"></i></span>
                     <span>Costos fijos mensuales</span>
                 </a>
 
-                <a th:href="@{/admin/suppliers}" class="menu-link submenu"
-                   th:classappend="${activePage}=='suppliers' ? ' active'">
+                <a th:href="@{/admin/suppliers}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'suppliers' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-building"></i></span>
                     <span>Proveedores</span>
                 </a>
@@ -151,11 +170,11 @@
         </div>
 
         <div class="menu-group"
-             th:with="isInventoryActive=${activePage == 'products' or
-                                           activePage == 'supplies' or
-                                           activePage == 'categories' or
-                                           activePage == 'warehouse_products_stock' or
-                                           activePage == 'warehouse_supplies_stock'}">
+             th:with="isInventoryActive=${activePage == 'products'
+                                          or activePage == 'supplies'
+                                          or activePage == 'categories'
+                                          or activePage == 'warehouse_products_stock'
+                                          or activePage == 'warehouse_supplies_stock'}">
             <input type="checkbox"
                    id="menu-inventory-toggle"
                    class="menu-toggle"
@@ -166,32 +185,37 @@
                 <span class="caret"><i class="bi bi-chevron-right"></i></span>
             </label>
             <div class="submenu-container">
-                <a th:href="@{/admin/products}" class="menu-link submenu"
-                   th:classappend="${activePage}=='products' ? ' active'">
+                <a th:href="@{/admin/products}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'products' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-box-seam"></i></span>
                     <span>Productos</span>
                 </a>
 
-                <a th:href="@{/admin/supplies}" class="menu-link submenu"
-                   th:classappend="${activePage}=='supplies' ? ' active'">
+                <a th:href="@{/admin/supplies}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'supplies' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-droplet-half"></i></span>
                     <span>Insumos</span>
                 </a>
 
-                <a th:href="@{/admin/categories}" class="menu-link submenu"
-                   th:classappend="${activePage}=='categories' ? ' active'">
+                <a th:href="@{/admin/categories}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'categories' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-folder2-open"></i></span>
                     <span>Categorías</span>
                 </a>
 
-                <a th:href="@{/warehouse/products-stock}" class="menu-link submenu"
-                   th:classappend="${activePage}=='warehouse_products_stock' ? ' active'">
+                <a th:href="@{/warehouse/products-stock}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'warehouse_products_stock' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-archive"></i></span>
                     <span>Stock de productos</span>
                 </a>
 
-                <a th:href="@{/warehouse/supplies-stock}" class="menu-link submenu"
-                   th:classappend="${activePage}=='warehouse_supplies_stock' ? ' active'">
+                <a th:href="@{/warehouse/supplies-stock}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'warehouse_supplies_stock' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-moisture"></i></span>
                     <span>Stock de insumos</span>
                 </a>
@@ -199,9 +223,9 @@
         </div>
 
         <div class="menu-group"
-             th:with="isFinanceActive=${activePage == 'accounting_sales_registry' or
-                                         activePage == 'accounting_purchase_registry' or
-                                         activePage == 'cashflow'}">
+             th:with="isFinanceActive=${activePage == 'accounting_sales_registry'
+                                        or activePage == 'accounting_purchase_registry'
+                                        or activePage == 'cashflow'}">
             <input type="checkbox"
                    id="menu-finance-toggle"
                    class="menu-toggle"
@@ -214,21 +238,21 @@
             <div class="submenu-container">
                 <a th:href="@{/accounting/sales-registry}"
                    class="menu-link submenu"
-                   th:classappend="${activePage}=='accounting_sales_registry' ? ' active'">
+                   th:classappend="${activePage == 'accounting_sales_registry' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-journal-text"></i></span>
                     <span>Reg. ventas e ingresos</span>
                 </a>
 
                 <a th:href="@{/accounting/purchase-registry}"
                    class="menu-link submenu"
-                   th:classappend="${activePage}=='accounting_purchase_registry' ? ' active'">
+                   th:classappend="${activePage == 'accounting_purchase_registry' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-journal-check"></i></span>
                     <span>Reg. compras y gastos</span>
                 </a>
 
                 <a th:href="@{/cashflow}"
                    class="menu-link submenu"
-                   th:classappend="${activePage}=='cashflow' ? ' active'">
+                   th:classappend="${activePage == 'cashflow' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-cash-stack"></i></span>
                     <span>Flujo de caja</span>
                 </a>
@@ -238,7 +262,9 @@
         <div class="menu-section-title">Gestión de marca</div>
 
         <div class="menu-group"
-             th:with="isMarketingActive=${activePage == 'blog_posts' or activePage == 'blog' or activePage == 'testimonials'}">
+             th:with="isMarketingActive=${activePage == 'blog_posts'
+                                          or activePage == 'blog'
+                                          or activePage == 'testimonials'}">
             <input type="checkbox"
                    id="menu-marketing-toggle"
                    class="menu-toggle"
@@ -249,14 +275,16 @@
                 <span class="caret"><i class="bi bi-chevron-right"></i></span>
             </label>
             <div class="submenu-container">
-                <a th:href="@{/admin/blog}" class="menu-link submenu"
-                   th:classappend="${activePage}=='blog_posts' or ${activePage}=='blog' ? ' active'">
+                <a th:href="@{/admin/blog}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'blog_posts' or activePage == 'blog' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-journal-text"></i></span>
                     <span>Blog / consejos</span>
                 </a>
 
-                <a th:href="@{/marketing/admin/testimonials}" class="menu-link submenu"
-                   th:classappend="${activePage}=='testimonials' ? ' active'">
+                <a th:href="@{/marketing/admin/testimonials}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'testimonials' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-chat-quote"></i></span>
                     <span>Testimonials</span>
                 </a>
@@ -266,10 +294,10 @@
         <div class="menu-section-title">Sistema</div>
 
         <div class="menu-group"
-             th:with="isSystemActive=${activePage == 'platform_settings' or
-                                        activePage == 'admin_users' or
-                                        activePage == 'job_positions' or
-                                        activePage == 'admin_roles_permissions'}">
+             th:with="isSystemActive=${activePage == 'platform_settings'
+                                       or activePage == 'admin_users'
+                                       or activePage == 'job_positions'
+                                       or activePage == 'admin_roles_permissions'}">
             <input type="checkbox"
                    id="menu-system-toggle"
                    class="menu-toggle"
@@ -280,55 +308,34 @@
                 <span class="caret"><i class="bi bi-chevron-right"></i></span>
             </label>
             <div class="submenu-container">
-                <a th:href="@{/admin/platform-settings}" class="menu-link submenu"
-                   th:classappend="${activePage}=='platform_settings' ? ' active'">
+                <a th:href="@{/admin/platform-settings}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'platform_settings' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-sliders"></i></span>
                     <span>Configuración</span>
                 </a>
 
-                <a th:href="@{/admin/users}" class="menu-link submenu"
-                   th:classappend="${activePage}=='admin_users' ? ' active'">
+                <a th:href="@{/admin/users}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'admin_users' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-people"></i></span>
                     <span>Usuarios</span>
                 </a>
 
-                <a th:href="@{/admin/job-positions}" class="menu-link submenu"
-                   th:classappend="${activePage}=='job_positions' ? ' active'">
+                <a th:href="@{/admin/job-positions}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'job_positions' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-briefcase"></i></span>
                     <span>Cargos (puestos)</span>
                 </a>
 
-                <a th:href="@{/admin/roles-permissions}" class="menu-link submenu"
-                   th:classappend="${activePage}=='admin_roles_permissions' ? ' active'">
+                <a th:href="@{/admin/roles-permissions}"
+                   class="menu-link submenu"
+                   th:classappend="${activePage == 'admin_roles_permissions' ? ' active' : ''}">
                     <span class="icon"><i class="bi bi-shield-lock"></i></span>
                     <span>Roles y permisos</span>
                 </a>
             </div>
         </div>
-
-        <!-- Reportes future block kept on purpose for incremental growth -->
-        <!--
-        <div class="menu-section-title">Reportes</div>
-        <div class="menu-group"
-             th:with="isReportsActive=${activePage == 'price_simulator'}">
-            <input type="checkbox"
-                   id="menu-reports-toggle"
-                   class="menu-toggle"
-                   th:checked="${isReportsActive}">
-            <label class="menu-link has-children" for="menu-reports-toggle">
-                <span class="icon"><i class="bi bi-bar-chart-line"></i></span>
-                <span>Reportes</span>
-                <span class="caret"><i class="bi bi-chevron-right"></i></span>
-            </label>
-            <div class="submenu-container">
-                <a th:href="@{/admin/price-simulator}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage}=='price_simulator' ? ' active'">
-                    <span class="icon"><i class="bi bi-graph-up-arrow"></i></span>
-                    <span>Simulador de precio</span>
-                </a>
-            </div>
-        </div>
-        -->
     </div>
 </aside>

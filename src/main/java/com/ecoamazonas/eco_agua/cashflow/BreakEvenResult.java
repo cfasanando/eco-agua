@@ -5,6 +5,7 @@ import com.ecoamazonas.eco_agua.product.Product;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Result of a break-even analysis for one product and one period.
@@ -17,10 +18,6 @@ public class BreakEvenResult {
 
     private final BigDecimal fixedCosts;
     private final BigDecimal baseIndustrialUnitCost;
-    private final BigDecimal fuelVariableUnitCost;
-    private final BigDecimal deliveryCommissionPercent;
-    private final BigDecimal deliveryCommissionUnitCost;
-    private final BigDecimal operationalVariableUnitCost;
     private final BigDecimal variableUnitCost;
     private final BigDecimal totalUnitsSold;
     private final BigDecimal totalRevenueInPeriod;
@@ -37,6 +34,22 @@ public class BreakEvenResult {
     private final BreakEvenStatus status;
     private final BigDecimal safetyMarginUnits;
     private final BigDecimal safetyMarginPercent;
+    private final BigDecimal structuralGapUnits;
+    private final BigDecimal structuralGapSales;
+
+    private final BigDecimal operationalVariableTotal;
+    private final BigDecimal operationalVariablePersonnelTotal;
+    private final BigDecimal operationalVariableNonPersonnelTotal;
+    private final BigDecimal operationalVariableUnitCost;
+    private final BigDecimal operationalContributionMargin;
+    private final BigDecimal operationalBreakEvenUnitsExact;
+    private final BigDecimal operationalBreakEvenUnitsRounded;
+    private final BigDecimal operationalGapUnits;
+    private final BigDecimal operationalGapSales;
+    private final BigDecimal operationalContributionTotalBeforeFixed;
+    private final BigDecimal operationalResultAfterFixed;
+    private final boolean operationalReadingAvailable;
+    private final Map<String, BigDecimal> operationalVariableByCategory;
 
     private final List<BreakEvenScenario> scenarios;
     private final List<BreakEvenFixedCostLine> fixedCostLines;
@@ -47,10 +60,6 @@ public class BreakEvenResult {
             LocalDate periodEnd,
             BigDecimal fixedCosts,
             BigDecimal baseIndustrialUnitCost,
-            BigDecimal fuelVariableUnitCost,
-            BigDecimal deliveryCommissionPercent,
-            BigDecimal deliveryCommissionUnitCost,
-            BigDecimal operationalVariableUnitCost,
             BigDecimal variableUnitCost,
             BigDecimal totalUnitsSold,
             BigDecimal totalRevenueInPeriod,
@@ -65,6 +74,21 @@ public class BreakEvenResult {
             BreakEvenStatus status,
             BigDecimal safetyMarginUnits,
             BigDecimal safetyMarginPercent,
+            BigDecimal structuralGapUnits,
+            BigDecimal structuralGapSales,
+            BigDecimal operationalVariableTotal,
+            BigDecimal operationalVariablePersonnelTotal,
+            BigDecimal operationalVariableNonPersonnelTotal,
+            BigDecimal operationalVariableUnitCost,
+            BigDecimal operationalContributionMargin,
+            BigDecimal operationalBreakEvenUnitsExact,
+            BigDecimal operationalBreakEvenUnitsRounded,
+            BigDecimal operationalGapUnits,
+            BigDecimal operationalGapSales,
+            BigDecimal operationalContributionTotalBeforeFixed,
+            BigDecimal operationalResultAfterFixed,
+            boolean operationalReadingAvailable,
+            Map<String, BigDecimal> operationalVariableByCategory,
             List<BreakEvenScenario> scenarios,
             List<BreakEvenFixedCostLine> fixedCostLines
     ) {
@@ -73,10 +97,6 @@ public class BreakEvenResult {
         this.periodEnd = periodEnd;
         this.fixedCosts = fixedCosts;
         this.baseIndustrialUnitCost = baseIndustrialUnitCost;
-        this.fuelVariableUnitCost = fuelVariableUnitCost;
-        this.deliveryCommissionPercent = deliveryCommissionPercent;
-        this.deliveryCommissionUnitCost = deliveryCommissionUnitCost;
-        this.operationalVariableUnitCost = operationalVariableUnitCost;
         this.variableUnitCost = variableUnitCost;
         this.totalUnitsSold = totalUnitsSold;
         this.totalRevenueInPeriod = totalRevenueInPeriod;
@@ -91,6 +111,21 @@ public class BreakEvenResult {
         this.status = status;
         this.safetyMarginUnits = safetyMarginUnits;
         this.safetyMarginPercent = safetyMarginPercent;
+        this.structuralGapUnits = structuralGapUnits;
+        this.structuralGapSales = structuralGapSales;
+        this.operationalVariableTotal = operationalVariableTotal;
+        this.operationalVariablePersonnelTotal = operationalVariablePersonnelTotal;
+        this.operationalVariableNonPersonnelTotal = operationalVariableNonPersonnelTotal;
+        this.operationalVariableUnitCost = operationalVariableUnitCost;
+        this.operationalContributionMargin = operationalContributionMargin;
+        this.operationalBreakEvenUnitsExact = operationalBreakEvenUnitsExact;
+        this.operationalBreakEvenUnitsRounded = operationalBreakEvenUnitsRounded;
+        this.operationalGapUnits = operationalGapUnits;
+        this.operationalGapSales = operationalGapSales;
+        this.operationalContributionTotalBeforeFixed = operationalContributionTotalBeforeFixed;
+        this.operationalResultAfterFixed = operationalResultAfterFixed;
+        this.operationalReadingAvailable = operationalReadingAvailable;
+        this.operationalVariableByCategory = operationalVariableByCategory;
         this.scenarios = scenarios;
         this.fixedCostLines = fixedCostLines;
     }
@@ -113,22 +148,6 @@ public class BreakEvenResult {
 
     public BigDecimal getBaseIndustrialUnitCost() {
         return baseIndustrialUnitCost;
-    }
-
-    public BigDecimal getFuelVariableUnitCost() {
-        return fuelVariableUnitCost;
-    }
-
-    public BigDecimal getDeliveryCommissionPercent() {
-        return deliveryCommissionPercent;
-    }
-
-    public BigDecimal getDeliveryCommissionUnitCost() {
-        return deliveryCommissionUnitCost;
-    }
-
-    public BigDecimal getOperationalVariableUnitCost() {
-        return operationalVariableUnitCost;
     }
 
     public BigDecimal getVariableUnitCost() {
@@ -185,6 +204,66 @@ public class BreakEvenResult {
 
     public BigDecimal getSafetyMarginPercent() {
         return safetyMarginPercent;
+    }
+
+    public BigDecimal getStructuralGapUnits() {
+        return structuralGapUnits;
+    }
+
+    public BigDecimal getStructuralGapSales() {
+        return structuralGapSales;
+    }
+
+    public BigDecimal getOperationalVariableTotal() {
+        return operationalVariableTotal;
+    }
+
+    public BigDecimal getOperationalVariablePersonnelTotal() {
+        return operationalVariablePersonnelTotal;
+    }
+
+    public BigDecimal getOperationalVariableNonPersonnelTotal() {
+        return operationalVariableNonPersonnelTotal;
+    }
+
+    public BigDecimal getOperationalVariableUnitCost() {
+        return operationalVariableUnitCost;
+    }
+
+    public BigDecimal getOperationalContributionMargin() {
+        return operationalContributionMargin;
+    }
+
+    public BigDecimal getOperationalBreakEvenUnitsExact() {
+        return operationalBreakEvenUnitsExact;
+    }
+
+    public BigDecimal getOperationalBreakEvenUnitsRounded() {
+        return operationalBreakEvenUnitsRounded;
+    }
+
+    public BigDecimal getOperationalGapUnits() {
+        return operationalGapUnits;
+    }
+
+    public BigDecimal getOperationalGapSales() {
+        return operationalGapSales;
+    }
+
+    public BigDecimal getOperationalContributionTotalBeforeFixed() {
+        return operationalContributionTotalBeforeFixed;
+    }
+
+    public BigDecimal getOperationalResultAfterFixed() {
+        return operationalResultAfterFixed;
+    }
+
+    public boolean isOperationalReadingAvailable() {
+        return operationalReadingAvailable;
+    }
+
+    public Map<String, BigDecimal> getOperationalVariableByCategory() {
+        return operationalVariableByCategory;
     }
 
     public List<BreakEvenScenario> getScenarios() {

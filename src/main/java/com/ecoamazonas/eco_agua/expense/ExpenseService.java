@@ -3,7 +3,8 @@ package com.ecoamazonas.eco_agua.expense;
 import com.ecoamazonas.eco_agua.category.Category;
 import com.ecoamazonas.eco_agua.category.CategoryRepository;
 import com.ecoamazonas.eco_agua.category.CategoryType;
-import com.ecoamazonas.eco_agua.product.cost.PeriodExpenseLine;
+import com.ecoamazonas.eco_agua.category.CostBehavior;
+import com.ecoamazonas.eco_agua.category.PersonnelMode;
 import com.ecoamazonas.eco_agua.supplier.Supplier;
 import com.ecoamazonas.eco_agua.supplier.SupplierRepository;
 import com.ecoamazonas.eco_agua.supply.Supply;
@@ -25,20 +26,6 @@ import java.util.stream.Collectors;
 
 @Service
 public class ExpenseService {
-
-    private static final List<Long> FIXED_COST_CATEGORY_IDS = List.of(
-            17L, // Luz local
-            18L, // Agua local
-            19L, // Alquiler local
-            20L, // Contador
-            21L, // Sunat
-            22L, // Boletas y facturas
-            28L, // Cochera
-            29L, // Mantenimiento y aceite furgón
-            31L, // Detergente
-            32L, // Escobilla
-            34L  // Declaración IE
-    );
 
     private enum ExpenseInputContext {
         SUPPLIER,
@@ -106,7 +93,42 @@ public class ExpenseService {
         return false;
     }
 
+    private boolean isExpenseCategory(Category category) {
+        return category != null && category.getType() != null && category.getType().isExpenseType();
+    }
+
+    private boolean isFixedStructuralCategory(Category category) {
+        return isExpenseCategory(category)
+                && category.getCostBehavior() == CostBehavior.FIXED_STRUCTURAL
+                && category.isIncludeInBreakEven();
+    }
+
+    private boolean isOperationalVariableCategory(Category category) {
+        return isExpenseCategory(category)
+                && category.getCostBehavior() == CostBehavior.VARIABLE_OPERATIONAL
+                && category.isIncludeInOperationalReading();
+    }
+
+    private boolean isOperationalVariablePersonnelCategory(Category category) {
+        return isOperationalVariableCategory(category)
+                && category.getPersonnelMode() != null
+                && category.getPersonnelMode().isPersonnelCategory();
+    }
+
+    private boolean isOperationalVariableNonPersonnelCategory(Category category) {
+        return isOperationalVariableCategory(category)
+                && (category.getPersonnelMode() == null || !category.getPersonnelMode().isPersonnelCategory());
+    }
+
+    private BigDecimal normalizeAmount(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
     private ExpenseInputContext resolveExpenseInputContext(Category category) {
+        if (category != null && category.getPersonnelMode() != null && category.getPersonnelMode().isPersonnelCategory()) {
+            return ExpenseInputContext.PERSONNEL;
+        }
+
         String normalizedCategoryName = normalizeText(category != null ? category.getName() : null);
 
         if (normalizedCategoryName.contains("insumo")) {
@@ -545,26 +567,12 @@ public class ExpenseService {
 
     @Transactional(readOnly = true)
     public BigDecimal getTotalFixedCosts(LocalDate start, LocalDate end) {
-        if (start == null || end == null) {
-            throw new IllegalArgumentException("Start and end dates are required.");
-        }
+        List<Expense> expenses = findNormalizedRangeExpenses(start, end);
 
-        LocalDate from = start;
-        LocalDate to = end;
-
-        if (to.isBefore(from)) {
-            LocalDate tmp = from;
-            from = to;
-            to = tmp;
-        }
-
-        BigDecimal total = expenseRepository.sumAmountByCategoryIdsAndPeriod(
-                FIXED_COST_CATEGORY_IDS,
-                from,
-                to
-        );
-
-        return total != null ? total : BigDecimal.ZERO;
+        return expenses.stream()
+                .filter(expense -> isFixedStructuralCategory(expense.getCategory()))
+                .map(expense -> normalizeAmount(expense.getAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     @Transactional(readOnly = true)
@@ -576,6 +584,67 @@ public class ExpenseService {
 
     @Transactional(readOnly = true)
     public Map<String, BigDecimal> getFixedCostsByCategory(LocalDate start, LocalDate end) {
+        List<Expense> expenses = findNormalizedRangeExpenses(start, end);
+
+        Map<String, BigDecimal> result = new LinkedHashMap<>();
+        for (Expense expense : expenses) {
+            Category category = expense.getCategory();
+            if (!isFixedStructuralCategory(category)) {
+                continue;
+            }
+
+            String key = category.getName();
+            result.merge(key, normalizeAmount(expense.getAmount()), BigDecimal::add);
+        }
+
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal getOperationalVariableTotal(LocalDate start, LocalDate end) {
+        return getOperationalVariableByCategory(start, end).values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal getOperationalVariablePersonnelTotal(LocalDate start, LocalDate end) {
+        List<Expense> expenses = findNormalizedRangeExpenses(start, end);
+
+        return expenses.stream()
+                .filter(expense -> isOperationalVariablePersonnelCategory(expense.getCategory()))
+                .map(expense -> normalizeAmount(expense.getAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal getOperationalVariableNonPersonnelTotal(LocalDate start, LocalDate end) {
+        List<Expense> expenses = findNormalizedRangeExpenses(start, end);
+
+        return expenses.stream()
+                .filter(expense -> isOperationalVariableNonPersonnelCategory(expense.getCategory()))
+                .map(expense -> normalizeAmount(expense.getAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, BigDecimal> getOperationalVariableByCategory(LocalDate start, LocalDate end) {
+        List<Expense> expenses = findNormalizedRangeExpenses(start, end);
+
+        Map<String, BigDecimal> result = new LinkedHashMap<>();
+        for (Expense expense : expenses) {
+            Category category = expense.getCategory();
+            if (!isOperationalVariableCategory(category)) {
+                continue;
+            }
+
+            String key = category.getName();
+            result.merge(key, normalizeAmount(expense.getAmount()), BigDecimal::add);
+        }
+
+        return result;
+    }
+
+    private List<Expense> findNormalizedRangeExpenses(LocalDate start, LocalDate end) {
         if (start == null || end == null) {
             throw new IllegalArgumentException("Start and end dates are required.");
         }
@@ -589,20 +658,7 @@ public class ExpenseService {
             to = tmp;
         }
 
-        List<PeriodExpenseLine> rows = expenseRepository.sumAmountByCategoryIdsGrouped(
-                FIXED_COST_CATEGORY_IDS,
-                from,
-                to
-        );
-
-        Map<String, BigDecimal> result = new LinkedHashMap<>();
-        for (PeriodExpenseLine row : rows) {
-            result.put(
-                    row.getCategoryName(),
-                    row.getTotalAmount() != null ? row.getTotalAmount() : BigDecimal.ZERO
-            );
-        }
-
-        return result;
+        return findByDateRange(from, to);
     }
+
 }

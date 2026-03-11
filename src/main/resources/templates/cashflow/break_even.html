@@ -17,7 +17,7 @@
                     <h1 class="h4 mb-1">Punto de equilibrio</h1>
                     <div class="small text-muted">
                         Calcula cuántos botellones debes vender para cubrir los costos fijos reales del período,
-                        separando lo fijo mensual de lo variable operativo como gasolina y comisión del repartidor.
+                        usando el costo variable directo del producto y los precios por perfil cuando aplique.
                     </div>
                 </div>
 
@@ -85,17 +85,21 @@
                 No hay productos activos para calcular el punto de equilibrio.
             </div>
 
+            <div th:if="${!#lists.isEmpty(products) and result == null}" class="alert alert-info mb-3">
+                Selecciona producto, año y mes, y luego haz clic en <strong>Buscar</strong> para ver el punto de equilibrio.
+            </div>
+
             <div th:if="${!#lists.isEmpty(products) and result != null}">
 
                 <div class="row g-3 mb-3">
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <div class="card shadow-sm h-100 border-primary-subtle">
                             <div class="card-body">
                                 <div class="small text-muted mb-1">Escenario principal</div>
                                 <div class="fw-semibold mb-2" th:text="${result.primaryScenarioLabel}">Precio promedio real del período</div>
                                 <div class="small text-muted">
                                     <span th:if="${result.usesProfilePricing}">
-                                        El análisis principal usa el precio promedio real o, si aún no hay ventas, el primer perfil activo.
+                                        Para agua de mesa, el análisis principal usa el precio promedio realmente vendido del período.
                                     </span>
                                     <span th:if="${!result.usesProfilePricing}">
                                         El análisis principal usa el precio actual del producto.
@@ -105,10 +109,23 @@
                         </div>
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-4">
+                        <div class="card shadow-sm h-100 border-success-subtle">
+                            <div class="card-body">
+                                <div class="small text-muted mb-1">Costo variable unitario directo</div>
+                                <div class="fs-4 fw-semibold">
+                                    S/.
+                                    <span th:text="${#numbers.formatDecimal(result.variableUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span>
+                                </div>
+                                <div class="small text-muted">Calculado desde la composición real del producto.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
                         <div class="card shadow-sm h-100 border-warning-subtle">
                             <div class="card-body">
-                                <div class="small text-muted mb-1">Costos fijos mensuales usados</div>
+                                <div class="small text-muted mb-1">Costos fijos usados</div>
                                 <div class="fs-4 fw-semibold">
                                     S/.
                                     <span th:text="${#numbers.formatDecimal(result.fixedCosts, 1, 'POINT', 2, 'POINT')}">0.00</span>
@@ -117,37 +134,10 @@
                             </div>
                         </div>
                     </div>
-
-                    <div class="col-md-3">
-                        <div class="card shadow-sm h-100 border-success-subtle">
-                            <div class="card-body">
-                                <div class="small text-muted mb-1">CVU total del escenario principal</div>
-                                <div class="fs-4 fw-semibold">
-                                    S/.
-                                    <span th:text="${#numbers.formatDecimal(result.variableUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span>
-                                </div>
-                                <div class="small text-muted">
-                                    Base directa + gasolina variable + comisión reparto.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-3">
-                        <div class="card shadow-sm h-100 border-info-subtle">
-                            <div class="card-body">
-                                <div class="small text-muted mb-1">Ventas comparables del período</div>
-                                <div class="fs-4 fw-semibold" th:text="${#numbers.formatDecimal(result.totalUnitsSold, 1, 'POINT', 2, 'POINT')}">0.00</div>
-                                <div class="small text-muted">
-                                    Precio promedio real: S/. <span th:text="${#numbers.formatDecimal(result.actualAverageSellingPrice, 1, 'POINT', 2, 'POINT')}">0.00</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="row g-3 mb-3">
-                    <div class="col-lg-7">
+                    <div class="col-md-6">
                         <div class="card shadow-sm h-100">
                             <div class="card-body">
                                 <h5 class="card-title mb-2">Punto de equilibrio principal</h5>
@@ -175,10 +165,6 @@
                                         <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(result.sellingPrice, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
                                     </tr>
                                     <tr>
-                                        <th>CVU total del escenario principal</th>
-                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(result.variableUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span></td>
-                                    </tr>
-                                    <tr>
                                         <th>Margen de contribución por unidad</th>
                                         <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(result.contributionMargin, 1, 'POINT', 4, 'POINT')}">0.0000</span></td>
                                     </tr>
@@ -196,41 +182,43 @@
                         </div>
                     </div>
 
-                    <div class="col-lg-5">
+                    <div class="col-md-6">
                         <div class="card shadow-sm h-100">
                             <div class="card-body">
-                                <h5 class="card-title mb-3">Desglose del costo variable unitario</h5>
+                                <h5 class="card-title mb-2">Estado actual de ventas</h5>
+                                <div class="mb-3">
+                                    <span class="badge"
+                                          th:classappend="${result.status.name() == 'BEFORE_BREAK_EVEN' ? ' text-bg-danger' : (result.status.name() == 'AT_BREAK_EVEN' ? ' text-bg-warning' : ' text-bg-success')}">
+                                        <span th:text="${result.status.name() == 'BEFORE_BREAK_EVEN' ? 'Aún no cubres el punto de equilibrio' : (result.status.name() == 'AT_BREAK_EVEN' ? 'Estás justo en equilibrio' : 'Ya superaste el punto de equilibrio')}">
+                                            Estado
+                                        </span>
+                                    </span>
+                                </div>
+
                                 <table class="table table-sm align-middle mb-0">
                                     <tbody>
                                     <tr>
-                                        <th style="width: 60%">Base industrial directa</th>
-                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(result.baseIndustrialUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span></td>
+                                        <th style="width: 55%">Unidades vendidas comparables</th>
+                                        <td class="text-end"><span th:text="${#numbers.formatDecimal(result.unitsSold, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
                                     </tr>
                                     <tr>
-                                        <th>Gasolina variable por botellón</th>
-                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(result.fuelVariableUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span></td>
+                                        <th>Margen de seguridad (unidades)</th>
+                                        <td class="text-end"><span th:text="${#numbers.formatDecimal(result.safetyMarginUnits, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
                                     </tr>
                                     <tr>
-                                        <th>Comisión repartidor (%)</th>
-                                        <td class="text-end"><span th:text="${#numbers.formatDecimal(result.deliveryCommissionPercent, 1, 'POINT', 2, 'POINT')}">0.00</span>%</td>
+                                        <th>Margen de seguridad (%)</th>
+                                        <td class="text-end"><span th:text="${#numbers.formatDecimal(result.safetyMarginPercent, 1, 'POINT', 2, 'POINT')}">0.00</span>%</td>
                                     </tr>
                                     <tr>
-                                        <th>Comisión repartidor por unidad</th>
-                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(result.deliveryCommissionUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span></td>
+                                        <th>Total vendido del producto en el período</th>
+                                        <td class="text-end"><span th:text="${#numbers.formatDecimal(result.totalUnitsSold, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
                                     </tr>
                                     <tr>
-                                        <th>Variable operativo total</th>
-                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(result.operationalVariableUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span></td>
-                                    </tr>
-                                    <tr>
-                                        <th>CVU total</th>
-                                        <td class="text-end fw-semibold">S/. <span th:text="${#numbers.formatDecimal(result.variableUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span></td>
+                                        <th>Precio promedio real del período</th>
+                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(result.actualAverageSellingPrice, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
                                     </tr>
                                     </tbody>
                                 </table>
-                                <div class="alert alert-light small mt-3 mb-0">
-                                    Gasolina y reparto ya no se leen como costos fijos mensuales. Ahora se muestran como variables operativos.
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -242,7 +230,8 @@
                             <div>
                                 <h5 class="card-title mb-1">Escenarios por precio</h5>
                                 <div class="small text-muted">
-                                    Cada fila recalcula el punto de equilibrio con un precio distinto y con una comisión de reparto proporcional al precio cuando aplique.
+                                    Cada fila recalcula el punto de equilibrio con un precio distinto. En productos con venta por perfil,
+                                    esta tabla es la referencia principal para decidir cuánto necesitas vender en cada caso.
                                 </div>
                             </div>
                             <div class="small text-muted text-end">
@@ -256,13 +245,12 @@
                                 <tr>
                                     <th>Escenario</th>
                                     <th class="text-end">Precio</th>
-                                    <th class="text-end">Base dir.</th>
-                                    <th class="text-end">Gasolina</th>
-                                    <th class="text-end">Comisión</th>
-                                    <th class="text-end">CVU total</th>
+                                    <th class="text-end">Prom. real</th>
                                     <th class="text-end">Margen contrib.</th>
+                                    <th class="text-end">PE exacto</th>
                                     <th class="text-end">PE redondeado</th>
                                     <th class="text-end">Vendidas</th>
+                                    <th class="text-end">Ingresos</th>
                                     <th class="text-center">Estado</th>
                                 </tr>
                                 </thead>
@@ -274,23 +262,14 @@
                                             <span th:if="${scenario.primary}" class="badge text-bg-dark">Principal</span>
                                         </div>
                                         <div class="small text-muted" th:text="${scenario.subtitle}">Detalle</div>
-                                        <div class="small text-muted">
-                                            Prom. real: S/. <span th:text="${#numbers.formatDecimal(scenario.realizedAveragePrice, 1, 'POINT', 2, 'POINT')}">0.00</span>
-                                            &nbsp;|&nbsp;
-                                            Ingresos: S/. <span th:text="${#numbers.formatDecimal(scenario.revenueInPeriod, 1, 'POINT', 2, 'POINT')}">0.00</span>
-                                        </div>
                                     </td>
                                     <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(scenario.sellingPrice, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
-                                    <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(scenario.baseIndustrialUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span></td>
-                                    <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(scenario.fuelVariableUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span></td>
-                                    <td class="text-end">
-                                        <div>S/. <span th:text="${#numbers.formatDecimal(scenario.deliveryCommissionUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span></div>
-                                        <div class="small text-muted"><span th:text="${#numbers.formatDecimal(scenario.deliveryCommissionPercent, 1, 'POINT', 2, 'POINT')}">0.00</span>%</div>
-                                    </td>
-                                    <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(scenario.totalVariableUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span></td>
+                                    <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(scenario.realizedAveragePrice, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
                                     <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(scenario.contributionMargin, 1, 'POINT', 4, 'POINT')}">0.0000</span></td>
+                                    <td class="text-end"><span th:text="${#numbers.formatDecimal(scenario.breakEvenUnitsExact, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
                                     <td class="text-end"><span th:text="${#numbers.formatDecimal(scenario.breakEvenUnitsRounded, 0, 'POINT', 0, 'POINT')}">0</span></td>
                                     <td class="text-end"><span th:text="${#numbers.formatDecimal(scenario.unitsSold, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
+                                    <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(scenario.revenueInPeriod, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
                                     <td class="text-center">
                                         <span class="badge"
                                               th:classappend="${scenario.status.name() == 'BEFORE_BREAK_EVEN' ? ' text-bg-danger' : (scenario.status.name() == 'AT_BREAK_EVEN' ? ' text-bg-warning' : ' text-bg-success')}">
@@ -299,7 +278,7 @@
                                     </td>
                                 </tr>
                                 <tr th:if="${#lists.isEmpty(result.scenarios)}">
-                                    <td colspan="10" class="text-center text-muted py-4">
+                                    <td colspan="9" class="text-center text-muted py-4">
                                         No hay escenarios de precio disponibles para este producto.
                                     </td>
                                 </tr>
@@ -350,11 +329,9 @@
                             <div class="card-body">
                                 <h5 class="card-title mb-3">Criterio del cálculo</h5>
                                 <ul class="mb-3 ps-3 small">
-                                    <li>La base industrial directa sale de la composición real del producto en <strong>product_supply</strong>.</li>
-                                    <li>Gasolina ya no se trata como costo fijo mensual; se muestra como variable operativo por unidad.</li>
-                                    <li>La comisión del repartidor ya no se trata como fija; se calcula como porcentaje del precio del escenario.</li>
+                                    <li>El CVU sale de la composición real del producto en <strong>product_supply</strong>.</li>
                                     <li>Las ventas comparables incluyen solo pedidos <strong>PAID</strong> y <strong>CREDIT</strong>.</li>
-                                    <li>Los costos fijos del período excluyen gasolina y personal variable para evitar doble conteo.</li>
+                                    <li>Los costos fijos excluyen conceptos variables por botellón ya cargados dentro del CVU.</li>
                                     <li th:if="${result.usesProfilePricing}">
                                         Como este producto se vende por perfil de cliente, el punto de equilibrio debe leerse por escenario de precio.
                                     </li>
@@ -365,8 +342,8 @@
 
                                 <div class="alert alert-secondary mb-0 small">
                                     <strong>Lectura recomendada:</strong>
-                                    si el reparto depende del precio vendido y la gasolina cambia con la operación,
-                                    no deben leerse como costos fijos. Lo importante aquí es comparar el margen de contribución real de cada escenario contra tus costos fijos mensuales.
+                                    si el negocio vende el mismo botellón a precios distintos según perfil,
+                                    no uses un solo precio fijo para decidir metas. Mira primero la tabla de escenarios y luego compara cuánto vendiste realmente en cada uno.
                                 </div>
                             </div>
                         </div>

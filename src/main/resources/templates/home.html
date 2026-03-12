@@ -157,10 +157,19 @@
                                             </td>
 
                                             <td class="text-center">
-                                                <a th:href="@{/orders/new(clientId=${suggestion.clientId})}"
-                                                   class="btn btn-sm btn-primary mb-1">
-                                                    <i class="bi bi-telephone me-1"></i>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-success mb-1 js-possible-order-whatsapp"
+                                                        th:attr="data-phone=${suggestion.clientPhone},
+                                                                 data-client-name=${suggestion.clientName},
+                                                                 data-action-label=${suggestion.actionLabel},
+                                                                 data-order-url=@{|/orders/new?clientId=${suggestion.clientId}&redirect=/home|}">
+                                                    <i class="bi bi-whatsapp me-1"></i>
                                                     <span th:text="${suggestion.actionLabel}">Llamar hoy</span>
+                                                </button>
+
+                                                <a th:href="@{|/orders/new?clientId=${suggestion.clientId}&redirect=/home|}"
+                                                   class="btn btn-sm btn-outline-primary mb-1">
+                                                    Crear pedido
                                                 </a>
                                             </td>
                                         </tr>
@@ -251,6 +260,117 @@
                                 </div>
                             </div>
 
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                            <span>Flujo de caja semanal</span>
+                            <small class="fw-normal">
+                                <span th:text="${#temporals.format(weekStart, 'dd/MM')}">10/03</span>
+                                -
+                                <span th:text="${#temporals.format(weekEnd, 'dd/MM')}">16/03</span>
+                            </small>
+                        </div>
+                        <div class="card-body p-2">
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-4">
+                                    <div class="border rounded p-2 h-100 bg-light">
+                                        <div class="small text-muted">Ingresos</div>
+                                        <div class="fw-semibold"
+                                             th:text="'S/ ' + ${#numbers.formatDecimal(weeklySalesTotal,1,'POINT',2,'POINT')}">
+                                            S/ 0.00
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="border rounded p-2 h-100 bg-light">
+                                        <div class="small text-muted">Gastos</div>
+                                        <div class="fw-semibold"
+                                             th:text="'S/ ' + ${#numbers.formatDecimal(weeklyExpensesTotal,1,'POINT',2,'POINT')}">
+                                            S/ 0.00
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="border rounded p-2 h-100 bg-light">
+                                        <div class="small text-muted">Neto</div>
+                                        <div class="fw-semibold"
+                                             th:text="'S/ ' + ${#numbers.formatDecimal(weeklyNetCashFlow,1,'POINT',2,'POINT')}">
+                                            S/ 0.00
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="small text-muted mb-2">
+                                Resumen de lunes a domingo. Se actualiza al registrar pedidos pagados y gastos.
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Día</th>
+                                        <th class="text-end">Ingresos</th>
+                                        <th class="text-end">Gastos</th>
+                                        <th class="text-end">Neto</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="row : ${weeklyCashFlowRows}"
+                                        th:classappend="${row['today']} ? 'table-warning' : ''">
+                                        <td>
+                                            <div class="fw-semibold d-flex align-items-center gap-1">
+                                                <span th:text="${row['dayLabel']}">Lun</span>
+                                                <span th:if="${row['today']}" class="badge text-bg-warning text-dark">Hoy</span>
+                                            </div>
+                                            <div class="small text-muted"
+                                                 th:text="${#temporals.format(row['date'], 'dd/MM')}">
+                                                11/03
+                                            </div>
+                                        </td>
+                                        <td class="text-end"
+                                            th:text="${#numbers.formatDecimal(row['sales'],1,'POINT',2,'POINT')}">
+                                            0.00
+                                        </td>
+                                        <td class="text-end"
+                                            th:text="${#numbers.formatDecimal(row['expenses'],1,'POINT',2,'POINT')}">
+                                            0.00
+                                        </td>
+                                        <td class="text-end fw-semibold"
+                                            th:text="${#numbers.formatDecimal(row['net'],1,'POINT',2,'POINT')}">
+                                            0.00
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                    <tfoot>
+                                    <tr>
+                                        <th>Total</th>
+                                        <th class="text-end"
+                                            th:text="${#numbers.formatDecimal(weeklySalesTotal,1,'POINT',2,'POINT')}">
+                                            0.00
+                                        </th>
+                                        <th class="text-end"
+                                            th:text="${#numbers.formatDecimal(weeklyExpensesTotal,1,'POINT',2,'POINT')}">
+                                            0.00
+                                        </th>
+                                        <th class="text-end"
+                                            th:text="${#numbers.formatDecimal(weeklyNetCashFlow,1,'POINT',2,'POINT')}">
+                                            0.00
+                                        </th>
+                                    </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+
+                            <div class="small text-muted mt-2">
+                                Neto de hoy:
+                                <strong th:text="'S/ ' + ${#numbers.formatDecimal(todayNetCashFlow,1,'POINT',2,'POINT')}">
+                                    S/ 0.00
+                                </strong>
+                            </div>
                         </div>
                     </div>
 
@@ -689,15 +809,40 @@
                                     th:text="${cat.name}">
                             </option>
                         </select>
-                        <small class="text-muted d-block mt-2">
-                            En edición rápida se corrigen los datos principales del gasto sin recalcular el contexto original.
+                        <small class="text-muted d-block mt-2" id="editExpenseContextHint">
+                            En edición rápida puedes corregir el monto manualmente y, si es gasto de personal, recalcular el costo sugerido.
                         </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="editExpenseEmployeeGroup">
+                        <label class="form-label">Personal (solo para recalcular)</label>
+                        <select class="form-select" id="editExpenseEmployeeId">
+                            <option value="">- Seleccione -</option>
+                            <option th:each="emp : ${employees}"
+                                    th:value="${emp.id}"
+                                    th:text="${(emp.firstName != null ? emp.firstName : '') + (emp.lastName != null ? ' ' + emp.lastName : '')}"
+                                    th:data-position="${emp.jobPosition != null ? emp.jobPosition.name : ''}">
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 d-none" id="editExpenseEmployeePaymentTypeGroup">
+                        <label class="form-label">Tipo de pago (solo para recalcular)</label>
+                        <select class="form-select" id="editExpenseEmployeePaymentType">
+                            <option value="">- Seleccione -</option>
+                            <option value="SALARY">Salario</option>
+                            <option value="ADVANCE">Adelanto</option>
+                            <option value="DISCOUNT">Descuento</option>
+                        </select>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Costo S/.</label>
                         <input type="number" class="form-control" name="amount" id="editExpenseAmount"
                                min="0" step="0.01" required>
+                        <small class="text-muted d-block mt-2" id="editExpenseAmountHint">
+                            Puedes editar este monto manualmente.
+                        </small>
                     </div>
 
                     <div class="mb-3">
@@ -706,9 +851,19 @@
                                   rows="3" placeholder="Detalle del gasto"></textarea>
                     </div>
 
-                    <div class="mb-0">
+                    <div class="mb-3">
                         <label class="form-label">Fecha</label>
                         <input type="date" class="form-control" name="expenseDate" id="editExpenseDate" required>
+                    </div>
+
+                    <div class="mb-0 d-none" id="editExpenseRecalculateGroup">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="editExpenseRecalculateButton">
+                            <i class="bi bi-arrow-repeat me-1"></i>
+                            Recalcular costo
+                        </button>
+                        <small class="text-muted d-block mt-2">
+                            Este botón solo recalcula el monto sugerido usando la configuración actual del trabajador y las ventas pagadas de la fecha seleccionada.
+                        </small>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -778,6 +933,82 @@
     document.addEventListener('DOMContentLoaded', function () {
         'use strict';
 
+        function normalizeLookupText(value) {
+            return (value || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim();
+        }
+
+        function resolveExpenseContextByText(categoryText) {
+            const normalized = normalizeLookupText(categoryText);
+
+            if (!normalized) {
+                return 'NONE';
+            }
+
+            if (normalized.includes('insumo')) {
+                return 'SUPPLY';
+            }
+
+            if (
+                normalized.includes('personal') ||
+                normalized.includes('repartidor') ||
+                normalized.includes('llenador') ||
+                normalized.includes('lavador')
+            ) {
+                return 'PERSONNEL';
+            }
+
+            return 'SUPPLIER';
+        }
+
+        function parseMoney(value) {
+            const numberValue = Number(value || 0);
+            if (!Number.isFinite(numberValue)) {
+                return 0;
+            }
+
+            return Math.round(numberValue * 100) / 100;
+        }
+
+        function formatMoney(value) {
+            return parseMoney(value).toFixed(2);
+        }
+
+        function normalizePhoneForWhatsapp(phone) {
+            const digits = String(phone || '').replace(/\D/g, '');
+            if (digits.length < 9) {
+                return '';
+            }
+
+            if (digits.startsWith('51')) {
+                return digits;
+            }
+
+            return '51' + digits;
+        }
+
+        function buildPossibleOrderMessage(clientName, actionLabel) {
+            const safeClientName = (clientName || 'cliente').trim();
+            const normalizedAction = normalizeLookupText(actionLabel);
+
+            if (normalizedAction.includes('llamar hoy')) {
+                return 'Hola ' + safeClientName + ', te escribimos de Eco Agua. Queríamos consultar si hoy necesitas tu pedido de agua.';
+            }
+
+            if (normalizedAction.includes('record')) {
+                return 'Hola ' + safeClientName + ', te escribimos de Eco Agua para recordarte que estamos atentos si deseas realizar tu pedido de agua.';
+            }
+
+            if (normalizedAction.includes('contactar')) {
+                return 'Hola ' + safeClientName + ', te escribimos de Eco Agua. Estamos atentos por si hoy deseas tu pedido de agua.';
+            }
+
+            return 'Hola ' + safeClientName + ', te escribimos de Eco Agua. Estamos atentos por si deseas realizar tu pedido de agua.';
+        }
+
         const cancelButtons = document.querySelectorAll('.js-cancel-order');
         const cancelOrderForm = document.getElementById('cancelOrderForm');
         const cancelReasonInput = document.getElementById('cancelReasonInput');
@@ -841,6 +1072,24 @@
             });
         }
 
+        document.querySelectorAll('.js-possible-order-whatsapp').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const phone = normalizePhoneForWhatsapp(this.getAttribute('data-phone'));
+                const clientName = this.getAttribute('data-client-name') || 'cliente';
+                const actionLabel = this.getAttribute('data-action-label') || '';
+                const orderUrl = this.getAttribute('data-order-url') || '/orders/new';
+
+                if (!phone) {
+                    window.location.href = orderUrl;
+                    return;
+                }
+
+                const message = buildPossibleOrderMessage(clientName, actionLabel);
+                const whatsappUrl = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
+                window.open(whatsappUrl, '_blank', 'noopener');
+            });
+        });
+
         const addExpenseButton = document.getElementById('btnOpenDailyExpenseModal');
         const dailyExpenseForm = document.getElementById('dailyExpenseForm');
         const dailyExpenseModalTitle = document.getElementById('dailyExpenseModalLabel');
@@ -852,10 +1101,226 @@
         const editExpenseDate = document.getElementById('editExpenseDate');
         const editExpenseButtons = document.querySelectorAll('.js-edit-expense');
         const deleteExpenseForms = document.querySelectorAll('.js-delete-expense-form');
+        const editExpenseContextHint = document.getElementById('editExpenseContextHint');
+        const editExpenseEmployeeGroup = document.getElementById('editExpenseEmployeeGroup');
+        const editExpenseEmployeeId = document.getElementById('editExpenseEmployeeId');
+        const editExpenseEmployeePaymentTypeGroup = document.getElementById('editExpenseEmployeePaymentTypeGroup');
+        const editExpenseEmployeePaymentType = document.getElementById('editExpenseEmployeePaymentType');
+        const editExpenseAmountHint = document.getElementById('editExpenseAmountHint');
+        const editExpenseRecalculateGroup = document.getElementById('editExpenseRecalculateGroup');
+        const editExpenseRecalculateButton = document.getElementById('editExpenseRecalculateButton');
+
         let editExpenseModal = null;
 
         if (editExpenseModalEl && typeof bootstrap !== 'undefined') {
             editExpenseModal = new bootstrap.Modal(editExpenseModalEl);
+        }
+
+        function setEditAmountHint(message, type) {
+            if (!editExpenseAmountHint) {
+                return;
+            }
+
+            editExpenseAmountHint.textContent = message || '';
+            editExpenseAmountHint.classList.remove('text-muted', 'text-danger', 'text-success');
+
+            if (type === 'error') {
+                editExpenseAmountHint.classList.add('text-danger');
+                return;
+            }
+
+            if (type === 'success') {
+                editExpenseAmountHint.classList.add('text-success');
+                return;
+            }
+
+            editExpenseAmountHint.classList.add('text-muted');
+        }
+
+        function guessEditEmployeeIdFromObservation(observation) {
+            if (!editExpenseEmployeeId) {
+                return '';
+            }
+
+            const normalizedObservation = normalizeLookupText(observation);
+            if (!normalizedObservation) {
+                return '';
+            }
+
+            const options = Array.from(editExpenseEmployeeId.options).filter(function (option) {
+                return option.value;
+            });
+
+            for (const option of options) {
+                const label = normalizeLookupText(option.textContent);
+                if (label && normalizedObservation.includes(label)) {
+                    return option.value;
+                }
+            }
+
+            return '';
+        }
+
+        function guessEditPaymentTypeFromObservation(observation) {
+            const normalizedObservation = normalizeLookupText(observation);
+
+            if (normalizedObservation.includes('adelanto')) {
+                return 'ADVANCE';
+            }
+
+            if (normalizedObservation.includes('descuento')) {
+                return 'DISCOUNT';
+            }
+
+            return 'SALARY';
+        }
+
+        function updateEditExpenseUi() {
+            if (!editExpenseCategory) {
+                return;
+            }
+
+            const selectedOption = editExpenseCategory.options[editExpenseCategory.selectedIndex];
+            const categoryText = selectedOption ? selectedOption.text : '';
+            const context = resolveExpenseContextByText(categoryText);
+            const isPersonnel = context === 'PERSONNEL';
+
+            if (editExpenseContextHint) {
+                if (isPersonnel) {
+                    editExpenseContextHint.textContent = 'Esta categoría parece de personal. Puedes recalcular el costo sugerido antes de guardar.';
+                } else {
+                    editExpenseContextHint.textContent = 'En edición rápida puedes corregir el monto manualmente y, si es gasto de personal, recalcular el costo sugerido.';
+                }
+            }
+
+            if (editExpenseEmployeeGroup) {
+                editExpenseEmployeeGroup.classList.toggle('d-none', !isPersonnel);
+            }
+
+            if (editExpenseEmployeePaymentTypeGroup) {
+                editExpenseEmployeePaymentTypeGroup.classList.toggle('d-none', !isPersonnel);
+            }
+
+            if (editExpenseRecalculateGroup) {
+                editExpenseRecalculateGroup.classList.toggle('d-none', !isPersonnel);
+            }
+
+            if (!isPersonnel) {
+                if (editExpenseEmployeeId) {
+                    editExpenseEmployeeId.value = '';
+                }
+                if (editExpenseEmployeePaymentType) {
+                    editExpenseEmployeePaymentType.value = '';
+                }
+                setEditAmountHint('Puedes editar este monto manualmente.', 'muted');
+                return;
+            }
+
+            if (!editExpenseEmployeeId || !editExpenseEmployeeId.value) {
+                setEditAmountHint('Selecciona el trabajador para poder recalcular el costo.', 'muted');
+                return;
+            }
+
+            if (!editExpenseEmployeePaymentType || !editExpenseEmployeePaymentType.value) {
+                setEditAmountHint('Selecciona el tipo de pago para recalcular el costo.', 'muted');
+                return;
+            }
+
+            if (editExpenseEmployeePaymentType.value !== 'SALARY') {
+                setEditAmountHint('Para adelantos o descuentos el monto sigue siendo manual.', 'muted');
+                return;
+            }
+
+            setEditAmountHint('Pulsa "Recalcular costo" para obtener el monto sugerido según ventas pagadas del día.', 'muted');
+        }
+
+        async function recalculateEditPersonnelExpense() {
+            if (!editExpenseEmployeeId || !editExpenseEmployeePaymentType || !editExpenseDate) {
+                return;
+            }
+
+            const employeeId = editExpenseEmployeeId.value;
+            const paymentType = editExpenseEmployeePaymentType.value;
+            const expenseDate = editExpenseDate.value;
+
+            if (!employeeId) {
+                setEditAmountHint('Selecciona el trabajador para recalcular el costo.', 'error');
+                return;
+            }
+
+            if (!paymentType) {
+                setEditAmountHint('Selecciona el tipo de pago para recalcular el costo.', 'error');
+                return;
+            }
+
+            if (paymentType !== 'SALARY') {
+                setEditAmountHint('Para adelantos o descuentos el monto se mantiene manual.', 'muted');
+                return;
+            }
+
+            if (!expenseDate) {
+                setEditAmountHint('Selecciona la fecha para recalcular el costo.', 'error');
+                return;
+            }
+
+            setEditAmountHint('Calculando costo sugerido...', 'muted');
+            editExpenseRecalculateButton.disabled = true;
+
+            try {
+                const url = new URL('/expenses/personnel-preview', window.location.origin);
+                url.searchParams.set('employeeId', employeeId);
+                url.searchParams.set('paymentType', paymentType);
+                url.searchParams.set('expenseDate', expenseDate);
+
+                const response = await fetch(url.toString(), {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Could not calculate personnel expense preview.');
+                }
+
+                const preview = await response.json();
+
+                if (!preview || !preview.autoFilled) {
+                    setEditAmountHint(
+                        preview && preview.message
+                            ? preview.message
+                            : 'No se pudo calcular automáticamente el costo.',
+                        'error'
+                    );
+                    return;
+                }
+
+                editExpenseAmount.value = formatMoney(preview.suggestedAmount);
+
+                const totalSales = formatMoney(preview.totalSales);
+                const fixedComponent = formatMoney(preview.fixedComponent);
+                const commissionComponent = formatMoney(preview.commissionComponent);
+                const commissionRate = formatMoney(preview.commissionRate);
+
+                let detailMessage = 'Costo sugerido actualizado: S/ ' + formatMoney(preview.suggestedAmount);
+
+                if (preview.paymentMode === 'COMMISSION') {
+                    detailMessage += ' = ' + commissionRate + '% de ventas pagadas del día (S/ ' + totalSales + ').';
+                } else if (preview.paymentMode === 'MIXED') {
+                    detailMessage += ' = fijo S/ ' + fixedComponent + ' + comisión S/ ' + commissionComponent +
+                        ' sobre ventas del día (S/ ' + totalSales + ').';
+                } else {
+                    detailMessage += ' = monto fijo diario según el cargo.';
+                }
+
+                setEditAmountHint(detailMessage, 'success');
+            } catch (error) {
+                setEditAmountHint(
+                    'No se pudo calcular automáticamente el costo. Puedes ingresar el monto manualmente.',
+                    'error'
+                );
+            } finally {
+                editExpenseRecalculateButton.disabled = false;
+            }
         }
 
         function resetCreateExpenseForm() {
@@ -907,6 +1372,16 @@
             editExpenseAmount.value = expense.amount != null ? expense.amount : '';
             editExpenseObservation.value = expense.observation != null ? expense.observation : '';
             editExpenseDate.value = expense.expenseDate != null ? expense.expenseDate : '';
+
+            if (editExpenseEmployeeId) {
+                editExpenseEmployeeId.value = guessEditEmployeeIdFromObservation(expense.observation);
+            }
+
+            if (editExpenseEmployeePaymentType) {
+                editExpenseEmployeePaymentType.value = guessEditPaymentTypeFromObservation(expense.observation);
+            }
+
+            updateEditExpenseUi();
             editExpenseModal.show();
         }
 
@@ -938,6 +1413,26 @@
                 }
             });
         });
+
+        if (editExpenseCategory) {
+            editExpenseCategory.addEventListener('change', updateEditExpenseUi);
+        }
+
+        if (editExpenseEmployeeId) {
+            editExpenseEmployeeId.addEventListener('change', updateEditExpenseUi);
+        }
+
+        if (editExpenseEmployeePaymentType) {
+            editExpenseEmployeePaymentType.addEventListener('change', updateEditExpenseUi);
+        }
+
+        if (editExpenseDate) {
+            editExpenseDate.addEventListener('change', updateEditExpenseUi);
+        }
+
+        if (editExpenseRecalculateButton) {
+            editExpenseRecalculateButton.addEventListener('click', recalculateEditPersonnelExpense);
+        }
 
         deleteExpenseForms.forEach(function (form) {
             form.addEventListener('submit', function (event) {

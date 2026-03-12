@@ -464,11 +464,20 @@ public class ExpenseController {
         }
 
         String trimmed = redirect.trim();
-        if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
-            return defaultPath;
+
+        if ("HOME".equalsIgnoreCase(trimmed)) {
+            return "/home";
         }
 
-        return trimmed;
+        if ("BY_DATE".equalsIgnoreCase(trimmed)) {
+            return "/expenses/by-date";
+        }
+
+        if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+            return trimmed;
+        }
+
+        return defaultPath;
     }
 
     private int resolveYear(Integer year) {

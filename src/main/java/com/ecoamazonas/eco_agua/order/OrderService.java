@@ -2,6 +2,7 @@ package com.ecoamazonas.eco_agua.order;
 
 import com.ecoamazonas.eco_agua.client.Client;
 import com.ecoamazonas.eco_agua.client.ClientRepository;
+import com.ecoamazonas.eco_agua.expense.PersonnelExpenseAutoSyncService;
 import com.ecoamazonas.eco_agua.inventory.InventoryMovementType;
 import com.ecoamazonas.eco_agua.inventory.InventoryService;
 import com.ecoamazonas.eco_agua.product.Product;
@@ -29,17 +30,20 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final ClientRepository clientRepository;
     private final InventoryService inventoryService;
+    private final PersonnelExpenseAutoSyncService personnelExpenseAutoSyncService;
 
     public OrderService(
             SaleOrderRepository orderRepository,
             ProductRepository productRepository,
             ClientRepository clientRepository,
-            InventoryService inventoryService
+            InventoryService inventoryService,
+            PersonnelExpenseAutoSyncService personnelExpenseAutoSyncService
     ) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.clientRepository = clientRepository;
         this.inventoryService = inventoryService;
+        this.personnelExpenseAutoSyncService = personnelExpenseAutoSyncService;
     }
 
     @Transactional
@@ -156,6 +160,9 @@ public class OrderService {
                 saved.getOrderDate()
         ));
 
+        orderRepository.flush();
+        personnelExpenseAutoSyncService.syncSalaryExpensesForDate(saved.getOrderDate());
+
         return saved;
     }
 
@@ -206,6 +213,11 @@ public class OrderService {
         }
 
         order.setStatus(newStatus);
+
+        orderRepository.save(order);
+        orderRepository.flush();
+        personnelExpenseAutoSyncService.syncSalaryExpensesForDate(order.getOrderDate());
+
         return order;
     }
 
@@ -533,7 +545,7 @@ public class OrderService {
                 "Monitorear",
                 "secondary",
                 "Monitorear"
-        );
+            );
     }
 
     private double calculateRegularityScore(List<LocalDate> purchaseDates) {

@@ -2,10 +2,6 @@ package com.ecoamazonas.eco_agua.expense;
 
 import com.ecoamazonas.eco_agua.user.Employee;
 import com.ecoamazonas.eco_agua.user.EmployeeRepository;
-import com.ecoamazonas.eco_agua.user.JobPosition;
-import com.ecoamazonas.eco_agua.user.PaymentMode;
-import com.ecoamazonas.eco_agua.user.SalaryPeriod;
-import com.ecoamazonas.eco_agua.order.OrderService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -30,20 +26,20 @@ import java.util.Map;
 public class ExpenseController {
 
     private final ExpenseService expenseService;
-    private final OrderService orderService;
+    private final PersonnelExpenseCalculatorService personnelExpenseCalculatorService;
     private final EmployeeRepository employeeRepository;
     private final FixedCostTemplateService fixedCostTemplateService;
 
     public ExpenseController(
             ExpenseService expenseService,
-            OrderService orderService,
             EmployeeRepository employeeRepository,
-            FixedCostTemplateService fixedCostTemplateService
+            FixedCostTemplateService fixedCostTemplateService,
+            PersonnelExpenseCalculatorService personnelExpenseCalculatorService
     ) {
         this.expenseService = expenseService;
-        this.orderService = orderService;
         this.employeeRepository = employeeRepository;
         this.fixedCostTemplateService = fixedCostTemplateService;
+        this.personnelExpenseCalculatorService = personnelExpenseCalculatorService;
     }
 
     @GetMapping("/by-date")
@@ -236,62 +232,22 @@ public class ExpenseController {
         Employee employee = employeeRepository.findByIdWithJobPosition(employeeId)
                 .orElseThrow(() -> new IllegalArgumentException("Employee not found: " + employeeId));
 
-        JobPosition position = employee.getJobPosition();
-        if (position == null) {
-            payload.put("employeeName", buildEmployeeDisplayName(employee));
-            payload.put("message", "The selected employee has no job position configured.");
-            return payload;
-        }
+        PersonnelExpenseCalculation calculation =
+                personnelExpenseCalculatorService.calculateSalaryExpense(employee, effectiveDate);
 
-        BigDecimal totalSales = normalizeMoney(orderService.getPaidSalesTotalForDate(effectiveDate));
-        BigDecimal fixedComponent = resolveDailyFixedAmount(position);
-        BigDecimal commissionRate = normalizeMoney(position.getCommissionRate());
-        BigDecimal commissionComponent = totalSales
-                .multiply(commissionRate)
-                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
-
-        PaymentMode paymentMode = position.getPaymentMode() != null
-                ? position.getPaymentMode()
-                : PaymentMode.FIXED;
-
-        BigDecimal suggestedAmount;
-        String explanation;
-
-        switch (paymentMode) {
-            case COMMISSION:
-                suggestedAmount = commissionComponent;
-                explanation = "Commission-only mode. Amount calculated as " +
-                        commissionRate + "% of paid sales for the selected date.";
-                break;
-
-            case MIXED:
-                suggestedAmount = fixedComponent.add(commissionComponent);
-                explanation = "Mixed mode. Amount calculated as fixed daily amount plus " +
-                        commissionRate + "% of paid sales for the selected date.";
-                break;
-
-            case FIXED:
-            default:
-                suggestedAmount = fixedComponent;
-                explanation = "Fixed mode. Amount calculated from the job position salary settings.";
-                break;
-        }
-
-        suggestedAmount = normalizeMoney(suggestedAmount);
-
-        payload.put("autoFilled", true);
-        payload.put("employeeName", buildEmployeeDisplayName(employee));
-        payload.put("jobPositionName", position.getName());
-        payload.put("paymentMode", paymentMode.name());
-        payload.put("paymentModeLabel", position.getPaymentModeLabel());
-        payload.put("salaryPeriod", position.getSalaryPeriod() != null ? position.getSalaryPeriod().name() : null);
-        payload.put("salaryPeriodLabel", position.getSalaryPeriod() != null ? position.getSalaryPeriod().getLabel() : null);
-        payload.put("totalSales", totalSales);
-        payload.put("fixedComponent", fixedComponent);
-        payload.put("commissionComponent", commissionComponent);
-        payload.put("commissionRate", commissionRate);
-        payload.put("suggestedAmount", suggestedAmount);
-        payload.put("message", explanation);
+        payload.put("autoFilled", calculation.isAutoFilled());
+        payload.put("employeeName", calculation.getEmployeeName());
+        payload.put("jobPositionName", calculation.getJobPositionName());
+        payload.put("paymentMode", calculation.getPaymentMode());
+        payload.put("paymentModeLabel", calculation.getPaymentModeLabel());
+        payload.put("salaryPeriod", calculation.getSalaryPeriod());
+        payload.put("salaryPeriodLabel", calculation.getSalaryPeriodLabel());
+        payload.put("totalSales", calculation.getTotalSales());
+        payload.put("fixedComponent", calculation.getFixedComponent());
+        payload.put("commissionComponent", calculation.getCommissionComponent());
+        payload.put("commissionRate", calculation.getCommissionRate());
+        payload.put("suggestedAmount", calculation.getSuggestedAmount());
+        payload.put("message", calculation.getMessage());
 
         return payload;
     }
@@ -488,32 +444,6 @@ public class ExpenseController {
         return month != null ? month : LocalDate.now().getMonthValue();
     }
 
-    private BigDecimal resolveDailyFixedAmount(JobPosition position) {
-        if (position == null) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        }
-
-        BigDecimal reference = normalizeMoney(
-                position.getSalaryAmount() != null && position.getSalaryAmount().signum() > 0
-                        ? position.getSalaryAmount()
-                        : position.getBaseSalary()
-        );
-
-        SalaryPeriod period = position.getSalaryPeriod() != null
-                ? position.getSalaryPeriod()
-                : SalaryPeriod.DAILY;
-
-        BigDecimal dailyAmount = switch (period) {
-            case DAILY -> reference;
-            case WEEKLY -> reference.divide(new BigDecimal("7"), 2, RoundingMode.HALF_UP);
-            case BIWEEKLY -> reference.divide(new BigDecimal("15"), 2, RoundingMode.HALF_UP);
-            case MONTHLY -> reference.divide(new BigDecimal("30"), 2, RoundingMode.HALF_UP);
-            case HOURLY -> reference;
-        };
-
-        return normalizeMoney(dailyAmount);
-    }
-
     private BigDecimal normalizeMoney(BigDecimal value) {
         if (value == null) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
@@ -522,14 +452,5 @@ public class ExpenseController {
         return value.setScale(2, RoundingMode.HALF_UP);
     }
 
-    private String buildEmployeeDisplayName(Employee employee) {
-        if (employee == null) {
-            return "";
-        }
 
-        String firstName = employee.getFirstName() != null ? employee.getFirstName().trim() : "";
-        String lastName = employee.getLastName() != null ? employee.getLastName().trim() : "";
-
-        return (firstName + " " + lastName).trim();
-    }
 }

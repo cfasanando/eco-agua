@@ -1,16 +1,22 @@
 package com.ecoamazonas.eco_agua;
 
+import com.ecoamazonas.eco_agua.cashflow.BreakEvenResult;
+import com.ecoamazonas.eco_agua.cashflow.BreakEvenService;
+import com.ecoamazonas.eco_agua.cashflow.BreakEvenStatus;
 import com.ecoamazonas.eco_agua.expense.Expense;
 import com.ecoamazonas.eco_agua.expense.ExpenseService;
 import com.ecoamazonas.eco_agua.order.OrderService;
 import com.ecoamazonas.eco_agua.order.OrderStatus;
 import com.ecoamazonas.eco_agua.order.PossibleOrderSuggestion;
 import com.ecoamazonas.eco_agua.order.SaleOrder;
+import com.ecoamazonas.eco_agua.product.Product;
+import com.ecoamazonas.eco_agua.product.ProductRepository;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -24,13 +30,19 @@ public class HomeController {
 
     private final OrderService orderService;
     private final ExpenseService expenseService;
+    private final BreakEvenService breakEvenService;
+    private final ProductRepository productRepository;
 
     public HomeController(
             OrderService orderService,
-            ExpenseService expenseService
+            ExpenseService expenseService,
+            BreakEvenService breakEvenService,
+            ProductRepository productRepository
     ) {
         this.orderService = orderService;
         this.expenseService = expenseService;
+        this.breakEvenService = breakEvenService;
+        this.productRepository = productRepository;
     }
 
     @GetMapping("/home")
@@ -137,6 +149,45 @@ public class HomeController {
             weeklyCashFlowRows.add(row);
         }
 
+        LocalDate monthStart = today.withDayOfMonth(1);
+        LocalDate monthEnd = today.withDayOfMonth(today.lengthOfMonth());
+
+        BreakEvenResult homeBreakEvenResult = null;
+        Long homeBreakEvenProductId = null;
+        Integer homeBreakEvenYear = today.getYear();
+        Integer homeBreakEvenMonth = today.getMonthValue();
+        String homeBreakEvenStatusLabel = "Sin datos";
+        String homeBreakEvenStatusClass = "secondary";
+        BigDecimal homeBreakEvenProgressPercent = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal homeBreakEvenGapUnits = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal homeBreakEvenUnitsPerRemainingDay = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        long homeBreakEvenRemainingDays = ChronoUnit.DAYS.between(today, monthEnd) + 1;
+
+        List<Product> activeProducts = productRepository.findByActiveTrueOrderByNameAsc();
+        if (!activeProducts.isEmpty()) {
+            Product product = activeProducts.get(0);
+            homeBreakEvenProductId = product.getId();
+
+            homeBreakEvenResult = breakEvenService.calculateForProductAndPeriod(
+                    homeBreakEvenProductId,
+                    monthStart,
+                    monthEnd
+            );
+
+            homeBreakEvenStatusLabel = buildBreakEvenStatusLabel(homeBreakEvenResult.getStatus());
+            homeBreakEvenStatusClass = buildBreakEvenStatusClass(homeBreakEvenResult.getStatus());
+            homeBreakEvenProgressPercent = calculateBreakEvenProgressPercent(
+                    homeBreakEvenResult.getUnitsSold(),
+                    homeBreakEvenResult.getBreakEvenUnitsRounded()
+            );
+            homeBreakEvenGapUnits = normalizeAmount(homeBreakEvenResult.getStructuralGapUnits(), 2);
+
+            if (homeBreakEvenGapUnits.compareTo(BigDecimal.ZERO) > 0 && homeBreakEvenRemainingDays > 0) {
+                homeBreakEvenUnitsPerRemainingDay = homeBreakEvenGapUnits
+                        .divide(BigDecimal.valueOf(homeBreakEvenRemainingDays), 2, RoundingMode.HALF_UP);
+            }
+        }
+
         model.addAttribute("activePage", "home");
         model.addAttribute("today", today);
         model.addAttribute("paidOrders", paidOrders);
@@ -158,6 +209,17 @@ public class HomeController {
         model.addAttribute("weeklyNetCashFlow", weeklyNetCashFlow);
         model.addAttribute("todayNetCashFlow", todayNetCashFlow);
 
+        model.addAttribute("homeBreakEvenResult", homeBreakEvenResult);
+        model.addAttribute("homeBreakEvenProductId", homeBreakEvenProductId);
+        model.addAttribute("homeBreakEvenYear", homeBreakEvenYear);
+        model.addAttribute("homeBreakEvenMonth", homeBreakEvenMonth);
+        model.addAttribute("homeBreakEvenStatusLabel", homeBreakEvenStatusLabel);
+        model.addAttribute("homeBreakEvenStatusClass", homeBreakEvenStatusClass);
+        model.addAttribute("homeBreakEvenProgressPercent", homeBreakEvenProgressPercent);
+        model.addAttribute("homeBreakEvenGapUnits", homeBreakEvenGapUnits);
+        model.addAttribute("homeBreakEvenUnitsPerRemainingDay", homeBreakEvenUnitsPerRemainingDay);
+        model.addAttribute("homeBreakEvenRemainingDays", homeBreakEvenRemainingDays);
+
         model.addAttribute("expenseCategories", expenseService.findExpenseCategories());
         model.addAttribute("categories", expenseService.findExpenseCategories());
         model.addAttribute("suppliers", expenseService.findActiveSuppliers());
@@ -177,5 +239,59 @@ public class HomeController {
             case SATURDAY -> "Sáb";
             case SUNDAY -> "Dom";
         };
+    }
+
+    private String buildBreakEvenStatusLabel(BreakEvenStatus status) {
+        if (status == null) {
+            return "Sin datos";
+        }
+
+        return switch (status) {
+            case BEFORE_BREAK_EVEN -> "Debajo del equilibrio";
+            case AT_BREAK_EVEN -> "En equilibrio";
+            case AFTER_BREAK_EVEN -> "Encima del equilibrio";
+        };
+    }
+
+    private String buildBreakEvenStatusClass(BreakEvenStatus status) {
+        if (status == null) {
+            return "secondary";
+        }
+
+        return switch (status) {
+            case BEFORE_BREAK_EVEN -> "danger";
+            case AT_BREAK_EVEN -> "warning";
+            case AFTER_BREAK_EVEN -> "success";
+        };
+    }
+
+    private BigDecimal calculateBreakEvenProgressPercent(BigDecimal soldUnits, BigDecimal targetUnits) {
+        BigDecimal sold = normalizeAmount(soldUnits, 2);
+        BigDecimal target = normalizeAmount(targetUnits, 2);
+
+        if (target.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal percent = sold.multiply(BigDecimal.valueOf(100))
+                .divide(target, 2, RoundingMode.HALF_UP);
+
+        if (percent.compareTo(BigDecimal.valueOf(100)) > 0) {
+            return BigDecimal.valueOf(100).setScale(2, RoundingMode.HALF_UP);
+        }
+
+        if (percent.compareTo(BigDecimal.ZERO) < 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        return percent;
+    }
+
+    private BigDecimal normalizeAmount(BigDecimal value, int scale) {
+        if (value == null) {
+            return BigDecimal.ZERO.setScale(scale, RoundingMode.HALF_UP);
+        }
+
+        return value.setScale(scale, RoundingMode.HALF_UP);
     }
 }

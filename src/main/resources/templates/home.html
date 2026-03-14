@@ -3,6 +3,113 @@
 <head th:replace="fragments/head_admin :: adminHead('Inicio - Eco Agua')"></head>
 
 <body>
+<style>
+    .home-widgets-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+    }
+
+    .home-widgets-toolbar .toolbar-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .home-widget-column {
+        min-height: 140px;
+    }
+
+    .home-widget-card {
+        margin-bottom: 1rem;
+    }
+
+    .home-widget-card.dragging {
+        opacity: 0.45;
+    }
+
+    .home-widget-placeholder {
+        border: 2px dashed #0d6efd;
+        border-radius: 0.5rem;
+        background: rgba(13, 110, 253, 0.06);
+        margin-bottom: 1rem;
+        min-height: 80px;
+    }
+
+    .home-widget-tools {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-shrink: 0;
+    }
+
+    .home-widget-tool-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 0.4rem;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: rgba(255, 255, 255, 0.88);
+        color: #495057;
+        cursor: pointer;
+        padding: 0;
+        transition: all 0.15s ease-in-out;
+    }
+
+    .home-widget-tool-button:hover {
+        background: #ffffff;
+        color: #212529;
+        transform: translateY(-1px);
+    }
+
+    .home-widget-tool-button:active {
+        transform: translateY(0);
+    }
+
+    .widget-drag-handle {
+        cursor: grab;
+    }
+
+    .widget-drag-handle:active {
+        cursor: grabbing;
+    }
+
+    .widget-collapsed .card-body {
+        display: none !important;
+    }
+
+    .widget-collapsed .card-footer {
+        display: none !important;
+    }
+
+    .home-widget-card .card {
+        transition: box-shadow 0.15s ease-in-out;
+    }
+
+    .home-widget-card .card:hover {
+        box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.08);
+    }
+
+    @media (max-width: 991.98px) {
+        .home-widgets-toolbar {
+            align-items: stretch;
+        }
+
+        .home-widgets-toolbar .toolbar-actions {
+            width: 100%;
+        }
+
+        .home-widgets-toolbar .toolbar-actions .btn {
+            flex: 1 1 auto;
+        }
+    }
+</style>
+
 <div class="app-layout" th:with="activePage='home'">
     <aside th:replace="fragments/sidebar :: sidebar"></aside>
 
@@ -18,604 +125,916 @@
                 </div>
             </div>
 
-            <div class="row g-3">
-                <div class="col-lg-8">
+            <div class="home-widgets-toolbar">
+                <div class="toolbar-actions">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnExpandAllWidgets">
+                        <i class="bi bi-arrows-expand me-1"></i>
+                        Expandir todo
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCollapseAllWidgets">
+                        <i class="bi bi-arrows-collapse me-1"></i>
+                        Minimizar todo
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnResetWidgetLayout">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>
+                        Restablecer layout
+                    </button>
+                </div>
+                <div class="text-muted small">
+                    Los widgets se pueden mover entre izquierda y derecha. El layout se guarda en este navegador.
+                </div>
+            </div>
 
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-header bg-success text-white">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span>Operaciones</span>
-                                <small class="fw-normal">Seleccione un item para hacer un pedido</small>
+            <div class="row g-3" id="homeWidgetBoard">
+                <div class="col-lg-7">
+                    <div class="home-widget-column" data-column="left">
+
+                        <div class="home-widget-card" data-widget-id="operations" draggable="false">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-success text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div class="d-flex justify-content-between align-items-center flex-grow-1">
+                                            <span>Operaciones</span>
+                                            <small class="fw-normal">Seleccione un item para hacer un pedido</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-collapse-toggle"
+                                                    title="Minimizar / expandir">
+                                                <i class="bi bi-dash-lg"></i>
+                                            </button>
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-drag-handle"
+                                                    title="Mover widget">
+                                                <i class="bi bi-grip-vertical"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-6 col-md-4">
+                                            <a th:href="@{/orders/new}"
+                                               class="btn btn-light w-100 h-100 border d-flex flex-column align-items-center justify-content-center">
+                                                <i class="bi bi-person fs-2 mb-1"></i>
+                                                <span>Item #1</span>
+                                                <small class="text-muted">Nuevo pedido</small>
+                                            </a>
+                                        </div>
+
+                                        <div class="col-6 col-md-4" th:each="i : ${#numbers.sequence(2,6)}">
+                                            <button type="button"
+                                                    class="btn btn-outline-light w-100 h-100 border d-flex flex-column align-items-center justify-content-center"
+                                                    disabled>
+                                                <i class="bi bi-person fs-2 mb-1"></i>
+                                                <span th:text="'Item #' + ${i}">Item</span>
+                                                <small class="text-muted">Próximamente</small>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="card-body">
-                            <div class="row g-3">
-                                <div class="col-6 col-md-4">
-                                    <a th:href="@{/orders/new}"
-                                       class="btn btn-light w-100 h-100 border d-flex flex-column align-items-center justify-content-center">
-                                        <i class="bi bi-person fs-2 mb-1"></i>
-                                        <span>Item #1</span>
-                                        <small class="text-muted">Nuevo pedido</small>
-                                    </a>
-                                </div>
 
-                                <div class="col-6 col-md-4" th:each="i : ${#numbers.sequence(2,6)}">
-                                    <button type="button"
-                                            class="btn btn-outline-light w-100 h-100 border d-flex flex-column align-items-center justify-content-center"
-                                            disabled>
-                                        <i class="bi bi-person fs-2 mb-1"></i>
-                                        <span th:text="'Item #' + ${i}">Item</span>
-                                        <small class="text-muted">Próximamente</small>
-                                    </button>
+                        <div class="home-widget-card" data-widget-id="possible-orders" draggable="false">
+                            <div class="card shadow-sm">
+                                <div class="card-header bg-dark text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div class="d-flex justify-content-between align-items-center flex-grow-1">
+                                            <span>Posibles pedidos</span>
+                                            <small class="fw-normal">Clientes con mayor probabilidad de compra hoy</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-collapse-toggle"
+                                                    title="Minimizar / expandir">
+                                                <i class="bi bi-dash-lg"></i>
+                                            </button>
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-drag-handle"
+                                                    title="Mover widget">
+                                                <i class="bi bi-grip-vertical"></i>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
+                                <div class="card-body p-2">
+
+                                    <div th:if="${possibleOrders == null or #lists.isEmpty(possibleOrders)}"
+                                         class="small text-muted">
+                                        No hay sugerencias de compra por ahora. El sistema mostrará aquí a los clientes
+                                        con historial suficiente y mayor probabilidad de volver a comprar hoy.
+                                    </div>
+
+                                    <div th:if="${possibleOrders != null and !#lists.isEmpty(possibleOrders)}">
+                                        <div class="small text-muted mb-2">
+                                            Se consideran clientes activos con historial de compras pagadas o fiadas,
+                                            excluyendo quienes ya tienen pedido registrado hoy.
+                                        </div>
+
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped align-middle mb-0">
+                                                <thead class="table-light">
+                                                <tr>
+                                                    <th>Cliente</th>
+                                                    <th class="text-center">Prob.</th>
+                                                    <th class="text-center">Frecuencia</th>
+                                                    <th class="text-center">Última</th>
+                                                    <th class="text-center">Próx.</th>
+                                                    <th class="text-center">Estado</th>
+                                                    <th class="text-center">Acción</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                <tr th:each="suggestion : ${possibleOrders}">
+                                                    <td>
+                                                        <div class="fw-semibold" th:text="${suggestion.clientName}">Cliente</div>
+                                                        <div class="small text-muted">
+                                                            <span th:text="${suggestion.profileName}">Perfil</span>
+                                                            <span th:if="${suggestion.clientPhone != null and !#strings.isEmpty(suggestion.clientPhone)}">
+                                                                &nbsp;|&nbsp;
+                                                                <span th:text="${suggestion.clientPhone}">999999999</span>
+                                                            </span>
+                                                        </div>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <span class="badge rounded-pill"
+                                                              th:classappend="${
+                                                                    suggestion.probabilityPercent >= 85 ? ' text-bg-danger' :
+                                                                    (suggestion.probabilityPercent >= 70 ? ' text-bg-warning' :
+                                                                    (suggestion.probabilityPercent >= 55 ? ' text-bg-info' : ' text-bg-secondary'))
+                                                              }"
+                                                              th:text="${suggestion.probabilityPercent + '%'}">
+                                                            70%
+                                                        </span>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <div>
+                                                            Cada
+                                                            <strong th:text="${suggestion.averageIntervalDays}">3</strong>
+                                                            días
+                                                        </div>
+                                                        <div class="small text-muted">
+                                                            <span th:text="${suggestion.successfulOrderDays}">4</span>
+                                                            compras
+                                                        </div>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <div th:text="${#temporals.format(suggestion.lastOrderDate, 'dd/MM/yyyy')}">07/03/2026</div>
+                                                        <div class="small text-muted">
+                                                            hace
+                                                            <span th:text="${suggestion.daysSinceLastOrder}">2</span>
+                                                            día(s)
+                                                        </div>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <div th:text="${#temporals.format(suggestion.expectedNextOrderDate, 'dd/MM/yyyy')}">09/03/2026</div>
+                                                        <div class="small"
+                                                             th:classappend="${suggestion.overdueDays > 0} ? ' text-danger' : ' text-muted'">
+                                                            <span th:if="${suggestion.overdueDays > 0}"
+                                                                  th:text="'atrasado ' + ${suggestion.overdueDays} + ' día(s)'">
+                                                                atrasado 1 día
+                                                            </span>
+                                                            <span th:if="${suggestion.overdueDays == 0}">
+                                                                dentro del ciclo esperado
+                                                            </span>
+                                                        </div>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <span class="badge rounded-pill"
+                                                              th:classappend="${
+                                                                    suggestion.statusClass == 'danger' ? ' text-bg-danger' :
+                                                                    (suggestion.statusClass == 'warning' ? ' text-bg-warning text-dark' : ' text-bg-secondary')
+                                                              }"
+                                                              th:text="${suggestion.statusLabel}">
+                                                            Monitorear
+                                                        </span>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-success mb-1 js-possible-order-whatsapp"
+                                                                th:attr="data-phone=${suggestion.clientPhone},
+                                                                         data-client-name=${suggestion.clientName},
+                                                                         data-action-label=${suggestion.actionLabel},
+                                                                         data-order-url=@{|/orders/new?clientId=${suggestion.clientId}&redirect=/home|}">
+                                                            <i class="bi bi-whatsapp me-1"></i>
+                                                            <span th:text="${suggestion.actionLabel}">Llamar hoy</span>
+                                                        </button>
+
+                                                        <a th:href="@{|/orders/new?clientId=${suggestion.clientId}&redirect=/home|}"
+                                                           class="btn btn-sm btn-outline-primary mb-1">
+                                                            Crear pedido
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="home-widget-column" data-column="right">
+
+                        <div class="home-widget-card" data-widget-id="sales-today" draggable="false">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-info text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <span>Ventas del día</span>
+                                        <div class="home-widget-tools">
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-collapse-toggle"
+                                                    title="Minimizar / expandir">
+                                                <i class="bi bi-dash-lg"></i>
+                                            </button>
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-drag-handle"
+                                                    title="Mover widget">
+                                                <i class="bi bi-grip-vertical"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body p-2">
+
+                                    <div th:if="${#lists.isEmpty(paidOrders)}" class="small text-muted">
+                                        No hay ventas del día (pagados).
+                                    </div>
+
+                                    <div th:if="${!#lists.isEmpty(paidOrders)}">
+                                        <div class="d-flex justify-content-between align-items-center mb-2 small">
+                                            <span th:text="'Pedidos pagados: ' + ${#lists.size(paidOrders)}">
+                                                Pedidos pagados: 0
+                                            </span>
+                                            <span>
+                                                Total S/.
+                                                <strong th:text="${#numbers.formatDecimal(totalSalesToday,1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </strong>
+                                            </span>
+                                        </div>
+
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped align-middle mb-0">
+                                                <thead class="table-light">
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Cliente</th>
+                                                    <th class="text-end">Total S/.</th>
+                                                    <th class="text-center">Acciones</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                <tr th:each="order : ${paidOrders}">
+                                                    <td th:text="${order.orderNumber}">1</td>
+                                                    <td th:text="${order.client != null ? order.client.name : 'Sin cliente'}">
+                                                        Cliente
+                                                    </td>
+                                                    <td class="text-end"
+                                                        th:text="${#numbers.formatDecimal(order.totalAmount,1,'POINT',2,'POINT')}">
+                                                        0.00
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <a th:href="@{|/orders/${order.id}?from=/home|}"
+                                                           class="btn btn-outline-primary btn-sm mb-1">
+                                                            Ver
+                                                        </a>
+
+                                                        <form th:action="@{'/orders/' + ${order.id} + '/credit'}"
+                                                              method="post"
+                                                              class="d-inline">
+                                                            <input type="hidden"
+                                                                   th:name="${_csrf.parameterName}"
+                                                                   th:value="${_csrf.token}"/>
+                                                            <input type="hidden" name="redirect" value="/home"/>
+                                                            <button type="submit"
+                                                                    class="btn btn-warning btn-sm mb-1">
+                                                                Fiado
+                                                            </button>
+                                                        </form>
+
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-danger js-cancel-order mb-1"
+                                                                th:data-order-id="${order.id}"
+                                                                th:data-order-number="${order.orderNumber}"
+                                                                data-redirect="/home">
+                                                            Anular
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="weekly-cash-flow" draggable="false">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                    <div class="d-flex justify-content-between align-items-center gap-2 flex-grow-1">
+                                        <span>Flujo de caja semanal</span>
+                                        <small class="fw-normal">
+                                            <span th:text="${#temporals.format(weekStart, 'dd/MM')}">10/03</span>
+                                            -
+                                            <span th:text="${#temporals.format(weekEnd, 'dd/MM')}">16/03</span>
+                                        </small>
+                                    </div>
+                                    <div class="home-widget-tools ms-2">
+                                        <button type="button"
+                                                class="home-widget-tool-button widget-collapse-toggle"
+                                                title="Minimizar / expandir">
+                                            <i class="bi bi-dash-lg"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="home-widget-tool-button widget-drag-handle"
+                                                title="Mover widget">
+                                            <i class="bi bi-grip-vertical"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body p-2">
+
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-4">
+                                            <div class="border rounded p-2 h-100 bg-light">
+                                                <div class="small text-muted">Ingresos</div>
+                                                <div class="fw-semibold"
+                                                     th:text="'S/ ' + ${#numbers.formatDecimal(weeklySalesTotal,1,'POINT',2,'POINT')}">
+                                                    S/ 0.00
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="border rounded p-2 h-100 bg-light">
+                                                <div class="small text-muted">Gastos</div>
+                                                <div class="fw-semibold"
+                                                     th:text="'S/ ' + ${#numbers.formatDecimal(weeklyExpensesTotal,1,'POINT',2,'POINT')}">
+                                                    S/ 0.00
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="border rounded p-2 h-100 bg-light">
+                                                <div class="small text-muted">Neto</div>
+                                                <div class="fw-semibold"
+                                                     th:text="'S/ ' + ${#numbers.formatDecimal(weeklyNetCashFlow,1,'POINT',2,'POINT')}">
+                                                    S/ 0.00
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="small text-muted mb-2">
+                                        Resumen de lunes a domingo. Se actualiza al registrar pedidos pagados y gastos.
+                                    </div>
+
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-striped align-middle mb-0">
+                                            <thead class="table-light">
+                                            <tr>
+                                                <th>Día</th>
+                                                <th class="text-end">Ingresos</th>
+                                                <th class="text-end">Gastos</th>
+                                                <th class="text-end">Neto</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            <tr th:each="row : ${weeklyCashFlowRows}"
+                                                th:classappend="${row['today']} ? 'table-warning' : ''">
+                                                <td>
+                                                    <div class="fw-semibold d-flex align-items-center gap-1">
+                                                        <span th:text="${row['dayLabel']}">Lun</span>
+                                                        <span th:if="${row['today']}" class="badge text-bg-warning text-dark">Hoy</span>
+                                                    </div>
+                                                    <div class="small text-muted"
+                                                         th:text="${#temporals.format(row['date'], 'dd/MM')}">
+                                                        11/03
+                                                    </div>
+                                                </td>
+                                                <td class="text-end"
+                                                    th:text="${#numbers.formatDecimal(row['sales'],1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </td>
+                                                <td class="text-end"
+                                                    th:text="${#numbers.formatDecimal(row['expenses'],1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </td>
+                                                <td class="text-end fw-semibold"
+                                                    th:text="${#numbers.formatDecimal(row['net'],1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </td>
+                                            </tr>
+                                            </tbody>
+                                            <tfoot>
+                                            <tr>
+                                                <th>Total</th>
+                                                <th class="text-end"
+                                                    th:text="${#numbers.formatDecimal(weeklySalesTotal,1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </th>
+                                                <th class="text-end"
+                                                    th:text="${#numbers.formatDecimal(weeklyExpensesTotal,1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </th>
+                                                <th class="text-end"
+                                                    th:text="${#numbers.formatDecimal(weeklyNetCashFlow,1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </th>
+                                            </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+
+                                    <div class="small text-muted mt-2">
+                                        Neto de hoy:
+                                        <strong th:text="'S/ ' + ${#numbers.formatDecimal(todayNetCashFlow,1,'POINT',2,'POINT')}">
+                                            S/ 0.00
+                                        </strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="home-widget-card" data-widget-id="break-even-month" draggable="false">
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-grow-1">
+                <span>Punto de equilibrio del mes</span>
+                <small class="fw-normal">
+                    <span th:if="${homeBreakEvenResult != null}"
+                          th:text="${#temporals.format(homeBreakEvenResult.periodStart, 'dd/MM')} + ' - ' + ${#temporals.format(homeBreakEvenResult.periodEnd, 'dd/MM')}">
+                        01/03 - 31/03
+                    </span>
+                    <span th:if="${homeBreakEvenResult == null}">
+                        Mes actual
+                    </span>
+                </small>
+            </div>
+            <div class="home-widget-tools ms-2">
+                <button type="button"
+                        class="home-widget-tool-button widget-collapse-toggle"
+                        title="Minimizar / expandir">
+                    <i class="bi bi-dash-lg"></i>
+                </button>
+                <button type="button"
+                        class="home-widget-tool-button widget-drag-handle"
+                        title="Mover widget">
+                    <i class="bi bi-grip-vertical"></i>
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-2">
+
+            <div th:if="${homeBreakEvenResult == null}" class="small text-muted">
+                No hay un producto activo disponible para calcular el punto de equilibrio.
+            </div>
+
+            <div th:if="${homeBreakEvenResult != null}">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <div class="fw-semibold" th:text="${homeBreakEvenResult.product.name}">
+                            Producto
+                        </div>
+                        <div class="small text-muted">
+                            Escenario principal:
+                            <span th:text="${homeBreakEvenResult.primaryScenarioLabel}">Precio promedio real del período</span>
+                        </div>
+                    </div>
+                    <span class="badge rounded-pill"
+                          th:classappend="${
+                                homeBreakEvenStatusClass == 'success' ? ' text-bg-success' :
+                                (homeBreakEvenStatusClass == 'warning' ? ' text-bg-warning text-dark' :
+                                (homeBreakEvenStatusClass == 'danger' ? ' text-bg-danger' : ' text-bg-secondary'))
+                          }"
+                          th:text="${homeBreakEvenStatusLabel}">
+                        Debajo del equilibrio
+                    </span>
+                </div>
+
+                <div class="row g-2 mb-2">
+                    <div class="col-4">
+                        <div class="border rounded p-2 h-100 bg-light">
+                            <div class="small text-muted">Vendidas</div>
+                            <div class="fw-semibold"
+                                 th:text="${#numbers.formatDecimal(homeBreakEvenResult.unitsSold,1,'POINT',0,'POINT')}">
+                                0
                             </div>
                         </div>
                     </div>
-
-                    <!-- Possible orders -->
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                            <span>Posibles pedidos</span>
-                            <small class="fw-normal">Clientes con mayor probabilidad de compra hoy</small>
+                    <div class="col-4">
+                        <div class="border rounded p-2 h-100 bg-light">
+                            <div class="small text-muted">Objetivo</div>
+                            <div class="fw-semibold"
+                                 th:text="${#numbers.formatDecimal(homeBreakEvenResult.breakEvenUnitsRounded,1,'POINT',0,'POINT')}">
+                                0
+                            </div>
                         </div>
-                        <div class="card-body p-2">
-
-                            <div th:if="${possibleOrders == null or #lists.isEmpty(possibleOrders)}"
-                                 class="small text-muted">
-                                No hay sugerencias de compra por ahora. El sistema mostrará aquí a los clientes
-                                con historial suficiente y mayor probabilidad de volver a comprar hoy.
+                    </div>
+                    <div class="col-4">
+                        <div class="border rounded p-2 h-100 bg-light">
+                            <div class="small text-muted">Faltan</div>
+                            <div class="fw-semibold"
+                                 th:text="${#numbers.formatDecimal(homeBreakEvenGapUnits,1,'POINT',0,'POINT')}">
+                                0
                             </div>
-
-                            <div th:if="${possibleOrders != null and !#lists.isEmpty(possibleOrders)}">
-                                <div class="small text-muted mb-2">
-                                    Se consideran clientes activos con historial de compras pagadas o fiadas,
-                                    excluyendo quienes ya tienen pedido registrado hoy.
-                                </div>
-
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-striped align-middle mb-0">
-                                        <thead class="table-light">
-                                        <tr>
-                                            <th>Cliente</th>
-                                            <th class="text-center">Prob.</th>
-                                            <th class="text-center">Frecuencia</th>
-                                            <th class="text-center">Última</th>
-                                            <th class="text-center">Próx.</th>
-                                            <th class="text-center">Estado</th>
-                                            <th class="text-center">Acción</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        <tr th:each="suggestion : ${possibleOrders}">
-                                            <td>
-                                                <div class="fw-semibold" th:text="${suggestion.clientName}">Cliente</div>
-                                                <div class="small text-muted">
-                                                    <span th:text="${suggestion.profileName}">Perfil</span>
-                                                    <span th:if="${suggestion.clientPhone != null and !#strings.isEmpty(suggestion.clientPhone)}">
-                                                        &nbsp;|&nbsp;
-                                                        <span th:text="${suggestion.clientPhone}">999999999</span>
-                                                    </span>
-                                                </div>
-                                            </td>
-
-                                            <td class="text-center">
-                                                <span class="badge rounded-pill"
-                                                      th:classappend="${
-                                                            suggestion.probabilityPercent >= 85 ? ' text-bg-danger' :
-                                                            (suggestion.probabilityPercent >= 70 ? ' text-bg-warning' :
-                                                            (suggestion.probabilityPercent >= 55 ? ' text-bg-info' : ' text-bg-secondary'))
-                                                      }"
-                                                      th:text="${suggestion.probabilityPercent + '%'}">
-                                                    70%
-                                                </span>
-                                            </td>
-
-                                            <td class="text-center">
-                                                <div>
-                                                    Cada
-                                                    <strong th:text="${suggestion.averageIntervalDays}">3</strong>
-                                                    días
-                                                </div>
-                                                <div class="small text-muted">
-                                                    <span th:text="${suggestion.successfulOrderDays}">4</span>
-                                                    compras
-                                                </div>
-                                            </td>
-
-                                            <td class="text-center">
-                                                <div th:text="${#temporals.format(suggestion.lastOrderDate, 'dd/MM/yyyy')}">07/03/2026</div>
-                                                <div class="small text-muted">
-                                                    hace
-                                                    <span th:text="${suggestion.daysSinceLastOrder}">2</span>
-                                                    día(s)
-                                                </div>
-                                            </td>
-
-                                            <td class="text-center">
-                                                <div th:text="${#temporals.format(suggestion.expectedNextOrderDate, 'dd/MM/yyyy')}">09/03/2026</div>
-                                                <div class="small"
-                                                     th:classappend="${suggestion.overdueDays > 0} ? ' text-danger' : ' text-muted'">
-                                                    <span th:if="${suggestion.overdueDays > 0}"
-                                                          th:text="'atrasado ' + ${suggestion.overdueDays} + ' día(s)'">
-                                                        atrasado 1 día
-                                                    </span>
-                                                    <span th:if="${suggestion.overdueDays == 0}">
-                                                        dentro del ciclo esperado
-                                                    </span>
-                                                </div>
-                                            </td>
-
-                                            <td class="text-center">
-                                                <span class="badge rounded-pill"
-                                                      th:classappend="${
-                                                            suggestion.statusClass == 'danger' ? ' text-bg-danger' :
-                                                            (suggestion.statusClass == 'warning' ? ' text-bg-warning text-dark' : ' text-bg-secondary')
-                                                      }"
-                                                      th:text="${suggestion.statusLabel}">
-                                                    Monitorear
-                                                </span>
-                                            </td>
-
-                                            <td class="text-center">
-                                                <button type="button"
-                                                        class="btn btn-sm btn-success mb-1 js-possible-order-whatsapp"
-                                                        th:attr="data-phone=${suggestion.clientPhone},
-                                                                 data-client-name=${suggestion.clientName},
-                                                                 data-action-label=${suggestion.actionLabel},
-                                                                 data-order-url=@{|/orders/new?clientId=${suggestion.clientId}&redirect=/home|}">
-                                                    <i class="bi bi-whatsapp me-1"></i>
-                                                    <span th:text="${suggestion.actionLabel}">Llamar hoy</span>
-                                                </button>
-
-                                                <a th:href="@{|/orders/new?clientId=${suggestion.clientId}&redirect=/home|}"
-                                                   class="btn btn-sm btn-outline-primary mb-1">
-                                                    Crear pedido
-                                                </a>
-                                            </td>
-                                        </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
                         </div>
                     </div>
                 </div>
 
-                <div class="col-lg-4">
-
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-header bg-info text-white">
-                            Ventas del día
-                        </div>
-                        <div class="card-body p-2">
-
-                            <div th:if="${#lists.isEmpty(paidOrders)}" class="small text-muted">
-                                No hay ventas del día (pagados).
-                            </div>
-
-                            <div th:if="${!#lists.isEmpty(paidOrders)}">
-                                <div class="d-flex justify-content-between align-items-center mb-2 small">
-                                    <span th:text="'Pedidos pagados: ' + ${#lists.size(paidOrders)}">
-                                        Pedidos pagados: 0
-                                    </span>
-                                    <span>
-                                        Total S/.
-                                        <strong th:text="${#numbers.formatDecimal(totalSalesToday,1,'POINT',2,'POINT')}">
-                                            0.00
-                                        </strong>
-                                    </span>
-                                </div>
-
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-striped align-middle mb-0">
-                                        <thead class="table-light">
-                                        <tr>
-                                            <th>#</th>
-                                            <th>Cliente</th>
-                                            <th class="text-end">Total S/.</th>
-                                            <th class="text-center">Acciones</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        <tr th:each="order : ${paidOrders}">
-                                            <td th:text="${order.orderNumber}">1</td>
-                                            <td th:text="${order.client != null ? order.client.name : 'Sin cliente'}">
-                                                Cliente
-                                            </td>
-                                            <td class="text-end"
-                                                th:text="${#numbers.formatDecimal(order.totalAmount,1,'POINT',2,'POINT')}">
-                                                0.00
-                                            </td>
-                                            <td class="text-center">
-                                                <a th:href="@{|/orders/${order.id}?from=/home|}"
-                                                   class="btn btn-outline-primary btn-sm mb-1">
-                                                    Ver
-                                                </a>
-
-                                                <form th:action="@{'/orders/' + ${order.id} + '/credit'}"
-                                                      method="post"
-                                                      class="d-inline">
-                                                    <input type="hidden"
-                                                           th:name="${_csrf.parameterName}"
-                                                           th:value="${_csrf.token}"/>
-                                                    <input type="hidden" name="redirect" value="/home"/>
-                                                    <button type="submit"
-                                                            class="btn btn-warning btn-sm mb-1">
-                                                        Fiado
-                                                    </button>
-                                                </form>
-
-                                                <button type="button"
-                                                        class="btn btn-sm btn-outline-danger js-cancel-order mb-1"
-                                                        th:data-order-id="${order.id}"
-                                                        th:data-order-number="${order.orderNumber}"
-                                                        data-redirect="/home">
-                                                    Anular
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center small mb-1">
+                        <span>Avance del equilibrio</span>
+                        <strong th:text="${#numbers.formatDecimal(homeBreakEvenProgressPercent,1,'POINT',2,'POINT')} + '%'">
+                            0.00%
+                        </strong>
+                    </div>
+                    <div class="progress" role="progressbar" aria-label="Avance del punto de equilibrio"
+                         aria-valuemin="0" aria-valuemax="100"
+                         th:attr="aria-valuenow=${homeBreakEvenProgressPercent}">
+                        <div class="progress-bar"
+                             th:classappend="${
+                                homeBreakEvenStatusClass == 'success' ? ' bg-success' :
+                                (homeBreakEvenStatusClass == 'warning' ? ' bg-warning' : ' bg-danger')
+                             }"
+                             th:style="'width:' + ${#numbers.formatDecimal(homeBreakEvenProgressPercent,1,'POINT',2,'POINT')} + '%'">
                         </div>
                     </div>
+                </div>
 
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                            <span>Flujo de caja semanal</span>
-                            <small class="fw-normal">
-                                <span th:text="${#temporals.format(weekStart, 'dd/MM')}">10/03</span>
-                                -
-                                <span th:text="${#temporals.format(weekEnd, 'dd/MM')}">16/03</span>
-                            </small>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <tbody>
+                        <tr>
+                            <th>Precio promedio real</th>
+                            <td class="text-end"
+                                th:text="'S/ ' + ${#numbers.formatDecimal(homeBreakEvenResult.actualAverageSellingPrice,1,'POINT',2,'POINT')}">
+                                S/ 0.00
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Margen de contribución</th>
+                            <td class="text-end"
+                                th:text="'S/ ' + ${#numbers.formatDecimal(homeBreakEvenResult.contributionMargin,1,'POINT',4,'POINT')}">
+                                S/ 0.0000
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Costos fijos usados</th>
+                            <td class="text-end"
+                                th:text="'S/ ' + ${#numbers.formatDecimal(homeBreakEvenResult.fixedCosts,1,'POINT',2,'POINT')}">
+                                S/ 0.00
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Margen de seguridad</th>
+                            <td class="text-end"
+                                th:text="${#numbers.formatDecimal(homeBreakEvenResult.safetyMarginPercent,1,'POINT',2,'POINT')} + '%'">
+                                0.00%
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Unidades por día restantes</th>
+                            <td class="text-end"
+                                th:text="${#numbers.formatDecimal(homeBreakEvenUnitsPerRemainingDay,1,'POINT',2,'POINT')}">
+                                0.00
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="small text-muted mt-2">
+                    <span th:if="${homeBreakEvenGapUnits > 0}">
+                        Faltan
+                        <strong th:text="${#numbers.formatDecimal(homeBreakEvenGapUnits,1,'POINT',0,'POINT')}">0</strong>
+                        unidades en
+                        <strong th:text="${homeBreakEvenRemainingDays}">0</strong>
+                        día(s) para cubrir los costos fijos del período.
+                    </span>
+                    <span th:if="${homeBreakEvenGapUnits <= 0}">
+                        Ya cubres el punto de equilibrio del período actual.
+                    </span>
+                </div>
+
+                <div class="mt-2">
+                    <a th:href="@{/cashflow/break-even(productId=${homeBreakEvenProductId},year=${homeBreakEvenYear},month=${homeBreakEvenMonth})}"
+                       class="btn btn-sm btn-outline-dark">
+                        <i class="bi bi-graph-up-arrow me-1"></i>
+                        Ver detalle
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+                        <div class="home-widget-card" data-widget-id="expenses-today" draggable="false">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                                    <div class="d-flex justify-content-between align-items-center flex-grow-1">
+                                        <span>Gastos del día</span>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-light"
+                                                id="btnOpenDailyExpenseModal"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#dailyExpenseModal">
+                                            <i class="bi bi-plus-circle me-1"></i>
+                                            Agregar
+                                        </button>
+                                    </div>
+                                    <div class="home-widget-tools ms-2">
+                                        <button type="button"
+                                                class="home-widget-tool-button widget-collapse-toggle"
+                                                title="Minimizar / expandir">
+                                            <i class="bi bi-dash-lg"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="home-widget-tool-button widget-drag-handle"
+                                                title="Mover widget">
+                                            <i class="bi bi-grip-vertical"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body p-2">
+
+                                    <div th:if="${dailyExpenses == null or #lists.isEmpty(dailyExpenses)}"
+                                         class="small text-muted">
+                                        No hay gastos en la fecha
+                                        <span th:text="${#temporals.format(today, 'dd/MM/yyyy')}">23/11/2025</span>.
+                                    </div>
+
+                                    <div th:if="${dailyExpenses != null and !#lists.isEmpty(dailyExpenses)}">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm align-middle mb-0">
+                                                <thead class="table-light">
+                                                <tr>
+                                                    <th>Categoría</th>
+                                                    <th>Observación</th>
+                                                    <th class="text-end">S/.</th>
+                                                    <th class="text-center">Acciones</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                <tr th:each="e : ${dailyExpenses}">
+                                                    <td th:text="${e.category != null ? e.category.name : '-'}">Categoría</td>
+                                                    <td th:text="${e.observation} ?: '-'">Observación</td>
+                                                    <td class="text-end"
+                                                        th:text="${#numbers.formatDecimal(e.amount,1,'POINT',2,'POINT')}">
+                                                        0.00
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button type="button"
+                                                                class="btn btn-outline-primary btn-sm js-edit-expense mb-1"
+                                                                th:data-expense-id="${e.id}">
+                                                            <i class="bi bi-pencil-square"></i>
+                                                        </button>
+
+                                                        <form th:action="@{'/expenses/' + ${e.id} + '/delete'}"
+                                                              method="post"
+                                                              class="d-inline js-delete-expense-form">
+                                                            <input type="hidden"
+                                                                   th:name="${_csrf.parameterName}"
+                                                                   th:value="${_csrf.token}"/>
+                                                            <input type="hidden" name="redirect" value="/home"/>
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm mb-1">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                                </tbody>
+                                                <tfoot>
+                                                <tr>
+                                                    <th colspan="2" class="text-end">TOTAL</th>
+                                                    <th class="text-end"
+                                                        th:text="${#numbers.formatDecimal(totalExpensesToday,1,'POINT',2,'POINT')}">
+                                                        0.00
+                                                    </th>
+                                                    <th></th>
+                                                </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
                         </div>
-                        <div class="card-body p-2">
 
-                            <div class="row g-2 mb-2">
-                                <div class="col-4">
-                                    <div class="border rounded p-2 h-100 bg-light">
-                                        <div class="small text-muted">Ingresos</div>
-                                        <div class="fw-semibold"
-                                             th:text="'S/ ' + ${#numbers.formatDecimal(weeklySalesTotal,1,'POINT',2,'POINT')}">
-                                            S/ 0.00
+                        <div class="home-widget-card" data-widget-id="credit-orders" draggable="false">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-danger text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <span>Pedidos fiados</span>
+                                        <div class="home-widget-tools">
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-collapse-toggle"
+                                                    title="Minimizar / expandir">
+                                                <i class="bi bi-dash-lg"></i>
+                                            </button>
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-drag-handle"
+                                                    title="Mover widget">
+                                                <i class="bi bi-grip-vertical"></i>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-4">
-                                    <div class="border rounded p-2 h-100 bg-light">
-                                        <div class="small text-muted">Gastos</div>
-                                        <div class="fw-semibold"
-                                             th:text="'S/ ' + ${#numbers.formatDecimal(weeklyExpensesTotal,1,'POINT',2,'POINT')}">
-                                            S/ 0.00
+                                <div class="card-body p-2">
+
+                                    <div th:if="${#lists.isEmpty(creditOrders)}" class="small text-muted">
+                                        No hay pedidos fiados pendientes.
+                                    </div>
+
+                                    <div th:if="${!#lists.isEmpty(creditOrders)}">
+                                        <div class="d-flex justify-content-between align-items-center mb-2 small">
+                                            <span th:text="'Pendientes por cobrar: ' + ${#lists.size(creditOrders)}">
+                                                Pendientes por cobrar: 0
+                                            </span>
+                                            <span>
+                                                Total S/.
+                                                <strong th:text="${#numbers.formatDecimal(totalCreditAmount,1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </strong>
+                                            </span>
+                                        </div>
+
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped align-middle mb-0">
+                                                <thead class="table-light">
+                                                <tr>
+                                                    <th>Cliente</th>
+                                                    <th class="text-center">Días</th>
+                                                    <th class="text-end">Total S/.</th>
+                                                    <th class="text-center">Acciones</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                <tr th:each="order : ${creditOrders}">
+                                                    <td>
+                                                        <div th:text="${order.client != null ? order.client.name : 'Sin cliente'}">Cliente</div>
+                                                        <small class="text-muted">
+                                                            Desde
+                                                            <span th:text="${#temporals.format(order.orderDate,'dd/MM/yyyy')}">07/03/2026</span>
+                                                        </small>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <span th:text="${creditDaysByOrderId[order.id]}">0</span>
+                                                    </td>
+                                                    <td class="text-end"
+                                                        th:text="${#numbers.formatDecimal(order.totalAmount,1,'POINT',2,'POINT')}">
+                                                        0.00
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <a th:href="@{|/orders/${order.id}?from=/home|}"
+                                                           class="btn btn-outline-primary btn-sm mb-1">
+                                                            Ver
+                                                        </a>
+
+                                                        <form th:action="@{'/orders/' + ${order.id} + '/pay'}"
+                                                              method="post"
+                                                              class="d-inline">
+                                                            <input type="hidden"
+                                                                   th:name="${_csrf.parameterName}"
+                                                                   th:value="${_csrf.token}"/>
+                                                            <input type="hidden" name="redirect" value="/home"/>
+                                                            <button type="submit"
+                                                                    class="btn btn-success btn-sm mb-1">
+                                                                Pagar
+                                                            </button>
+                                                        </form>
+
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-danger js-cancel-order mb-1"
+                                                                th:data-order-id="${order.id}"
+                                                                th:data-order-number="${order.orderNumber}"
+                                                                data-redirect="/home">
+                                                            Anular
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="requested-orders" draggable="false">
+                            <div class="card shadow-sm">
+                                <div class="card-header bg-warning text-dark">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <span>Pedidos del día (x entregar)</span>
+                                        <div class="home-widget-tools">
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-collapse-toggle"
+                                                    title="Minimizar / expandir">
+                                                <i class="bi bi-dash-lg"></i>
+                                            </button>
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-drag-handle"
+                                                    title="Mover widget">
+                                                <i class="bi bi-grip-vertical"></i>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-4">
-                                    <div class="border rounded p-2 h-100 bg-light">
-                                        <div class="small text-muted">Neto</div>
-                                        <div class="fw-semibold"
-                                             th:text="'S/ ' + ${#numbers.formatDecimal(weeklyNetCashFlow,1,'POINT',2,'POINT')}">
-                                            S/ 0.00
+                                <div class="card-body p-2">
+
+                                    <div th:if="${#lists.isEmpty(requestedOrders)}" class="small text-muted">
+                                        No hay pedidos por entregar.
+                                    </div>
+
+                                    <div th:if="${!#lists.isEmpty(requestedOrders)}">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped align-middle mb-0">
+                                                <thead class="table-light">
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Cliente</th>
+                                                    <th class="text-end">Total S/.</th>
+                                                    <th class="text-center">Acciones</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                <tr th:each="order : ${requestedOrders}">
+                                                    <td th:text="${order.orderNumber}">1</td>
+                                                    <td th:text="${order.client != null ? order.client.name : 'Sin cliente'}">
+                                                        Cliente
+                                                    </td>
+                                                    <td class="text-end"
+                                                        th:text="${#numbers.formatDecimal(order.totalAmount,1,'POINT',2,'POINT')}">
+                                                        0.00
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <a th:href="@{|/orders/${order.id}?from=/home|}"
+                                                           class="btn btn-outline-primary btn-sm mb-1">
+                                                            Ver
+                                                        </a>
+
+                                                        <form th:action="@{'/orders/' + ${order.id} + '/pay'}"
+                                                              method="post"
+                                                              class="d-inline">
+                                                            <input type="hidden"
+                                                                   th:name="${_csrf.parameterName}"
+                                                                   th:value="${_csrf.token}"/>
+                                                            <input type="hidden" name="redirect" value="/home"/>
+                                                            <button type="submit"
+                                                                    class="btn btn-success btn-sm mb-1">
+                                                                Pagar
+                                                            </button>
+                                                        </form>
+
+                                                        <form th:action="@{'/orders/' + ${order.id} + '/credit'}"
+                                                              method="post"
+                                                              class="d-inline">
+                                                            <input type="hidden"
+                                                                   th:name="${_csrf.parameterName}"
+                                                                   th:value="${_csrf.token}"/>
+                                                            <input type="hidden" name="redirect" value="/home"/>
+                                                            <button type="submit"
+                                                                    class="btn btn-warning btn-sm mb-1">
+                                                                Fiado
+                                                            </button>
+                                                        </form>
+
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-danger js-cancel-order mb-1"
+                                                                th:data-order-id="${order.id}"
+                                                                th:data-order-number="${order.orderNumber}"
+                                                                data-redirect="/home">
+                                                            Anular
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </div>
+
                                 </div>
                             </div>
-
-                            <div class="small text-muted mb-2">
-                                Resumen de lunes a domingo. Se actualiza al registrar pedidos pagados y gastos.
-                            </div>
-
-                            <div class="table-responsive">
-                                <table class="table table-sm table-striped align-middle mb-0">
-                                    <thead class="table-light">
-                                    <tr>
-                                        <th>Día</th>
-                                        <th class="text-end">Ingresos</th>
-                                        <th class="text-end">Gastos</th>
-                                        <th class="text-end">Neto</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody>
-                                    <tr th:each="row : ${weeklyCashFlowRows}"
-                                        th:classappend="${row['today']} ? 'table-warning' : ''">
-                                        <td>
-                                            <div class="fw-semibold d-flex align-items-center gap-1">
-                                                <span th:text="${row['dayLabel']}">Lun</span>
-                                                <span th:if="${row['today']}" class="badge text-bg-warning text-dark">Hoy</span>
-                                            </div>
-                                            <div class="small text-muted"
-                                                 th:text="${#temporals.format(row['date'], 'dd/MM')}">
-                                                11/03
-                                            </div>
-                                        </td>
-                                        <td class="text-end"
-                                            th:text="${#numbers.formatDecimal(row['sales'],1,'POINT',2,'POINT')}">
-                                            0.00
-                                        </td>
-                                        <td class="text-end"
-                                            th:text="${#numbers.formatDecimal(row['expenses'],1,'POINT',2,'POINT')}">
-                                            0.00
-                                        </td>
-                                        <td class="text-end fw-semibold"
-                                            th:text="${#numbers.formatDecimal(row['net'],1,'POINT',2,'POINT')}">
-                                            0.00
-                                        </td>
-                                    </tr>
-                                    </tbody>
-                                    <tfoot>
-                                    <tr>
-                                        <th>Total</th>
-                                        <th class="text-end"
-                                            th:text="${#numbers.formatDecimal(weeklySalesTotal,1,'POINT',2,'POINT')}">
-                                            0.00
-                                        </th>
-                                        <th class="text-end"
-                                            th:text="${#numbers.formatDecimal(weeklyExpensesTotal,1,'POINT',2,'POINT')}">
-                                            0.00
-                                        </th>
-                                        <th class="text-end"
-                                            th:text="${#numbers.formatDecimal(weeklyNetCashFlow,1,'POINT',2,'POINT')}">
-                                            0.00
-                                        </th>
-                                    </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-
-                            <div class="small text-muted mt-2">
-                                Neto de hoy:
-                                <strong th:text="'S/ ' + ${#numbers.formatDecimal(todayNetCashFlow,1,'POINT',2,'POINT')}">
-                                    S/ 0.00
-                                </strong>
-                            </div>
                         </div>
+
                     </div>
-
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
-                            <span>Gastos del día</span>
-                            <button type="button"
-                                    class="btn btn-sm btn-outline-light"
-                                    id="btnOpenDailyExpenseModal"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#dailyExpenseModal">
-                                <i class="bi bi-plus-circle me-1"></i>
-                                Agregar
-                            </button>
-                        </div>
-                        <div class="card-body p-2">
-
-                            <div th:if="${dailyExpenses == null or #lists.isEmpty(dailyExpenses)}"
-                                 class="small text-muted">
-                                No hay gastos en la fecha
-                                <span th:text="${#temporals.format(today, 'dd/MM/yyyy')}">23/11/2025</span>.
-                            </div>
-
-                            <div th:if="${dailyExpenses != null and !#lists.isEmpty(dailyExpenses)}">
-                                <div class="table-responsive">
-                                    <table class="table table-sm align-middle mb-0">
-                                        <thead class="table-light">
-                                        <tr>
-                                            <th>Categoría</th>
-                                            <th>Observación</th>
-                                            <th class="text-end">S/.</th>
-                                            <th class="text-center">Acciones</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        <tr th:each="e : ${dailyExpenses}">
-                                            <td th:text="${e.category != null ? e.category.name : '-'}">Categoría</td>
-                                            <td th:text="${e.observation} ?: '-'">Observación</td>
-                                            <td class="text-end"
-                                                th:text="${#numbers.formatDecimal(e.amount,1,'POINT',2,'POINT')}">
-                                                0.00
-                                            </td>
-                                            <td class="text-center">
-                                                <button type="button"
-                                                        class="btn btn-outline-primary btn-sm js-edit-expense mb-1"
-                                                        th:data-expense-id="${e.id}">
-                                                    <i class="bi bi-pencil-square"></i>
-                                                </button>
-
-                                                <form th:action="@{'/expenses/' + ${e.id} + '/delete'}"
-                                                      method="post"
-                                                      class="d-inline js-delete-expense-form">
-                                                    <input type="hidden"
-                                                           th:name="${_csrf.parameterName}"
-                                                           th:value="${_csrf.token}"/>
-                                                    <input type="hidden" name="redirect" value="/home"/>
-                                                    <button type="submit" class="btn btn-outline-danger btn-sm mb-1">
-                                                        <i class="bi bi-trash"></i>
-                                                    </button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                        </tbody>
-                                        <tfoot>
-                                        <tr>
-                                            <th colspan="2" class="text-end">TOTAL</th>
-                                            <th class="text-end"
-                                                th:text="${#numbers.formatDecimal(totalExpensesToday,1,'POINT',2,'POINT')}">
-                                                0.00
-                                            </th>
-                                            <th></th>
-                                        </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-header bg-danger text-white">
-                            Pedidos fiados
-                        </div>
-                        <div class="card-body p-2">
-
-                            <div th:if="${#lists.isEmpty(creditOrders)}" class="small text-muted">
-                                No hay pedidos fiados pendientes.
-                            </div>
-
-                            <div th:if="${!#lists.isEmpty(creditOrders)}">
-                                <div class="d-flex justify-content-between align-items-center mb-2 small">
-                                    <span th:text="'Pendientes por cobrar: ' + ${#lists.size(creditOrders)}">
-                                        Pendientes por cobrar: 0
-                                    </span>
-                                    <span>
-                                        Total S/.
-                                        <strong th:text="${#numbers.formatDecimal(totalCreditAmount,1,'POINT',2,'POINT')}">
-                                            0.00
-                                        </strong>
-                                    </span>
-                                </div>
-
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-striped align-middle mb-0">
-                                        <thead class="table-light">
-                                        <tr>
-                                            <th>Cliente</th>
-                                            <th class="text-center">Días</th>
-                                            <th class="text-end">Total S/.</th>
-                                            <th class="text-center">Acciones</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        <tr th:each="order : ${creditOrders}">
-                                            <td>
-                                                <div th:text="${order.client != null ? order.client.name : 'Sin cliente'}">Cliente</div>
-                                                <small class="text-muted">
-                                                    Desde
-                                                    <span th:text="${#temporals.format(order.orderDate,'dd/MM/yyyy')}">07/03/2026</span>
-                                                </small>
-                                            </td>
-                                            <td class="text-center">
-                                                <span th:text="${creditDaysByOrderId[order.id]}">0</span>
-                                            </td>
-                                            <td class="text-end"
-                                                th:text="${#numbers.formatDecimal(order.totalAmount,1,'POINT',2,'POINT')}">
-                                                0.00
-                                            </td>
-                                            <td class="text-center">
-                                                <a th:href="@{|/orders/${order.id}?from=/home|}"
-                                                   class="btn btn-outline-primary btn-sm mb-1">
-                                                    Ver
-                                                </a>
-
-                                                <form th:action="@{'/orders/' + ${order.id} + '/pay'}"
-                                                      method="post"
-                                                      class="d-inline">
-                                                    <input type="hidden"
-                                                           th:name="${_csrf.parameterName}"
-                                                           th:value="${_csrf.token}"/>
-                                                    <input type="hidden" name="redirect" value="/home"/>
-                                                    <button type="submit"
-                                                            class="btn btn-success btn-sm mb-1">
-                                                        Pagar
-                                                    </button>
-                                                </form>
-
-                                                <button type="button"
-                                                        class="btn btn-sm btn-outline-danger js-cancel-order mb-1"
-                                                        th:data-order-id="${order.id}"
-                                                        th:data-order-number="${order.orderNumber}"
-                                                        data-redirect="/home">
-                                                    Anular
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-warning text-dark">
-                            Pedidos del día (x entregar)
-                        </div>
-                        <div class="card-body p-2">
-
-                            <div th:if="${#lists.isEmpty(requestedOrders)}" class="small text-muted">
-                                No hay pedidos por entregar.
-                            </div>
-
-                            <div th:if="${!#lists.isEmpty(requestedOrders)}">
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-striped align-middle mb-0">
-                                        <thead class="table-light">
-                                        <tr>
-                                            <th>#</th>
-                                            <th>Cliente</th>
-                                            <th class="text-end">Total S/.</th>
-                                            <th class="text-center">Acciones</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        <tr th:each="order : ${requestedOrders}">
-                                            <td th:text="${order.orderNumber}">1</td>
-                                            <td th:text="${order.client != null ? order.client.name : 'Sin cliente'}">
-                                                Cliente
-                                            </td>
-                                            <td class="text-end"
-                                                th:text="${#numbers.formatDecimal(order.totalAmount,1,'POINT',2,'POINT')}">
-                                                0.00
-                                            </td>
-                                            <td class="text-center">
-                                                <a th:href="@{|/orders/${order.id}?from=/home|}"
-                                                   class="btn btn-outline-primary btn-sm mb-1">
-                                                    Ver
-                                                </a>
-
-                                                <form th:action="@{'/orders/' + ${order.id} + '/pay'}"
-                                                      method="post"
-                                                      class="d-inline">
-                                                    <input type="hidden"
-                                                           th:name="${_csrf.parameterName}"
-                                                           th:value="${_csrf.token}"/>
-                                                    <input type="hidden" name="redirect" value="/home"/>
-                                                    <button type="submit"
-                                                            class="btn btn-success btn-sm mb-1">
-                                                        Pagar
-                                                    </button>
-                                                </form>
-
-                                                <form th:action="@{'/orders/' + ${order.id} + '/credit'}"
-                                                      method="post"
-                                                      class="d-inline">
-                                                    <input type="hidden"
-                                                           th:name="${_csrf.parameterName}"
-                                                           th:value="${_csrf.token}"/>
-                                                    <input type="hidden" name="redirect" value="/home"/>
-                                                    <button type="submit"
-                                                            class="btn btn-warning btn-sm mb-1">
-                                                        Fiado
-                                                    </button>
-                                                </form>
-
-                                                <button type="button"
-                                                        class="btn btn-sm btn-outline-danger js-cancel-order mb-1"
-                                                        th:data-order-id="${order.id}"
-                                                        th:data-order-number="${order.orderNumber}"
-                                                        data-redirect="/home">
-                                                    Anular
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-
                 </div>
             </div>
 
@@ -932,6 +1351,8 @@
 <script th:inline="javascript">
     document.addEventListener('DOMContentLoaded', function () {
         'use strict';
+
+        const WIDGET_STORAGE_KEY = 'ecoagua-home-widget-layout-v1';
 
         function normalizeLookupText(value) {
             return (value || '')
@@ -1892,6 +2313,305 @@
             expenseDateInputId: 'dailyExpenseDate',
             personnelPreviewUrl: /*[[@{/expenses/personnel-preview}]]*/ '/expenses/personnel-preview'
         });
+
+        const widgetBoard = document.getElementById('homeWidgetBoard');
+        const widgetColumns = Array.from(document.querySelectorAll('.home-widget-column'));
+        const widgetCards = Array.from(document.querySelectorAll('.home-widget-card'));
+        const btnExpandAllWidgets = document.getElementById('btnExpandAllWidgets');
+        const btnCollapseAllWidgets = document.getElementById('btnCollapseAllWidgets');
+        const btnResetWidgetLayout = document.getElementById('btnResetWidgetLayout');
+
+        const defaultLayout = {};
+        widgetColumns.forEach(function (column) {
+            defaultLayout[column.getAttribute('data-column')] = Array.from(
+                column.querySelectorAll('.home-widget-card')
+            ).map(function (card) {
+                return card.getAttribute('data-widget-id');
+            });
+        });
+
+        function getWidgetBody(card) {
+            return card ? card.querySelector('.card-body') : null;
+        }
+
+        function getWidgetCollapseButton(card) {
+            return card ? card.querySelector('.widget-collapse-toggle') : null;
+        }
+
+        function setWidgetCollapsed(card, collapsed) {
+            if (!card) {
+                return;
+            }
+
+            card.classList.toggle('widget-collapsed', collapsed);
+
+            const body = getWidgetBody(card);
+            if (body) {
+                body.style.display = collapsed ? 'none' : '';
+            }
+
+            const collapseButton = getWidgetCollapseButton(card);
+            if (collapseButton) {
+                collapseButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                const icon = collapseButton.querySelector('i');
+                if (icon) {
+                    icon.className = collapsed ? 'bi bi-plus-lg' : 'bi bi-dash-lg';
+                }
+            }
+        }
+
+        function saveWidgetLayout() {
+            const payload = {
+                columns: {},
+                collapsed: {}
+            };
+
+            widgetColumns.forEach(function (column) {
+                const columnKey = column.getAttribute('data-column');
+                payload.columns[columnKey] = Array.from(column.querySelectorAll('.home-widget-card'))
+                    .map(function (card) {
+                        return card.getAttribute('data-widget-id');
+                    });
+            });
+
+            widgetCards.forEach(function (card) {
+                payload.collapsed[card.getAttribute('data-widget-id')] = card.classList.contains('widget-collapsed');
+            });
+
+            try {
+                window.localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(payload));
+            } catch (error) {
+                console.warn('Could not save widget layout.', error);
+            }
+        }
+
+        function restoreDefaultWidgetLayout() {
+            widgetColumns.forEach(function (column) {
+                const columnKey = column.getAttribute('data-column');
+                const ids = defaultLayout[columnKey] || [];
+
+                ids.forEach(function (widgetId) {
+                    const card = widgetBoard.querySelector('.home-widget-card[data-widget-id="' + widgetId + '"]');
+                    if (card) {
+                        column.appendChild(card);
+                    }
+                });
+            });
+
+            widgetCards.forEach(function (card) {
+                setWidgetCollapsed(card, false);
+                card.setAttribute('draggable', 'false');
+                delete card.dataset.dragAllowed;
+            });
+
+            saveWidgetLayout();
+        }
+
+        function applySavedWidgetLayout() {
+            let savedLayout = null;
+
+            try {
+                savedLayout = JSON.parse(window.localStorage.getItem(WIDGET_STORAGE_KEY) || 'null');
+            } catch (error) {
+                savedLayout = null;
+            }
+
+            if (!savedLayout || typeof savedLayout !== 'object') {
+                return;
+            }
+
+            const placed = new Set();
+
+            widgetColumns.forEach(function (column) {
+                const columnKey = column.getAttribute('data-column');
+                const ids = savedLayout.columns && Array.isArray(savedLayout.columns[columnKey])
+                    ? savedLayout.columns[columnKey]
+                    : [];
+
+                ids.forEach(function (widgetId) {
+                    const card = widgetBoard.querySelector('.home-widget-card[data-widget-id="' + widgetId + '"]');
+                    if (card) {
+                        column.appendChild(card);
+                        placed.add(widgetId);
+                    }
+                });
+            });
+
+            widgetCards.forEach(function (card) {
+                const widgetId = card.getAttribute('data-widget-id');
+                if (placed.has(widgetId)) {
+                    return;
+                }
+
+                for (const [columnKey, ids] of Object.entries(defaultLayout)) {
+                    if (ids.includes(widgetId)) {
+                        const column = widgetBoard.querySelector('.home-widget-column[data-column="' + columnKey + '"]');
+                        if (column) {
+                            column.appendChild(card);
+                        }
+                        break;
+                    }
+                }
+            });
+
+            widgetCards.forEach(function (card) {
+                const widgetId = card.getAttribute('data-widget-id');
+                const collapsed = !!(savedLayout.collapsed && savedLayout.collapsed[widgetId]);
+                setWidgetCollapsed(card, collapsed);
+            });
+        }
+
+        widgetCards.forEach(function (card) {
+            const collapseButton = card.querySelector('.widget-collapse-toggle');
+            if (collapseButton) {
+                collapseButton.addEventListener('click', function () {
+                    const collapsed = !card.classList.contains('widget-collapsed');
+                    setWidgetCollapsed(card, collapsed);
+                    saveWidgetLayout();
+                });
+            }
+        });
+
+        if (btnExpandAllWidgets) {
+            btnExpandAllWidgets.addEventListener('click', function () {
+                widgetCards.forEach(function (card) {
+                    setWidgetCollapsed(card, false);
+                });
+                saveWidgetLayout();
+            });
+        }
+
+        if (btnCollapseAllWidgets) {
+            btnCollapseAllWidgets.addEventListener('click', function () {
+                widgetCards.forEach(function (card) {
+                    setWidgetCollapsed(card, true);
+                });
+                saveWidgetLayout();
+            });
+        }
+
+        if (btnResetWidgetLayout) {
+            btnResetWidgetLayout.addEventListener('click', function () {
+                restoreDefaultWidgetLayout();
+            });
+        }
+
+        const dragPlaceholder = document.createElement('div');
+        dragPlaceholder.className = 'home-widget-placeholder';
+
+        let draggedWidget = null;
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = Array.from(
+                container.querySelectorAll('.home-widget-card:not(.dragging)')
+            );
+
+            let closest = {
+                offset: Number.NEGATIVE_INFINITY,
+                element: null
+            };
+
+            draggableElements.forEach(function (element) {
+                const box = element.getBoundingClientRect();
+                const offset = y - box.top - (box.height / 2);
+
+                if (offset < 0 && offset > closest.offset) {
+                    closest = {
+                        offset: offset,
+                        element: element
+                    };
+                }
+            });
+
+            return closest.element;
+        }
+
+        widgetCards.forEach(function (card) {
+            const dragHandle = card.querySelector('.widget-drag-handle');
+
+            if (dragHandle) {
+                dragHandle.addEventListener('mousedown', function () {
+                    card.dataset.dragAllowed = 'true';
+                    card.setAttribute('draggable', 'true');
+                });
+
+                dragHandle.addEventListener('mouseup', function () {
+                    if (!draggedWidget) {
+                        card.dataset.dragAllowed = 'false';
+                        card.setAttribute('draggable', 'false');
+                    }
+                });
+
+                dragHandle.addEventListener('mouseleave', function () {
+                    if (!draggedWidget) {
+                        card.dataset.dragAllowed = 'false';
+                        card.setAttribute('draggable', 'false');
+                    }
+                });
+            }
+
+            card.addEventListener('dragstart', function (event) {
+                if (card.dataset.dragAllowed !== 'true') {
+                    event.preventDefault();
+                    return;
+                }
+
+                draggedWidget = card;
+                card.classList.add('dragging');
+                dragPlaceholder.style.height = card.offsetHeight + 'px';
+
+                if (event.dataTransfer) {
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', card.getAttribute('data-widget-id'));
+                }
+            });
+
+            card.addEventListener('dragend', function () {
+                card.classList.remove('dragging');
+                card.dataset.dragAllowed = 'false';
+                card.setAttribute('draggable', 'false');
+                draggedWidget = null;
+                dragPlaceholder.remove();
+                saveWidgetLayout();
+            });
+        });
+
+        widgetColumns.forEach(function (column) {
+            column.addEventListener('dragover', function (event) {
+                event.preventDefault();
+
+                if (!draggedWidget) {
+                    return;
+                }
+
+                const afterElement = getDragAfterElement(column, event.clientY);
+
+                if (afterElement == null) {
+                    column.appendChild(dragPlaceholder);
+                } else {
+                    column.insertBefore(dragPlaceholder, afterElement);
+                }
+            });
+
+            column.addEventListener('drop', function (event) {
+                event.preventDefault();
+
+                if (!draggedWidget) {
+                    return;
+                }
+
+                if (dragPlaceholder.parentNode === column) {
+                    column.insertBefore(draggedWidget, dragPlaceholder);
+                } else {
+                    column.appendChild(draggedWidget);
+                }
+
+                dragPlaceholder.remove();
+                saveWidgetLayout();
+            });
+        });
+
+        applySavedWidgetLayout();
 
         const flashMessage = /*[[${message}]]*/ null;
         const flashType = /*[[${messageType}]]*/ null;

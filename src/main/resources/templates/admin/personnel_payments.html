@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="fragments/head_admin :: adminHead('Pagos del personal')"></head>
+
+<body>
+
+<div class="app-layout" th:with="activePage='personnel_payments'">
+
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Pagos del personal</h1>
+                    <div class="text-muted small">
+                        Fase 1 de RR.HH.: historial de pagos, préstamos y adelantos por empleado.
+                        En esta fase aún no se generan boletas ni asientos automáticos a gastos.
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${message}"
+                 class="alert"
+                 th:classappend="${messageType == 'success'} ? ' alert-success' : ' alert-danger'"
+                 th:text="${message}">
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <form method="get"
+                          th:action="@{/admin/personnel/payments}"
+                          class="row g-3 align-items-end">
+
+                        <div class="col-lg-7">
+                            <label for="employeeId" class="form-label">Empleado</label>
+                            <select id="employeeId" name="employeeId" class="form-select">
+                                <option value="">- Seleccione -</option>
+                                <option th:each="employee : ${employees}"
+                                        th:value="${employee.id}"
+                                        th:selected="${selectedEmployeeId != null and selectedEmployeeId == employee.id}"
+                                        th:text="${employee.firstName + ' ' + employee.lastName}">
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="col-lg-2 col-md-3">
+                            <label for="year" class="form-label">Año</label>
+                            <input id="year"
+                                   type="number"
+                                   name="year"
+                                   min="2024"
+                                   max="2100"
+                                   class="form-control"
+                                   th:value="${selectedYear}">
+                        </div>
+
+                        <div class="col-lg-1 col-md-3">
+                            <label for="month" class="form-label">Mes</label>
+                            <select id="month" name="month" class="form-select">
+                                <option value="1" th:selected="${selectedMonth == 1}">Enero</option>
+                                <option value="2" th:selected="${selectedMonth == 2}">Febrero</option>
+                                <option value="3" th:selected="${selectedMonth == 3}">Marzo</option>
+                                <option value="4" th:selected="${selectedMonth == 4}">Abril</option>
+                                <option value="5" th:selected="${selectedMonth == 5}">Mayo</option>
+                                <option value="6" th:selected="${selectedMonth == 6}">Junio</option>
+                                <option value="7" th:selected="${selectedMonth == 7}">Julio</option>
+                                <option value="8" th:selected="${selectedMonth == 8}">Agosto</option>
+                                <option value="9" th:selected="${selectedMonth == 9}">Setiembre</option>
+                                <option value="10" th:selected="${selectedMonth == 10}">Octubre</option>
+                                <option value="11" th:selected="${selectedMonth == 11}">Noviembre</option>
+                                <option value="12" th:selected="${selectedMonth == 12}">Diciembre</option>
+                            </select>
+                        </div>
+
+                        <div class="col-lg-2 col-md-6">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search me-1"></i> Ver historial
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div th:if="${selectedEmployee == null}" class="card shadow-sm">
+                <div class="card-body text-muted">
+                    Selecciona un empleado y un período para ver su historial de pagos, registrar préstamos o guardar pagos.
+                </div>
+            </div>
+
+            <th:block th:if="${selectedEmployee != null}">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h2 class="h6 mb-1">
+                            Historial del período:
+                            <span class="text-primary"
+                                  th:text="${(selectedMonth == 1 ? 'Enero'
+                                           : selectedMonth == 2 ? 'Febrero'
+                                           : selectedMonth == 3 ? 'Marzo'
+                                           : selectedMonth == 4 ? 'Abril'
+                                           : selectedMonth == 5 ? 'Mayo'
+                                           : selectedMonth == 6 ? 'Junio'
+                                           : selectedMonth == 7 ? 'Julio'
+                                           : selectedMonth == 8 ? 'Agosto'
+                                           : selectedMonth == 9 ? 'Setiembre'
+                                           : selectedMonth == 10 ? 'Octubre'
+                                           : selectedMonth == 11 ? 'Noviembre'
+                                           : 'Diciembre') + ' ' + selectedYear}">
+                                Marzo 2026
+                            </span>
+                        </h2>
+                        <div class="text-muted small">
+                            El historial combina pagos nuevos registrados en RR.HH. y pagos históricos legacy que antes se guardaban como gasto de personal.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted text-uppercase small">Total ganado</div>
+                                <div class="fs-3 fw-bold"
+                                     th:text="${'S/. ' + #numbers.formatDecimal(summary.totalGross, 1, 2)}">
+                                    S/. 0.00
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted text-uppercase small">Total descontado</div>
+                                <div class="fs-3 fw-bold"
+                                     th:text="${'S/. ' + #numbers.formatDecimal(summary.totalDiscount, 1, 2)}">
+                                    S/. 0.00
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted text-uppercase small">Neto pagado</div>
+                                <div class="fs-3 fw-bold"
+                                     th:text="${'S/. ' + #numbers.formatDecimal(summary.totalNet, 1, 2)}">
+                                    S/. 0.00
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted text-uppercase small">Saldo pendiente</div>
+                                <div class="fs-3 fw-bold"
+                                     th:text="${'S/. ' + #numbers.formatDecimal(summary.totalPendingObligations, 1, 2)}">
+                                    S/. 0.00
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+
+                    <div class="col-xl-6">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h2 class="h5 mb-3">Registrar pago</h2>
+
+                                <div class="alert alert-info py-2 px-3 small mb-3"
+                                     th:if="${suggestedCalculation != null}">
+                                    <strong>Monto sugerido hoy:</strong>
+                                    <span th:text="${'S/. ' + #numbers.formatDecimal(suggestedCalculation.suggestedAmount, 1, 2)}">
+                                        S/. 0.00
+                                    </span>
+                                    <span class="mx-1">|</span>
+                                    <strong>Base ventas:</strong>
+                                    <span th:text="${'S/. ' + #numbers.formatDecimal(suggestedCalculation.totalSales, 1, 2)}">
+                                        S/. 0.00
+                                    </span>
+                                </div>
+
+                                <form method="post"
+                                      th:action="@{/admin/personnel/payments/save}"
+                                      th:object="${paymentForm}">
+
+                                    <input type="hidden" th:field="*{employeeId}"/>
+
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="paymentDate" class="form-label">Fecha de pago</label>
+                                            <input id="paymentDate" type="date" class="form-control" th:field="*{paymentDate}">
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label for="grossAmount" class="form-label">Monto bruto</label>
+                                            <input id="grossAmount"
+                                                   type="number"
+                                                   step="0.01"
+                                                   min="0"
+                                                   class="form-control"
+                                                   th:field="*{grossAmount}"
+                                                   placeholder="Vacío = usar sugerido">
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label for="manualDiscountAmount" class="form-label">Descuento manual</label>
+                                            <input id="manualDiscountAmount"
+                                                   type="number"
+                                                   step="0.01"
+                                                   min="0"
+                                                   class="form-control"
+                                                   th:field="*{manualDiscountAmount}"
+                                                   placeholder="Ej: descuento adicional del día">
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label for="obligationId" class="form-label">Préstamo / adelanto</label>
+                                            <select id="obligationId" class="form-select" th:field="*{obligationId}">
+                                                <option value="">- Sin obligación -</option>
+                                                <option th:each="item : ${activeObligations}"
+                                                        th:value="${item.id}"
+                                                        th:text="${item.type.label + ' | saldo S/. ' + #numbers.formatDecimal(item.pendingAmount, 1, 2)}">
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label for="obligationAppliedAmount" class="form-label">Descuento de obligación</label>
+                                            <input id="obligationAppliedAmount"
+                                                   type="number"
+                                                   step="0.01"
+                                                   min="0"
+                                                   class="form-control"
+                                                   th:field="*{obligationAppliedAmount}"
+                                                   placeholder="Vacío = usar regla configurada">
+                                        </div>
+
+                                        <div class="col-12">
+                                            <label for="paymentObservation" class="form-label">Observación</label>
+                                            <textarea id="paymentObservation"
+                                                      class="form-control"
+                                                      rows="4"
+                                                      th:field="*{observation}"
+                                                      placeholder="Detalle del pago o acuerdo con el trabajador"></textarea>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-3">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="bi bi-save me-1"></i> Guardar pago
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-6">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h2 class="h5 mb-3">Registrar préstamo / adelanto</h2>
+
+                                <form method="post"
+                                      th:action="@{/admin/personnel/payments/obligations/save}"
+                                      th:object="${obligationForm}">
+
+                                    <input type="hidden" th:field="*{employeeId}"/>
+
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="type" class="form-label">Tipo</label>
+                                            <select id="type" class="form-select" th:field="*{type}">
+                                                <option th:each="type : ${obligationTypes}"
+                                                        th:value="${type.name()}"
+                                                        th:text="${type.label}">
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label for="issueDate" class="form-label">Fecha</label>
+                                            <input id="issueDate" type="date" class="form-control" th:field="*{issueDate}">
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label for="originalAmount" class="form-label">Monto</label>
+                                            <input id="originalAmount"
+                                                   type="number"
+                                                   step="0.01"
+                                                   min="0"
+                                                   class="form-control"
+                                                   th:field="*{originalAmount}">
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label for="discountMode" class="form-label">Modo de descuento</label>
+                                            <select id="discountMode" class="form-select" th:field="*{discountMode}">
+                                                <option th:each="mode : ${obligationDiscountModes}"
+                                                        th:value="${mode.name()}"
+                                                        th:text="${mode.label}">
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label for="fixedDiscountAmount" class="form-label">Monto fijo por pago</label>
+                                            <input id="fixedDiscountAmount"
+                                                   type="number"
+                                                   step="0.01"
+                                                   min="0"
+                                                   class="form-control"
+                                                   th:field="*{fixedDiscountAmount}">
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label for="discountPercentage" class="form-label">Porcentaje por pago</label>
+                                            <input id="discountPercentage"
+                                                   type="number"
+                                                   step="0.01"
+                                                   min="0"
+                                                   class="form-control"
+                                                   th:field="*{discountPercentage}">
+                                        </div>
+
+                                        <div class="col-12">
+                                            <label for="obligationDescription" class="form-label">Descripción</label>
+                                            <textarea id="obligationDescription"
+                                                      class="form-control"
+                                                      rows="4"
+                                                      th:field="*{description}"
+                                                      placeholder="Ej: préstamo personal, adelanto por emergencia, etc."></textarea>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-3">
+                                        <button type="submit" class="btn btn-outline-secondary">
+                                            <i class="bi bi-wallet2 me-1"></i> Guardar obligación
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm mb-3" th:if="${editObligationForm != null}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h2 class="h5 mb-0">Editar obligación</h2>
+                            <a class="btn btn-sm btn-outline-secondary"
+                               th:href="@{/admin/personnel/payments(employeeId=${selectedEmployeeId}, year=${selectedYear}, month=${selectedMonth})}">
+                                Cancelar edición
+                            </a>
+                        </div>
+
+                        <div class="alert alert-warning py-2 px-3 small mb-3" th:if="${editObligationHasPayments}">
+                            Esta obligación ya tiene descuentos aplicados por un total de
+                            <strong th:text="${'S/. ' + #numbers.formatDecimal(editObligationAppliedAmount, 1, 2)}">S/. 0.00</strong>.
+                            Puedes editarla y ajustar su saldo, pero ya no se podrá eliminar.
+                        </div>
+
+                        <form method="post"
+                              th:action="@{/admin/personnel/payments/obligations/update}"
+                              th:object="${editObligationForm}">
+
+                            <input type="hidden" th:field="*{id}"/>
+                            <input type="hidden" th:field="*{employeeId}"/>
+                            <input type="hidden" name="year" th:value="${selectedYear}"/>
+                            <input type="hidden" name="month" th:value="${selectedMonth}"/>
+
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="editType" class="form-label">Tipo</label>
+                                    <select id="editType" class="form-select" th:field="*{type}">
+                                        <option th:each="type : ${obligationTypes}"
+                                                th:value="${type.name()}"
+                                                th:text="${type.label}"></option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label for="editIssueDate" class="form-label">Fecha</label>
+                                    <input id="editIssueDate" type="date" class="form-control" th:field="*{issueDate}">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label for="editOriginalAmount" class="form-label">Monto original</label>
+                                    <input id="editOriginalAmount"
+                                           type="number"
+                                           step="0.01"
+                                           min="0"
+                                           class="form-control"
+                                           th:field="*{originalAmount}">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label for="editPendingAmount" class="form-label">Saldo pendiente</label>
+                                    <input id="editPendingAmount"
+                                           type="number"
+                                           step="0.01"
+                                           min="0"
+                                           class="form-control"
+                                           th:field="*{pendingAmount}">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label for="editDiscountMode" class="form-label">Modo de descuento</label>
+                                    <select id="editDiscountMode" class="form-select" th:field="*{discountMode}">
+                                        <option th:each="mode : ${obligationDiscountModes}"
+                                                th:value="${mode.name()}"
+                                                th:text="${mode.label}"></option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label for="editActive" class="form-label d-block">Estado</label>
+                                    <div class="form-check form-switch mt-2">
+                                        <input id="editActive" class="form-check-input" type="checkbox" th:field="*{active}">
+                                        <label class="form-check-label" for="editActive">Activa</label>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label for="editFixedDiscountAmount" class="form-label">Monto fijo por pago</label>
+                                    <input id="editFixedDiscountAmount"
+                                           type="number"
+                                           step="0.01"
+                                           min="0"
+                                           class="form-control"
+                                           th:field="*{fixedDiscountAmount}">
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label for="editDiscountPercentage" class="form-label">Porcentaje por pago</label>
+                                    <input id="editDiscountPercentage"
+                                           type="number"
+                                           step="0.01"
+                                           min="0"
+                                           class="form-control"
+                                           th:field="*{discountPercentage}">
+                                </div>
+
+                                <div class="col-12">
+                                    <label for="editDescription" class="form-label">Descripción</label>
+                                    <textarea id="editDescription"
+                                              class="form-control"
+                                              rows="3"
+                                              th:field="*{description}"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="mt-3 d-flex gap-2 flex-wrap">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save me-1"></i> Guardar cambios
+                                </button>
+
+                                <form th:action="@{/admin/personnel/payments/obligations/{id}/close(id=${editObligationForm.id})}"
+                                      method="post"
+                                      class="d-inline">
+                                    <input type="hidden" name="employeeId" th:value="${selectedEmployeeId}"/>
+                                    <input type="hidden" name="year" th:value="${selectedYear}"/>
+                                    <input type="hidden" name="month" th:value="${selectedMonth}"/>
+                                    <button type="submit" class="btn btn-outline-warning"
+                                            onclick="return confirm('¿Cerrar esta obligación? Ya no se usará para descuentos automáticos.')">
+                                        <i class="bi bi-pause-circle me-1"></i> Cerrar obligación
+                                    </button>
+                                </form>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h2 class="h5 mb-0">Historial de pagos</h2>
+                            <span class="text-muted small">
+                                Cantidad de pagos del período:
+                                <strong th:text="${summary.paymentCount}">0</strong>
+                            </span>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover align-middle">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Bruto</th>
+                                    <th>Descuento</th>
+                                    <th>Neto</th>
+                                    <th>Base cálculo</th>
+                                    <th>Esquema</th>
+                                    <th>Observación</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:if="${#lists.isEmpty(payments)}">
+                                    <td colspan="7" class="text-muted">
+                                        No hay pagos registrados para este empleado y período.
+                                    </td>
+                                </tr>
+                                <tr th:each="item : ${payments}">
+                                    <td th:text="${item.paymentDate}">2026-03-14</td>
+                                    <td th:text="${'S/. ' + #numbers.formatDecimal(item.grossAmount, 1, 2)}">S/. 0.00</td>
+                                    <td th:text="${'S/. ' + #numbers.formatDecimal(item.discountAmount, 1, 2)}">S/. 0.00</td>
+                                    <td th:text="${'S/. ' + #numbers.formatDecimal(item.netAmount, 1, 2)}">S/. 0.00</td>
+                                    <td th:text="${'S/. ' + #numbers.formatDecimal(item.calculationBaseAmount, 1, 2)}">S/. 0.00</td>
+                                    <td>
+                                        <span class="badge"
+                                              th:classappend="${item.observation != null and #strings.startsWith(item.observation, 'Legacy expense |')} ? ' bg-warning text-dark' : ' bg-secondary'"
+                                              th:text="${item.paymentModeSnapshot}">
+                                            COMMISSION
+                                        </span>
+                                        <div class="small text-muted"
+                                             th:text="${item.salaryPeriodSnapshot != null ? item.salaryPeriodSnapshot : '-'}">
+                                            DAILY
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span th:if="${item.observation != null and #strings.startsWith(item.observation, 'Legacy expense |')}"
+                                              class="badge bg-warning text-dark me-1">
+                                            Legacy
+                                        </span>
+                                        <span th:text="${item.observation != null ? item.observation : '-'}">-</span>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h2 class="h5 mb-0">Préstamos y adelantos</h2>
+                            <div class="text-muted small">Ahora ya puedes editar, cerrar o eliminar obligaciones.</div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover align-middle">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Monto original</th>
+                                    <th>Saldo</th>
+                                    <th>Modo descuento</th>
+                                    <th>Activo</th>
+                                    <th>Descripción</th>
+                                    <th class="text-end">Acciones</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:if="${#lists.isEmpty(obligations)}">
+                                    <td colspan="8" class="text-muted">
+                                        No hay obligaciones registradas para este empleado.
+                                    </td>
+                                </tr>
+                                <tr th:each="item : ${obligations}">
+                                    <td th:text="${item.issueDate}">2026-03-14</td>
+                                    <td th:text="${item.type.label}">Préstamo</td>
+                                    <td th:text="${'S/. ' + #numbers.formatDecimal(item.originalAmount, 1, 2)}">S/. 0.00</td>
+                                    <td th:text="${'S/. ' + #numbers.formatDecimal(item.pendingAmount, 1, 2)}">S/. 0.00</td>
+                                    <td>
+                                        <div th:text="${item.discountMode.label}">Manual</div>
+                                        <div class="small text-muted"
+                                             th:if="${item.discountMode.name() == 'FIXED_PER_PAYMENT'}"
+                                             th:text="${'Monto fijo: S/. ' + #numbers.formatDecimal(item.fixedDiscountAmount, 1, 2)}">
+                                            Monto fijo: S/. 0.00
+                                        </div>
+                                        <div class="small text-muted"
+                                             th:if="${item.discountMode.name() == 'PERCENTAGE'}"
+                                             th:text="${'Porcentaje: ' + #numbers.formatDecimal(item.discountPercentage, 1, 2) + '%'}">
+                                            Porcentaje: 0.00%
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge"
+                                              th:classappend="${item.active} ? ' bg-success' : ' bg-secondary'"
+                                              th:text="${item.active ? 'Sí' : 'No'}">
+                                            Sí
+                                        </span>
+                                    </td>
+                                    <td th:text="${item.description != null ? item.description : '-'}">-</td>
+                                    <td class="text-end">
+                                        <div class="d-flex justify-content-end gap-2 flex-wrap">
+                                            <a class="btn btn-sm btn-outline-primary"
+                                               th:href="@{/admin/personnel/payments(employeeId=${selectedEmployeeId}, year=${selectedYear}, month=${selectedMonth}, editObligationId=${item.id})}">
+                                                <i class="bi bi-pencil-square me-1"></i> Editar
+                                            </a>
+
+                                            <form th:action="@{/admin/personnel/payments/obligations/{id}/close(id=${item.id})}"
+                                                  method="post"
+                                                  class="d-inline">
+                                                <input type="hidden" name="employeeId" th:value="${selectedEmployeeId}"/>
+                                                <input type="hidden" name="year" th:value="${selectedYear}"/>
+                                                <input type="hidden" name="month" th:value="${selectedMonth}"/>
+                                                <button type="submit" class="btn btn-sm btn-outline-warning"
+                                                        onclick="return confirm('¿Cerrar esta obligación?')">
+                                                    <i class="bi bi-pause-circle me-1"></i> Cerrar
+                                                </button>
+                                            </form>
+
+                                            <form th:action="@{/admin/personnel/payments/obligations/{id}/delete(id=${item.id})}"
+                                                  method="post"
+                                                  class="d-inline">
+                                                <input type="hidden" name="employeeId" th:value="${selectedEmployeeId}"/>
+                                                <input type="hidden" name="year" th:value="${selectedYear}"/>
+                                                <input type="hidden" name="month" th:value="${selectedMonth}"/>
+                                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                        onclick="return confirm('¿Eliminar esta obligación? Solo se podrá eliminar si aún no tuvo descuentos aplicados.')">
+                                                    <i class="bi bi-trash me-1"></i> Eliminar
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </th:block>
+
+        </main>
+
+    </div>
+
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+</body>
+</html>

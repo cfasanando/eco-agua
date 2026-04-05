@@ -7,10 +7,7 @@ import com.ecoamazonas.eco_agua.income.OtherIncomeService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
@@ -24,33 +21,32 @@ public class IncomeController {
     private final OrderService orderService;
     private final OtherIncomeService otherIncomeService;
     private final CategoryRepository categoryRepository;
+    private final ReceivableService receivableService;
 
     public IncomeController(
             OrderService orderService,
             OtherIncomeService otherIncomeService,
-            CategoryRepository categoryRepository
+            CategoryRepository categoryRepository,
+            ReceivableService receivableService
     ) {
         this.orderService = orderService;
         this.otherIncomeService = otherIncomeService;
         this.categoryRepository = categoryRepository;
+        this.receivableService = receivableService;
     }
 
     @GetMapping("/sales")
     public String salesByDate(
             @RequestParam(name = "mode", required = false, defaultValue = "DAY") String mode,
-            @RequestParam(name = "date", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam(name = "startDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(name = "endDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(name = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(name = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             Model model
     ) {
         LocalDate today = LocalDate.now();
         mode = mode != null ? mode.toUpperCase() : "DAY";
 
         List<SaleOrder> orders;
-
         if ("PERIOD".equals(mode)) {
             if (startDate == null && endDate == null) {
                 startDate = today;
@@ -67,12 +63,7 @@ public class IncomeController {
                 startDate = endDate;
                 endDate = tmp;
             }
-
-            orders = orderService.findOrdersBetweenDatesAndStatus(
-                    startDate,
-                    endDate,
-                    OrderStatus.PAID
-            );
+            orders = orderService.findOrdersBetweenDatesAndStatus(startDate, endDate, OrderStatus.PAID);
             date = null;
         } else {
             if (date == null) {
@@ -100,16 +91,13 @@ public class IncomeController {
         model.addAttribute("orders", orders);
         model.addAttribute("totalAmount", total);
         model.addAttribute("summaryRange", summaryRange);
-
         return "income/sales_by_date";
     }
 
     @GetMapping("/credit")
     public String creditAccounts(
-            @RequestParam(name = "startDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(name = "endDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(name = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             Model model
     ) {
         LocalDate today = LocalDate.now();
@@ -125,31 +113,91 @@ public class IncomeController {
             endDate = tmp;
         }
 
-        List<SaleOrder> orders = orderService.findOrdersBetweenDatesAndStatus(
-                startDate,
-                endDate,
-                OrderStatus.CREDIT
-        );
-
-        BigDecimal total = orders.stream()
-                .map(SaleOrder::getTotalAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<SaleOrder> orders = receivableService.findOpenCreditOrders(startDate, endDate);
+        BigDecimal total = receivableService.calculatePendingTotal(orders);
 
         model.addAttribute("activePage", "income_credit");
         model.addAttribute("startDate", startDate);
         model.addAttribute("endDate", endDate);
         model.addAttribute("orders", orders);
         model.addAttribute("totalAmount", total);
-
         return "income/credit_accounts";
+    }
+
+    @GetMapping("/credit/{id}")
+    public String creditDetail(
+            @PathVariable Long id,
+            @RequestParam(name = "back", required = false) String back,
+            Model model
+    ) {
+        SaleOrder order = receivableService.findDetailedOrder(id);
+        model.addAttribute("activePage", "income_credit");
+        model.addAttribute("order", order);
+        model.addAttribute("backUrl", resolveRedirectTarget(back, "/income/credit"));
+        return "income/credit_detail";
+    }
+
+    @PostMapping("/credit/{id}/payments")
+    public String registerCreditPayment(
+            @PathVariable Long id,
+            @RequestParam(name = "paymentDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate paymentDate,
+            @RequestParam("amount") BigDecimal amount,
+            @RequestParam("paymentMethod") String paymentMethod,
+            @RequestParam(name = "reference", required = false) String reference,
+            @RequestParam(name = "observation", required = false) String observation,
+            @RequestParam(name = "back", required = false) String back,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            SaleOrderPayment payment = receivableService.registerPayment(
+                    id,
+                    paymentDate,
+                    amount,
+                    paymentMethod,
+                    reference,
+                    observation
+            );
+            redirectAttributes.addFlashAttribute(
+                    "message",
+                    "Cobro registrado correctamente por S/. " + payment.getAmount()
+            );
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("message", ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "warning");
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute("message", "Error al registrar el cobro: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "error");
+        }
+        return "redirect:/income/credit/" + id + "?back=" + resolveRedirectTarget(back, "/income/credit");
+    }
+
+    @PostMapping("/credit/{id}/due-date")
+    public String updateCreditDueDate(
+            @PathVariable Long id,
+            @RequestParam("dueDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dueDate,
+            @RequestParam(name = "back", required = false) String back,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            receivableService.updateDueDate(id, dueDate);
+            redirectAttributes.addFlashAttribute("message", "Fecha de vencimiento actualizada correctamente.");
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("message", ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "warning");
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute("message", "Error al actualizar vencimiento: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "error");
+        }
+        return "redirect:/income/credit/" + id + "?back=" + resolveRedirectTarget(back, "/income/credit");
     }
 
     @GetMapping("/others")
     public String otherIncomeList(
-            @RequestParam(name = "startDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(name = "endDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(name = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             Model model
     ) {
         LocalDate today = LocalDate.now();
@@ -166,7 +214,6 @@ public class IncomeController {
         }
 
         List<OtherIncome> incomes = otherIncomeService.findByDateRange(startDate, endDate);
-
         BigDecimal total = incomes.stream()
                 .map(OtherIncome::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -176,9 +223,7 @@ public class IncomeController {
         model.addAttribute("endDate", endDate);
         model.addAttribute("incomes", incomes);
         model.addAttribute("totalAmount", total);
-        model.addAttribute("incomeCategories",
-                categoryRepository.findByTypeAndActiveTrueOrderByNameAsc(CategoryType.INCOME));
-
+        model.addAttribute("incomeCategories", categoryRepository.findByTypeAndActiveTrueOrderByNameAsc(CategoryType.INCOME));
         return "income/other_income_placeholder";
     }
 
@@ -186,8 +231,7 @@ public class IncomeController {
     public String addOtherIncome(
             @RequestParam("categoryId") Long categoryId,
             @RequestParam("amount") BigDecimal amount,
-            @RequestParam("incomeDate")
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate incomeDate,
+            @RequestParam("incomeDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate incomeDate,
             @RequestParam(name = "observation", required = false) String observation,
             RedirectAttributes redirectAttributes
     ) {
@@ -210,10 +254,8 @@ public class IncomeController {
     @PostMapping("/others/delete")
     public String deleteOtherIncome(
             @RequestParam(name = "ids", required = false) List<Long> ids,
-            @RequestParam(name = "startDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(name = "endDate", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(name = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             RedirectAttributes redirectAttributes
     ) {
         if (ids == null || ids.isEmpty()) {
@@ -232,7 +274,17 @@ public class IncomeController {
         if (endDate == null) {
             endDate = startDate;
         }
-
         return "redirect:/income/others?startDate=" + startDate + "&endDate=" + endDate;
+    }
+
+    private String resolveRedirectTarget(String redirect, String defaultPath) {
+        if (redirect == null || redirect.isBlank()) {
+            return defaultPath;
+        }
+        String trimmed = redirect.trim();
+        if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+            return defaultPath;
+        }
+        return trimmed;
     }
 }

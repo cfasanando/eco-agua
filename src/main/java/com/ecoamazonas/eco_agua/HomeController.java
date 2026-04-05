@@ -11,6 +11,9 @@ import com.ecoamazonas.eco_agua.order.PossibleOrderSuggestion;
 import com.ecoamazonas.eco_agua.order.SaleOrder;
 import com.ecoamazonas.eco_agua.product.Product;
 import com.ecoamazonas.eco_agua.product.ProductRepository;
+import com.ecoamazonas.eco_agua.user.Employee;
+import com.ecoamazonas.eco_agua.user.EmployeeObligation;
+import com.ecoamazonas.eco_agua.user.EmployeePaymentService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -28,21 +32,26 @@ import java.util.Map;
 @Controller
 public class HomeController {
 
+    private static final DateTimeFormatter HOME_SHORT_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
     private final OrderService orderService;
     private final ExpenseService expenseService;
     private final BreakEvenService breakEvenService;
     private final ProductRepository productRepository;
+    private final EmployeePaymentService employeePaymentService;
 
     public HomeController(
             OrderService orderService,
             ExpenseService expenseService,
             BreakEvenService breakEvenService,
-            ProductRepository productRepository
+            ProductRepository productRepository,
+            EmployeePaymentService employeePaymentService
     ) {
         this.orderService = orderService;
         this.expenseService = expenseService;
         this.breakEvenService = breakEvenService;
         this.productRepository = productRepository;
+        this.employeePaymentService = employeePaymentService;
     }
 
     @GetMapping("/home")
@@ -75,6 +84,40 @@ public class HomeController {
             LocalDate orderDate = order.getOrderDate();
             long days = orderDate != null ? ChronoUnit.DAYS.between(orderDate, today) : 0;
             creditDaysByOrderId.put(order.getId(), Math.max(days, 0));
+        }
+
+        Map<Long, String> expenseDebtSettlementUrlByExpenseId = new LinkedHashMap<>();
+        Map<Long, String> expenseDebtSettlementHelpByExpenseId = new LinkedHashMap<>();
+
+        for (Expense expense : dailyExpenses) {
+            if (expense == null || expense.getId() == null) {
+                continue;
+            }
+
+            Employee linkedEmployee = employeePaymentService.resolveEmployeeFromExpense(expense);
+            if (linkedEmployee == null || linkedEmployee.getId() == null) {
+                continue;
+            }
+
+            EmployeeObligation oldestObligation = employeePaymentService.findOldestActiveObligation(linkedEmployee.getId());
+            if (oldestObligation == null || oldestObligation.getId() == null) {
+                continue;
+            }
+
+            LocalDate targetDate = expense.getExpenseDate() != null ? expense.getExpenseDate() : today;
+
+            expenseDebtSettlementUrlByExpenseId.put(
+                    expense.getId(),
+                    "/admin/personnel/payments?employeeId=" + linkedEmployee.getId()
+                            + "&year=" + targetDate.getYear()
+                            + "&month=" + targetDate.getMonthValue()
+                            + "&settleObligationId=" + oldestObligation.getId()
+            );
+
+            expenseDebtSettlementHelpByExpenseId.put(
+                    expense.getId(),
+                    buildOldestObligationHelp(oldestObligation)
+            );
         }
 
         LocalDate weekStart = today.with(DayOfWeek.MONDAY);
@@ -200,6 +243,8 @@ public class HomeController {
         model.addAttribute("dailyExpenses", dailyExpenses);
         model.addAttribute("expensesToday", dailyExpenses);
         model.addAttribute("totalExpensesToday", totalExpensesToday);
+        model.addAttribute("expenseDebtSettlementUrlByExpenseId", expenseDebtSettlementUrlByExpenseId);
+        model.addAttribute("expenseDebtSettlementHelpByExpenseId", expenseDebtSettlementHelpByExpenseId);
 
         model.addAttribute("weekStart", weekStart);
         model.addAttribute("weekEnd", weekEnd);
@@ -293,5 +338,22 @@ public class HomeController {
         }
 
         return value.setScale(scale, RoundingMode.HALF_UP);
+    }
+
+    private String buildOldestObligationHelp(EmployeeObligation obligation) {
+        if (obligation == null) {
+            return "Abonar deuda más antigua";
+        }
+
+        String dateText = obligation.getIssueDate() != null
+                ? obligation.getIssueDate().format(HOME_SHORT_DATE_FORMAT)
+                : "-";
+
+        String description = obligation.getDescription();
+        if (description == null || description.isBlank()) {
+            description = obligation.getType() != null ? obligation.getType().getLabel() : "Deuda";
+        }
+
+        return "Abonar deuda más antigua: " + dateText + " | " + description;
     }
 }

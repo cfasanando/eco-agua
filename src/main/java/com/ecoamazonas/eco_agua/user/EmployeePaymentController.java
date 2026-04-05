@@ -31,6 +31,7 @@ public class EmployeePaymentController {
             @RequestParam(name = "year", required = false) Integer year,
             @RequestParam(name = "month", required = false) Integer month,
             @RequestParam(name = "editObligationId", required = false) Long editObligationId,
+            @RequestParam(name = "settleObligationId", required = false) Long settleObligationId,
             Model model
     ) {
         LocalDate today = LocalDate.now();
@@ -42,7 +43,8 @@ public class EmployeePaymentController {
         PersonnelExpenseCalculation suggestedCalculation = null;
         EmployeeObligationForm editObligationForm = null;
         BigDecimal editObligationAppliedAmount = BigDecimal.ZERO;
-        boolean editObligationHasPayments = false;
+        boolean editObligationHasMovements = false;
+        EmployeeObligationSettlementForm settlementForm = buildSettlementForm(employeeId, settleObligationId);
 
         if (selectedEmployee != null) {
             suggestedCalculation = employeePaymentService.getSuggestedCalculation(employeeId, today);
@@ -50,7 +52,11 @@ public class EmployeePaymentController {
             if (editObligationId != null) {
                 editObligationForm = employeePaymentService.buildEditObligationForm(employeeId, editObligationId);
                 editObligationAppliedAmount = employeePaymentService.getAppliedAmount(editObligationId);
-                editObligationHasPayments = employeePaymentService.hasAppliedPayments(editObligationId);
+                editObligationHasMovements = employeePaymentService.hasAppliedMovements(editObligationId);
+            }
+
+            if (settleObligationId != null) {
+                settlementForm = employeePaymentService.buildSettlementForm(employeeId, settleObligationId);
             }
         }
 
@@ -61,15 +67,17 @@ public class EmployeePaymentController {
         model.addAttribute("selectedYear", selectedYear);
         model.addAttribute("selectedMonth", selectedMonth);
         model.addAttribute("payments", employeePaymentService.findPaymentsForMonth(employeeId, selectedYear, selectedMonth));
+        model.addAttribute("settlements", employeePaymentService.findSettlementsForMonth(employeeId, selectedYear, selectedMonth));
         model.addAttribute("obligations", employeePaymentService.findObligations(employeeId));
         model.addAttribute("activeObligations", employeePaymentService.findActiveObligations(employeeId));
         model.addAttribute("summary", employeePaymentService.buildMonthlySummary(employeeId, selectedYear, selectedMonth));
         model.addAttribute("suggestedCalculation", suggestedCalculation);
         model.addAttribute("paymentForm", buildPaymentForm(employeeId));
         model.addAttribute("obligationForm", buildObligationForm(employeeId));
+        model.addAttribute("settlementForm", settlementForm);
         model.addAttribute("editObligationForm", editObligationForm);
         model.addAttribute("editObligationAppliedAmount", editObligationAppliedAmount);
-        model.addAttribute("editObligationHasPayments", editObligationHasPayments);
+        model.addAttribute("editObligationHasMovements", editObligationHasMovements);
         model.addAttribute("obligationTypes", EmployeeObligationType.values());
         model.addAttribute("obligationDiscountModes", EmployeeObligationDiscountMode.values());
 
@@ -93,7 +101,7 @@ public class EmployeePaymentController {
             redirectAttributes.addFlashAttribute("messageType", "error");
         }
 
-        return buildRedirectUrl(employeeId, paymentDate.getYear(), paymentDate.getMonthValue(), null);
+        return buildRedirectUrl(employeeId, paymentDate.getYear(), paymentDate.getMonthValue(), null, null);
     }
 
     @PostMapping("/obligations/save")
@@ -113,7 +121,27 @@ public class EmployeePaymentController {
             redirectAttributes.addFlashAttribute("messageType", "error");
         }
 
-        return buildRedirectUrl(employeeId, issueDate.getYear(), issueDate.getMonthValue(), null);
+        return buildRedirectUrl(employeeId, issueDate.getYear(), issueDate.getMonthValue(), null, null);
+    }
+
+    @PostMapping("/obligations/settlements/save")
+    public String saveDirectSettlement(
+            @ModelAttribute("settlementForm") EmployeeObligationSettlementForm settlementForm,
+            RedirectAttributes redirectAttributes
+    ) {
+        Long employeeId = settlementForm.getEmployeeId();
+        LocalDate settlementDate = settlementForm.getSettlementDate() != null ? settlementForm.getSettlementDate() : LocalDate.now();
+
+        try {
+            BigDecimal totalApplied = employeePaymentService.registerDirectSettlement(settlementForm);
+            redirectAttributes.addFlashAttribute("message", "Abono registrado correctamente. Total aplicado: S/. " + totalApplied.setScale(2));
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute("message", "Error al registrar abono: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "error");
+        }
+
+        return buildRedirectUrl(employeeId, settlementDate.getYear(), settlementDate.getMonthValue(), null, null);
     }
 
     @PostMapping("/obligations/update")
@@ -134,7 +162,7 @@ public class EmployeePaymentController {
             redirectAttributes.addFlashAttribute("messageType", "error");
         }
 
-        return buildRedirectUrl(employeeId, safeYear(year), safeMonth(month), null);
+        return buildRedirectUrl(employeeId, safeYear(year), safeMonth(month), null, null);
     }
 
     @PostMapping("/obligations/{id}/close")
@@ -154,7 +182,7 @@ public class EmployeePaymentController {
             redirectAttributes.addFlashAttribute("messageType", "error");
         }
 
-        return buildRedirectUrl(employeeId, safeYear(year), safeMonth(month), null);
+        return buildRedirectUrl(employeeId, safeYear(year), safeMonth(month), null, null);
     }
 
     @PostMapping("/obligations/{id}/delete")
@@ -174,7 +202,7 @@ public class EmployeePaymentController {
             redirectAttributes.addFlashAttribute("messageType", "error");
         }
 
-        return buildRedirectUrl(employeeId, safeYear(year), safeMonth(month), null);
+        return buildRedirectUrl(employeeId, safeYear(year), safeMonth(month), null, null);
     }
 
     private EmployeePaymentForm buildPaymentForm(Long employeeId) {
@@ -192,6 +220,14 @@ public class EmployeePaymentController {
         return form;
     }
 
+    private EmployeeObligationSettlementForm buildSettlementForm(Long employeeId, Long obligationId) {
+        EmployeeObligationSettlementForm form = new EmployeeObligationSettlementForm();
+        form.setEmployeeId(employeeId);
+        form.setSettlementDate(LocalDate.now());
+        form.setObligationId(obligationId);
+        return form;
+    }
+
     private int safeYear(Integer year) {
         return year != null ? year : LocalDate.now().getYear();
     }
@@ -200,7 +236,7 @@ public class EmployeePaymentController {
         return month != null ? month : LocalDate.now().getMonthValue();
     }
 
-    private String buildRedirectUrl(Long employeeId, int year, int month, Long editObligationId) {
+    private String buildRedirectUrl(Long employeeId, int year, int month, Long editObligationId, Long settleObligationId) {
         StringBuilder builder = new StringBuilder();
         builder.append("redirect:/admin/personnel/payments?employeeId=")
                 .append(employeeId != null ? employeeId : 0L)
@@ -209,8 +245,12 @@ public class EmployeePaymentController {
                 .append("&month=")
                 .append(month);
 
-        if (editObligationId != null) {
+        if (editObligationId != null && editObligationId > 0) {
             builder.append("&editObligationId=").append(editObligationId);
+        }
+
+        if (settleObligationId != null && settleObligationId > 0) {
+            builder.append("&settleObligationId=").append(settleObligationId);
         }
 
         return builder.toString();

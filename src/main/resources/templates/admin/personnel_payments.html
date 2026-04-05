@@ -19,8 +19,7 @@
                 <div>
                     <h1 class="h5 mb-1">Pagos del personal</h1>
                     <div class="text-muted small">
-                        Fase 1 de RR.HH.: historial de pagos, préstamos y adelantos por empleado.
-                        En esta fase aún no se generan boletas ni asientos automáticos a gastos.
+                        Fase 1 de RR.HH.: historial de pagos, préstamos, adelantos y amortizaciones directas por empleado.
                     </div>
                 </div>
             </div>
@@ -89,7 +88,7 @@
 
             <div th:if="${selectedEmployee == null}" class="card shadow-sm">
                 <div class="card-body text-muted">
-                    Selecciona un empleado y un período para ver su historial de pagos, registrar préstamos o guardar pagos.
+                    Selecciona un empleado y un período para ver su historial de pagos, registrar préstamos, guardar pagos o amortizar deudas.
                 </div>
             </div>
 
@@ -191,6 +190,11 @@
                                     </span>
                                 </div>
 
+                                <div class="alert alert-light border small mb-3">
+                                    Usa este formulario solo cuando realmente haya <strong>pago al trabajador</strong>.
+                                    Si hoy no hubo venta ni pago del día y solo quieres amortizar deuda, usa el bloque <strong>Registrar abono a deuda</strong>.
+                                </div>
+
                                 <form method="post"
                                       th:action="@{/admin/personnel/payments/save}"
                                       th:object="${paymentForm}">
@@ -231,7 +235,7 @@
                                                 <option value="">- Sin obligación -</option>
                                                 <option th:each="item : ${activeObligations}"
                                                         th:value="${item.id}"
-                                                        th:text="${item.type.label + ' | saldo S/. ' + #numbers.formatDecimal(item.pendingAmount, 1, 2)}">
+                                                        th:text="${#temporals.format(item.issueDate, 'dd/MM/yyyy') + ' | ' + (item.description != null ? item.description : item.type.label) + ' | saldo S/. ' + #numbers.formatDecimal(item.pendingAmount, 1, 2)}">
                                                 </option>
                                             </select>
                                         </div>
@@ -355,7 +359,76 @@
                     </div>
                 </div>
 
-                <div class="card shadow-sm mb-3" th:if="${editObligationForm != null}">
+                <div id="settlement-card" class="card shadow-sm mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h2 class="h5 mb-0">Registrar abono a deuda</h2>
+                            <div class="text-muted small">Para días sin venta o sin pago al trabajador.</div>
+                        </div>
+
+                        <div class="alert alert-warning py-2 px-3 small mb-3">
+                            Si dejas la deuda sin seleccionar, el sistema aplicará el monto <strong>desde la obligación más antigua pendiente</strong>.
+                            Si eliges una deuda específica, el abono se aplicará solo a esa deuda.
+                        </div>
+
+                        <div id="settlement-focus-banner"
+                             class="alert alert-info py-2 px-3 small mb-3 d-none">
+                            Estás registrando un abono directo a una deuda seleccionada desde la tabla inferior.
+                        </div>
+
+                        <form method="post"
+                              th:action="@{/admin/personnel/payments/obligations/settlements/save}"
+                              th:object="${settlementForm}">
+
+                            <input type="hidden" th:field="*{employeeId}"/>
+
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label for="settlementDate" class="form-label">Fecha del abono</label>
+                                    <input id="settlementDate" type="date" class="form-control" th:field="*{settlementDate}">
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label for="settlementAmount" class="form-label">Monto del abono</label>
+                                    <input id="settlementAmount"
+                                           type="number"
+                                           step="0.01"
+                                           min="0"
+                                           class="form-control"
+                                           th:field="*{amount}">
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="settlementObligationId" class="form-label">Deuda específica (opcional)</label>
+                                    <select id="settlementObligationId" class="form-select" th:field="*{obligationId}">
+                                        <option value="">- Aplicar a la deuda más antigua pendiente -</option>
+                                        <option th:each="item : ${activeObligations}"
+                                                th:value="${item.id}"
+                                                th:text="${#temporals.format(item.issueDate, 'dd/MM/yyyy') + ' | ' + (item.description != null ? item.description : item.type.label) + ' | saldo S/. ' + #numbers.formatDecimal(item.pendingAmount, 1, 2)}">
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12">
+                                    <label for="settlementObservation" class="form-label">Observación</label>
+                                    <textarea id="settlementObservation"
+                                              class="form-control"
+                                              rows="3"
+                                              th:field="*{observation}"
+                                              placeholder="Ej: Irvin amortizó voluntariamente parte del alquiler de enero."></textarea>
+                                </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <button type="submit" class="btn btn-outline-primary">
+                                    <i class="bi bi-cash-coin me-1"></i> Guardar abono
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="edit-obligation-card" class="card shadow-sm mb-3" th:if="${editObligationForm != null}">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h2 class="h5 mb-0">Editar obligación</h2>
@@ -365,8 +438,8 @@
                             </a>
                         </div>
 
-                        <div class="alert alert-warning py-2 px-3 small mb-3" th:if="${editObligationHasPayments}">
-                            Esta obligación ya tiene descuentos aplicados por un total de
+                        <div class="alert alert-warning py-2 px-3 small mb-3" th:if="${editObligationHasMovements}">
+                            Esta obligación ya tiene descuentos o amortizaciones aplicadas por un total de
                             <strong th:text="${'S/. ' + #numbers.formatDecimal(editObligationAppliedAmount, 1, 2)}">S/. 0.00</strong>.
                             Puedes editarla y ajustar su saldo, pero ya no se podrá eliminar.
                         </div>
@@ -465,18 +538,6 @@
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-save me-1"></i> Guardar cambios
                                 </button>
-
-                                <form th:action="@{/admin/personnel/payments/obligations/{id}/close(id=${editObligationForm.id})}"
-                                      method="post"
-                                      class="d-inline">
-                                    <input type="hidden" name="employeeId" th:value="${selectedEmployeeId}"/>
-                                    <input type="hidden" name="year" th:value="${selectedYear}"/>
-                                    <input type="hidden" name="month" th:value="${selectedMonth}"/>
-                                    <button type="submit" class="btn btn-outline-warning"
-                                            onclick="return confirm('¿Cerrar esta obligación? Ya no se usará para descuentos automáticos.')">
-                                        <i class="bi bi-pause-circle me-1"></i> Cerrar obligación
-                                    </button>
-                                </form>
                             </div>
                         </form>
                     </div>
@@ -542,11 +603,46 @@
                     </div>
                 </div>
 
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h2 class="h5 mb-0">Abonos directos a deuda</h2>
+                            <span class="text-muted small">No afectan el total ganado ni el neto pagado.</span>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover align-middle">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Deuda aplicada</th>
+                                    <th>Monto abonado</th>
+                                    <th>Observación</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:if="${#lists.isEmpty(settlements)}">
+                                    <td colspan="4" class="text-muted">No hay abonos directos registrados en este período.</td>
+                                </tr>
+                                <tr th:each="item : ${settlements}">
+                                    <td th:text="${item.settlementDate}">2026-03-15</td>
+                                    <td th:text="${#temporals.format(item.employeeObligation.issueDate, 'dd/MM/yyyy') + ' | ' + (item.employeeObligation.description != null ? item.employeeObligation.description : item.employeeObligation.type.label)}">
+                                        05/01/2026 | Celular de enero
+                                    </td>
+                                    <td th:text="${'S/. ' + #numbers.formatDecimal(item.appliedAmount, 1, 2)}">S/. 0.00</td>
+                                    <td th:text="${item.observation != null ? item.observation : '-'}">-</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card shadow-sm">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h2 class="h5 mb-0">Préstamos y adelantos</h2>
-                            <div class="text-muted small">Ahora ya puedes editar, cerrar o eliminar obligaciones.</div>
+                            <div class="text-muted small">Ahora ya puedes editar, cerrar, eliminar o abonar obligaciones.</div>
                         </div>
 
                         <div class="table-responsive">
@@ -602,6 +698,11 @@
                                                 <i class="bi bi-pencil-square me-1"></i> Editar
                                             </a>
 
+                                            <a class="btn btn-sm btn-outline-info"
+                                               th:href="@{/admin/personnel/payments(employeeId=${selectedEmployeeId}, year=${selectedYear}, month=${selectedMonth}, settleObligationId=${item.id})}">
+                                                <i class="bi bi-cash-coin me-1"></i> Abonar
+                                            </a>
+
                                             <form th:action="@{/admin/personnel/payments/obligations/{id}/close(id=${item.id})}"
                                                   method="post"
                                                   class="d-inline">
@@ -621,7 +722,7 @@
                                                 <input type="hidden" name="year" th:value="${selectedYear}"/>
                                                 <input type="hidden" name="month" th:value="${selectedMonth}"/>
                                                 <button type="submit" class="btn btn-sm btn-outline-danger"
-                                                        onclick="return confirm('¿Eliminar esta obligación? Solo se podrá eliminar si aún no tuvo descuentos aplicados.')">
+                                                        onclick="return confirm('¿Eliminar esta obligación? Solo se podrá eliminar si aún no tuvo descuentos ni abonos aplicados.')">
                                                     <i class="bi bi-trash me-1"></i> Eliminar
                                                 </button>
                                             </form>
@@ -643,6 +744,69 @@
 </div>
 
 <th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<style>
+    .focus-target-card {
+        scroll-margin-top: 110px;
+        border: 2px solid #0d6efd !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15) !important;
+        transition: box-shadow 0.25s ease, border-color 0.25s ease;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const params = new URLSearchParams(window.location.search);
+        const settleObligationId = params.get('settleObligationId');
+        const editObligationId = params.get('editObligationId');
+
+        let targetCard = null;
+        let targetInput = null;
+
+        if (editObligationId) {
+            targetCard = document.getElementById('edit-obligation-card');
+            targetInput = document.getElementById('editPendingAmount')
+                || document.getElementById('editOriginalAmount')
+                || document.getElementById('editDescription');
+        } else if (settleObligationId) {
+            targetCard = document.getElementById('settlement-card');
+            targetInput = document.getElementById('settlementAmount')
+                || document.getElementById('settlementObligationId')
+                || document.getElementById('settlementObservation');
+
+            const banner = document.getElementById('settlement-focus-banner');
+            if (banner) {
+                banner.classList.remove('d-none');
+            }
+        }
+
+        if (!targetCard) {
+            return;
+        }
+
+        targetCard.classList.add('focus-target-card');
+
+        window.setTimeout(function () {
+            targetCard.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+
+            if (targetInput) {
+                window.setTimeout(function () {
+                    targetInput.focus({ preventScroll: true });
+                    if (typeof targetInput.select === 'function' && targetInput.tagName === 'INPUT') {
+                        targetInput.select();
+                    }
+                }, 450);
+            }
+        }, 120);
+
+        window.setTimeout(function () {
+            targetCard.classList.remove('focus-target-card');
+        }, 4500);
+    });
+</script>
 
 </body>
 </html>

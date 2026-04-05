@@ -16,11 +16,15 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class EmployeePaymentService {
 
     private static final Long LEGACY_PERSONNEL_CATEGORY_ID = 35L;
+    private static final Pattern EMPLOYEE_NAME_PATTERN =
+            Pattern.compile("(?:^|\\.\\s)Personal:\\s([^.]+?)(?:\\.\\s|$)", Pattern.CASE_INSENSITIVE);
 
     /*
      * Temporary legacy bridge.
@@ -36,6 +40,7 @@ public class EmployeePaymentService {
     private final EmployeePaymentRepository employeePaymentRepository;
     private final EmployeeObligationRepository employeeObligationRepository;
     private final EmployeeObligationPaymentRepository employeeObligationPaymentRepository;
+    private final EmployeeObligationSettlementRepository employeeObligationSettlementRepository;
     private final PersonnelExpenseCalculatorService personnelExpenseCalculatorService;
     private final ExpenseRepository expenseRepository;
 
@@ -44,6 +49,7 @@ public class EmployeePaymentService {
             EmployeePaymentRepository employeePaymentRepository,
             EmployeeObligationRepository employeeObligationRepository,
             EmployeeObligationPaymentRepository employeeObligationPaymentRepository,
+            EmployeeObligationSettlementRepository employeeObligationSettlementRepository,
             PersonnelExpenseCalculatorService personnelExpenseCalculatorService,
             ExpenseRepository expenseRepository
     ) {
@@ -51,6 +57,7 @@ public class EmployeePaymentService {
         this.employeePaymentRepository = employeePaymentRepository;
         this.employeeObligationRepository = employeeObligationRepository;
         this.employeeObligationPaymentRepository = employeeObligationPaymentRepository;
+        this.employeeObligationSettlementRepository = employeeObligationSettlementRepository;
         this.personnelExpenseCalculatorService = personnelExpenseCalculatorService;
         this.expenseRepository = expenseRepository;
     }
@@ -63,6 +70,51 @@ public class EmployeePaymentService {
                         .comparing(Employee::getFirstName, String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(Employee::getLastName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Employee resolveEmployeeFromExpense(Expense expense) {
+        if (expense == null) {
+            return null;
+        }
+
+        String employeeName = extractEmployeeNameFromObservation(expense.getObservation());
+        if (employeeName != null) {
+            Employee employee = findEmployeeByExactName(employeeName);
+            if (employee != null) {
+                return employee;
+            }
+        }
+
+        String normalizedObservation = normalizeText(expense.getObservation());
+        if (normalizedObservation.isBlank()) {
+            return null;
+        }
+
+        for (Employee employee : findActiveEmployees()) {
+            String normalizedEmployeeName = normalizeText(buildEmployeeDisplayName(employee));
+            if (!normalizedEmployeeName.isBlank() && normalizedObservation.contains(normalizedEmployeeName)) {
+                return employee;
+            }
+        }
+
+        for (Map.Entry<Long, List<String>> entry : LEGACY_EMPLOYEE_MARKERS.entrySet()) {
+            boolean matchesMarker = entry.getValue().stream()
+                    .map(this::normalizeText)
+                    .anyMatch(normalizedObservation::contains);
+
+            if (matchesMarker) {
+                return findEmployee(entry.getKey());
+            }
+        }
+
+        return null;
+    }
+
+    @Transactional(readOnly = true)
+    public EmployeeObligation findOldestActiveObligation(Long employeeId) {
+        List<EmployeeObligation> activeObligations = findActiveObligations(employeeId);
+        return activeObligations.isEmpty() ? null : activeObligations.get(0);
     }
 
     @Transactional(readOnly = true)
@@ -119,6 +171,22 @@ public class EmployeePaymentService {
     }
 
     @Transactional(readOnly = true)
+    public List<EmployeeObligationSettlement> findSettlementsForMonth(Long employeeId, int year, int month) {
+        if (employeeId == null || employeeId <= 0) {
+            return List.of();
+        }
+
+        LocalDate startDate = LocalDate.of(year, month, 1);
+        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+
+        return employeeObligationSettlementRepository.findByEmployeeIdAndSettlementDateBetweenOrderBySettlementDateDescIdDesc(
+                employeeId,
+                startDate,
+                endDate
+        );
+    }
+
+    @Transactional(readOnly = true)
     public List<EmployeeObligation> findObligations(Long employeeId) {
         if (employeeId == null || employeeId <= 0) {
             return List.of();
@@ -135,6 +203,9 @@ public class EmployeePaymentService {
 
         return employeeObligationRepository.findByEmployeeIdAndActiveTrueOrderByIssueDateDescIdDesc(employeeId).stream()
                 .filter(item -> normalizeMoney(item.getPendingAmount()).compareTo(BigDecimal.ZERO) > 0)
+                .sorted(Comparator
+                        .comparing(EmployeeObligation::getIssueDate, Comparator.nullsLast(LocalDate::compareTo))
+                        .thenComparing(EmployeeObligation::getId, Comparator.nullsLast(Long::compareTo)))
                 .toList();
     }
 
@@ -174,6 +245,20 @@ public class EmployeePaymentService {
     }
 
     @Transactional(readOnly = true)
+    public EmployeeObligationSettlementForm buildSettlementForm(Long employeeId, Long obligationId) {
+        EmployeeObligationSettlementForm form = new EmployeeObligationSettlementForm();
+        form.setEmployeeId(employeeId);
+        form.setSettlementDate(LocalDate.now());
+
+        if (employeeId != null && employeeId > 0 && obligationId != null && obligationId > 0) {
+            EmployeeObligation obligation = findObligationForEmployee(employeeId, obligationId);
+            form.setObligationId(obligation.getId());
+        }
+
+        return form;
+    }
+
+    @Transactional(readOnly = true)
     public EmployeeObligation findObligationForEmployee(Long employeeId, Long obligationId) {
         if (employeeId == null || employeeId <= 0) {
             throw new IllegalArgumentException("Employee must be selected.");
@@ -188,12 +273,13 @@ public class EmployeePaymentService {
     }
 
     @Transactional(readOnly = true)
-    public boolean hasAppliedPayments(Long obligationId) {
+    public boolean hasAppliedMovements(Long obligationId) {
         if (obligationId == null || obligationId <= 0) {
             return false;
         }
 
-        return employeeObligationPaymentRepository.existsByEmployeeObligationId(obligationId);
+        return employeeObligationPaymentRepository.existsByEmployeeObligationId(obligationId)
+                || employeeObligationSettlementRepository.existsByEmployeeObligationId(obligationId);
     }
 
     @Transactional(readOnly = true)
@@ -202,12 +288,17 @@ public class EmployeePaymentService {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
 
-        return normalizeMoney(
-                employeeObligationPaymentRepository.findByEmployeeObligationIdOrderByIdDesc(obligationId).stream()
-                        .map(EmployeeObligationPayment::getAppliedAmount)
-                        .filter(item -> item != null)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add)
-        );
+        BigDecimal fromPayments = employeeObligationPaymentRepository.findByEmployeeObligationIdOrderByIdDesc(obligationId).stream()
+                .map(EmployeeObligationPayment::getAppliedAmount)
+                .filter(item -> item != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal fromSettlements = employeeObligationSettlementRepository.findByEmployeeObligationIdOrderByIdDesc(obligationId).stream()
+                .map(EmployeeObligationSettlement::getAppliedAmount)
+                .filter(item -> item != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return normalizeMoney(fromPayments.add(fromSettlements));
     }
 
     @Transactional
@@ -227,7 +318,7 @@ public class EmployeePaymentService {
         }
 
         if (grossAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("The payment amount must be greater than zero.");
+            throw new IllegalArgumentException("The payment amount must be greater than zero. If you only want to amortize debt, use the direct debt settlement form.");
         }
 
         BigDecimal manualDiscountAmount = normalizeMoney(form.getManualDiscountAmount());
@@ -272,20 +363,7 @@ public class EmployeePaymentService {
         EmployeePayment savedPayment = employeePaymentRepository.save(payment);
 
         if (selectedObligation != null && obligationAppliedAmount.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal updatedPendingAmount = normalizeMoney(selectedObligation.getPendingAmount().subtract(obligationAppliedAmount));
-            selectedObligation.setPendingAmount(updatedPendingAmount);
-            if (updatedPendingAmount.compareTo(BigDecimal.ZERO) <= 0) {
-                selectedObligation.setPendingAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
-                selectedObligation.setActive(false);
-            }
-            employeeObligationRepository.save(selectedObligation);
-
-            EmployeeObligationPayment link = new EmployeeObligationPayment();
-            link.setEmployeePayment(savedPayment);
-            link.setEmployeeObligation(selectedObligation);
-            link.setAppliedAmount(obligationAppliedAmount);
-            link.setObservation("Applied automatically from payment registration.");
-            employeeObligationPaymentRepository.save(link);
+            applyPaymentDiscountToObligation(savedPayment, selectedObligation, obligationAppliedAmount);
         }
 
         return savedPayment;
@@ -344,7 +422,7 @@ public class EmployeePaymentService {
         }
 
         if (originalAmount.compareTo(appliedAmount) < 0) {
-            throw new IllegalArgumentException("The original amount cannot be lower than the total already discounted.");
+            throw new IllegalArgumentException("The original amount cannot be lower than the total already discounted or amortized.");
         }
 
         obligation.setType(form.getType() != null ? form.getType() : obligation.getType());
@@ -373,11 +451,130 @@ public class EmployeePaymentService {
     public void deleteObligation(Long employeeId, Long obligationId) {
         EmployeeObligation obligation = findObligationForEmployee(employeeId, obligationId);
 
-        if (hasAppliedPayments(obligationId)) {
-            throw new IllegalArgumentException("This obligation already has discounts applied and cannot be deleted. Close it or adjust its balance instead.");
+        if (hasAppliedMovements(obligationId)) {
+            throw new IllegalArgumentException("This obligation already has discounts or amortizations applied and cannot be deleted. Close it or adjust its balance instead.");
         }
 
         employeeObligationRepository.delete(obligation);
+    }
+
+    @Transactional
+    public BigDecimal registerDirectSettlement(EmployeeObligationSettlementForm form) {
+        if (form == null || form.getEmployeeId() == null) {
+            throw new IllegalArgumentException("Employee must be selected.");
+        }
+
+        Employee employee = findEmployee(form.getEmployeeId());
+        LocalDate settlementDate = form.getSettlementDate() != null ? form.getSettlementDate() : LocalDate.now();
+        BigDecimal requestedAmount = normalizeMoney(form.getAmount());
+
+        if (requestedAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("The settlement amount must be greater than zero.");
+        }
+
+        String cleanObservation = cleanText(form.getObservation());
+        BigDecimal remainingAmount = requestedAmount;
+        BigDecimal totalApplied = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+        if (form.getObligationId() != null && form.getObligationId() > 0) {
+            EmployeeObligation obligation = findObligationForEmployee(employee.getId(), form.getObligationId());
+            BigDecimal pendingAmount = normalizeMoney(obligation.getPendingAmount());
+
+            if (pendingAmount.compareTo(BigDecimal.ZERO) <= 0 || !obligation.isActive()) {
+                throw new IllegalArgumentException("The selected obligation no longer has pending balance.");
+            }
+
+            if (requestedAmount.compareTo(pendingAmount) > 0) {
+                throw new IllegalArgumentException("The amount exceeds the pending balance of the selected obligation. Leave the obligation empty if you want to apply the amount oldest-first.");
+            }
+
+            totalApplied = applyDirectSettlement(employee, obligation, settlementDate, requestedAmount, cleanObservation);
+        } else {
+            List<EmployeeObligation> activeObligations = findActiveObligations(employee.getId());
+            if (activeObligations.isEmpty()) {
+                throw new IllegalArgumentException("The employee has no active pending obligations.");
+            }
+
+            for (EmployeeObligation obligation : activeObligations) {
+                if (remainingAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                    break;
+                }
+
+                BigDecimal pendingAmount = normalizeMoney(obligation.getPendingAmount());
+                if (pendingAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+
+                BigDecimal amountToApply = remainingAmount.min(pendingAmount).setScale(2, RoundingMode.HALF_UP);
+                totalApplied = totalApplied.add(
+                        applyDirectSettlement(employee, obligation, settlementDate, amountToApply, cleanObservation)
+                );
+                remainingAmount = remainingAmount.subtract(amountToApply).setScale(2, RoundingMode.HALF_UP);
+            }
+
+            if (remainingAmount.compareTo(BigDecimal.ZERO) > 0) {
+                throw new IllegalArgumentException("The amount is greater than the total pending balance. Review the selected employee obligations.");
+            }
+        }
+
+        return normalizeMoney(totalApplied);
+    }
+
+    private BigDecimal applyDirectSettlement(
+            Employee employee,
+            EmployeeObligation obligation,
+            LocalDate settlementDate,
+            BigDecimal amount,
+            String observation
+    ) {
+        BigDecimal normalizedAmount = normalizeMoney(amount);
+        if (normalizedAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal pendingAmount = normalizeMoney(obligation.getPendingAmount());
+        if (normalizedAmount.compareTo(pendingAmount) > 0) {
+            throw new IllegalArgumentException("The settlement amount cannot be greater than the pending balance of the obligation.");
+        }
+
+        EmployeeObligationSettlement settlement = new EmployeeObligationSettlement();
+        settlement.setEmployee(employee);
+        settlement.setEmployeeObligation(obligation);
+        settlement.setSettlementDate(settlementDate);
+        settlement.setAppliedAmount(normalizedAmount);
+        settlement.setObservation(observation != null ? observation : "Direct debt settlement.");
+        employeeObligationSettlementRepository.save(settlement);
+
+        BigDecimal updatedPendingAmount = normalizeMoney(pendingAmount.subtract(normalizedAmount));
+        obligation.setPendingAmount(updatedPendingAmount);
+        if (updatedPendingAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            obligation.setPendingAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+            obligation.setActive(false);
+        }
+        employeeObligationRepository.save(obligation);
+
+        return normalizedAmount;
+    }
+
+    private void applyPaymentDiscountToObligation(
+            EmployeePayment payment,
+            EmployeeObligation obligation,
+            BigDecimal obligationAppliedAmount
+    ) {
+        BigDecimal updatedPendingAmount = normalizeMoney(obligation.getPendingAmount().subtract(obligationAppliedAmount));
+        obligation.setPendingAmount(updatedPendingAmount);
+        if (updatedPendingAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            obligation.setPendingAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+            obligation.setActive(false);
+        }
+        employeeObligationRepository.save(obligation);
+
+        EmployeeObligationPayment link = new EmployeeObligationPayment();
+        link.setEmployeePayment(payment);
+        link.setEmployeeObligation(obligation);
+        link.setAppliedAmount(obligationAppliedAmount);
+        link.setObservation("Applied automatically from payment registration.");
+        employeeObligationPaymentRepository.save(link);
     }
 
     private List<EmployeePayment> buildLegacyPaymentsForMonth(Employee employee, LocalDate startDate, LocalDate endDate) {
@@ -498,6 +695,36 @@ public class EmployeePaymentService {
         }
 
         return "Legacy expense | " + cleanObservation;
+    }
+
+    private String extractEmployeeNameFromObservation(String observation) {
+        if (observation == null || observation.isBlank()) {
+            return null;
+        }
+
+        Matcher matcher = EMPLOYEE_NAME_PATTERN.matcher(observation);
+        if (!matcher.find()) {
+            return null;
+        }
+
+        String value = matcher.group(1);
+        return value != null ? value.trim() : null;
+    }
+
+    private Employee findEmployeeByExactName(String employeeName) {
+        String normalizedExpectedName = normalizeText(employeeName);
+        if (normalizedExpectedName.isBlank()) {
+            return null;
+        }
+
+        for (Employee employee : findActiveEmployees()) {
+            String normalizedEmployeeName = normalizeText(buildEmployeeDisplayName(employee));
+            if (normalizedExpectedName.equals(normalizedEmployeeName)) {
+                return employee;
+            }
+        }
+
+        return null;
     }
 
     private BigDecimal resolveObligationAppliedAmount(

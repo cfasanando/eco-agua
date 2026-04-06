@@ -133,4 +133,26 @@ public interface SaleOrderRepository extends JpaRepository<SaleOrder, Long> {
             where o.id = :id
             """)
     Optional<SaleOrder> findDetailedById(@Param("id") Long id);
+
+    @Query("""
+            select distinct o
+            from SaleOrder o
+            join fetch o.client c
+            left join fetch c.profile cp
+            left join fetch o.deliveryZone z
+            where o.orderDate = :orderDate
+            order by o.deliveryOrderIndex asc nulls last, o.orderNumber asc, o.id asc
+            """)
+    List<SaleOrder> findDeliveryOrdersForDate(@Param("orderDate") LocalDate orderDate);
+
+    @Query("""
+            select distinct o
+            from SaleOrder o
+            join fetch o.client c
+            left join fetch c.profile cp
+            left join fetch o.items i
+            left join fetch o.deliveryZone z
+            where o.id = :id
+            """)
+    Optional<SaleOrder> findDeliveryOrderById(@Param("id") Long id);
 }

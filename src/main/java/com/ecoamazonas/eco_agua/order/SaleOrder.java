@@ -1,11 +1,14 @@
 package com.ecoamazonas.eco_agua.order;
 
 import com.ecoamazonas.eco_agua.client.Client;
+import com.ecoamazonas.eco_agua.delivery.DeliveryStatus;
+import com.ecoamazonas.eco_agua.delivery.DeliveryZone;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,11 +40,25 @@ public class SaleOrder {
     @Column(name = "status", length = 20, nullable = false)
     private OrderStatus status = OrderStatus.REQUESTED;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_status", length = 20, nullable = false)
+    private DeliveryStatus deliveryStatus = DeliveryStatus.PENDING;
+
     @Column(name = "total_amount", precision = 10, scale = 2, nullable = false)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
     @Column(name = "delivery_person", length = 200)
     private String deliveryPerson;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "delivery_zone_id")
+    private DeliveryZone deliveryZone;
+
+    @Column(name = "delivery_order_index")
+    private Integer deliveryOrderIndex;
+
+    @Column(name = "delivered_at")
+    private LocalDateTime deliveredAt;
 
     @Column(name = "borrowed_bottles")
     private Integer borrowedBottles = 0;
@@ -54,6 +71,9 @@ public class SaleOrder {
 
     @Column(name = "comment", length = 255)
     private String comment;
+
+    @Column(name = "delivery_observation", length = 255)
+    private String deliveryObservation;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SaleOrderItem> items = new ArrayList<>();
@@ -128,6 +148,14 @@ public class SaleOrder {
         this.status = status;
     }
 
+    public DeliveryStatus getDeliveryStatus() {
+        return deliveryStatus;
+    }
+
+    public void setDeliveryStatus(DeliveryStatus deliveryStatus) {
+        this.deliveryStatus = deliveryStatus;
+    }
+
     public BigDecimal getTotalAmount() {
         return totalAmount;
     }
@@ -142,6 +170,30 @@ public class SaleOrder {
 
     public void setDeliveryPerson(String deliveryPerson) {
         this.deliveryPerson = deliveryPerson;
+    }
+
+    public DeliveryZone getDeliveryZone() {
+        return deliveryZone;
+    }
+
+    public void setDeliveryZone(DeliveryZone deliveryZone) {
+        this.deliveryZone = deliveryZone;
+    }
+
+    public Integer getDeliveryOrderIndex() {
+        return deliveryOrderIndex;
+    }
+
+    public void setDeliveryOrderIndex(Integer deliveryOrderIndex) {
+        this.deliveryOrderIndex = deliveryOrderIndex;
+    }
+
+    public LocalDateTime getDeliveredAt() {
+        return deliveredAt;
+    }
+
+    public void setDeliveredAt(LocalDateTime deliveredAt) {
+        this.deliveredAt = deliveredAt;
     }
 
     public Integer getBorrowedBottles() {
@@ -181,6 +233,14 @@ public class SaleOrder {
 
     public void setComment(String comment) {
         this.comment = comment;
+    }
+
+    public String getDeliveryObservation() {
+        return deliveryObservation;
+    }
+
+    public void setDeliveryObservation(String deliveryObservation) {
+        this.deliveryObservation = deliveryObservation;
     }
 
     public List<SaleOrderItem> getItems() {
@@ -341,6 +401,10 @@ public class SaleOrder {
 
         if (this.taxRate == null) {
             this.taxRate = DEFAULT_TAX_RATE;
+        }
+
+        if (this.deliveryStatus == null) {
+            this.deliveryStatus = DeliveryStatus.PENDING;
         }
 
         if (this.containersDelivered == null) {

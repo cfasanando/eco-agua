@@ -46,6 +46,12 @@ public class SaleOrder {
     @Column(name = "borrowed_bottles")
     private Integer borrowedBottles = 0;
 
+    @Column(name = "containers_delivered", nullable = false)
+    private Integer containersDelivered = 0;
+
+    @Column(name = "containers_returned", nullable = false)
+    private Integer containersReturned = 0;
+
     @Column(name = "comment", length = 255)
     private String comment;
 
@@ -144,6 +150,29 @@ public class SaleOrder {
 
     public void setBorrowedBottles(Integer borrowedBottles) {
         this.borrowedBottles = borrowedBottles;
+    }
+
+    public Integer getContainersDelivered() {
+        return containersDelivered;
+    }
+
+    public void setContainersDelivered(Integer containersDelivered) {
+        this.containersDelivered = containersDelivered;
+    }
+
+    public Integer getContainersReturned() {
+        return containersReturned;
+    }
+
+    public void setContainersReturned(Integer containersReturned) {
+        this.containersReturned = containersReturned;
+    }
+
+    @Transient
+    public int getNetContainerChange() {
+        int delivered = containersDelivered != null ? containersDelivered : 0;
+        int returned = containersReturned != null ? containersReturned : 0;
+        return delivered - returned;
     }
 
     public String getComment() {
@@ -260,6 +289,7 @@ public class SaleOrder {
         if (payments == null || payments.isEmpty()) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
+
         return payments.stream()
                 .map(SaleOrderPayment::getAmount)
                 .filter(amount -> amount != null)
@@ -271,9 +301,11 @@ public class SaleOrder {
     public BigDecimal getPendingAmount() {
         BigDecimal total = totalAmount != null ? totalAmount : BigDecimal.ZERO;
         BigDecimal pending = total.subtract(getPaidAmount());
+
         if (pending.compareTo(BigDecimal.ZERO) < 0) {
             pending = BigDecimal.ZERO;
         }
+
         return pending.setScale(2, RoundingMode.HALF_UP);
     }
 
@@ -292,9 +324,11 @@ public class SaleOrder {
         if (status != OrderStatus.CREDIT || dueDate == null || isFullyPaid()) {
             return 0;
         }
+
         if (!LocalDate.now().isAfter(dueDate)) {
             return 0;
         }
+
         return ChronoUnit.DAYS.between(dueDate, LocalDate.now());
     }
 
@@ -304,9 +338,23 @@ public class SaleOrder {
         if (this.totalAmount == null) {
             this.totalAmount = BigDecimal.ZERO;
         }
+
         if (this.taxRate == null) {
             this.taxRate = DEFAULT_TAX_RATE;
         }
+
+        if (this.containersDelivered == null) {
+            this.containersDelivered = this.borrowedBottles != null && this.borrowedBottles > 0
+                    ? this.borrowedBottles
+                    : 0;
+        }
+
+        if (this.containersReturned == null) {
+            this.containersReturned = 0;
+        }
+
+        this.borrowedBottles = getNetContainerChange();
+
         if (this.taxBase == null || this.taxIgv == null) {
             BigDecimal divisor = BigDecimal.ONE.add(this.taxRate);
             BigDecimal base = this.totalAmount.divide(divisor, 2, RoundingMode.HALF_UP);
@@ -314,6 +362,7 @@ public class SaleOrder {
             this.taxBase = base;
             this.taxIgv = igv;
         }
+
         if (this.status == OrderStatus.CREDIT && this.dueDate == null && this.orderDate != null) {
             this.dueDate = this.orderDate.plusDays(7);
         }

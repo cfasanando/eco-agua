@@ -3,6 +3,7 @@ package com.ecoamazonas.eco_agua.order;
 import com.ecoamazonas.eco_agua.category.CategoryRepository;
 import com.ecoamazonas.eco_agua.category.CategoryType;
 import com.ecoamazonas.eco_agua.client.ClientRepository;
+import com.ecoamazonas.eco_agua.container.ClientContainerService;
 import com.ecoamazonas.eco_agua.product.ProductService;
 import com.ecoamazonas.eco_agua.promotion.PromotionService;
 import com.ecoamazonas.eco_agua.promotion.PromotionService.ClientPromotionDTO;
@@ -22,6 +23,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 
 @Controller
 @RequestMapping("/orders")
@@ -33,6 +35,7 @@ public class OrderController {
     private final CategoryRepository categoryRepository;
     private final PromotionService promotionService;
     private final EmployeeRepository employeeRepository;
+    private final ClientContainerService clientContainerService;
 
     public OrderController(
             OrderService orderService,
@@ -40,7 +43,8 @@ public class OrderController {
             ClientRepository clientRepository,
             CategoryRepository categoryRepository,
             PromotionService promotionService,
-            EmployeeRepository employeeRepository
+            EmployeeRepository employeeRepository,
+            ClientContainerService clientContainerService
     ) {
         this.orderService = orderService;
         this.productService = productService;
@@ -48,11 +52,13 @@ public class OrderController {
         this.categoryRepository = categoryRepository;
         this.promotionService = promotionService;
         this.employeeRepository = employeeRepository;
+        this.clientContainerService = clientContainerService;
     }
 
     @GetMapping("/new")
     public String newOrderForm(Model model) {
         LocalDate today = LocalDate.now();
+        Map<Long, Integer> clientContainerBalances = clientContainerService.getCurrentBalanceMap();
 
         model.addAttribute("activePage", "home");
         model.addAttribute("today", today);
@@ -66,18 +72,19 @@ public class OrderController {
                 "deliveryEmployees",
                 employeeRepository.findActiveByJobPositionName("Repartidor")
         );
+        model.addAttribute("clientContainerBalances", clientContainerBalances);
 
         return "orders/order_form";
     }
 
     @PostMapping
     public String createOrder(
-            @RequestParam("orderDate")
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate orderDate,
+            @RequestParam("orderDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate orderDate,
             @RequestParam("clientId") Long clientId,
             @RequestParam(value = "deliveryPerson", required = false) String deliveryPerson,
             @RequestParam(value = "borrowedBottles", required = false) Integer borrowedBottles,
+            @RequestParam(value = "containersDelivered", required = false) Integer containersDelivered,
+            @RequestParam(value = "containersReturned", required = false) Integer containersReturned,
             @RequestParam(value = "comment", required = false) String comment,
             @RequestParam(value = "productId", required = false) List<Long> productIds,
             @RequestParam(value = "quantity", required = false) List<BigDecimal> quantities,
@@ -102,6 +109,8 @@ public class OrderController {
                     clientId,
                     deliveryPerson,
                     borrowedBottles,
+                    containersDelivered,
+                    containersReturned,
                     comment,
                     productIds,
                     quantities,
@@ -117,7 +126,6 @@ public class OrderController {
             redirectAttributes.addFlashAttribute("messageType", "success");
 
             return "redirect:/home";
-
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("message", ex.getMessage());
             redirectAttributes.addFlashAttribute("messageType", "error");
@@ -196,8 +204,7 @@ public class OrderController {
     @ResponseBody
     public List<ClientPromotionDTO> getClientPromotions(
             @PathVariable Long clientId,
-            @RequestParam(value = "date", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+            @RequestParam(value = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
     ) {
         return promotionService.findApplicablePromotionDtos(clientId, date);
     }

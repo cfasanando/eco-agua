@@ -2,6 +2,7 @@ package com.ecoamazonas.eco_agua.order;
 
 import com.ecoamazonas.eco_agua.client.Client;
 import com.ecoamazonas.eco_agua.client.ClientRepository;
+import com.ecoamazonas.eco_agua.container.ClientContainerService;
 import com.ecoamazonas.eco_agua.expense.PersonnelExpenseAutoSyncService;
 import com.ecoamazonas.eco_agua.inventory.InventoryMovementType;
 import com.ecoamazonas.eco_agua.inventory.InventoryService;
@@ -31,19 +32,22 @@ public class OrderService {
     private final ClientRepository clientRepository;
     private final InventoryService inventoryService;
     private final PersonnelExpenseAutoSyncService personnelExpenseAutoSyncService;
+    private final ClientContainerService clientContainerService;
 
     public OrderService(
             SaleOrderRepository orderRepository,
             ProductRepository productRepository,
             ClientRepository clientRepository,
             InventoryService inventoryService,
-            PersonnelExpenseAutoSyncService personnelExpenseAutoSyncService
+            PersonnelExpenseAutoSyncService personnelExpenseAutoSyncService,
+            ClientContainerService clientContainerService
     ) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.clientRepository = clientRepository;
         this.inventoryService = inventoryService;
         this.personnelExpenseAutoSyncService = personnelExpenseAutoSyncService;
+        this.clientContainerService = clientContainerService;
     }
 
     @Transactional
@@ -52,6 +56,8 @@ public class OrderService {
             Long clientId,
             String deliveryPerson,
             Integer borrowedBottles,
+            Integer containersDelivered,
+            Integer containersReturned,
             String comment,
             List<Long> productIds,
             List<BigDecimal> quantities,
@@ -72,12 +78,20 @@ public class OrderService {
 
         LocalDate effectiveDate = (orderDate != null ? orderDate : LocalDate.now());
 
+        int normalizedDelivered = normalizeContainerCount(containersDelivered);
+        int normalizedReturned = normalizeContainerCount(containersReturned);
+        int normalizedNet = borrowedBottles != null
+                ? borrowedBottles
+                : (normalizedDelivered - normalizedReturned);
+
         SaleOrder order = new SaleOrder();
         order.setClient(client);
         order.setOrderDate(effectiveDate);
         order.setStatus(initialStatus != null ? initialStatus : OrderStatus.REQUESTED);
         order.setDeliveryPerson(deliveryPerson);
-        order.setBorrowedBottles(borrowedBottles != null ? borrowedBottles : 0);
+        order.setContainersDelivered(normalizedDelivered);
+        order.setContainersReturned(normalizedReturned);
+        order.setBorrowedBottles(normalizedNet);
         order.setComment(comment);
 
         long countForDay = orderRepository.countByOrderDate(effectiveDate);
@@ -87,17 +101,13 @@ public class OrderService {
 
         for (int i = 0; i < productIds.size(); i++) {
             Long productId = productIds.get(i);
+
             if (productId == null) {
                 continue;
             }
 
-            BigDecimal qty = (quantities != null && quantities.size() > i)
-                    ? quantities.get(i)
-                    : null;
-
-            BigDecimal price = (unitPrices != null && unitPrices.size() > i)
-                    ? unitPrices.get(i)
-                    : null;
+            BigDecimal qty = (quantities != null && quantities.size() > i) ? quantities.get(i) : null;
+            BigDecimal price = (unitPrices != null && unitPrices.size() > i) ? unitPrices.get(i) : null;
 
             if (qty == null || price == null) {
                 continue;
@@ -111,11 +121,10 @@ public class OrderService {
                     .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
 
             BigDecimal availableStock = product.getStock() != null ? product.getStock() : BigDecimal.ZERO;
-
             if (availableStock.compareTo(qty) < 0) {
                 throw new IllegalArgumentException(
-                        "Insufficient stock for product: " + product.getName() +
-                                " (available: " + availableStock + ", required: " + qty + ")"
+                        "Insufficient stock for product: " + product.getName()
+                                + " (available: " + availableStock + ", required: " + qty + ")"
                 );
             }
 
@@ -136,7 +145,6 @@ public class OrderService {
 
             lineTotal = lineTotal.setScale(2, RoundingMode.HALF_UP);
             item.setTotal(lineTotal);
-
             order.addItem(item);
             total = total.add(lineTotal);
         }
@@ -161,6 +169,7 @@ public class OrderService {
         ));
 
         orderRepository.flush();
+        clientContainerService.syncOrderContainerMovements(saved);
         personnelExpenseAutoSyncService.syncSalaryExpensesForDate(saved.getOrderDate());
 
         return saved;
@@ -213,9 +222,9 @@ public class OrderService {
         }
 
         order.setStatus(newStatus);
-
         orderRepository.save(order);
         orderRepository.flush();
+        clientContainerService.syncOrderContainerMovements(order);
         personnelExpenseAutoSyncService.syncSalaryExpensesForDate(order.getOrderDate());
 
         return order;
@@ -296,7 +305,6 @@ public class OrderService {
                 today,
                 List.of(OrderStatus.PAID, OrderStatus.CREDIT)
         );
-
         List<Long> clientIdsWithOrderToday = orderRepository.findDistinctClientIdsWithOrderOnDate(
                 today,
                 List.of(OrderStatus.REQUESTED, OrderStatus.PAID, OrderStatus.CREDIT)
@@ -310,7 +318,6 @@ public class OrderService {
         }
 
         Map<Long, LinkedHashSet<LocalDate>> purchaseDatesByClientId = new LinkedHashMap<>();
-
         for (SaleOrder order : historicalOrders) {
             if (order.getClient() == null || order.getClient().getId() == null || order.getOrderDate() == null) {
                 continue;
@@ -327,9 +334,9 @@ public class OrderService {
         }
 
         List<PossibleOrderSuggestion> suggestions = new ArrayList<>();
-
         for (Client client : activeClients) {
             Long clientId = client.getId();
+
             if (clientId == null) {
                 continue;
             }
@@ -349,7 +356,6 @@ public class OrderService {
             LocalDate lastOrderDate = purchaseDates.get(purchaseDates.size() - 1);
             long daysSinceLastOrder = Math.max(ChronoUnit.DAYS.between(lastOrderDate, today), 0);
             int purchaseDayCount = purchaseDates.size();
-
             int averageIntervalDays = calculateAverageIntervalDaysRecent(purchaseDates, daysSinceLastOrder);
             LocalDate expectedNextOrderDate = lastOrderDate.plusDays(averageIntervalDays);
             long overdueDays = expectedNextOrderDate.isBefore(today)
@@ -417,6 +423,10 @@ public class OrderService {
         return suggestions;
     }
 
+    private int normalizeContainerCount(Integer value) {
+        return value != null && value > 0 ? value : 0;
+    }
+
     private int calculateAverageIntervalDaysRecent(List<LocalDate> purchaseDates, long daysSinceLastOrder) {
         if (purchaseDates == null || purchaseDates.isEmpty()) {
             return 7;
@@ -474,9 +484,9 @@ public class OrderService {
         double progressScore = Math.min(cycleProgress, 1.35);
 
         int probabilityPercent = (int) Math.round(
-                (progressScore / 1.35) * 60.0 +
-                regularityScore * 20.0 +
-                frequencyScore * 20.0
+                (progressScore / 1.35) * 60.0
+                        + regularityScore * 20.0
+                        + frequencyScore * 20.0
         );
 
         if (overdueDays > 0) {
@@ -518,34 +528,18 @@ public class OrderService {
             int probabilityPercent
     ) {
         if (overdueDays > 0) {
-            return new SuggestionStatus(
-                    "Atrasado +" + overdueDays + "d",
-                    "danger",
-                    "Llamar hoy"
-            );
+            return new SuggestionStatus("Atrasado +" + overdueDays + "d", "danger", "Llamar hoy");
         }
 
         if (purchaseDayCount == 1 && daysSinceLastOrder >= 3) {
-            return new SuggestionStatus(
-                    "Seguimiento",
-                    "warning",
-                    "Contactar"
-            );
+            return new SuggestionStatus("Seguimiento", "warning", "Contactar");
         }
 
         if (daysSinceLastOrder >= Math.max(1, averageIntervalDays - 1) || probabilityPercent >= 70) {
-            return new SuggestionStatus(
-                    "Toca pronto",
-                    "warning",
-                    "Seguimiento"
-            );
+            return new SuggestionStatus("Toca pronto", "warning", "Seguimiento");
         }
 
-        return new SuggestionStatus(
-                "Monitorear",
-                "secondary",
-                "Monitorear"
-            );
+        return new SuggestionStatus("Monitorear", "secondary", "Monitorear");
     }
 
     private double calculateRegularityScore(List<LocalDate> purchaseDates) {
@@ -573,8 +567,8 @@ public class OrderService {
             double delta = interval - avg;
             variance += delta * delta;
         }
-        variance = variance / intervals.size();
 
+        variance = variance / intervals.size();
         double stdDev = Math.sqrt(variance);
         double score = 1.0 - Math.min(stdDev / (avg * 1.25), 1.0);
 

@@ -35,14 +35,31 @@ public class ClientContainerService {
     }
 
     @Transactional(readOnly = true)
+    public Map<Long, Integer> getCurrentBalanceMap() {
+        List<ClientContainerMovement> allMovements = movementRepository.findAllByOrderByMovementDateAscIdAsc();
+        Map<Long, Integer> balances = new LinkedHashMap<>();
+
+        for (ClientContainerMovement movement : allMovements) {
+            if (movement.getClientId() == null) {
+                continue;
+            }
+
+            balances.put(
+                    movement.getClientId(),
+                    balances.getOrDefault(movement.getClientId(), 0) + movement.getSignedQuantity()
+            );
+        }
+
+        return balances;
+    }
+
+    @Transactional(readOnly = true)
     public List<ClientContainerBalanceRow> buildBalanceRows(Long selectedClientId, boolean includeZero) {
         List<Client> clients = resolveClients(selectedClientId);
-        List<ClientContainerMovement> allMovements = movementRepository.findAllByOrderByMovementDateAscIdAsc();
-
         Map<Long, Integer> balanceByClient = new LinkedHashMap<>();
         Map<Long, LocalDate> lastMovementDateByClient = new LinkedHashMap<>();
 
-        for (ClientContainerMovement movement : allMovements) {
+        for (ClientContainerMovement movement : movementRepository.findAllByOrderByMovementDateAscIdAsc()) {
             Long clientId = movement.getClientId();
             if (clientId == null) {
                 continue;
@@ -180,38 +197,28 @@ public class ClientContainerService {
 
     @Transactional
     public boolean syncOrderLoanMovement(SaleOrder order) {
+        return syncOrderContainerMovements(order);
+    }
+
+    @Transactional
+    public boolean syncOrderContainerMovements(SaleOrder order) {
         if (order == null || order.getId() == null || order.getClient() == null) {
             return false;
         }
 
-        int desiredNet = resolveDesiredLoan(order);
         List<ClientContainerMovement> orderMovements =
                 movementRepository.findBySaleOrderIdOrderByMovementDateAscIdAsc(order.getId());
 
-        int currentNet = computeBalance(orderMovements);
-        int delta = desiredNet - currentNet;
+        int desiredLoan = resolveDesiredLoan(order);
+        int desiredReturn = resolveDesiredReturn(order);
+        int currentLoan = sumMovementQuantity(orderMovements, ContainerMovementType.LOAN);
+        int currentReturn = sumMovementQuantity(orderMovements, ContainerMovementType.RETURN);
 
-        if (delta == 0) {
-            return false;
-        }
+        boolean changed = false;
+        changed |= syncLoanDelta(order, desiredLoan - currentLoan);
+        changed |= syncReturnDelta(order, desiredReturn - currentReturn);
 
-        ClientContainerMovement movement = new ClientContainerMovement();
-        movement.setClientId(order.getClient().getId());
-        movement.setSaleOrderId(order.getId());
-        movement.setMovementDate(order.getOrderDate() != null ? order.getOrderDate() : LocalDate.now());
-
-        if (delta > 0) {
-            movement.setMovementType(ContainerMovementType.LOAN);
-            movement.setQuantity(delta);
-            movement.setObservation("Automatic loan sync from order #" + order.getOrderNumber());
-        } else {
-            movement.setMovementType(ContainerMovementType.ADJUSTMENT_IN);
-            movement.setQuantity(Math.abs(delta));
-            movement.setObservation("Automatic reverse sync from order #" + order.getOrderNumber());
-        }
-
-        movementRepository.save(movement);
-        return true;
+        return changed;
     }
 
     @Transactional
@@ -220,12 +227,62 @@ public class ClientContainerService {
         int changes = 0;
 
         for (SaleOrder order : orders) {
-            if (syncOrderLoanMovement(order)) {
+            if (syncOrderContainerMovements(order)) {
                 changes++;
             }
         }
 
         return changes;
+    }
+
+    private boolean syncLoanDelta(SaleOrder order, int delta) {
+        if (delta == 0) {
+            return false;
+        }
+
+        ClientContainerMovement movement = buildBaseSyncMovement(order);
+
+        if (delta > 0) {
+            movement.setMovementType(ContainerMovementType.LOAN);
+            movement.setQuantity(delta);
+            movement.setObservation("Automatic delivered-container sync from order #" + order.getOrderNumber());
+        } else {
+            movement.setMovementType(ContainerMovementType.ADJUSTMENT_IN);
+            movement.setQuantity(Math.abs(delta));
+            movement.setObservation("Automatic loan reduction sync from order #" + order.getOrderNumber());
+        }
+
+        movementRepository.save(movement);
+        return true;
+    }
+
+    private boolean syncReturnDelta(SaleOrder order, int delta) {
+        if (delta == 0) {
+            return false;
+        }
+
+        ClientContainerMovement movement = buildBaseSyncMovement(order);
+
+        if (delta > 0) {
+            movement.setMovementType(ContainerMovementType.RETURN);
+            movement.setQuantity(delta);
+            movement.setObservation("Automatic returned-container sync from order #" + order.getOrderNumber());
+        } else {
+            movement.setMovementType(ContainerMovementType.ADJUSTMENT_OUT);
+            movement.setQuantity(Math.abs(delta));
+            movement.setObservation("Automatic return reduction sync from order #" + order.getOrderNumber());
+        }
+
+        movementRepository.save(movement);
+        return true;
+    }
+
+    private ClientContainerMovement buildBaseSyncMovement(SaleOrder order) {
+        ClientContainerMovement movement = new ClientContainerMovement();
+        movement.setClientId(order.getClient().getId());
+        movement.setSaleOrderId(order.getId());
+        movement.setMovementDate(order.getOrderDate() != null ? order.getOrderDate() : LocalDate.now());
+        return movement;
     }
 
     private List<Client> resolveClients(Long selectedClientId) {
@@ -248,9 +305,11 @@ public class ClientContainerService {
             if (startDate == null) {
                 startDate = endDate;
             }
+
             if (endDate == null) {
                 endDate = startDate;
             }
+
             if (endDate.isBefore(startDate)) {
                 LocalDate tmp = startDate;
                 startDate = endDate;
@@ -278,8 +337,34 @@ public class ClientContainerService {
             return 0;
         }
 
+        Integer delivered = order.getContainersDelivered();
+        if (delivered != null && delivered > 0) {
+            return delivered;
+        }
+
         Integer borrowedBottles = order.getBorrowedBottles();
         return borrowedBottles != null && borrowedBottles > 0 ? borrowedBottles : 0;
+    }
+
+    private int resolveDesiredReturn(SaleOrder order) {
+        if (order.getStatus() == OrderStatus.CANCELED) {
+            return 0;
+        }
+
+        Integer returned = order.getContainersReturned();
+        return returned != null && returned > 0 ? returned : 0;
+    }
+
+    private int sumMovementQuantity(List<ClientContainerMovement> movements, ContainerMovementType type) {
+        int total = 0;
+
+        for (ClientContainerMovement movement : movements) {
+            if (movement.getMovementType() == type && movement.getQuantity() != null) {
+                total += movement.getQuantity();
+            }
+        }
+
+        return total;
     }
 
     private int computeBalance(List<ClientContainerMovement> movements) {

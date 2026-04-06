@@ -96,7 +96,8 @@
                                                 th:data-phone="${c.phone != null && !#strings.isEmpty(c.phone) ? c.phone : '-'}"
                                                 th:data-address="${c.address != null && !#strings.isEmpty(c.address) ? c.address : '-'}"
                                                 th:data-profile="${c.profile != null ? c.profile.name : '-'}"
-                                                th:data-suggested-price="${c.profile != null ? c.profile.suggestedPrice : 0}">
+                                                th:data-suggested-price="${c.profile != null ? c.profile.suggestedPrice : 0}"
+                                                th:data-container-balance="${clientContainerBalances[c.id] != null ? clientContainerBalances[c.id] : 0}">
                                             </option>
                                         </select>
                                     </div>
@@ -133,24 +134,74 @@
                                     </div>
                                 </div>
 
-                                <div class="row g-2 mb-3">
-                                    <div class="col-md-4">
-                                        <label for="borrowedBottles" class="form-label d-flex justify-content-between align-items-center">
-                                            <span>Botellones prestados</span>
-                                            <a href="#" id="borrowedBottlesAutoLink" class="small text-decoration-none">Usar sugerido</a>
-                                        </label>
+                                <div class="row g-3 mb-3">
+                                    <input type="hidden" id="borrowedBottles" name="borrowedBottles" value="0" />
 
+                                    <div class="col-md-6 col-xl-3">
+                                        <div class="d-flex justify-content-between align-items-start mb-1" style="min-height: 2.75rem;">
+                                            <label class="form-label mb-0" for="currentContainerBalance">Saldo actual</label>
+                                            <span class="small invisible">Acción</span>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            class="form-control bg-light"
+                                            id="currentContainerBalance"
+                                            value="0"
+                                            readonly
+                                        />
+                                        <small class="text-muted d-block mt-1" style="min-height: 2.5rem;">Botellones que el cliente mantiene pendientes.</small>
+                                    </div>
+
+                                    <div class="col-md-6 col-xl-3">
+                                        <div class="d-flex justify-content-between align-items-start mb-1" style="min-height: 2.75rem;">
+                                            <label for="containersDelivered" class="form-label mb-0">Envases entregados</label>
+                                            <a href="#" id="borrowedBottlesAutoLink" class="small text-decoration-none mt-1">Usar sugerido</a>
+                                        </div>
                                         <input
                                             type="number"
                                             min="0"
                                             step="1"
                                             class="form-control"
-                                            id="borrowedBottles"
-                                            name="borrowedBottles"
+                                            id="containersDelivered"
+                                            name="containersDelivered"
                                             value="0"
                                         />
+                                        <small class="text-muted d-block mt-1" style="min-height: 2.5rem;">Llenos que salen hoy hacia el cliente.</small>
                                     </div>
-                                    <div class="col-md-8">
+
+                                    <div class="col-md-6 col-xl-3">
+                                        <div class="d-flex justify-content-between align-items-start mb-1" style="min-height: 2.75rem;">
+                                            <label for="containersReturned" class="form-label mb-0">Envases recogidos</label>
+                                            <span class="small invisible">Acción</span>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            class="form-control"
+                                            id="containersReturned"
+                                            name="containersReturned"
+                                            value="0"
+                                        />
+                                        <small class="text-muted d-block mt-1" style="min-height: 2.5rem;">Vacíos que regresan hoy desde el cliente.</small>
+                                    </div>
+
+                                    <div class="col-md-6 col-xl-3">
+                                        <div class="d-flex justify-content-between align-items-start mb-1" style="min-height: 2.75rem;">
+                                            <label class="form-label mb-0" for="projectedContainerBalance">Saldo proyectado</label>
+                                            <span class="small invisible">Acción</span>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            class="form-control bg-light"
+                                            id="projectedContainerBalance"
+                                            value="0"
+                                            readonly
+                                        />
+                                        <small class="text-muted d-block mt-1" style="min-height: 2.5rem;">Saldo estimado después de registrar este pedido.</small>
+                                    </div>
+
+                                    <div class="col-md-12">
                                         <label class="form-label">Comentario</label>
                                         <textarea class="form-control"
                                                   name="comment"
@@ -360,10 +411,15 @@
         const deliveryPersonSelect = document.getElementById('deliveryPerson');
         const clientSuggestions = document.getElementById('clientSuggestions');
         const borrowedBottlesInput = document.getElementById('borrowedBottles');
+        const currentContainerBalanceInput = document.getElementById('currentContainerBalance');
+        const containersDeliveredInput = document.getElementById('containersDelivered');
+        const containersReturnedInput = document.getElementById('containersReturned');
+        const projectedContainerBalanceInput = document.getElementById('projectedContainerBalance');
         const borrowedBottlesAutoLink = document.getElementById('borrowedBottlesAutoLink');
 
         let borrowedBottlesManualOverride = false;
-        let lastSuggestedBorrowedBottles = 0;
+        let lastSuggestedDelivered = 0;
+        let lastSuggestedReturned = 0;
 
         initSingleDeliveryPerson();
         setupClientAutocomplete();
@@ -378,7 +434,19 @@
                 clAddress.textContent = '-';
                 clProfile.textContent = '-';
                 clSuggestedPrice.textContent = '0.00';
+
+                if (currentContainerBalanceInput) {
+                    currentContainerBalanceInput.value = 0;
+                }
+                if (containersDeliveredInput) {
+                    containersDeliveredInput.value = 0;
+                }
+                if (containersReturnedInput) {
+                    containersReturnedInput.value = 0;
+                }
+
                 syncAutoPricedRowsWithClientProfile();
+                updateProjectedContainerBalance();
                 return;
             }
 
@@ -391,6 +459,12 @@
             clSuggestedPrice.textContent = parseFloat(sug).toFixed(2);
 
             syncAutoPricedRowsWithClientProfile();
+
+            if (!borrowedBottlesManualOverride) {
+                applySuggestedContainerFlow();
+            } else {
+                updateProjectedContainerBalance();
+            }
         }
 
         function getSelectedClientSuggestedPrice() {
@@ -1200,25 +1274,17 @@
             });
         }
 
-        function setupBorrowedBottlesAutoMode() {
-            if (!borrowedBottlesInput) {
-                return;
+        function getSelectedClientContainerBalance() {
+            const opt = clientSelect ? clientSelect.options[clientSelect.selectedIndex] : null;
+
+            if (!opt || !opt.value) {
+                return 0;
             }
 
-            borrowedBottlesInput.addEventListener('input', function () {
-                const currentValue = parseInt(borrowedBottlesInput.value || '0', 10) || 0;
-                borrowedBottlesManualOverride = currentValue !== lastSuggestedBorrowedBottles;
-            });
+            const raw = opt.getAttribute('data-container-balance') || '0';
+            const value = parseInt(raw, 10);
 
-            if (borrowedBottlesAutoLink) {
-                borrowedBottlesAutoLink.addEventListener('click', function (event) {
-                    event.preventDefault();
-                    borrowedBottlesManualOverride = false;
-                    updateBorrowedBottlesSuggestion();
-                });
-            }
-
-            updateBorrowedBottlesSuggestion();
+            return Number.isNaN(value) ? 0 : value;
         }
 
         function sumBorrowedBottleEligibleQty() {
@@ -1237,16 +1303,80 @@
             return total;
         }
 
+        function updateProjectedContainerBalance() {
+            const current = getSelectedClientContainerBalance();
+            const delivered = parseInt(containersDeliveredInput?.value || '0', 10) || 0;
+            const returned = parseInt(containersReturnedInput?.value || '0', 10) || 0;
+            const projected = current + delivered - returned;
+
+            if (currentContainerBalanceInput) {
+                currentContainerBalanceInput.value = current;
+            }
+
+            if (projectedContainerBalanceInput) {
+                projectedContainerBalanceInput.value = projected;
+            }
+
+            if (borrowedBottlesInput) {
+                borrowedBottlesInput.value = delivered - returned;
+            }
+        }
+
+        function applySuggestedContainerFlow() {
+            const current = getSelectedClientContainerBalance();
+            const suggestedDelivered = sumBorrowedBottleEligibleQty();
+            const suggestedReturned = Math.min(current, suggestedDelivered);
+
+            lastSuggestedDelivered = suggestedDelivered;
+            lastSuggestedReturned = suggestedReturned;
+
+            if (containersDeliveredInput) {
+                containersDeliveredInput.value = suggestedDelivered;
+            }
+
+            if (containersReturnedInput) {
+                containersReturnedInput.value = suggestedReturned;
+            }
+
+            updateProjectedContainerBalance();
+        }
+
+        function setupBorrowedBottlesAutoMode() {
+            if (!containersDeliveredInput || !containersReturnedInput || !borrowedBottlesAutoLink) {
+                updateProjectedContainerBalance();
+                return;
+            }
+
+            containersDeliveredInput.addEventListener('input', function () {
+                borrowedBottlesManualOverride = true;
+                updateProjectedContainerBalance();
+            });
+
+            containersReturnedInput.addEventListener('input', function () {
+                borrowedBottlesManualOverride = true;
+                updateProjectedContainerBalance();
+            });
+
+            borrowedBottlesAutoLink.addEventListener('click', function (event) {
+                event.preventDefault();
+                borrowedBottlesManualOverride = false;
+                applySuggestedContainerFlow();
+            });
+
+            updateProjectedContainerBalance();
+        }
+
         function updateBorrowedBottlesSuggestion() {
             if (!borrowedBottlesInput) {
                 return;
             }
 
-            lastSuggestedBorrowedBottles = sumBorrowedBottleEligibleQty();
-
             if (!borrowedBottlesManualOverride) {
-                borrowedBottlesInput.value = lastSuggestedBorrowedBottles;
+                applySuggestedContainerFlow();
+                return;
             }
+
+            updateProjectedContainerBalance();
         }
 
         if (clientSelect) {

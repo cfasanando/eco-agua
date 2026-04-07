@@ -5,6 +5,7 @@ import com.ecoamazonas.eco_agua.supply.Supply;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 @Entity
@@ -15,7 +16,6 @@ public class InventoryMovement {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Either product or supply must be set (not both)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id")
     private Product product;
@@ -28,10 +28,10 @@ public class InventoryMovement {
     @Column(name = "movement_type", length = 20, nullable = false)
     private InventoryMovementType movementType;
 
-    @Column(name = "quantity_in", precision = 10, scale = 2, nullable = false)
+    @Column(name = "quantity_in", precision = 10, scale = 4, nullable = false)
     private BigDecimal quantityIn = BigDecimal.ZERO;
 
-    @Column(name = "quantity_out", precision = 10, scale = 2, nullable = false)
+    @Column(name = "quantity_out", precision = 10, scale = 4, nullable = false)
     private BigDecimal quantityOut = BigDecimal.ZERO;
 
     @Column(name = "movement_date", nullable = false)
@@ -45,8 +45,6 @@ public class InventoryMovement {
 
     @Column(name = "reference_id")
     private Long referenceId;
-
-    // --- Getters & setters ---
 
     public Long getId() {
         return id;
@@ -105,11 +103,15 @@ public class InventoryMovement {
     }
 
     public void setQuantityIn(BigDecimal quantityIn) {
-        this.quantityIn = quantityIn;
+        this.quantityIn = quantityIn != null
+                ? quantityIn.setScale(4, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
     }
 
     public void setQuantityOut(BigDecimal quantityOut) {
-        this.quantityOut = quantityOut;
+        this.quantityOut = quantityOut != null
+                ? quantityOut.setScale(4, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
     }
 
     public void setMovementDate(LocalDateTime movementDate) {

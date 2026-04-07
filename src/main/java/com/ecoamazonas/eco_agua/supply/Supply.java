@@ -25,19 +25,17 @@ public class Supply {
     @Column(name = "base_quantity", precision = 10, scale = 4, nullable = false)
     private BigDecimal baseQuantity;
 
-    @Column(name = "base_cost", precision = 10, scale = 2, nullable = false)
+    @Column(name = "base_cost", precision = 10, scale = 4, nullable = false)
     private BigDecimal baseCost;
 
-    @Column(precision = 10, scale = 2, nullable = false)
+    @Column(precision = 10, scale = 4, nullable = false)
     private BigDecimal stock = BigDecimal.ZERO;
 
     @Column(nullable = false)
     private boolean active = true;
-    
+
     @Column(name = "group_label", length = 100)
     private String groupLabel;
-
-    // Getters & setters
 
     public Long getId() {
         return id;
@@ -71,6 +69,10 @@ public class Supply {
         return active;
     }
 
+    public String getGroupLabel() {
+        return groupLabel;
+    }
+
     public void setId(Long id) {
         this.id = id;
     }
@@ -88,43 +90,41 @@ public class Supply {
     }
 
     public void setBaseQuantity(BigDecimal baseQuantity) {
-        this.baseQuantity = baseQuantity;
+        this.baseQuantity = baseQuantity != null
+                ? baseQuantity.setScale(4, RoundingMode.HALF_UP)
+                : null;
     }
 
     public void setBaseCost(BigDecimal baseCost) {
-        this.baseCost = baseCost;
+        this.baseCost = baseCost != null
+                ? baseCost.setScale(4, RoundingMode.HALF_UP)
+                : null;
     }
 
     public void setStock(BigDecimal stock) {
-        this.stock = stock;
+        this.stock = stock != null
+                ? stock.setScale(4, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
     }
 
     public void setActive(boolean active) {
         this.active = active;
     }
 
-    public String getGroupLabel() {
-        return groupLabel;
-    }
-
     public void setGroupLabel(String groupLabel) {
         this.groupLabel = groupLabel;
     }
-    
-    
 
-    /**
-     * Compute unit cost (baseCost / baseQuantity).
-     */
     @Transient
     public BigDecimal getUnitCost() {
         if (baseCost == null || baseQuantity == null) {
             return null;
         }
+
         if (baseQuantity.compareTo(BigDecimal.ZERO) == 0) {
             return null;
         }
-        // 6 decimal places to keep enough precision for composition
+
         return baseCost.divide(baseQuantity, 6, RoundingMode.HALF_UP);
     }
 }

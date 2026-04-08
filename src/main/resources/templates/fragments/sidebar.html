@@ -440,9 +440,10 @@
 
       <div
         class="menu-group"
-        th:with="isMarketingActive=${activePage == 'blog_posts'
-          or activePage == 'blog'
-          or activePage == 'testimonials'}"
+        th:with="isMarketingActive=${activePage == 'marketing_campaigns'
+        or activePage == 'blog_posts'
+        or activePage == 'blog'
+        or activePage == 'testimonials'}"
       >
         <input
           type="checkbox"
@@ -458,6 +459,16 @@
         </label>
 
         <div class="submenu-container">
+            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT')">
+            <a
+              th:href="@{/marketing/admin/campaigns}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'marketing_campaigns' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-megaphone-fill"></i></span>
+              <span>Panel campañas</span>
+            </a>
+          </th:block>
           <a
             th:href="@{/admin/blog}"
             class="menu-link submenu"

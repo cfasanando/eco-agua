@@ -1,375 +1,565 @@
 <!-- templates/fragments/sidebar.html -->
-<aside class="sidebar" xmlns:th="http://www.thymeleaf.org" th:fragment="sidebar">
-
-    <div class="sidebar-brand">
-        <img src="/img/logo-eco.png" alt="Eco del Amazonas">
-        <div class="sidebar-brand-title">
-            SISTEMA<br>INTEGRAL
-        </div>
+<aside
+  class="sidebar"
+  xmlns:th="http://www.thymeleaf.org"
+  xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+  th:fragment="sidebar"
+>
+  <div class="sidebar-brand">
+    <img src="/img/logo-eco.png" alt="Eco del Amazonas">
+    <div class="sidebar-brand-title">
+      SISTEMA<br>INTEGRAL
     </div>
+  </div>
 
-    <div class="sidebar-nav">
-        <div class="menu-section-title">Principal</div>
+  <div class="sidebar-nav">
+    <div class="menu-section-title">Principal</div>
 
-        <a th:href="@{/home}"
-           class="menu-link"
-           th:classappend="${activePage == 'home' ? ' active' : ''}">
-            <span class="icon"><i class="bi bi-house-door"></i></span>
-            <span>Inicio</span>
-        </a>
+    <a
+      th:href="@{/home}"
+      class="menu-link"
+      th:classappend="${activePage == 'home' ? ' active' : ''}"
+    >
+      <span class="icon"><i class="bi bi-house-door"></i></span>
+      <span>Inicio</span>
+    </a>
 
-        <a th:href="@{/dashboard/business-overview}"
-           class="menu-link"
-           th:classappend="${activePage == 'business_overview' ? ' active' : ''}">
-            <span class="icon"><i class="bi bi-speedometer2"></i></span>
-            <span>Estado del negocio</span>
-        </a>
+    <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','ADMIN_RRHH','SUPERVISOR')">
+      <a
+        th:href="@{/dashboard/business-overview}"
+        class="menu-link"
+        th:classappend="${activePage == 'business_overview' ? ' active' : ''}"
+      >
+        <span class="icon"><i class="bi bi-speedometer2"></i></span>
+        <span>Estado del negocio</span>
+      </a>
 
-        <a th:href="@{/dashboard/monthly-followup}"
-           class="menu-link"
-           th:classappend="${activePage == 'monthly_followup' ? ' active' : ''}">
-            <span class="icon"><i class="bi bi-calendar2-week"></i></span>
-            <span>Seguimiento del mes</span>
-        </a>
+      <a
+        th:href="@{/dashboard/monthly-followup}"
+        class="menu-link"
+        th:classappend="${activePage == 'monthly_followup' ? ' active' : ''}"
+      >
+        <span class="icon"><i class="bi bi-calendar2-week"></i></span>
+        <span>Seguimiento del mes</span>
+      </a>
+    </th:block>
 
-        <div class="menu-section-title">Operación diaria</div>
+    <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','SUPERVISOR','OPERARIO')">
+      <div class="menu-section-title">Operación diaria</div>
 
-        <div class="menu-group"
-             th:with="isCommercialActive=${activePage == 'client-profiles'
-                                          or activePage == 'clients'
-                                          or activePage == 'clients_portfolio'
-                                          or activePage == 'promotions'
-                                          or activePage == 'delivery_zones'}">
-            <input type="checkbox"
-                   id="menu-commercial-toggle"
-                   class="menu-toggle"
-                   th:checked="${isCommercialActive}">
-            <label class="menu-link has-children" for="menu-commercial-toggle">
-                <span class="icon"><i class="bi bi-people"></i></span>
-                <span>Comercial / CRM</span>
-                <span class="caret"><i class="bi bi-chevron-right"></i></span>
-            </label>
-            <div class="submenu-container">
-                <a th:href="@{/admin/clients}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'clients' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-person-lines-fill"></i></span>
-                    <span>Clientes</span>
-                </a>
+      <div
+        class="menu-group"
+        th:with="isCommercialActive=${activePage == 'commercial_daily'
+          or activePage == 'client-profiles'
+          or activePage == 'clients'
+          or activePage == 'clients_portfolio'
+          or activePage == 'promotions'
+          or activePage == 'delivery_zones'
+          or activePage == 'delivery_daily'
+          or activePage == 'reorder_agenda'}"
+      >
+        <input
+          type="checkbox"
+          id="menu-commercial-toggle"
+          class="menu-toggle"
+          th:checked="${isCommercialActive}"
+        >
 
-                <a th:href="@{/admin/clients/portfolio}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'clients_portfolio' or activePage == 'clients' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-bar-chart-line"></i></span>
-                    <span>Cartera de clientes</span>
-                </a>
+        <label class="menu-link has-children" for="menu-commercial-toggle">
+          <span class="icon"><i class="bi bi-people"></i></span>
+          <span>Comercial / CRM</span>
+          <span class="caret"><i class="bi bi-chevron-right"></i></span>
+        </label>
 
-                <a th:href="@{/admin/client-profiles}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'client-profiles' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-diagram-3"></i></span>
-                    <span>Perfiles de cliente</span>
-                </a>
+        <div class="submenu-container">
+          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ADMIN_CONT')">
+            <a
+              th:href="@{/dashboard/commercial-daily}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'commercial_daily' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-bullseye"></i></span>
+              <span>Panel comercial diario</span>
+            </a>
+          </th:block>
 
-                <a th:href="@{/admin/promotions}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'promotions' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-gift"></i></span>
-                    <span>Promociones</span>
-                </a>
+          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','SUPERVISOR','OPERARIO')">
+            <a
+              th:href="@{/admin/clients}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'clients' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-person-lines-fill"></i></span>
+              <span>Clientes</span>
+            </a>
+          </th:block>
 
-                <a th:href="@{/admin/delivery-zones}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'delivery_zones' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-geo-alt-fill"></i></span>
-                    <span>Zonas de reparto</span>
-                </a>
-                <a th:href="@{/delivery}"
-                    class="menu-link submenu"
-                    th:classappend="${activePage == 'delivery_daily' ? ' active' : ''}">
-                     <span class="icon"><i class="bi bi-truck"></i></span>
-                     <span>Reparto diario</span>
-                 </a>
-                <a th:href="@{/reorder-agenda}"
-                    class="menu-link submenu"
-                    th:classappend="${activePage == 'reorder_agenda' ? ' active' : ''}">
-                     <span class="icon"><i class="bi bi-arrow-repeat"></i></span>
-                     <span>Agenda de reposición</span>
-                 </a>
-            </div>
+          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ADMIN_CONT')">
+            <a
+              th:href="@{/admin/clients/portfolio}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'clients_portfolio' or activePage == 'clients' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-bar-chart-line"></i></span>
+              <span>Cartera de clientes</span>
+            </a>
+          </th:block>
+
+          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT')">
+            <a
+              th:href="@{/admin/client-profiles}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'client-profiles' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-diagram-3"></i></span>
+              <span>Perfiles de cliente</span>
+            </a>
+          </th:block>
+
+          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT')">
+            <a
+              th:href="@{/admin/promotions}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'promotions' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-gift"></i></span>
+              <span>Promociones</span>
+            </a>
+          </th:block>
+
+          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO')">
+            <a
+              th:href="@{/admin/delivery-zones}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'delivery_zones' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-geo-alt-fill"></i></span>
+              <span>Zonas de reparto</span>
+            </a>
+          </th:block>
+
+          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO')">
+            <a
+              th:href="@{/delivery}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'delivery_daily' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-truck"></i></span>
+              <span>Reparto diario</span>
+            </a>
+          </th:block>
+
+          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO')">
+            <a
+              th:href="@{/reorder-agenda}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'reorder_agenda' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-arrow-repeat"></i></span>
+              <span>Agenda de reposición</span>
+            </a>
+          </th:block>
         </div>
+      </div>
 
-        <div class="menu-group"
-             th:with="isIncomeActive=${activePage == 'income_sales'
-                                       or activePage == 'income_credit'
-                                       or activePage == 'income_others'}">
-            <input type="checkbox"
-                   id="menu-ingresos-toggle"
-                   class="menu-toggle"
-                   th:checked="${isIncomeActive}">
-            <label class="menu-link has-children" for="menu-ingresos-toggle">
-                <span class="icon"><i class="bi bi-cash-coin"></i></span>
-                <span>Ingresos y cobros</span>
-                <span class="caret"><i class="bi bi-chevron-right"></i></span>
-            </label>
-            <div class="submenu-container">
-                <a th:href="@{/income/sales}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'income_sales' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-calendar-range"></i></span>
-                    <span>Ventas por fecha</span>
-                </a>
+      <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT')">
+        <div
+          class="menu-group"
+          th:with="isIncomeActive=${activePage == 'income_sales'
+            or activePage == 'income_credit'
+            or activePage == 'income_others'}"
+        >
+          <input
+            type="checkbox"
+            id="menu-ingresos-toggle"
+            class="menu-toggle"
+            th:checked="${isIncomeActive}"
+          >
 
-                <a th:href="@{/income/credit}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'income_credit' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-cash-stack"></i></span>
-                    <span>Cuentas por cobrar</span>
-                </a>
+          <label class="menu-link has-children" for="menu-ingresos-toggle">
+            <span class="icon"><i class="bi bi-cash-coin"></i></span>
+            <span>Ingresos y cobros</span>
+            <span class="caret"><i class="bi bi-chevron-right"></i></span>
+          </label>
 
-                <a th:href="@{/income/others}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'income_others' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-plus-circle"></i></span>
-                    <span>Otros ingresos</span>
-                </a>
-            </div>
+          <div class="submenu-container">
+            <a
+              th:href="@{/income/sales}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'income_sales' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-calendar-range"></i></span>
+              <span>Ventas por fecha</span>
+            </a>
+
+            <a
+              th:href="@{/income/credit}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'income_credit' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-cash-stack"></i></span>
+              <span>Cuentas por cobrar</span>
+            </a>
+
+            <a
+              th:href="@{/income/others}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'income_others' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-plus-circle"></i></span>
+              <span>Otros ingresos</span>
+            </a>
+          </div>
         </div>
+      </th:block>
 
-        <div class="menu-group"
-             th:with="isExpensesActive=${activePage == 'expenses_by_date'
-                                         or activePage == 'expenses_debts'
-                                         or activePage == 'expenses_fixed_costs'
-                                         or activePage == 'suppliers'}">
-            <input type="checkbox"
-                   id="menu-egresos-toggle"
-                   class="menu-toggle"
-                   th:checked="${isExpensesActive}">
-            <label class="menu-link has-children" for="menu-egresos-toggle">
-                <span class="icon"><i class="bi bi-wallet2"></i></span>
-                <span>Egresos y compras</span>
-                <span class="caret"><i class="bi bi-chevron-right"></i></span>
-            </label>
-            <div class="submenu-container">
-                <a th:href="@{/expenses/by-date}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'expenses_by_date' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-calendar-range"></i></span>
-                    <span>Gastos por fecha</span>
-                </a>
+      <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','SUPERVISOR')">
+        <div
+          class="menu-group"
+          th:with="isExpensesActive=${activePage == 'expenses_by_date'
+            or activePage == 'expenses_debts'
+            or activePage == 'expenses_fixed_costs'
+            or activePage == 'suppliers'}"
+        >
+          <input
+            type="checkbox"
+            id="menu-egresos-toggle"
+            class="menu-toggle"
+            th:checked="${isExpensesActive}"
+          >
 
-                <a th:href="@{/expenses/debts}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'expenses_debts' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-credit-card-2-back"></i></span>
-                    <span>Cuentas por pagar</span>
-                </a>
+          <label class="menu-link has-children" for="menu-egresos-toggle">
+            <span class="icon"><i class="bi bi-wallet2"></i></span>
+            <span>Egresos y compras</span>
+            <span class="caret"><i class="bi bi-chevron-right"></i></span>
+          </label>
 
-                <a th:href="@{/expenses/fixed-costs}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'expenses_fixed_costs' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-receipt-cutoff"></i></span>
-                    <span>Costos fijos mensuales</span>
-                </a>
+          <div class="submenu-container">
+            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT')">
+              <a
+                th:href="@{/expenses/by-date}"
+                class="menu-link submenu"
+                th:classappend="${activePage == 'expenses_by_date' ? ' active' : ''}"
+              >
+                <span class="icon"><i class="bi bi-calendar-range"></i></span>
+                <span>Gastos por fecha</span>
+              </a>
+            </th:block>
 
-                <a th:href="@{/admin/suppliers}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'suppliers' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-building"></i></span>
-                    <span>Proveedores</span>
-                </a>
-            </div>
+            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT')">
+              <a
+                th:href="@{/expenses/debts}"
+                class="menu-link submenu"
+                th:classappend="${activePage == 'expenses_debts' ? ' active' : ''}"
+              >
+                <span class="icon"><i class="bi bi-credit-card-2-back"></i></span>
+                <span>Cuentas por pagar</span>
+              </a>
+            </th:block>
+
+            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT')">
+              <a
+                th:href="@{/expenses/fixed-costs}"
+                class="menu-link submenu"
+                th:classappend="${activePage == 'expenses_fixed_costs' ? ' active' : ''}"
+              >
+                <span class="icon"><i class="bi bi-receipt-cutoff"></i></span>
+                <span>Costos fijos mensuales</span>
+              </a>
+            </th:block>
+
+            <a
+              th:href="@{/admin/suppliers}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'suppliers' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-building"></i></span>
+              <span>Proveedores</span>
+            </a>
+          </div>
         </div>
+      </th:block>
 
-        <div class="menu-group"
-            th:with="isInventoryActive=${activePage == 'products'
-                                         or activePage == 'supplies'
-                                         or activePage == 'categories'
-                                         or activePage == 'warehouse_products_stock'
-                                         or activePage == 'warehouse_supplies_stock'
-                                         or activePage == 'warehouse_containers'}">
-           <input type="checkbox"
-                  id="menu-inventory-toggle"
-                  class="menu-toggle"
-                  th:checked="${isInventoryActive}">
-           <label class="menu-link has-children" for="menu-inventory-toggle">
-               <span class="icon"><i class="bi bi-box-seam"></i></span>
-               <span>Inventario y catálogo</span>
-               <span class="caret"><i class="bi bi-chevron-right"></i></span>
-           </label>
-           <div class="submenu-container">
-               <a th:href="@{/admin/products}"
-                  class="menu-link submenu"
-                  th:classappend="${activePage == 'products' ? ' active' : ''}">
-                   <span class="icon"><i class="bi bi-box-seam"></i></span>
-                   <span>Productos</span>
-               </a>
+      <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO')">
+        <div
+          class="menu-group"
+          th:with="isInventoryActive=${activePage == 'products'
+            or activePage == 'supplies'
+            or activePage == 'categories'
+            or activePage == 'warehouse_products_stock'
+            or activePage == 'warehouse_supplies_stock'
+            or activePage == 'warehouse_containers'
+            or activePage == 'production'}"
+        >
+          <input
+            type="checkbox"
+            id="menu-inventory-toggle"
+            class="menu-toggle"
+            th:checked="${isInventoryActive}"
+          >
 
-               <a th:href="@{/admin/supplies}"
-                  class="menu-link submenu"
-                  th:classappend="${activePage == 'supplies' ? ' active' : ''}">
-                   <span class="icon"><i class="bi bi-droplet-half"></i></span>
-                   <span>Insumos</span>
-               </a>
+          <label class="menu-link has-children" for="menu-inventory-toggle">
+            <span class="icon"><i class="bi bi-box-seam"></i></span>
+            <span>Inventario y catálogo</span>
+            <span class="caret"><i class="bi bi-chevron-right"></i></span>
+          </label>
 
-               <a th:href="@{/admin/categories}"
-                  class="menu-link submenu"
-                  th:classappend="${activePage == 'categories' ? ' active' : ''}">
-                   <span class="icon"><i class="bi bi-folder2-open"></i></span>
-                   <span>Categorías</span>
-               </a>
+          <div class="submenu-container">
+            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR')">
+              <a
+                th:href="@{/admin/products}"
+                class="menu-link submenu"
+                th:classappend="${activePage == 'products' ? ' active' : ''}"
+              >
+                <span class="icon"><i class="bi bi-box-seam"></i></span>
+                <span>Productos</span>
+              </a>
+            </th:block>
 
-               <a th:href="@{/warehouse/products-stock}"
-                  class="menu-link submenu"
-                  th:classappend="${activePage == 'warehouse_products_stock' ? ' active' : ''}">
-                   <span class="icon"><i class="bi bi-archive"></i></span>
-                   <span>Stock de productos</span>
-               </a>
+            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR')">
+              <a
+                th:href="@{/admin/supplies}"
+                class="menu-link submenu"
+                th:classappend="${activePage == 'supplies' ? ' active' : ''}"
+              >
+                <span class="icon"><i class="bi bi-droplet-half"></i></span>
+                <span>Insumos</span>
+              </a>
+            </th:block>
 
-               <a th:href="@{/containers}"
-                  class="menu-link submenu"
-                  th:classappend="${activePage == 'warehouse_containers' ? ' active' : ''}">
-                   <span class="icon"><i class="bi bi-arrow-repeat"></i></span>
-                   <span>Envases retornables</span>
-               </a>
+            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR')">
+              <a
+                th:href="@{/admin/categories}"
+                class="menu-link submenu"
+                th:classappend="${activePage == 'categories' ? ' active' : ''}"
+              >
+                <span class="icon"><i class="bi bi-folder2-open"></i></span>
+                <span>Categorías</span>
+              </a>
+            </th:block>
 
-               <a th:href="@{/warehouse/supplies-stock}"
-                  class="menu-link submenu"
-                  th:classappend="${activePage == 'warehouse_supplies_stock' ? ' active' : ''}">
-                   <span class="icon"><i class="bi bi-moisture"></i></span>
-                   <span>Stock de insumos</span>
-               </a>
-               <a th:href="@{/production}"
-                    class="menu-link submenu"
-                    th:classappend="${activePage == 'production' ? ' active' : ''}">
-                     <span class="icon"><i class="bi bi-gear-wide-connected"></i></span>
-                     <span>Producción / Planta</span>
-                 </a>
-           </div>
-       </div>
+            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR')">
+              <a
+                th:href="@{/warehouse/products-stock}"
+                class="menu-link submenu"
+                th:classappend="${activePage == 'warehouse_products_stock' ? ' active' : ''}"
+              >
+                <span class="icon"><i class="bi bi-archive"></i></span>
+                <span>Stock de productos</span>
+              </a>
+            </th:block>
 
-        <div class="menu-group"
-             th:with="isFinanceActive=${activePage == 'accounting_sales_registry'
-                                        or activePage == 'accounting_purchase_registry'
-                                        or activePage == 'cashflow'}">
-            <input type="checkbox"
-                   id="menu-finance-toggle"
-                   class="menu-toggle"
-                   th:checked="${isFinanceActive}">
-            <label class="menu-link has-children" for="menu-finance-toggle">
-                <span class="icon"><i class="bi bi-calculator"></i></span>
-                <span>Finanzas y control</span>
-                <span class="caret"><i class="bi bi-chevron-right"></i></span>
-            </label>
-            <div class="submenu-container">
-                <a th:href="@{/accounting/sales-registry}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'accounting_sales_registry' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-journal-text"></i></span>
-                    <span>Reg. ventas e ingresos</span>
-                </a>
+            <a
+              th:href="@{/containers}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'warehouse_containers' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-arrow-repeat"></i></span>
+              <span>Envases retornables</span>
+            </a>
 
-                <a th:href="@{/accounting/purchase-registry}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'accounting_purchase_registry' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-journal-check"></i></span>
-                    <span>Reg. compras y gastos</span>
-                </a>
+            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR')">
+              <a
+                th:href="@{/warehouse/supplies-stock}"
+                class="menu-link submenu"
+                th:classappend="${activePage == 'warehouse_supplies_stock' ? ' active' : ''}"
+              >
+                <span class="icon"><i class="bi bi-moisture"></i></span>
+                <span>Stock de insumos</span>
+              </a>
+            </th:block>
 
-                <a th:href="@{/cashflow}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'cashflow' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-cash-stack"></i></span>
-                    <span>Flujo de caja</span>
-                </a>
-            </div>
+            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR')">
+              <a
+                th:href="@{/production}"
+                class="menu-link submenu"
+                th:classappend="${activePage == 'production' ? ' active' : ''}"
+              >
+                <span class="icon"><i class="bi bi-gear-wide-connected"></i></span>
+                <span>Producción / Planta</span>
+              </a>
+            </th:block>
+          </div>
         </div>
+      </th:block>
 
-        <div class="menu-section-title">Gestión de marca</div>
+      <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT')">
+        <div
+          class="menu-group"
+          th:with="isFinanceActive=${activePage == 'accounting_sales_registry'
+            or activePage == 'accounting_purchase_registry'
+            or activePage == 'cashflow'}"
+        >
+          <input
+            type="checkbox"
+            id="menu-finance-toggle"
+            class="menu-toggle"
+            th:checked="${isFinanceActive}"
+          >
 
-        <div class="menu-group"
-             th:with="isMarketingActive=${activePage == 'blog_posts'
-                                          or activePage == 'blog'
-                                          or activePage == 'testimonials'}">
-            <input type="checkbox"
-                   id="menu-marketing-toggle"
-                   class="menu-toggle"
-                   th:checked="${isMarketingActive}">
-            <label class="menu-link has-children" for="menu-marketing-toggle">
-                <span class="icon"><i class="bi bi-megaphone"></i></span>
-                <span>Marketing y contenido</span>
-                <span class="caret"><i class="bi bi-chevron-right"></i></span>
-            </label>
-            <div class="submenu-container">
-                <a th:href="@{/admin/blog}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'blog_posts' or activePage == 'blog' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-journal-text"></i></span>
-                    <span>Blog / consejos</span>
-                </a>
+          <label class="menu-link has-children" for="menu-finance-toggle">
+            <span class="icon"><i class="bi bi-calculator"></i></span>
+            <span>Finanzas y control</span>
+            <span class="caret"><i class="bi bi-chevron-right"></i></span>
+          </label>
 
-                <a th:href="@{/marketing/admin/testimonials}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'testimonials' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-chat-quote"></i></span>
-                    <span>Testimonials</span>
-                </a>
-            </div>
+          <div class="submenu-container">
+            <a
+              th:href="@{/accounting/sales-registry}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'accounting_sales_registry' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-journal-text"></i></span>
+              <span>Reg. ventas e ingresos</span>
+            </a>
+
+            <a
+              th:href="@{/accounting/purchase-registry}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'accounting_purchase_registry' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-journal-check"></i></span>
+              <span>Reg. compras y gastos</span>
+            </a>
+
+            <a
+              th:href="@{/cashflow}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'cashflow' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-cash-stack"></i></span>
+              <span>Flujo de caja</span>
+            </a>
+          </div>
         </div>
+      </th:block>
+    </th:block>
 
-        <div class="menu-section-title">Sistema</div>
+    <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT')">
+      <div class="menu-section-title">Gestión de marca</div>
 
-        <div class="menu-group"
-             th:with="isSystemActive=${activePage == 'platform_settings'
-                                       or activePage == 'admin_users'
-                                       or activePage == 'job_positions'
-                                       or activePage == 'personnel_payments'
-                                       or activePage == 'admin_roles_permissions'}">
-            <input type="checkbox"
-                   id="menu-system-toggle"
-                   class="menu-toggle"
-                   th:checked="${isSystemActive}">
-            <label class="menu-link has-children" for="menu-system-toggle">
-                <span class="icon"><i class="bi bi-gear"></i></span>
-                <span>Configuración y RRHH</span>
-                <span class="caret"><i class="bi bi-chevron-right"></i></span>
-            </label>
-            <div class="submenu-container">
-                <a th:href="@{/admin/platform-settings}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'platform_settings' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-sliders"></i></span>
-                    <span>Configuración</span>
-                </a>
+      <div
+        class="menu-group"
+        th:with="isMarketingActive=${activePage == 'blog_posts'
+          or activePage == 'blog'
+          or activePage == 'testimonials'}"
+      >
+        <input
+          type="checkbox"
+          id="menu-marketing-toggle"
+          class="menu-toggle"
+          th:checked="${isMarketingActive}"
+        >
 
-                <a th:href="@{/admin/users}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'admin_users' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-people"></i></span>
-                    <span>Usuarios</span>
-                </a>
+        <label class="menu-link has-children" for="menu-marketing-toggle">
+          <span class="icon"><i class="bi bi-megaphone"></i></span>
+          <span>Marketing y contenido</span>
+          <span class="caret"><i class="bi bi-chevron-right"></i></span>
+        </label>
 
-                <a th:href="@{/admin/job-positions}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'job_positions' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-briefcase"></i></span>
-                    <span>Cargos (puestos)</span>
-                </a>
+        <div class="submenu-container">
+          <a
+            th:href="@{/admin/blog}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'blog_posts' or activePage == 'blog' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-journal-text"></i></span>
+            <span>Blog / consejos</span>
+          </a>
 
-                <a th:href="@{/admin/personnel/payments}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'personnel_payments' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-cash-stack"></i></span>
-                    <span>Pagos del personal</span>
-                </a>
-
-                <a th:href="@{/admin/roles-permissions}"
-                   class="menu-link submenu"
-                   th:classappend="${activePage == 'admin_roles_permissions' ? ' active' : ''}">
-                    <span class="icon"><i class="bi bi-shield-lock"></i></span>
-                    <span>Roles y permisos</span>
-                </a>
-            </div>
+          <a
+            th:href="@{/marketing/admin/testimonials}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'testimonials' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-chat-quote"></i></span>
+            <span>Testimonials</span>
+          </a>
         </div>
-    </div>
+      </div>
+    </th:block>
+
+    <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH','ADMIN_CONT')">
+      <div class="menu-section-title">Sistema</div>
+
+      <div
+        class="menu-group"
+        th:with="isSystemActive=${activePage == 'platform_settings'
+          or activePage == 'admin_users'
+          or activePage == 'job_positions'
+          or activePage == 'personnel_payments'
+          or activePage == 'admin_roles_permissions'}"
+      >
+        <input
+          type="checkbox"
+          id="menu-system-toggle"
+          class="menu-toggle"
+          th:checked="${isSystemActive}"
+        >
+
+        <label class="menu-link has-children" for="menu-system-toggle">
+          <span class="icon"><i class="bi bi-gear"></i></span>
+          <span>Configuración y RRHH</span>
+          <span class="caret"><i class="bi bi-chevron-right"></i></span>
+        </label>
+
+        <div class="submenu-container">
+          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN')">
+            <a
+              th:href="@{/admin/platform-settings}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'platform_settings' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-sliders"></i></span>
+              <span>Configuración</span>
+            </a>
+          </th:block>
+
+          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH')">
+            <a
+              th:href="@{/admin/users}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'admin_users' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-people"></i></span>
+              <span>Usuarios</span>
+            </a>
+          </th:block>
+
+          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH')">
+            <a
+              th:href="@{/admin/job-positions}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'job_positions' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-briefcase"></i></span>
+              <span>Cargos (puestos)</span>
+            </a>
+          </th:block>
+
+          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH','ADMIN_CONT')">
+            <a
+              th:href="@{/admin/personnel/payments}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'personnel_payments' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-cash-stack"></i></span>
+              <span>Pagos del personal</span>
+            </a>
+          </th:block>
+
+          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN')">
+            <a
+              th:href="@{/admin/roles-permissions}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'admin_roles_permissions' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-shield-lock"></i></span>
+              <span>Roles y permisos</span>
+            </a>
+          </th:block>
+        </div>
+      </div>
+    </th:block>
+  </div>
 </aside>

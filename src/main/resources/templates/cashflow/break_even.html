@@ -22,6 +22,12 @@
                 </div>
 
                 <div class="d-flex gap-2">
+                    <button type="button"
+                            class="btn btn-outline-info btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#breakEvenHelpModal">
+                        <i class="bi bi-question-circle"></i> Ayuda
+                    </button>
                     <a th:href="@{/expenses/fixed-costs}" class="btn btn-outline-secondary btn-sm">
                         <i class="bi bi-arrow-left"></i> Ver costos fijos mensuales
                     </a>
@@ -82,7 +88,7 @@
             </div>
 
             <div th:if="${#lists.isEmpty(products)}" class="alert alert-warning">
-                No hay productos activos para calcular el punto de equilibrio.
+                No hay productos activos para calcular el punto de equilibrio. Crea al menos un producto activo con precio y composición de insumos.
             </div>
 
             <div th:if="${!#lists.isEmpty(products) and result == null}" class="alert alert-info mb-3">
@@ -95,7 +101,13 @@
                     <div class="col-md-4">
                         <div class="card shadow-sm h-100 border-primary-subtle">
                             <div class="card-body">
-                                <div class="small text-muted mb-1">Escenario principal</div>
+                                                                <div class="help-label small text-muted mb-1">
+                                    <span>Escenario principal</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Precio de referencia usado como lectura base para calcular el punto de equilibrio.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
                                 <div class="fw-semibold mb-2" th:text="${result.primaryScenarioLabel}">Precio promedio real del período</div>
                                 <div class="small text-muted">
                                     <span th:if="${result.usesProfilePricing}">
@@ -112,7 +124,13 @@
                     <div class="col-md-4">
                         <div class="card shadow-sm h-100 border-success-subtle">
                             <div class="card-body">
-                                <div class="small text-muted mb-1">Costo variable unitario directo</div>
+                                                                <div class="help-label small text-muted mb-1">
+                                    <span>Costo variable unitario directo</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Costo directo por unidad según la composición real del producto.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
                                 <div class="fs-4 fw-semibold">
                                     S/.
                                     <span th:text="${#numbers.formatDecimal(result.variableUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span>
@@ -125,7 +143,13 @@
                     <div class="col-md-4">
                         <div class="card shadow-sm h-100 border-warning-subtle">
                             <div class="card-body">
-                                <div class="small text-muted mb-1">Costos fijos usados</div>
+                                                                <div class="help-label small text-muted mb-1">
+                                    <span>Costos fijos usados</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Total fijo del período que se debe cubrir con la venta del producto.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
                                 <div class="fs-4 fw-semibold">
                                     S/.
                                     <span th:text="${#numbers.formatDecimal(result.fixedCosts, 1, 'POINT', 2, 'POINT')}">0.00</span>
@@ -140,7 +164,13 @@
                     <div class="col-md-6">
                         <div class="card shadow-sm h-100">
                             <div class="card-body">
-                                <h5 class="card-title mb-2">Punto de equilibrio principal</h5>
+                                <h5 class="card-title mb-2 help-label">
+                                    <span>Punto de equilibrio principal</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Cantidad mínima de unidades necesarias para cubrir costos fijos con el escenario principal.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </h5>
                                 <div class="small text-muted mb-2">
                                     <span th:text="${result.product.name}">Producto</span>
                                     &nbsp;|&nbsp;
@@ -185,7 +215,13 @@
                     <div class="col-md-6">
                         <div class="card shadow-sm h-100">
                             <div class="card-body">
-                                <h5 class="card-title mb-2">Estado actual de ventas</h5>
+                                <h5 class="card-title mb-2 help-label">
+                                    <span>Estado actual de ventas</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Compara las unidades ya vendidas contra el punto de equilibrio calculado.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </h5>
                                 <div class="mb-3">
                                     <span class="badge"
                                           th:classappend="${result.status.name() == 'BEFORE_BREAK_EVEN' ? ' text-bg-danger' : (result.status.name() == 'AT_BREAK_EVEN' ? ' text-bg-warning' : ' text-bg-success')}">
@@ -228,7 +264,13 @@
                     <div class="card-body">
                         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
                             <div>
-                                <h5 class="card-title mb-1">Escenarios por precio</h5>
+                                <h5 class="card-title mb-1 help-label">
+                                    <span>Escenarios por precio</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Permite comparar cómo cambia el punto de equilibrio si el precio varía por perfil o promoción.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </h5>
                                 <div class="small text-muted">
                                     Cada fila recalcula el punto de equilibrio con un precio distinto. En productos con venta por perfil,
                                     esta tabla es la referencia principal para decidir cuánto necesitas vender en cada caso.
@@ -292,7 +334,13 @@
                     <div class="col-lg-5">
                         <div class="card shadow-sm h-100">
                             <div class="card-body">
-                                <h5 class="card-title mb-3">Costos fijos realmente usados</h5>
+                                <h5 class="card-title mb-3 help-label">
+                                    <span>Costos fijos realmente usados</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Categorías de costos fijos que entraron al cálculo del período seleccionado.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </h5>
                                 <div class="table-responsive">
                                     <table class="table table-sm align-middle mb-0">
                                         <thead class="table-light">
@@ -308,7 +356,7 @@
                                         </tr>
                                         <tr th:if="${#lists.isEmpty(result.fixedCostLines)}">
                                             <td colspan="2" class="text-center text-muted py-4">
-                                                No hay gastos fijos registrados en el período para las categorías usadas por el cálculo.
+                                                No hay gastos fijos registrados en el período para las categorías usadas por el cálculo. Registra o genera costos fijos mensuales para obtener un PE confiable.
                                             </td>
                                         </tr>
                                         </tbody>
@@ -327,7 +375,13 @@
                     <div class="col-lg-7">
                         <div class="card shadow-sm h-100">
                             <div class="card-body">
-                                <h5 class="card-title mb-3">Criterio del cálculo</h5>
+                                <h5 class="card-title mb-3 help-label">
+                                    <span>Criterio del cálculo</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Reglas usadas para calcular CVU, ventas comparables, costos fijos y escenarios.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </h5>
                                 <ul class="mb-3 ps-3 small">
                                     <li>El CVU sale de la composición real del producto en <strong>product_supply</strong>.</li>
                                     <li>Las ventas comparables incluyen solo pedidos <strong>PAID</strong> y <strong>CREDIT</strong>.</li>
@@ -353,6 +407,76 @@
             </div>
 
         </main>
+    </div>
+</div>
+
+
+<button type="button"
+        class="btn btn-info page-help-floating"
+        data-bs-toggle="modal"
+        data-bs-target="#breakEvenHelpModal"
+        aria-label="Abrir ayuda de Punto de equilibrio">
+    <i class="bi bi-question-circle"></i>
+    <span>Ayuda</span>
+</button>
+
+<div class="modal fade" id="breakEvenHelpModal" tabindex="-1" aria-labelledby="breakEvenHelpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content help-modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="small text-muted">Guía rápida</div>
+                    <h2 class="modal-title h5" id="breakEvenHelpModalLabel">Cómo usar Punto de equilibrio</h2>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-4">
+                    Esta página calcula cuántas unidades necesitas vender para cubrir los costos fijos del mes usando el costo variable directo y el precio de venta.
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-box-seam"></i> 1. Selecciona producto</div>
+                            <p>El producto define el precio, composición de insumos y costo variable unitario.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-calendar-month"></i> 2. Elige el mes</div>
+                            <p>El mes define qué ventas y costos fijos se usan para comparar el avance real.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-bullseye"></i> 3. Lee el PE</div>
+                            <p>El punto de equilibrio indica la cantidad mínima de unidades para cubrir la estructura del período.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-bar-chart-line"></i> 4. Compara escenarios</div>
+                            <p>Si hay precios por perfil, revisa cada escenario antes de decidir metas comerciales.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h3 class="h6">Qué revisar si el cálculo no parece correcto</h3>
+                <ul class="mb-0">
+                    <li>Verifica que el producto tenga precio y composición de insumos.</li>
+                    <li>Genera o registra costos fijos para el mes seleccionado.</li>
+                    <li>Revisa que existan ventas cerradas como PAID o CREDIT.</li>
+                    <li>Confirma que el producto seleccionado sea el correcto.</li>
+                    <li>Compara escenarios si el precio cambia por perfil de cliente.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Entendido</button>
+            </div>
+        </div>
     </div>
 </div>
 

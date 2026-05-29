@@ -15,5 +15,9 @@ public interface BlogPostRepository extends JpaRepository<BlogPost, Long> {
 
     List<BlogPost> findTop3ByStatusOrderByPublishedAtDesc(BlogPost.Status status);
 
+    List<BlogPost> findTop5ByStatusOrderByPublishedAtDesc(BlogPost.Status status);
+
+    List<BlogPost> findTop5ByStatusAndSlugNotOrderByPublishedAtDesc(BlogPost.Status status, String slug);
+
     Optional<BlogPost> findBySlugAndStatus(String slug, BlogPost.Status status);
 }

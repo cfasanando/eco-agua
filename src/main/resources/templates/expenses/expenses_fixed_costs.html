@@ -20,11 +20,18 @@
                 </div>
 
                 <div class="d-flex gap-2 flex-wrap">
-                    <a th:href="@{/cashflow/break-even}" class="btn btn-outline-dark btn-sm">
+                    <button type="button"
+                            class="btn btn-outline-info btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#fixedCostsHelpModal">
+                        <i class="bi bi-question-circle"></i>
+                        Ayuda
+                    </button>
+                    <a th:if="${featureBreakEven}" th:href="@{/cashflow/break-even}" class="btn btn-outline-dark btn-sm">
                         <i class="bi bi-bullseye me-1"></i>
                         Ir al punto de equilibrio
                     </a>
-                    <a th:href="@{/admin/price-simulator}" class="btn btn-outline-primary btn-sm">
+                    <a th:if="${featurePriceSimulator}" th:href="@{/admin/price-simulator}" class="btn btn-outline-primary btn-sm">
                         <i class="bi bi-graph-up-arrow me-1"></i>
                         Ir al simulador de precio
                     </a>
@@ -89,7 +96,13 @@
                 <div class="col-md-3">
                     <div class="card shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <div class="text-muted text-uppercase small mb-1">Base esperada del mes</div>
+                                                        <div class="help-label text-muted text-uppercase small mb-1">
+                                <span>Base esperada del mes</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Suma de plantillas mensuales activas para el mes seleccionado. Es la base planificada.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
                             <div class="display-6 fw-bold mb-1"
                                  th:text="'S/ ' + ${#numbers.formatDecimal(summary.expectedTotal, 1, 'COMMA', 2, 'POINT')}">
                                 S/ 0.00
@@ -104,7 +117,13 @@
                 <div class="col-md-3">
                     <div class="card shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <div class="text-muted text-uppercase small mb-1">Generado en egresos</div>
+                                                        <div class="help-label text-muted text-uppercase small mb-1">
+                                <span>Generado en egresos</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Monto que ya fue convertido en gastos reales dentro del módulo de egresos.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
                             <div class="display-6 fw-bold mb-1"
                                  th:text="'S/ ' + ${#numbers.formatDecimal(summary.generatedTotal, 1, 'COMMA', 2, 'POINT')}">
                                 S/ 0.00
@@ -119,7 +138,13 @@
                 <div class="col-md-3">
                     <div class="card shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <div class="text-muted text-uppercase small mb-1">Pendiente por generar</div>
+                                                        <div class="help-label text-muted text-uppercase small mb-1">
+                                <span>Pendiente por generar</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Monto de plantillas activas que todavía falta convertir en gastos reales del mes.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
                             <div class="display-6 fw-bold mb-1"
                                  th:text="'S/ ' + ${#numbers.formatDecimal(summary.pendingTotal, 1, 'COMMA', 2, 'POINT')}">
                                 S/ 0.00
@@ -134,7 +159,13 @@
                 <div class="col-md-3">
                     <div class="card shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <div class="text-muted text-uppercase small mb-1">Base usada para PE</div>
+                                                        <div class="help-label text-muted text-uppercase small mb-1">
+                                <span>Base usada para PE</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Total de plantillas marcadas para entrar al cálculo del punto de equilibrio.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
                             <div class="display-6 fw-bold mb-1"
                                  th:text="'S/ ' + ${#numbers.formatDecimal(summary.expectedBreakEvenTotal, 1, 'COMMA', 2, 'POINT')}">
                                 S/ 0.00
@@ -149,7 +180,13 @@
 
             <div class="card mb-3 shadow-sm">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <span><strong>Generación mensual</strong></span>
+                    <span class="d-inline-flex align-items-center gap-2">
+                            <strong>Generación mensual</strong>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Convierte las plantillas activas del mes en gastos reales, evitando duplicados.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </span>
                     <form method="post" th:action="@{/expenses/fixed-costs/generate-month}" class="d-flex gap-2">
                         <input type="hidden" name="year" th:value="${year}">
                         <input type="hidden" name="month" th:value="${month}">
@@ -184,7 +221,13 @@
 
             <div class="card mb-3 shadow-sm">
                 <div class="card-header bg-light">
-                    <strong>Registrar plantilla mensual</strong>
+                    <span class="d-inline-flex align-items-center gap-2">
+                        <strong>Registrar plantilla mensual</strong>
+                        <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                title="Registra costos repetitivos como alquiler, luz, sueldos, servicios o mantenimiento.">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
+                    </span>
                 </div>
                 <div class="card-body">
                     <form class="row g-2 align-items-end" method="post" th:action="@{/expenses/fixed-costs/templates}">
@@ -247,7 +290,13 @@
 
             <div class="card mb-3 shadow-sm">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <span><strong>Plantillas del mes</strong></span>
+                    <span class="d-inline-flex align-items-center gap-2">
+                            <strong>Plantillas del mes</strong>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Lista de costos fijos planificados para el mes, su estado y si entran al punto de equilibrio.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </span>
                     <span class="small text-muted" th:text="'Total plantillas: ' + ${#lists.size(summary.rows)}">Total plantillas: 0</span>
                 </div>
                 <div class="card-body p-0">
@@ -325,7 +374,7 @@
                     </div>
 
                     <div class="alert alert-light mb-0 text-center" th:if="${#lists.isEmpty(summary.rows)}">
-                        Todavía no has registrado plantillas mensuales.
+                        Todavía no has registrado plantillas mensuales. Crea al menos una plantilla para generar gastos fijos del mes y alimentar el punto de equilibrio.
                     </div>
                 </div>
             </div>
@@ -334,7 +383,13 @@
                 <div class="col-md-6">
                     <div class="card shadow-sm border-0 h-100">
                         <div class="card-body">
-                            <div class="text-muted text-uppercase small mb-1">Costos fijos registrados del periodo</div>
+                                                        <div class="help-label text-muted text-uppercase small mb-1">
+                                <span>Costos fijos registrados del periodo</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Total real encontrado en egresos para el período. Puede incluir gastos manuales además de los generados.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
                             <div class="display-6 fw-bold mb-1"
                                  th:text="'S/ ' + ${#numbers.formatDecimal(totalFixedCosts != null ? totalFixedCosts : 0, 1, 'COMMA', 2, 'POINT')}">
                                 S/ 0.00
@@ -363,7 +418,13 @@
 
             <div class="card shadow-sm">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <span><strong>Detalle por categoría registrada</strong></span>
+                    <span class="d-inline-flex align-items-center gap-2">
+                            <strong>Detalle por categoría registrada</strong>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Agrupa los costos fijos reales del período por categoría de egreso.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </span>
                     <span class="small text-muted"
                           th:if="${breakdown != null and !#maps.isEmpty(breakdown)}"
                           th:text="'Total categorías: ' + ${#maps.size(breakdown)}">
@@ -395,12 +456,82 @@
                     </div>
 
                     <div class="alert alert-light mb-0 text-center" th:if="${breakdown == null or #maps.isEmpty(breakdown)}">
-                        No hay costos fijos registrados en el periodo seleccionado.
+                        No hay costos fijos registrados en el periodo seleccionado. Genera los gastos del mes o registra egresos fijos manualmente.
                     </div>
                 </div>
             </div>
 
         </main>
+    </div>
+</div>
+
+
+<button type="button"
+        class="btn btn-info page-help-floating"
+        data-bs-toggle="modal"
+        data-bs-target="#fixedCostsHelpModal"
+        aria-label="Abrir ayuda de Costos fijos mensuales">
+    <i class="bi bi-question-circle"></i>
+    <span>Ayuda</span>
+</button>
+
+<div class="modal fade" id="fixedCostsHelpModal" tabindex="-1" aria-labelledby="fixedCostsHelpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content help-modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="small text-muted">Guía rápida</div>
+                    <h2 class="modal-title h5" id="fixedCostsHelpModalLabel">Cómo usar Costos fijos mensuales</h2>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-4">
+                    Esta página sirve para planificar los costos fijos del mes, convertirlos en egresos reales y alimentar el punto de equilibrio.
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-list-check"></i> 1. Registra plantillas</div>
+                            <p>Crea plantillas para costos repetitivos como alquiler, luz, sueldos, servicios o mantenimiento.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-calendar3"></i> 2. Elige año y mes</div>
+                            <p>El filtro define el período donde se revisan plantillas, gastos generados y costos usados para análisis.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-magic"></i> 3. Genera gastos</div>
+                            <p>El botón crea gastos reales del mes a partir de las plantillas activas y evita duplicar lo ya generado.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-bullseye"></i> 4. Revisa el PE</div>
+                            <p>Las plantillas marcadas como PE alimentan el cálculo del punto de equilibrio para saber cuánto vender.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h3 class="h6">Qué hacer si los totales están en cero</h3>
+                <ul class="mb-0">
+                    <li>Crea plantillas mensuales activas.</li>
+                    <li>Marca PE si ese costo debe entrar al punto de equilibrio.</li>
+                    <li>Haz clic en Generar gastos del mes.</li>
+                    <li>Verifica que el año y mes seleccionados sean correctos.</li>
+                    <li>Revisa el módulo de egresos si registraste costos manualmente.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Entendido</button>
+            </div>
+        </div>
     </div>
 </div>
 

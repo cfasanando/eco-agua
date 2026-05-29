@@ -1,5 +1,6 @@
 package com.ecoamazonas.eco_agua.blog;
 
+import com.ecoamazonas.eco_agua.config.BusinessProperties;
 import com.ecoamazonas.eco_agua.config.PlatformSettingService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -18,99 +19,112 @@ public class PublicBlogController {
 
     private final BlogPostRepository blogPostRepository;
     private final PlatformSettingService platformSettingService;
+    private final BusinessProperties businessProperties;
 
-    // Default WhatsApp number from application.properties (fallback)
     @Value("${ecoagua.whatsapp.number:51980542101}")
     private String defaultWhatsappNumber;
 
     public PublicBlogController(BlogPostRepository blogPostRepository,
-                                PlatformSettingService platformSettingService) {
+                                PlatformSettingService platformSettingService,
+                                BusinessProperties businessProperties) {
         this.blogPostRepository = blogPostRepository;
         this.platformSettingService = platformSettingService;
+        this.businessProperties = businessProperties;
     }
 
     @GetMapping
     public String blogIndex(Model model) {
-        // All published posts, newest first
-        List<BlogPost> posts =
-                blogPostRepository.findAllByStatusOrderByPublishedAtDesc(BlogPost.Status.PUBLISHED);
+        List<BlogPost> posts = blogPostRepository.findAllByStatusOrderByPublishedAtDesc(BlogPost.Status.PUBLISHED);
+        List<BlogPost> latestPosts = blogPostRepository.findTop5ByStatusOrderByPublishedAtDesc(BlogPost.Status.PUBLISHED);
 
         model.addAttribute("posts", posts);
-
-        // Add shared public layout settings (header/footer/topbar)
+        model.addAttribute("latestPosts", latestPosts);
         addPublicLayoutSettings(model);
+        addBlogPageSettings(model);
 
-        // Matches templates/public/blog/list.html
         return "public/blog/list";
     }
 
     @GetMapping("/{slug}")
     public String blogDetail(@PathVariable String slug, Model model) {
-        // Only published posts
         BlogPost post = blogPostRepository
                 .findBySlugAndStatus(slug, BlogPost.Status.PUBLISHED)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        // Sidebar: last 3 posts
-        List<BlogPost> latest =
-                blogPostRepository.findTop3ByStatusOrderByPublishedAtDesc(BlogPost.Status.PUBLISHED);
+        List<BlogPost> latest = blogPostRepository.findTop5ByStatusAndSlugNotOrderByPublishedAtDesc(
+                BlogPost.Status.PUBLISHED,
+                slug
+        );
 
         model.addAttribute("post", post);
         model.addAttribute("latestPosts", latest);
-
-        // Shared layout settings
         addPublicLayoutSettings(model);
+        addBlogPageSettings(model);
 
-        // Matches templates/public/blog/detail.html
         return "public/blog/detail";
     }
 
-    /**
-     * Adds common public layout settings to the model
-     * so all blog pages share the same header/footer configuration.
-     */
     private void addPublicLayoutSettings(Model model) {
-        // Basic platform info
-        String platformName = platformSettingService.get("platform.name", "Eco del Amazonas");
-        String platformTagline = platformSettingService.get("platform.tagline", "Agua de mesa");
-        String platformLogo = platformSettingService.get("platform.logo", "/img/logo3-transparente.png");
+        String platformName = setting("platform.name", businessProperties.getName());
+        String platformTagline = setting("platform.tagline", businessProperties.getTagline());
+        String platformLogo = setting("platform.logo", businessProperties.getLogo());
+        String topbarLocation = setting("public.topbar.location", businessProperties.getLocation());
+        String topbarPhone = setting("public.topbar.phone", businessProperties.getPhone());
+        String topbarWhatsappLabel = setting("public.topbar.whatsapp_label", businessProperties.getTopbarWhatsappLabel());
+        String whatsappNumber = setting("public.whatsapp.number", getDefaultWhatsappNumber());
+        String footerRight = setting("public.footer.right", businessProperties.getFooterRight());
 
-        // Top bar settings
-        String topbarLocation = platformSettingService.get(
-                "public.topbar.location",
-                "Reparto en Iquitos y alrededores"
-        );
-        String topbarPhone = platformSettingService.get(
-                "public.topbar.phone",
-                "(065) 000000"
-        );
-        String topbarWhatsappLabel = platformSettingService.get(
-                "public.topbar.whatsapp_label",
-                "Pedidos por WhatsApp"
-        );
-
-        // WhatsApp number (DB or fallback)
-        String whatsappNumber = platformSettingService.get(
-                "public.whatsapp.number",
-                defaultWhatsappNumber
-        );
-
-        // Footer right text
-        String footerRight = platformSettingService.get(
-                "public.footer.right",
-                "Servicio de agua purificada a domicilio - Iquitos, Perú"
-        );
-
-        // Add attributes to model (used by blog/list.html y blog/detail.html)
         model.addAttribute("platformName", platformName);
         model.addAttribute("platformTagline", platformTagline);
         model.addAttribute("platformLogo", platformLogo);
-
         model.addAttribute("topbarLocation", topbarLocation);
         model.addAttribute("topbarPhone", topbarPhone);
+        model.addAttribute("topbarPhoneLabel", setting("public.topbar.phone_label", "Central:"));
         model.addAttribute("topbarWhatsappLabel", topbarWhatsappLabel);
         model.addAttribute("whatsappNumber", whatsappNumber);
-
         model.addAttribute("footerRight", footerRight);
+
+        model.addAttribute("publicPrimaryColor", setting("public.theme.primary_color", "#2e7d32"));
+        model.addAttribute("publicSecondaryColor", setting("public.theme.secondary_color", "#0277bd"));
+        model.addAttribute("publicNavHomeLabel", setting("public.nav.home_label", "Inicio"));
+        model.addAttribute("publicNavCatalogLabel", setting("public.nav.catalog_label", "Catálogo"));
+        model.addAttribute("publicNavBlogLabel", setting("public.nav.blog_label", "Blog & consejos"));
+        model.addAttribute("publicNavWhatsappLabel", setting("public.nav.whatsapp_label", "Pedir por WhatsApp"));
+        model.addAttribute("publicAccessLabel", setting("public.nav.access_label", "Acceso colaboradores"));
+    }
+
+    private void addBlogPageSettings(Model model) {
+        model.addAttribute("blogPageTitle", setting("public.blog.page_title", "Blog & consejos"));
+        model.addAttribute("blogPageSubtitle", setting("public.blog.subtitle", "Ideas, tips y recomendaciones para nuestros clientes."));
+        model.addAttribute("blogBullet1", setting("public.blog.bullet_1", "Consejos prácticos para el día a día."));
+        model.addAttribute("blogBullet2", setting("public.blog.bullet_2", "Recomendaciones para familias y negocios."));
+        model.addAttribute("blogBullet3", setting("public.blog.bullet_3", "Información útil para comprar mejor."));
+        model.addAttribute("blogHeroImage", setting("public.blog.hero_image", "/img/banner02.jpg"));
+        model.addAttribute("blogEmptyText", setting("public.blog.empty_text", "Próximamente publicaremos nuestros primeros artículos."));
+        model.addAttribute("blogAboutTitle", setting("public.blog.about_title", "Sobre " + businessProperties.getName()));
+        model.addAttribute("blogAboutText1", setting("public.blog.about_text_1", "Compartimos información útil para nuestros clientes."));
+        model.addAttribute("blogAboutText2", setting("public.blog.about_text_2", "Nuestro objetivo es ayudarte a elegir mejor y coordinar tus pedidos con confianza."));
+        model.addAttribute("blogCtaTitle", setting("public.blog.cta_title", "¿Necesitas hacer un pedido?"));
+        model.addAttribute("blogCtaText", setting("public.blog.cta_text", "Escríbenos por WhatsApp y coordinamos tu atención."));
+        model.addAttribute("blogCtaButtonLabel", setting("public.blog.cta_button_label", "Pedir por WhatsApp"));
+        model.addAttribute("blogLatestTitle", setting("public.blog.latest_title", "Últimos artículos"));
+        model.addAttribute("blogArticleCtaText", setting("public.blog.article_cta_text", "¿Te sirvió esta información? Escríbenos por WhatsApp para coordinar tu pedido."));
+        model.addAttribute("blogArticleCtaButtonLabel", setting("public.blog.article_cta_button_label", "Pedir por WhatsApp"));
+        model.addAttribute("blogQuickTipTitle", setting("public.blog.quick_tip_title", "Consejo rápido"));
+        model.addAttribute("blogQuickTipText", setting("public.blog.quick_tip_text", "Consulta siempre la disponibilidad antes de coordinar tu pedido."));
+    }
+
+    private String setting(String variable, String defaultValue) {
+        return platformSettingService.get(variable, defaultValue);
+    }
+
+    private String getDefaultWhatsappNumber() {
+        String configuredNumber = businessProperties.getWhatsappNumber();
+
+        if (configuredNumber != null && !configuredNumber.isBlank()) {
+            return configuredNumber;
+        }
+
+        return defaultWhatsappNumber;
     }
 }

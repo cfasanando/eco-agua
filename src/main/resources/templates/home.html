@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/head_admin :: adminHead('Inicio - Eco Agua')"></head>
+<head th:replace="fragments/head_admin :: adminHead('Inicio - Sistema integral')"></head>
 
 <body>
 <style>
@@ -116,7 +116,9 @@
     <div class="main-content">
         <header th:replace="fragments/topbar :: topbar"></header>
 
-        <main class="content-wrapper">
+        <main class="content-wrapper admin-home-page"
+              th:classappend="${adminHomeBackgroundImage != null and !#strings.isEmpty(adminHomeBackgroundImage)} ? ' has-admin-home-background' : ''"
+              th:style="${adminHomeBackgroundImage != null and !#strings.isEmpty(adminHomeBackgroundImage)} ? 'background-image: linear-gradient(rgba(243,245,249,0.88), rgba(243,245,249,0.88)), url(' + ${adminHomeBackgroundImage} + ');' : ''">
 
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h1 class="h5 mb-0">Inicio</h1>
@@ -124,6 +126,29 @@
                     <span th:text="${today}">2025-11-23</span>
                 </div>
             </div>
+
+            <section class="admin-home-hero mb-3">
+                <div class="admin-home-hero-copy">
+                    <span class="admin-home-kicker">Panel administrativo</span>
+                    <h2 th:text="${adminBrandTitle != null and !#strings.isEmpty(adminBrandTitle) ? adminBrandTitle : (businessName != null and !#strings.isEmpty(businessName) ? businessName : 'Sistema integral')}">
+                        Productos de la Selva Belén
+                    </h2>
+                    <p th:text="${adminBrandSubtitle != null and !#strings.isEmpty(adminBrandSubtitle) ? adminBrandSubtitle : (businessAdminTitle != null and !#strings.isEmpty(businessAdminTitle) ? businessAdminTitle : 'Sistema integral')}">
+                        Sistema integral
+                    </p>
+                    <div class="admin-home-hero-badges">
+                        <span><i class="bi bi-shop-window"></i> Gestión del negocio</span>
+                        <span><i class="bi bi-whatsapp"></i> Pedidos y atención</span>
+                        <span><i class="bi bi-graph-up-arrow"></i> Control diario</span>
+                    </div>
+                </div>
+                <div class="admin-home-hero-logo-wrap">
+                    <img th:src="${adminBrandLogo != null and !#strings.isEmpty(adminBrandLogo) ? adminBrandLogo : (businessAdminLogo != null and !#strings.isEmpty(businessAdminLogo) ? businessAdminLogo : '/img/logo-eco.png')}"
+                         th:alt="${adminBrandTitle != null and !#strings.isEmpty(adminBrandTitle) ? adminBrandTitle : (businessName != null and !#strings.isEmpty(businessName) ? businessName : 'Sistema integral')}"
+                         alt="Sistema integral"
+                         class="admin-home-hero-logo">
+                </div>
+            </section>
 
             <div class="home-widgets-toolbar">
                 <div class="toolbar-actions">
@@ -732,7 +757,7 @@
                 </div>
 
                 <div class="mt-2">
-                    <a th:href="@{/cashflow/break-even(productId=${homeBreakEvenProductId},year=${homeBreakEvenYear},month=${homeBreakEvenMonth})}"
+                    <a th:if="${featureBreakEven}" th:href="@{/cashflow/break-even(productId=${homeBreakEvenProductId},year=${homeBreakEvenYear},month=${homeBreakEvenMonth})}"
                        class="btn btn-sm btn-outline-dark">
                         <i class="bi bi-graph-up-arrow me-1"></i>
                         Ver detalle

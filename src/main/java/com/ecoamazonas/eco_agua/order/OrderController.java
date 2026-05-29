@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -56,12 +57,22 @@ public class OrderController {
     }
 
     @GetMapping("/new")
-    public String newOrderForm(Model model) {
+    public String newOrderForm(
+            @RequestParam(value = "orderDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate orderDate,
+            @RequestParam(value = "returnTo", required = false) String returnTo,
+            Model model
+    ) {
         LocalDate today = LocalDate.now();
+        LocalDate selectedOrderDate = orderDate != null ? orderDate : today;
+        String safeReturnTo = resolveRedirectTarget(returnTo, "/home");
         Map<Long, Integer> clientContainerBalances = clientContainerService.getCurrentBalanceMap();
 
-        model.addAttribute("activePage", "home");
+        model.addAttribute("activePage", resolveActivePage(safeReturnTo));
         model.addAttribute("today", today);
+        model.addAttribute("orderDate", selectedOrderDate);
+        model.addAttribute("returnTo", safeReturnTo);
+        model.addAttribute("cancelUrl", safeReturnTo);
         model.addAttribute("clients", clientRepository.findByActiveTrueOrderByNameAsc());
         model.addAttribute("products", productService.findAllActiveForOrder());
         model.addAttribute(
@@ -91,6 +102,7 @@ public class OrderController {
             @RequestParam(value = "unitPrice", required = false) List<BigDecimal> unitPrices,
             @RequestParam(value = "lineTotal", required = false) List<BigDecimal> lineTotals,
             @RequestParam("action") String action,
+            @RequestParam(value = "returnTo", required = false) String returnTo,
             RedirectAttributes redirectAttributes
     ) {
         try {
@@ -125,15 +137,15 @@ public class OrderController {
             );
             redirectAttributes.addFlashAttribute("messageType", "success");
 
-            return "redirect:/home";
+            return "redirect:" + resolveOrderSavedRedirect(order, returnTo);
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("message", ex.getMessage());
             redirectAttributes.addFlashAttribute("messageType", "error");
-            return "redirect:/orders/new";
+            return "redirect:" + buildNewOrderRedirect(orderDate, returnTo);
         } catch (Exception ex) {
             redirectAttributes.addFlashAttribute("message", "Error al guardar el pedido: " + ex.getMessage());
             redirectAttributes.addFlashAttribute("messageType", "error");
-            return "redirect:/orders/new";
+            return "redirect:" + buildNewOrderRedirect(orderDate, returnTo);
         }
     }
 
@@ -229,6 +241,54 @@ public class OrderController {
         model.addAttribute("daysSinceOrder", daysSinceOrder);
 
         return "orders/order_detail";
+    }
+
+
+    private String resolveOrderSavedRedirect(SaleOrder order, String returnTo) {
+        String safeReturnTo = resolveRedirectTarget(returnTo, "/home");
+        LocalDate effectiveOrderDate = order.getOrderDate() != null ? order.getOrderDate() : LocalDate.now();
+
+        if (safeReturnTo.startsWith("/income/")) {
+            if (order.getStatus() == OrderStatus.PAID) {
+                return "/income/sales?mode=DAY&date=" + effectiveOrderDate;
+            }
+
+            if (order.getStatus() == OrderStatus.CREDIT) {
+                return "/income/credit?startDate=" + effectiveOrderDate + "&endDate=" + effectiveOrderDate;
+            }
+
+            return "/home";
+        }
+
+        return safeReturnTo;
+    }
+
+    private String buildNewOrderRedirect(LocalDate orderDate, String returnTo) {
+        LocalDate effectiveOrderDate = orderDate != null ? orderDate : LocalDate.now();
+        UriComponentsBuilder builder = UriComponentsBuilder
+                .fromPath("/orders/new")
+                .queryParam("orderDate", effectiveOrderDate);
+
+        String safeReturnTo = resolveRedirectTarget(returnTo, "");
+        if (!safeReturnTo.isBlank()) {
+            builder.queryParam("returnTo", safeReturnTo);
+        }
+
+        return builder.toUriString();
+    }
+
+    private String resolveActivePage(String returnTo) {
+        String safeReturnTo = resolveRedirectTarget(returnTo, "/home");
+
+        if (safeReturnTo.startsWith("/income/sales")) {
+            return "income_sales";
+        }
+
+        if (safeReturnTo.startsWith("/income/credit")) {
+            return "income_credit";
+        }
+
+        return "home";
     }
 
     private String resolveRedirectTarget(String redirect, String defaultPath) {

@@ -1,0 +1,545 @@
+==== BLOG / PUBLIC / TEMPLATES ====
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPost.java
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostForm.java
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostRepository.java
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java
+src/main/resources/templates/public/blog/detail.html
+src/main/resources/templates/public/blog/list.html
+src/main/resources/templates/public/blog_detail.html
+src/main/resources/templates/public/blog_list.html
+src/main/resources/templates/public/catalog.html
+src/main/resources/templates/public/home.html
+src/main/resources/static/css/admin.css
+src/main/resources/static/css/login.css
+src/main/resources/static/css/public.css
+
+==== SEARCH: blog templates ====
+src/main/resources/templates/admin/blog/form.html:8:<div class="app-layout" th:with="activePage='blog_posts'">
+src/main/resources/templates/admin/blog/form.html:32:                                            <a th:href="@{/admin/blog}">Blog / consejos</a>
+src/main/resources/templates/admin/blog/form.html:45:                                    Completa el contenido que se mostrará en la sección de blog de la web.
+src/main/resources/templates/admin/blog/form.html:49:                                <a class="btn btn-outline-secondary btn-sm" th:href="@{/admin/blog}">
+src/main/resources/templates/admin/blog/form.html:59:                                      th:action="@{/admin/blog/save}"
+src/main/resources/templates/admin/blog/form.html:60:                                      method="post"
+src/main/resources/templates/admin/blog/form.html:101:                                                          placeholder="Resumen corto que se verá en la tarjeta del blog..."></textarea>
+src/main/resources/templates/admin/blog/index.html:3:<head th:replace="~{fragments/head_admin :: adminHead('Blog / artículos')}"></head>
+src/main/resources/templates/admin/blog/index.html:24:                                Blog / consejos
+src/main/resources/templates/admin/blog/index.html:28:                    <h1 class="h4 mb-0">Blog & consejos de hidratación</h1>
+src/main/resources/templates/admin/blog/index.html:36:                       th:href="@{/admin/blog/new}">
+src/main/resources/templates/admin/blog/index.html:43:            <!-- Tabla de posts -->
+src/main/resources/templates/admin/blog/index.html:46:                    <div th:if="${#lists.isEmpty(posts)}" class="p-3 text-muted small">
+src/main/resources/templates/admin/blog/index.html:51:                    <div th:if="${!#lists.isEmpty(posts)}" class="table-responsive">
+src/main/resources/templates/admin/blog/index.html:66:                            <tr th:each="post : ${posts}">
+src/main/resources/templates/admin/blog/index.html:67:                                <td th:text="${post.id}">1</td>
+src/main/resources/templates/admin/blog/index.html:70:                                         th:text="${post.title}">Título</div>
+src/main/resources/templates/admin/blog/index.html:72:                                        <span th:text="${post.slug}">slug-ejemplo</span>
+src/main/resources/templates/admin/blog/index.html:76:                                    th:text="${post.slug}">
+src/main/resources/templates/admin/blog/index.html:81:                                          th:if="${post.status.name() == 'DRAFT'}">
+src/main/resources/templates/admin/blog/index.html:85:                                          th:if="${post.status.name() == 'PUBLISHED'}">
+src/main/resources/templates/admin/blog/index.html:89:                                          th:if="${post.status.name() == 'SCHEDULED'}">
+src/main/resources/templates/admin/blog/index.html:94:                                    th:text="${post.publishedAt != null ? #temporals.format(post.publishedAt, 'dd/MM/yyyy HH:mm') : '-'}">
+src/main/resources/templates/admin/blog/index.html:99:                                       th:href="@{|/admin/blog/${post.id}/edit|}">
+src/main/resources/templates/admin/blog/list.html:3:<head th:replace="~{fragments/head_admin :: adminHead('Blog / artículos')}"></head>
+src/main/resources/templates/admin/blog/list.html:13:        <main class="app-content blog-admin-page">
+src/main/resources/templates/admin/blog/list.html:24:                            'Blog / consejos',
+src/main/resources/templates/admin/blog/list.html:30:                        <h1 class="h4 mb-0">Blog & consejos de hidratación</h1>
+src/main/resources/templates/admin/blog/list.html:36:                        <a class="btn btn-primary btn-sm" th:href="@{/admin/blog/new}">
+src/main/resources/templates/admin/blog/list.html:45:                        <div th:if="${#lists.isEmpty(posts)}" class="p-3 text-muted small">
+src/main/resources/templates/admin/blog/list.html:50:                        <div th:if="${!#lists.isEmpty(posts)}" class="table-responsive">
+src/main/resources/templates/admin/blog/list.html:63:                                <tr th:each="post : ${posts}">
+src/main/resources/templates/admin/blog/list.html:64:                                    <td th:text="${post.id}">1</td>
+src/main/resources/templates/admin/blog/list.html:66:                                        <div class="fw-semibold" th:text="${post.title}">Título</div>
+src/main/resources/templates/admin/blog/list.html:67:                                        <div class="small text-muted d-md-none" th:text="${post.slug}">slug</div>
+src/main/resources/templates/admin/blog/list.html:69:                                    <td class="small text-muted d-none d-md-table-cell" th:text="${post.slug}">slug</td>
+src/main/resources/templates/admin/blog/list.html:72:                                              th:if="${post.status.name() == 'DRAFT'}">Borrador</span>
+src/main/resources/templates/admin/blog/list.html:74:                                              th:if="${post.status.name() == 'PUBLISHED'}">Publicado</span>
+src/main/resources/templates/admin/blog/list.html:76:                                              th:if="${post.status.name() == 'SCHEDULED'}">Programado</span>
+src/main/resources/templates/admin/blog/list.html:79:                                        th:text="${post.publishedAt != null ? #temporals.format(post.publishedAt,'dd/MM/yyyy HH:mm') : '-'}">
+src/main/resources/templates/admin/blog/list.html:84:                                           th:href="@{|/admin/blog/${post.id}/edit|}">
+src/main/resources/templates/admin/blog/list.html:87:                                        <form th:action="@{|/admin/blog/${post.id}/delete|}"
+src/main/resources/templates/admin/blog/list.html:88:                                              method="post"
+src/main/resources/templates/admin/categories.html:129:                                                <form th:action="@{|/admin/categories/${c.id}/delete|}" method="post" class="d-inline">
+src/main/resources/templates/admin/categories.html:156:                            <form th:action="@{/admin/categories/save}" method="post" id="categoryForm" class="row g-3">
+src/main/resources/templates/admin/categories.html:305:                method: 'POST',
+src/main/resources/templates/admin/clients.html:189:                                      method="post"
+src/main/resources/templates/admin/clients.html:214:            <form id="clientForm" th:action="@{/admin/clients/save}" method="post">
+src/main/resources/templates/admin/client_profiles.html:82:                                      method="post" class="d-inline delete-form-single">
+src/main/resources/templates/admin/client_profiles.html:104:            <form id="profileForm" th:action="@{/admin/client-profiles/save}" method="post">
+src/main/resources/templates/admin/delivery_zones/list.html:47:                                  method="post" novalidate>
+src/main/resources/templates/admin/delivery_zones/list.html:164:                                                  method="post"
+src/main/resources/templates/admin/job_positions.html:94:                                          method="post"
+src/main/resources/templates/admin/job_positions.html:125:            <form id="jobPositionForm" th:action="@{/admin/job-positions/save}" method="post">
+src/main/resources/templates/admin/personnel_payments.html:198:                                <form method="post"
+src/main/resources/templates/admin/personnel_payments.html:279:                                <form method="post"
+src/main/resources/templates/admin/personnel_payments.html:379:                        <form method="post"
+src/main/resources/templates/admin/personnel_payments.html:447:                        <form method="post"
+src/main/resources/templates/admin/personnel_payments.html:707:                                                  method="post"
+src/main/resources/templates/admin/personnel_payments.html:719:                                                  method="post"
+src/main/resources/templates/admin/platform_settings.html:39:            <form id="settingsForm" method="post" th:action="@{/admin/platform-settings}">
+src/main/resources/templates/admin/platform_settings.html:96:                                              method="post"
+src/main/resources/templates/admin/products.html:178:                                      method="post" class="d-inline delete-form-single">
+src/main/resources/templates/admin/products.html:203:                  method="post"
+src/main/resources/templates/admin/products.html:310:                  method="post">
+src/main/resources/templates/admin/promotions.html:164:                                  method="post" class="d-inline delete-form-single ms-1">
+src/main/resources/templates/admin/promotions.html:191:                  method="post"
+src/main/resources/templates/admin/promotions.html:294:                  method="post">
+src/main/resources/templates/admin/roles_permissions.html:62:                                <!-- Debe coincidir con tu @PostMapping("/{roleId}/permissions") -->
+src/main/resources/templates/admin/roles_permissions.html:63:                                <form th:action="@{/admin/roles-permissions/save}" method="post">                                      
+src/main/resources/templates/admin/suppliers.html:114:                                      method="post"
+src/main/resources/templates/admin/suppliers.html:141:                  method="post">
+src/main/resources/templates/admin/supplies.html:129:                                      method="post"
+src/main/resources/templates/admin/supplies.html:156:                  method="post">
+src/main/resources/templates/admin/users.html:88:            <form th:action="@{/admin/users/save}" method="post">
+src/main/resources/templates/delivery/daily_detail.html:55:                            <form th:action="@{|/delivery/orders/${order.id}/route|}" method="post" class="row g-2">
+src/main/resources/templates/delivery/daily_detail.html:82:                            <form th:action="@{|/delivery/orders/${order.id}/status|}" method="post" class="row g-2">
+src/main/resources/templates/expenses/expenses_by_date.html:115:                                          method="post"
+src/main/resources/templates/expenses/expenses_by_date.html:156:                  method="post">
+src/main/resources/templates/expenses/expenses_by_date.html:302:            <form id="editExpenseForm" method="post">
+src/main/resources/templates/expenses/expenses_fixed_costs.html:190:                    <form method="post" th:action="@{/expenses/fixed-costs/generate-month}" class="d-flex gap-2">
+src/main/resources/templates/expenses/expenses_fixed_costs.html:233:                    <form class="row g-2 align-items-end" method="post" th:action="@{/expenses/fixed-costs/templates}">
+src/main/resources/templates/expenses/expenses_fixed_costs.html:350:                                        <form method="post" th:action="@{|/expenses/fixed-costs/templates/${row.templateId}/toggle|}">
+src/main/resources/templates/expenses/expenses_fixed_costs.html:359:                                        <form method="post"
+src/main/resources/templates/fragments/sidebar.html:448:        or activePage == 'blog_posts'
+src/main/resources/templates/fragments/sidebar.html:449:        or activePage == 'blog'
+src/main/resources/templates/fragments/sidebar.html:477:            th:if="${featureBlog}"
+src/main/resources/templates/fragments/sidebar.html:478:            th:href="@{/admin/blog}"
+src/main/resources/templates/fragments/sidebar.html:480:            th:classappend="${activePage == 'blog_posts' or activePage == 'blog' ? ' active' : ''}"
+src/main/resources/templates/fragments/sidebar.html:483:            <span>Blog / consejos</span>
+src/main/resources/templates/fragments/topbar.html:18:        <form th:action="@{/logout}" method="post" class="d-inline">
+src/main/resources/templates/home.html:416:                                                              method="post"
+src/main/resources/templates/home.html:817:                                                              method="post"
+src/main/resources/templates/home.html:919:                                                              method="post"
+src/main/resources/templates/home.html:1002:                                                              method="post"
+src/main/resources/templates/home.html:1015:                                                              method="post"
+src/main/resources/templates/home.html:1055:<form id="cancelOrderForm" method="post">
+src/main/resources/templates/home.html:1070:                  method="post">
+src/main/resources/templates/home.html:1221:            <form id="editExpenseForm" method="post">
+src/main/resources/templates/income/credit_detail.html:56:                            <form th:action="@{|/income/credit/${order.id}/due-date|}" method="post" class="row g-2 align-items-end">
+src/main/resources/templates/income/credit_detail.html:77:                            <form th:action="@{|/income/credit/${order.id}/payments|}" method="post" class="row g-3">
+src/main/resources/templates/income/other_income_placeholder.html:79:                          method="post">
+src/main/resources/templates/income/other_income_placeholder.html:175:            <form th:action="@{/income/others}" method="post">
+src/main/resources/templates/login.html:38:    <form th:action="@{/login}" method="post" autocomplete="off">
+src/main/resources/templates/logout.html:19:            <form id="logoutForm" th:action="@{/logout}" method="post">
+src/main/resources/templates/marketing/admin_campaigns.html:45:                    <a th:href="@{/admin/blog}" class="btn btn-outline-dark btn-sm">
+src/main/resources/templates/marketing/admin_campaigns.html:46:                        <i class="bi bi-journal-text"></i> Blog
+src/main/resources/templates/marketing/admin_campaigns.html:78:                                <span>Posts publicados</span>
+src/main/resources/templates/marketing/admin_campaigns.html:84:                            <div class="fs-4 fw-semibold" th:text="${snapshot.publishedPostCount}">0</div>
+src/main/resources/templates/marketing/admin_campaigns.html:100:                            <div class="fs-4 fw-semibold" th:text="${snapshot.draftPostCount}">0</div>
+src/main/resources/templates/marketing/admin_campaigns.html:163:                                            title="Promociones, posts y testimonios que ya pueden moverse comercialmente.">
+src/main/resources/templates/marketing/admin_campaigns.html:283:                                    <span>Contenido blog</span>
+src/main/resources/templates/marketing/admin_campaigns.html:291:                            <a th:href="@{/admin/blog}" class="btn btn-outline-dark btn-sm">Gestionar</a>
+src/main/resources/templates/marketing/admin_campaigns.html:298:                                        <div class="fw-semibold" th:text="${asset.title}">Post</div>
+src/main/resources/templates/marketing/admin_campaigns.html:429:                            <p>Los posts publicados y drafts sirven para educar al cliente y sostener presencia digital.</p>
+src/main/resources/templates/marketing/admin_campaigns.html:451:                    <li>Publica o prepara posts desde el módulo Blog.</li>
+src/main/resources/templates/marketing/admin_testimonials.html:76:                                                      method="post"
+src/main/resources/templates/marketing/admin_testimonials.html:114:                                      method="post">
+src/main/resources/templates/orders/order_detail.html:101:                      th:action="@{|/orders/${order.id}/pay|}" method="post">
+src/main/resources/templates/orders/order_detail.html:108:                      th:action="@{|/orders/${order.id}/credit|}" method="post">
+src/main/resources/templates/orders/order_detail.html:115:                      th:action="@{|/orders/${order.id}/cancel|}" method="post"
+src/main/resources/templates/orders/order_form.html:38:                                  method="post">
+src/main/resources/templates/production/detail.html:68:                <form th:if="${order.status.name() == 'DRAFT'}" th:action="@{|/production/${order.id}/confirm|}" method="post">
+src/main/resources/templates/production/detail.html:75:                      method="post"
+src/main/resources/templates/production/detail.html:81:                <form th:action="@{|/production/${order.id}/cancel|}" method="post">
+src/main/resources/templates/production/form.html:23:                    <form th:action="@{/production}" method="post" id="productionForm">
+src/main/resources/templates/public/blog/detail.html:3:<head th:replace="~{fragments/head_public :: publicHead(${post.title} + ' - ' + ${platformName})}"></head>
+src/main/resources/templates/public/blog/detail.html:48:                <li class="nav-item" th:if="${featureBlog}">
+src/main/resources/templates/public/blog/detail.html:49:                    <a class="nav-link active" th:href="@{/blog}" th:text="${publicNavBlogLabel}">Blog & consejos</a>
+src/main/resources/templates/public/blog/detail.html:72:                    <li class="breadcrumb-item"><a th:href="@{/blog}" th:text="${publicNavBlogLabel}">Blog / consejos</a></li>
+src/main/resources/templates/public/blog/detail.html:73:                    <li class="breadcrumb-item active" aria-current="page" th:text="${post.title}">Artículo</li>
+src/main/resources/templates/public/blog/detail.html:77:            <h1 class="h2 fw-bold mb-2" th:text="${post.title}">Título del artículo</h1>
+src/main/resources/templates/public/blog/detail.html:79:                <span th:if="${post.publishedAt != null}" th:text="${#temporals.format(post.publishedAt,'dd MMM yyyy')}">01 ene 2025</span>
+src/main/resources/templates/public/blog/detail.html:80:                · Blog <span th:text="${platformName}">Eco del Amazonas</span>
+src/main/resources/templates/public/blog/detail.html:86:                        <img th:if="${post.coverImagePath != null}"
+src/main/resources/templates/public/blog/detail.html:87:                             th:src="@{${post.coverImagePath}}"
+src/main/resources/templates/public/blog/detail.html:88:                             th:alt="${post.title}"
+src/main/resources/templates/public/blog/detail.html:92:                    <article class="blog-content bg-light p-4 rounded-4 shadow-sm">
+src/main/resources/templates/public/blog/detail.html:93:                        <div th:utext="${post.content}">Contenido HTML del artículo...</div>
+src/main/resources/templates/public/blog/detail.html:94:                    </article>
+src/main/resources/templates/public/blog/detail.html:97:                        <p class="small text-muted mb-1" th:text="${blogArticleCtaText}">
+src/main/resources/templates/public/blog/detail.html:102:                            <span th:text="${blogArticleCtaButtonLabel}">Pedir por WhatsApp</span>
+src/main/resources/templates/public/blog/detail.html:112:                                <li th:each="p : ${latestPosts}">
+src/main/resources/templates/public/blog/detail.html:113:                                    <a th:href="@{|/blog/${p.slug}|}" th:text="${p.title}" class="text-decoration-none d-block mb-1">
+src/main/resources/templates/public/blog/detail.html:123:                            <h3 class="h6 mb-2" th:text="${blogQuickTipTitle}">Consejo rápido</h3>
+src/main/resources/templates/public/blog/detail.html:124:                            <p class="small text-muted mb-0" th:text="${blogQuickTipText}">
+src/main/resources/templates/public/blog/list.html:3:<head th:replace="~{fragments/head_public :: publicHead(${blogPageTitle} + ' - ' + ${platformName})}"></head>
+src/main/resources/templates/public/blog/list.html:48:                <li class="nav-item" th:if="${featureBlog}">
+src/main/resources/templates/public/blog/list.html:49:                    <a class="nav-link active" th:href="@{/blog}" th:text="${publicNavBlogLabel}">Blog & consejos</a>
+src/main/resources/templates/public/blog/list.html:71:                    <h1 class="h2 fw-bold mb-2" th:text="${blogPageTitle}">Blog & consejos</h1>
+src/main/resources/templates/public/blog/list.html:72:                    <p class="section-subtitle mb-3" th:text="${blogPageSubtitle}">
+src/main/resources/templates/public/blog/list.html:76:                        <li><i class="bi bi-check-circle me-2"></i><span th:text="${blogBullet1}">Consejos prácticos.</span></li>
+src/main/resources/templates/public/blog/list.html:77:                        <li><i class="bi bi-emoji-smile me-2"></i><span th:text="${blogBullet2}">Recomendaciones útiles.</span></li>
+src/main/resources/templates/public/blog/list.html:78:                        <li><i class="bi bi-house-heart me-2"></i><span th:text="${blogBullet3}">Información para comprar mejor.</span></li>
+src/main/resources/templates/public/blog/list.html:82:                    <img th:src="@{${blogHeroImage}}" th:alt="${blogPageTitle}" class="img-fluid rounded-4 shadow-sm blog-hero-image">
+src/main/resources/templates/public/blog/list.html:92:                    <div th:if="${#lists.isEmpty(posts)}" class="text-muted" th:text="${blogEmptyText}">
+src/main/resources/templates/public/blog/list.html:96:                    <article class="blog-list-item mb-3" th:each="post : ${posts}">
+src/main/resources/templates/public/blog/list.html:97:                        <div class="card shadow-sm border-0 blog-card-list h-100">
+src/main/resources/templates/public/blog/list.html:100:                                    <div class="blog-card-list-image-wrapper">
+src/main/resources/templates/public/blog/list.html:101:                                        <img th:if="${post.coverImagePath != null}" th:src="@{${post.coverImagePath}}" th:alt="${post.title}" class="img-fluid blog-card-list-image">
+src/main/resources/templates/public/blog/list.html:102:                                        <div th:if="${post.coverImagePath == null}" class="d-flex align-items-center justify-content-center bg-light h-100">
+src/main/resources/templates/public/blog/list.html:110:                                            <a th:href="@{|/blog/${post.slug}|}" class="text-decoration-none text-dark" th:text="${post.title}">
+src/main/resources/templates/public/blog/list.html:111:                                                Título del post
+src/main/resources/templates/public/blog/list.html:115:                                            <span th:if="${post.publishedAt != null}" th:text="${#temporals.format(post.publishedAt,'dd/MM/yyyy')}">01/01/2025</span>
+src/main/resources/templates/public/blog/list.html:116:                                            · Blog <span th:text="${platformName}">Eco del Amazonas</span>
+src/main/resources/templates/public/blog/list.html:118:                                        <p class="card-text small mb-3" th:text="${post.summary}">Resumen del artículo...</p>
+src/main/resources/templates/public/blog/list.html:120:                                            <a th:href="@{|/blog/${post.slug}|}" class="btn btn-sm btn-outline-primary">Leer más »</a>
+src/main/resources/templates/public/blog/list.html:126:                    </article>
+src/main/resources/templates/public/blog/list.html:132:                            <h2 class="h6 mb-2" th:text="${blogAboutTitle}">Sobre el negocio</h2>
+src/main/resources/templates/public/blog/list.html:133:                            <p class="small text-muted mb-2" th:text="${blogAboutText1}">Texto introductorio.</p>
+src/main/resources/templates/public/blog/list.html:134:                            <p class="small text-muted mb-0" th:text="${blogAboutText2}">Texto secundario.</p>
+src/main/resources/templates/public/blog/list.html:140:                            <h2 class="h6 mb-2" th:text="${blogCtaTitle}">¿Necesitas hacer un pedido?</h2>
+src/main/resources/templates/public/blog/list.html:141:                            <p class="small text-muted mb-3" th:text="${blogCtaText}">Escríbenos por WhatsApp.</p>
+src/main/resources/templates/public/blog/list.html:144:                                <span th:text="${blogCtaButtonLabel}">Pedir por WhatsApp</span>
+src/main/resources/templates/public/blog/list.html:151:                            <h2 class="h6 mb-0" th:text="${blogLatestTitle}">Últimos artículos</h2>
+src/main/resources/templates/public/blog_detail.html:3:<head th:replace="~{fragments/head_public :: publicHead(${post.title} + ' - Blog Eco Agua')}"></head>
+src/main/resources/templates/public/blog_detail.html:31:                    <a class="nav-link active" th:href="@{/blog}">Blog</a>
+src/main/resources/templates/public/blog_detail.html:42:                <a th:href="@{/blog}" class="small text-decoration-none">
+src/main/resources/templates/public/blog_detail.html:43:                    ← Volver al blog
+src/main/resources/templates/public/blog_detail.html:47:            <article class="bg-white rounded-4 shadow-sm p-4 p-md-5">
+src/main/resources/templates/public/blog_detail.html:49:                    <p class="text-uppercase small text-primary mb-1">Blog • Consejos de hidratación</p>
+src/main/resources/templates/public/blog_detail.html:50:                    <h1 class="h3 mb-2" th:text="${post.title}">Título del artículo</h1>
+src/main/resources/templates/public/blog_detail.html:52:                       th:if="${post.publishedAt != null}">
+src/main/resources/templates/public/blog_detail.html:54:                        <span th:text="${#temporals.format(post.publishedAt, 'dd/MM/yyyy')}">01/01/2024</span>
+src/main/resources/templates/public/blog_detail.html:58:                <div class="mb-4" th:if="${post.coverImagePath != null}">
+src/main/resources/templates/public/blog_detail.html:59:                    <img th:src="@{${post.coverImagePath}}"
+src/main/resources/templates/public/blog_detail.html:60:                         th:alt="${post.title}"
+src/main/resources/templates/public/blog_detail.html:64:                <div class="article-content">
+src/main/resources/templates/public/blog_detail.html:66:                    <div th:utext="${post.content}">
+src/main/resources/templates/public/blog_detail.html:70:            </article>
+src/main/resources/templates/public/blog_list.html:3:<head th:replace="~{fragments/head_public :: publicHead('Blog - Eco Agua')}"></head>
+src/main/resources/templates/public/blog_list.html:31:                    <a class="nav-link active" th:href="@{/blog}">Blog</a>
+src/main/resources/templates/public/blog_list.html:42:                <h1 class="section-title mb-1">Blog & consejos de hidratación</h1>
+src/main/resources/templates/public/blog_list.html:50:                     th:each="post : ${page.content}">
+src/main/resources/templates/public/blog_list.html:51:                    <article class="blog-card h-100">
+src/main/resources/templates/public/blog_list.html:52:                        <div class="blog-image-wrapper">
+src/main/resources/templates/public/blog_list.html:53:                            <img th:if="${post.coverImagePath != null}"
+src/main/resources/templates/public/blog_list.html:54:                                 th:src="@{${post.coverImagePath}}"
+src/main/resources/templates/public/blog_list.html:55:                                 th:alt="${post.title}"
+src/main/resources/templates/public/blog_list.html:57:                            <div th:if="${post.coverImagePath == null}"
+src/main/resources/templates/public/blog_list.html:63:                        <div class="blog-body">
+src/main/resources/templates/public/blog_list.html:64:                            <h2 class="h6 mb-1" th:text="${post.title}">Título</h2>
+src/main/resources/templates/public/blog_list.html:65:                            <p class="small text-muted mb-2" th:text="${post.summary}">
+src/main/resources/templates/public/blog_list.html:68:                            <a class="blog-link small text-decoration-none"
+src/main/resources/templates/public/blog_list.html:69:                               th:href="@{|/blog/${post.slug}|}">
+src/main/resources/templates/public/blog_list.html:73:                    </article>
+src/main/resources/templates/public/blog_list.html:86:                           th:href="@{|/blog?page=${page.number - 1}|}">Anterior</a>
+src/main/resources/templates/public/blog_list.html:94:                           th:href="@{|/blog?page=${i}|}">1</a>
+src/main/resources/templates/public/blog_list.html:99:                           th:href="@{|/blog?page=${page.number + 1}|}">Siguiente</a>
+src/main/resources/templates/public/catalog.html:48:                <li class="nav-item" th:if="${featureBlog}">
+src/main/resources/templates/public/catalog.html:49:                    <a class="nav-link" th:href="@{/blog}" th:text="${publicNavBlogLabel}">Blog & consejos</a>
+src/main/resources/templates/public/home.html:56:                <li class="nav-item" th:if="${featureBlog}">
+src/main/resources/templates/public/home.html:57:                    <a class="nav-link" th:href="@{/blog}" th:text="${publicNavBlogLabel}">Blog & consejos</a>
+src/main/resources/templates/public/home.html:504:                            <article class="delivery-zone-card"
+src/main/resources/templates/public/home.html:512:                            </article>
+src/main/resources/templates/public/home.html:513:                            <article class="delivery-zone-card" th:if="${#lists.isEmpty(deliveryZones)}">
+src/main/resources/templates/public/home.html:519:                            </article>
+src/main/resources/templates/public/home.html:574:    <section id="blog" class="py-5 bg-white border-top" th:if="${featureBlog}">
+src/main/resources/templates/public/home.html:577:                <h2 class="section-title mb-1" th:text="${blogSectionTitle}">Blog & consejos</h2>
+src/main/resources/templates/public/home.html:578:                <p class="section-subtitle mb-0" th:text="${blogSectionSubtitle}">Información útil.</p>
+src/main/resources/templates/public/home.html:580:            <div class="row g-4" th:if="${!#lists.isEmpty(latestBlogPosts)}">
+src/main/resources/templates/public/home.html:581:                <div class="col-md-4" th:each="post : ${latestBlogPosts}">
+src/main/resources/templates/public/home.html:582:                    <article class="blog-card h-100">
+src/main/resources/templates/public/home.html:583:                        <div class="blog-image-wrapper">
+src/main/resources/templates/public/home.html:584:                            <img th:if="${post.coverImagePath != null}" th:src="@{${post.coverImagePath}}" th:alt="${post.title}" class="img-fluid">
+src/main/resources/templates/public/home.html:585:                            <div th:if="${post.coverImagePath == null}" class="d-flex align-items-center justify-content-center bg-light" style="height: 180px; border-radius: 1.25rem 1.25rem 0 0;">
+src/main/resources/templates/public/home.html:589:                        <div class="blog-body">
+src/main/resources/templates/public/home.html:590:                            <h3 class="h6 mb-1" th:text="${post.title}">Título</h3>
+src/main/resources/templates/public/home.html:591:                            <p class="small text-muted mb-2" th:text="${post.summary}">Resumen del artículo.</p>
+src/main/resources/templates/public/home.html:592:                            <a href="#" class="blog-link small text-decoration-none" th:href="@{|/blog/${post.slug}|}">Leer más »</a>
+src/main/resources/templates/public/home.html:594:                    </article>
+src/main/resources/templates/public/home.html:597:            <p class="text-muted small text-center mb-0" th:if="${#lists.isEmpty(latestBlogPosts)}" th:text="${blogSectionEmptyText}">
+src/main/resources/templates/reorder/agenda.html:174:                                        <form th:action="@{|/reorder-agenda/${row.clientId}/follow-up|}" method="post" class="d-flex flex-column gap-2">
+src/main/resources/templates/warehouse/container_balances.html:89:                    <form class="row g-2 align-items-end" th:action="@{/containers/sync-orders}" method="post">
+src/main/resources/templates/warehouse/container_detail.html:59:                            <form th:action="@{|/containers/client/${snapshot.client.id}/return|}" method="post" class="row g-2">
+src/main/resources/templates/warehouse/container_detail.html:100:                            <form th:action="@{|/containers/client/${snapshot.client.id}/adjustment|}" method="post" class="row g-2">
+src/main/resources/templates/warehouse/products_stock.html:101:                  method="post">
+src/main/resources/templates/warehouse/supplies_stock.html:87:                  method="post">
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:1:package com.ecoamazonas.eco_agua.blog.admin;
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:3:import com.ecoamazonas.eco_agua.blog.BlogPost;
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:4:import com.ecoamazonas.eco_agua.blog.BlogPostForm;
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:5:import com.ecoamazonas.eco_agua.blog.BlogPostRepository;
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:23:@RequestMapping("/admin/blog")
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:24:public class AdminBlogController {
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:26:    private final BlogPostRepository blogPostRepository;
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:28:    @Value("${app.blog.upload-dir:uploads/blog}")
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:29:    private String blogUploadDir;
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:31:    public AdminBlogController(BlogPostRepository blogPostRepository) {
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:32:        this.blogPostRepository = blogPostRepository;
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:36:        model.addAttribute("activePage", "admin_blog");
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:42:        model.addAttribute("posts", blogPostRepository.findAll());
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:43:        return "admin/blog/list";
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:49:        BlogPostForm form = new BlogPostForm();
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:50:        form.setStatus(BlogPost.Status.DRAFT);
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:52:        return "admin/blog/form";
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:58:        BlogPost post = blogPostRepository.findById(id)
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:59:                .orElseThrow(() -> new IllegalArgumentException("Post not found: " + id));
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:61:        model.addAttribute("form", BlogPostForm.fromEntity(post));
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:62:        return "admin/blog/form";
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:65:    @PostMapping("/save")
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:66:    public String save(@Valid @ModelAttribute("form") BlogPostForm form,
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:74:            return "admin/blog/form";
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:77:        BlogPost entity;
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:79:            entity = blogPostRepository.findById(form.getId())
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:80:                    .orElseThrow(() -> new IllegalArgumentException("Post not found: " + form.getId()));
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:82:            entity = new BlogPost();
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:103:        if (entity.getStatus() == BlogPost.Status.PUBLISHED && entity.getPublishedAt() == null) {
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:107:        blogPostRepository.save(entity);
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:109:        return "redirect:/admin/blog";
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:112:    @PostMapping("/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:114:        blogPostRepository.deleteById(id);
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:115:        return "redirect:/admin/blog";
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:140:        Path uploadRoot = Paths.get(blogUploadDir).toAbsolutePath().normalize();
+src/main/java/com/ecoamazonas/eco_agua/blog/admin/AdminBlogController.java:146:        String webPath = "/" + blogUploadDir.replace("\\", "/") + "/" + filename;
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:1:package com.ecoamazonas.eco_agua.blog;
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:12:@RequestMapping("/blog")
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:13:public class BlogController {
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:15:    private final BlogPostRepository blogPostRepository;
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:17:    public BlogController(BlogPostRepository blogPostRepository) {
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:18:        this.blogPostRepository = blogPostRepository;
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:23:        Page<BlogPost> posts = blogPostRepository.findByStatusOrderByPublishedAtDesc(
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:24:                BlogPost.Status.PUBLISHED,
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:28:        model.addAttribute("page", posts);
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:29:        return "public/blog_list";
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:34:        BlogPost post = blogPostRepository
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:35:                .findBySlugAndStatus(slug, BlogPost.Status.PUBLISHED)
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:38:        model.addAttribute("post", post);
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogController.java:39:        return "public/blog_detail";
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPost.java:1:package com.ecoamazonas.eco_agua.blog;
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPost.java:7:@Table(name = "blog_post")
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPost.java:8:public class BlogPost {
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostForm.java:1:package com.ecoamazonas.eco_agua.blog;
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostForm.java:6:public class BlogPostForm {
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostForm.java:26:    private BlogPost.Status status = BlogPost.Status.DRAFT;
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostForm.java:78:    public BlogPost.Status getStatus() {
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostForm.java:82:    public void setStatus(BlogPost.Status status) {
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostForm.java:88:    public static BlogPostForm fromEntity(BlogPost entity) {
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostForm.java:89:        BlogPostForm form = new BlogPostForm();
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostForm.java:100:    public void updateEntity(BlogPost entity) {
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostRepository.java:1:package com.ecoamazonas.eco_agua.blog;
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostRepository.java:10:public interface BlogPostRepository extends JpaRepository<BlogPost, Long> {
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostRepository.java:12:    Page<BlogPost> findByStatusOrderByPublishedAtDesc(BlogPost.Status status, Pageable pageable);
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostRepository.java:14:    List<BlogPost> findAllByStatusOrderByPublishedAtDesc(BlogPost.Status status);
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostRepository.java:16:    List<BlogPost> findTop3ByStatusOrderByPublishedAtDesc(BlogPost.Status status);
+src/main/java/com/ecoamazonas/eco_agua/blog/BlogPostRepository.java:18:    Optional<BlogPost> findBySlugAndStatus(String slug, BlogPost.Status status);
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:1:package com.ecoamazonas.eco_agua.blog;
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:17:@RequestMapping("/blog")
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:18:public class PublicBlogController {
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:20:    private final BlogPostRepository blogPostRepository;
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:27:    public PublicBlogController(BlogPostRepository blogPostRepository,
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:30:        this.blogPostRepository = blogPostRepository;
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:36:    public String blogIndex(Model model) {
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:37:        List<BlogPost> posts = blogPostRepository.findAllByStatusOrderByPublishedAtDesc(BlogPost.Status.PUBLISHED);
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:39:        model.addAttribute("posts", posts);
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:41:        addBlogPageSettings(model);
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:43:        return "public/blog/list";
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:47:    public String blogDetail(@PathVariable String slug, Model model) {
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:48:        BlogPost post = blogPostRepository
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:49:                .findBySlugAndStatus(slug, BlogPost.Status.PUBLISHED)
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:52:        List<BlogPost> latest = blogPostRepository.findTop3ByStatusOrderByPublishedAtDesc(BlogPost.Status.PUBLISHED);
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:54:        model.addAttribute("post", post);
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:55:        model.addAttribute("latestPosts", latest);
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:57:        addBlogPageSettings(model);
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:59:        return "public/blog/detail";
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:86:        model.addAttribute("publicNavBlogLabel", setting("public.nav.blog_label", "Blog & consejos"));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:91:    private void addBlogPageSettings(Model model) {
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:92:        model.addAttribute("blogPageTitle", setting("public.blog.page_title", "Blog & consejos"));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:93:        model.addAttribute("blogPageSubtitle", setting("public.blog.subtitle", "Ideas, tips y recomendaciones para nuestros clientes."));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:94:        model.addAttribute("blogBullet1", setting("public.blog.bullet_1", "Consejos prácticos para el día a día."));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:95:        model.addAttribute("blogBullet2", setting("public.blog.bullet_2", "Recomendaciones para familias y negocios."));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:96:        model.addAttribute("blogBullet3", setting("public.blog.bullet_3", "Información útil para comprar mejor."));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:97:        model.addAttribute("blogHeroImage", setting("public.blog.hero_image", "/img/banner02.jpg"));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:98:        model.addAttribute("blogEmptyText", setting("public.blog.empty_text", "Próximamente publicaremos nuestros primeros artículos."));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:99:        model.addAttribute("blogAboutTitle", setting("public.blog.about_title", "Sobre " + businessProperties.getName()));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:100:        model.addAttribute("blogAboutText1", setting("public.blog.about_text_1", "Compartimos información útil para nuestros clientes."));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:101:        model.addAttribute("blogAboutText2", setting("public.blog.about_text_2", "Nuestro objetivo es ayudarte a elegir mejor y coordinar tus pedidos con confianza."));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:102:        model.addAttribute("blogCtaTitle", setting("public.blog.cta_title", "¿Necesitas hacer un pedido?"));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:103:        model.addAttribute("blogCtaText", setting("public.blog.cta_text", "Escríbenos por WhatsApp y coordinamos tu atención."));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:104:        model.addAttribute("blogCtaButtonLabel", setting("public.blog.cta_button_label", "Pedir por WhatsApp"));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:105:        model.addAttribute("blogLatestTitle", setting("public.blog.latest_title", "Últimos artículos"));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:106:        model.addAttribute("blogArticleCtaText", setting("public.blog.article_cta_text", "¿Te sirvió esta información? Escríbenos por WhatsApp para coordinar tu pedido."));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:107:        model.addAttribute("blogArticleCtaButtonLabel", setting("public.blog.article_cta_button_label", "Pedir por WhatsApp"));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:108:        model.addAttribute("blogQuickTipTitle", setting("public.blog.quick_tip_title", "Consejo rápido"));
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:109:        model.addAttribute("blogQuickTipText", setting("public.blog.quick_tip_text", "Consulta siempre la disponibilidad antes de coordinar tu pedido."));
+src/main/java/com/ecoamazonas/eco_agua/category/CategoryController.java:42:    @PostMapping("/save")
+src/main/java/com/ecoamazonas/eco_agua/category/CategoryController.java:84:    @PostMapping("/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/category/CategoryController.java:92:    @PostMapping("/bulk-delete")
+src/main/java/com/ecoamazonas/eco_agua/client/ClientController.java:10:import org.springframework.web.bind.annotation.PostMapping;
+src/main/java/com/ecoamazonas/eco_agua/client/ClientController.java:163:    @PostMapping("/save")
+src/main/java/com/ecoamazonas/eco_agua/client/ClientController.java:206:    @PostMapping("/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/client/ClientController.java:223:    @PostMapping("/bulk-delete")
+src/main/java/com/ecoamazonas/eco_agua/client/ClientController.java:240:    @PostMapping("/geocode")
+src/main/java/com/ecoamazonas/eco_agua/client/ClientProfileController.java:3:import org.springframework.security.access.prepost.PreAuthorize;
+src/main/java/com/ecoamazonas/eco_agua/client/ClientProfileController.java:31:    @PostMapping("/save")
+src/main/java/com/ecoamazonas/eco_agua/client/ClientProfileController.java:47:    @PostMapping("/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/client/ClientProfileController.java:59:    @PostMapping("/bulk-delete")
+src/main/java/com/ecoamazonas/eco_agua/config/ClientFeatureProperties.java:15:    private boolean blog = true;
+src/main/java/com/ecoamazonas/eco_agua/config/ClientFeatureProperties.java:63:    public boolean isBlog() {
+src/main/java/com/ecoamazonas/eco_agua/config/ClientFeatureProperties.java:64:        return blog;
+src/main/java/com/ecoamazonas/eco_agua/config/ClientFeatureProperties.java:67:    public void setBlog(boolean blog) {
+src/main/java/com/ecoamazonas/eco_agua/config/ClientFeatureProperties.java:68:        this.blog = blog;
+src/main/java/com/ecoamazonas/eco_agua/config/ClientFeatureProperties.java:120:        return marketing || blog || testimonials;
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:55:        model.addAttribute("featureBlog", clientFeatureProperties.isBlog());
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingAdminController.java:55:    @PostMapping
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:119:        ensure("public.nav.blog_label", "Blog & consejos",
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:120:                "string", "public_site", "Public navigation blog label");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:178:        ensure("public.blog_section.title", "Blog & consejos de hidratación", "string", "public_site", "Home blog section title");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:179:        ensure("public.blog_section.subtitle", "Información simple y útil para cuidar tu salud y la de tu familia.", "text", "public_site", "Home blog section subtitle");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:180:        ensure("public.blog_section.empty_text", "Próximamente publicaremos consejos y artículos sobre hidratación.", "text", "public_site", "Home blog empty text");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:203:        // Blog public pages
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:204:        ensure("public.blog.page_title", "Blog & consejos", "string", "public_site", "Blog page title");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:205:        ensure("public.blog.subtitle", "Ideas, tips y recomendaciones para nuestros clientes.", "text", "public_site", "Blog page subtitle");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:206:        ensure("public.blog.bullet_1", "Consejos prácticos para el día a día.", "string", "public_site", "Blog bullet 1");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:207:        ensure("public.blog.bullet_2", "Recomendaciones para familias y negocios.", "string", "public_site", "Blog bullet 2");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:208:        ensure("public.blog.bullet_3", "Información útil para comprar mejor.", "string", "public_site", "Blog bullet 3");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:209:        ensure("public.blog.hero_image", "/img/banner02.jpg", "string", "public_site", "Blog hero image path");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:210:        ensure("public.blog.empty_text", "Próximamente publicaremos nuestros primeros artículos.", "text", "public_site", "Blog empty text");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:211:        ensure("public.blog.about_title", "Sobre " + businessProperties.getName(), "string", "public_site", "Blog about title");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:212:        ensure("public.blog.about_text_1", "Compartimos información útil para nuestros clientes.", "text", "public_site", "Blog about text 1");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:213:        ensure("public.blog.about_text_2", "Nuestro objetivo es ayudarte a elegir mejor y coordinar tus pedidos con confianza.", "text", "public_site", "Blog about text 2");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:214:        ensure("public.blog.cta_title", "¿Necesitas hacer un pedido?", "string", "public_site", "Blog CTA title");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:215:        ensure("public.blog.cta_text", "Escríbenos por WhatsApp y coordinamos tu atención.", "text", "public_site", "Blog CTA text");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:216:        ensure("public.blog.cta_button_label", "Pedir por WhatsApp", "string", "public_site", "Blog CTA button label");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:217:        ensure("public.blog.latest_title", "Últimos artículos", "string", "public_site", "Blog latest title");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:218:        ensure("public.blog.article_cta_text", "¿Te sirvió esta información? Escríbenos por WhatsApp para coordinar tu pedido.", "text", "public_site", "Blog article CTA text");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:219:        ensure("public.blog.article_cta_button_label", "Pedir por WhatsApp", "string", "public_site", "Blog article CTA button label");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:220:        ensure("public.blog.quick_tip_title", "Consejo rápido", "string", "public_site", "Blog quick tip title");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:221:        ensure("public.blog.quick_tip_text", "Consulta siempre la disponibilidad antes de coordinar tu pedido.", "text", "public_site", "Blog quick tip text");
+src/main/java/com/ecoamazonas/eco_agua/container/ContainerController.java:46:    @PostMapping("/sync-orders")
+src/main/java/com/ecoamazonas/eco_agua/container/ContainerController.java:69:    @PostMapping("/client/{clientId}/return")
+src/main/java/com/ecoamazonas/eco_agua/container/ContainerController.java:97:    @PostMapping("/client/{clientId}/adjustment")
+src/main/java/com/ecoamazonas/eco_agua/dashboard/CommercialDailyService.java:262:            nextAction = "Review the observation and close the post-sale follow-up.";
+src/main/java/com/ecoamazonas/eco_agua/delivery/AdminDeliveryZoneController.java:44:    @PostMapping("/save")
+src/main/java/com/ecoamazonas/eco_agua/delivery/AdminDeliveryZoneController.java:74:    @PostMapping("/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/delivery/DeliveryDailyController.java:57:    @PostMapping("/orders/{id}/route")
+src/main/java/com/ecoamazonas/eco_agua/delivery/DeliveryDailyController.java:72:    @PostMapping("/orders/{id}/status")
+src/main/java/com/ecoamazonas/eco_agua/expense/ExpenseController.java:11:import org.springframework.web.bind.annotation.PostMapping;
+src/main/java/com/ecoamazonas/eco_agua/expense/ExpenseController.java:100:    @PostMapping("/save-simple")
+src/main/java/com/ecoamazonas/eco_agua/expense/ExpenseController.java:160:    @PostMapping("/{id}/update")
+src/main/java/com/ecoamazonas/eco_agua/expense/ExpenseController.java:183:    @PostMapping("/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/expense/ExpenseController.java:283:    @PostMapping("/{id}/payments")
+src/main/java/com/ecoamazonas/eco_agua/expense/ExpenseController.java:330:    @PostMapping("/fixed-costs/templates")
+src/main/java/com/ecoamazonas/eco_agua/expense/ExpenseController.java:352:    @PostMapping("/fixed-costs/templates/{id}/toggle")
+src/main/java/com/ecoamazonas/eco_agua/expense/ExpenseController.java:374:    @PostMapping("/fixed-costs/templates/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/expense/ExpenseController.java:396:    @PostMapping("/fixed-costs/generate-month")
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingAdminController.java:47:    @PostMapping("/testimonials/save")
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingAdminController.java:65:    @PostMapping("/testimonials/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:3:import com.ecoamazonas.eco_agua.blog.BlogPost;
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:4:import com.ecoamazonas.eco_agua.blog.BlogPostRepository;
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:21:    private final BlogPostRepository blogPostRepository;
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:26:            BlogPostRepository blogPostRepository,
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:30:        this.blogPostRepository = blogPostRepository;
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:46:        List<BlogPost> allPosts = safeBlogPostList(blogPostRepository.findAll());
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:47:        List<BlogPost> publishedPosts = allPosts.stream()
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:48:                .filter(post -> post.getStatus() == BlogPost.Status.PUBLISHED)
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:49:                .sorted(Comparator.comparing(BlogPost::getPublishedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:51:        List<BlogPost> draftPosts = allPosts.stream()
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:52:                .filter(post -> post.getStatus() == BlogPost.Status.DRAFT)
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:53:                .sorted(Comparator.comparing(BlogPost::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:70:                publishedPosts.size(),
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:71:                draftPosts.size(),
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:74:                buildCampaignRows(activePromotions, publishedPosts, activeTestimonials, today),
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:76:                buildContentAssets(publishedPosts, draftPosts),
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:78:                buildPendingTasks(activePromotions, publishedPosts, draftPosts, activeTestimonials, today),
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:86:            List<BlogPost> publishedPosts,
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:107:        for (BlogPost post : publishedPosts.stream().limit(3).collect(Collectors.toList())) {
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:109:                    post.getTitle(),
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:111:                    inferContentAudience(post),
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:112:                    "Blog / WhatsApp / Social",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:113:                    post.getPublishedAt() != null ? post.getPublishedAt().toLocalDate() : null,
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:116:                    "Use post as awareness and trust asset",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:118:                    "/admin/blog"
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:155:    private List<MarketingCampaignsSnapshot.AssetRow> buildContentAssets(List<BlogPost> publishedPosts, List<BlogPost> draftPosts) {
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:157:        for (BlogPost post : publishedPosts.stream().limit(4).collect(Collectors.toList())) {
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:159:                    post.getTitle(),
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:161:                    firstNonBlank(post.getSummary(), "Published content ready to support campaigns."),
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:162:                    "Manage post",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:163:                    "/admin/blog",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:164:                    post.getPublishedAt() != null ? post.getPublishedAt().toLocalDate() : null
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:167:        for (BlogPost post : draftPosts.stream().limit(2).collect(Collectors.toList())) {
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:169:                    post.getTitle(),
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:171:                    firstNonBlank(post.getSummary(), "Draft content pending publication."),
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:173:                    "/admin/blog",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:174:                    post.getCreatedAt() != null ? post.getCreatedAt().toLocalDate() : null
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:208:            List<BlogPost> publishedPosts,
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:209:            List<BlogPost> draftPosts,
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:239:        if (!draftPosts.isEmpty()) {
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:243:                    "You have " + draftPosts.size() + " draft post(s) ready to review and publish.",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:244:                    "Open blog",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:245:                    "/admin/blog"
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:249:        if (publishedPosts.isEmpty()) {
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:253:                    "Publish at least one blog post to support trust and awareness campaigns.",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:254:                    "Create post",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:255:                    "/admin/blog/new"
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:364:    private String inferContentAudience(BlogPost post) {
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:365:        String text = (firstNonBlank(post.getTitle(), "") + " " + firstNonBlank(post.getSummary(), "")).toLowerCase(Locale.ROOT);
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:389:    private List<BlogPost> safeBlogPostList(List<?> posts) {
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:390:        return posts == null ? List.of() : (List<BlogPost>) posts;
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsSnapshot.java:10:    private final int publishedPostCount;
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsSnapshot.java:11:    private final int draftPostCount;
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsSnapshot.java:25:            int publishedPostCount,
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsSnapshot.java:26:            int draftPostCount,
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsSnapshot.java:39:        this.publishedPostCount = publishedPostCount;
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsSnapshot.java:40:        this.draftPostCount = draftPostCount;
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsSnapshot.java:54:    public int getPublishedPostCount() { return publishedPostCount; }
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsSnapshot.java:55:    public int getDraftPostCount() { return draftPostCount; }
+src/main/java/com/ecoamazonas/eco_agua/order/IncomeController.java:144:    @PostMapping("/credit/{id}/payments")
+src/main/java/com/ecoamazonas/eco_agua/order/IncomeController.java:180:    @PostMapping("/credit/{id}/due-date")
+src/main/java/com/ecoamazonas/eco_agua/order/IncomeController.java:234:    @PostMapping("/others")
+src/main/java/com/ecoamazonas/eco_agua/order/IncomeController.java:258:    @PostMapping("/others/delete")
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:16:import org.springframework.web.bind.annotation.PostMapping;
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:91:    @PostMapping
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:152:    @PostMapping("/{id}/pay")
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:161:    @PostMapping("/{id}/credit")
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:170:    @PostMapping("/{id}/cancel")
+src/main/java/com/ecoamazonas/eco_agua/product/ProductController.java:79:    @PostMapping("/save")
+src/main/java/com/ecoamazonas/eco_agua/product/ProductController.java:119:    @PostMapping("/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/product/ProductController.java:136:    @PostMapping("/bulk-delete")
+src/main/java/com/ecoamazonas/eco_agua/product/ProductController.java:153:    @PostMapping("/configure-supplies")
+src/main/java/com/ecoamazonas/eco_agua/production/ProductionController.java:66:    @PostMapping
+src/main/java/com/ecoamazonas/eco_agua/production/ProductionController.java:103:    @PostMapping("/{id}/confirm")
+src/main/java/com/ecoamazonas/eco_agua/production/ProductionController.java:115:    @PostMapping("/{id}/cancel")
+src/main/java/com/ecoamazonas/eco_agua/production/ProductionController.java:127:    @PostMapping("/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/promotion/PromotionController.java:48:    @PostMapping("/save")
+src/main/java/com/ecoamazonas/eco_agua/promotion/PromotionController.java:100:    @PostMapping("/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/promotion/PromotionController.java:117:    @PostMapping("/configure-products")
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:3:import com.ecoamazonas.eco_agua.blog.BlogPost;
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:4:import com.ecoamazonas.eco_agua.blog.BlogPostRepository;
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:20:import org.springframework.web.bind.annotation.PostMapping;
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:36:    private final BlogPostRepository blogPostRepository;
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:50:                                BlogPostRepository blogPostRepository,
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:57:        this.blogPostRepository = blogPostRepository;
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:79:        List<BlogPost> latestPosts = blogPostRepository.findTop3ByStatusOrderByPublishedAtDesc(BlogPost.Status.PUBLISHED);
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:85:        model.addAttribute("latestBlogPosts", latestPosts);
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:108:    @PostMapping("/order/whatsapp")
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:161:        model.addAttribute("publicNavBlogLabel", setting("public.nav.blog_label", "Blog & consejos"));
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:236:        model.addAttribute("blogSectionTitle", setting("public.blog_section.title", "Blog & consejos de hidratación"));
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:237:        model.addAttribute("blogSectionSubtitle", setting("public.blog_section.subtitle", "Información simple y útil para cuidar tu salud y la de tu familia."));
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:238:        model.addAttribute("blogSectionEmptyText", setting("public.blog_section.empty_text", "Próximamente publicaremos consejos y artículos sobre hidratación."));
+src/main/java/com/ecoamazonas/eco_agua/reorder/ReorderAgendaController.java:53:    @PostMapping("/{clientId}/follow-up")
+src/main/java/com/ecoamazonas/eco_agua/reorder/ReorderFollowUpStatus.java:6:    POSTPONED,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:32:                // Blog administration must stay protected
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:33:                .requestMatchers("/blog/admin/**").authenticated()
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:34:                // Public blog pages
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:35:                .requestMatchers("/blog", "/blog/**").permitAll()
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:60:            // Logout must be performed through POST to keep CSRF protection enabled.
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:62:                .logoutRequestMatcher(PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/logout"))
+src/main/java/com/ecoamazonas/eco_agua/supplier/SupplierController.java:35:    @PostMapping("/save")
+src/main/java/com/ecoamazonas/eco_agua/supplier/SupplierController.java:73:    @PostMapping("/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/supplier/SupplierController.java:90:    @PostMapping("/bulk-delete")
+src/main/java/com/ecoamazonas/eco_agua/supply/SupplyController.java:28:    @PostMapping("/save")
+src/main/java/com/ecoamazonas/eco_agua/supply/SupplyController.java:54:    @PostMapping("/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/supply/SupplyController.java:71:    @PostMapping("/bulk-delete")
+src/main/java/com/ecoamazonas/eco_agua/user/EmployeePaymentController.java:9:import org.springframework.web.bind.annotation.PostMapping;
+src/main/java/com/ecoamazonas/eco_agua/user/EmployeePaymentController.java:87:    @PostMapping("/save")
+src/main/java/com/ecoamazonas/eco_agua/user/EmployeePaymentController.java:107:    @PostMapping("/obligations/save")
+src/main/java/com/ecoamazonas/eco_agua/user/EmployeePaymentController.java:127:    @PostMapping("/obligations/settlements/save")
+src/main/java/com/ecoamazonas/eco_agua/user/EmployeePaymentController.java:147:    @PostMapping("/obligations/update")
+src/main/java/com/ecoamazonas/eco_agua/user/EmployeePaymentController.java:168:    @PostMapping("/obligations/{id}/close")
+src/main/java/com/ecoamazonas/eco_agua/user/EmployeePaymentController.java:188:    @PostMapping("/obligations/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/user/JobPositionController.java:41:    @PostMapping("/save")
+src/main/java/com/ecoamazonas/eco_agua/user/JobPositionController.java:58:    @PostMapping("/{id}/delete")
+src/main/java/com/ecoamazonas/eco_agua/user/RolePermissionController.java:54:    @PostMapping("/save")
+src/main/java/com/ecoamazonas/eco_agua/user/UserAdminController.java:45:    @PostMapping("/save")
+src/main/java/com/ecoamazonas/eco_agua/warehouse/ProductStockController.java:39:    @PostMapping("/adjust")
+src/main/java/com/ecoamazonas/eco_agua/warehouse/SupplyStockController.java:43:    @PostMapping("/adjust")

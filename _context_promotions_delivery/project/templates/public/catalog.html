@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_public :: publicHead(${catalogPageTitle} + ' - ' + ${platformName})}"></head>
+<body th:style="'--eco-primary:' + ${publicPrimaryColor} + '; --eco-secondary:' + ${publicSecondaryColor} + ';'">
+
+<div class="top-bar text-white py-1">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center small">
+        <span>
+            <i class="bi bi-geo-alt-fill me-1"></i>
+            <span th:text="${topbarLocation}">Atención en Iquitos y alrededores</span>
+        </span>
+        <span class="d-flex align-items-center">
+            <i class="bi bi-telephone-fill me-1"></i>
+            <span class="me-3">
+                <span th:text="${topbarPhoneLabel}">Central:</span> <span th:text="${topbarPhone}">(065) 000000</span>
+            </span>
+            <i class="bi bi-whatsapp me-1"></i>
+            <a class="text-white text-decoration-none fw-semibold" th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank">
+                <span th:text="${topbarWhatsappLabel}">Pedidos por WhatsApp</span>
+            </a>
+        </span>
+    </div>
+</div>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+    <div class="container">
+        <a class="navbar-brand fw-bold d-flex align-items-center" th:href="@{/portal}">
+            <img th:src="@{${platformLogo}}" th:alt="${platformName}" height="36" class="me-2">
+            <span>
+                <span class="d-block brand-title" th:text="${platformName}">Eco del Amazonas</span>
+                <span class="d-block brand-subtitle" th:text="${platformTagline}">Agua de mesa</span>
+            </span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarPublic" aria-controls="navbarPublic" aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarPublic">
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/portal}" th:text="${publicNavHomeLabel}">Inicio</a>
+                </li>
+                <li class="nav-item" th:if="${featurePublicCatalog}">
+                    <a class="nav-link active" th:href="@{/catalogo}" th:text="${publicNavCatalogLabel}">Catálogo</a>
+                </li>
+                <li class="nav-item" th:if="${featureBlog}">
+                    <a class="nav-link" th:href="@{/blog}" th:text="${publicNavBlogLabel}">Blog & consejos</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank">
+                        <i class="bi bi-whatsapp"></i> <span th:text="${publicNavWhatsappLabel}">Pedir ahora</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<main class="py-4 bg-light">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h1 class="h4 mb-0" th:text="${catalogPageTitle}">Catálogo de productos</h1>
+                <p class="text-muted mb-0" th:text="${catalogSubtitle}">
+                    Selecciona el producto y envía tu pedido por WhatsApp.
+                </p>
+            </div>
+        </div>
+
+        <div th:if="${#lists.isEmpty(products)}" class="alert alert-info" th:text="${catalogEmptyText}">
+            No hay productos activos configurados todavía.
+        </div>
+
+        <div th:if="${!#lists.isEmpty(products)}" class="row g-3">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-3" th:each="p : ${products}">
+                <div class="card product-card border-0 h-100"
+                     th:attr="data-id=${p.id}, data-name=${p.name}, data-price=${#numbers.formatDecimal(p.price, 1, 'POINT', 2, 'POINT')}, data-image=${p.imagePath != null and !#strings.isEmpty(p.imagePath) ? p.imagePath : catalogProductPlaceholderImage}, data-category=${p.category != null ? p.category.name : 'Sin categoría'}">
+                    <img th:src="${p.imagePath != null and !#strings.isEmpty(p.imagePath) ? p.imagePath : catalogProductPlaceholderImage}"
+                         class="card-img-top product-card-img"
+                         th:alt="${p.name}">
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title h6 mb-1 product-card-title" th:text="${p.name}">Nombre</h5>
+                        <p class="small text-muted mb-1" th:if="${p.category != null}">
+                            <i class="bi bi-tag"></i>
+                            <span th:text="${p.category.name}">Categoría</span>
+                        </p>
+
+                        <div class="card-text small text-muted mb-1 product-card-description" th:utext="${p.description}">
+                            Descripción…
+                        </div>
+
+                        <div class="d-none product-card-description-full" th:utext="${p.description}">
+                            Descripción completa…
+                        </div>
+
+                        <button type="button"
+                                class="btn btn-link see-more-link px-0 mb-2"
+                                data-bs-toggle="modal"
+                                data-bs-target="#productDetailModal"
+                                th:text="${catalogDetailsButtonLabel}">
+                            Ver detalles
+                        </button>
+
+                        <p class="fw-bold mb-3">
+                            S/ <span th:text="${#numbers.formatDecimal(p.price, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                        </p>
+
+                        <div class="mt-auto">
+                            <button type="button"
+                                    class="btn btn-primary btn-sm w-100"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#orderModal"
+                                    th:attr="data-id=${p.id}, data-name=${p.name}, data-price=${#numbers.formatDecimal(p.price, 1, 'POINT', 2, 'POINT')}">
+                                <i class="bi bi-whatsapp me-1"></i> <span th:text="${catalogOrderButtonLabel}">Pedir por WhatsApp</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<div class="modal fade" id="productDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="detailProductName">Detalle del producto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-5 text-center">
+                        <img id="detailProductImage" src="#" alt="Producto" class="img-fluid rounded mb-2 product-detail-image">
+                        <p class="small text-muted mb-0"><span id="detailProductCategory"></span></p>
+                        <p class="fw-bold fs-5 mb-0 mt-2">S/ <span id="detailProductPrice"></span></p>
+                    </div>
+                    <div class="col-md-7">
+                        <div id="detailProductDescription" class="small text-muted"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-success btn-sm" id="detailOrderButton" data-bs-toggle="modal" data-bs-target="#orderModal" data-bs-dismiss="modal">
+                    <i class="bi bi-whatsapp me-1"></i> <span th:text="${catalogOrderButtonLabel}">Pedir por WhatsApp</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="orderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="orderForm" onsubmit="sendWhatsappOrderFromCatalog(event)">
+                <div class="modal-header">
+                    <h5 class="modal-title" th:text="${orderModalTitle}">Pedido por WhatsApp</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="productId" id="orderProductId"/>
+                    <div class="mb-2">
+                        <label class="form-label small text-muted" th:text="${businessProductLabel}">Producto</label>
+                        <input type="text" class="form-control" id="orderProductName" readonly>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small text-muted">Precio referencial (S/.)</label>
+                        <input type="text" class="form-control" id="orderProductPrice" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" th:text="${orderModalQuantityLabel}">Cantidad</label>
+                        <input type="number" class="form-control" name="quantity" id="orderQuantity" min="1" value="1" required>
+                    </div>
+                    <hr>
+                    <p class="small text-muted mb-2" th:text="${orderModalIntro}">Para coordinar la entrega, por favor completa tus datos:</p>
+                    <div class="mb-2">
+                        <label class="form-label">Soy...</label>
+                        <select name="customerType" class="form-select" required>
+                            <option value="NEW">Cliente nuevo</option>
+                            <option value="EXISTING">Ya soy cliente</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Nombre completo</label>
+                        <input type="text" class="form-control" name="customerName" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Celular</label>
+                        <input type="text" class="form-control" name="customerPhone" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label" th:text="${orderModalAddressLabel}">Dirección (referencia)</label>
+                        <textarea class="form-control" name="customerAddress" rows="2" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" th:text="${orderModalNotesLabel}">Notas para la entrega (opcional)</label>
+                        <textarea class="form-control" name="extraNotes" rows="2" th:placeholder="${orderModalNotesPlaceholder}"></textarea>
+                    </div>
+                    <p class="small text-muted mb-0">
+                        Al hacer clic en <strong th:text="${orderModalSubmitLabel}">Enviar por WhatsApp</strong> se abrirá la conversación con nuestro número, con el pedido ya redactado.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success btn-sm">
+                        <i class="bi bi-whatsapp"></i> <span th:text="${orderModalSubmitLabel}">Enviar por WhatsApp</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999;">
+    <a th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank" class="btn btn-success btn-lg rounded-circle d-flex align-items-center justify-content-center shadow">
+        <i class="bi bi-whatsapp fs-3"></i>
+    </a>
+</div>
+
+<footer class="border-top py-3 bg-white mt-4">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center small text-muted">
+        <span>
+            © <span th:text="${#temporals.format(#temporals.createNow(), 'yyyy')}">2024</span>
+            <span th:text="${platformName}">Eco del Amazonas</span>
+            -
+            <span th:text="${platformTagline}">Agua de mesa</span>
+        </span>
+        <span th:text="${footerRight}">Servicio a domicilio - Iquitos, Perú</span>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+    const ADMIN_WHATSAPP = /*[[${whatsappNumber} ?: '51999999999']]*/ '51999999999';
+    const BUSINESS_CATALOG_WHATSAPP_INTRO = /*[[${businessCatalogWhatsappIntro} ?: 'Hola, deseo hacer un pedido desde el catálogo']]*/ 'Hola, deseo hacer un pedido desde el catálogo';
+    const PRODUCT_LABEL = /*[[${businessProductLabel} ?: 'Producto']]*/ 'Producto';
+
+    function sendWhatsappOrderFromCatalog(event) {
+        event.preventDefault();
+
+        const productName = document.getElementById('orderProductName').value.trim();
+        const productPrice = document.getElementById('orderProductPrice').value.trim();
+        const quantity = document.getElementById('orderQuantity').value.trim();
+
+        const form = event.target;
+        const customerTypeSelect = form.querySelector('[name="customerType"]');
+        const customerName = form.querySelector('[name="customerName"]').value.trim();
+        const customerPhone = form.querySelector('[name="customerPhone"]').value.trim();
+        const customerAddress = form.querySelector('[name="customerAddress"]').value.trim();
+        const extraNotes = form.querySelector('[name="extraNotes"]').value.trim();
+
+        if (!productName || !quantity || !customerName || !customerPhone || !customerAddress) {
+            alert('Por favor completa todos los campos obligatorios.');
+            return;
+        }
+
+        let customerTypeLabel = '';
+        if (customerTypeSelect) {
+            const selectedOption = customerTypeSelect.options[customerTypeSelect.selectedIndex];
+            customerTypeLabel = selectedOption ? selectedOption.text : '';
+        }
+
+        const lines = [
+            BUSINESS_CATALOG_WHATSAPP_INTRO,
+            '',
+            '🛒 ' + PRODUCT_LABEL + ': ' + productName,
+            '💰 Precio referencial: S/ ' + (productPrice || '-'),
+            '🔢 Cantidad: ' + quantity,
+            '',
+            (customerTypeLabel ? '🙋‍♂️ Tipo de cliente: ' + customerTypeLabel : ''),
+            '👤 Nombre: ' + customerName,
+            '📞 Celular: ' + customerPhone,
+            '📍 Dirección / referencia: ' + customerAddress
+        ];
+
+        if (extraNotes) {
+            lines.push('📝 Notas: ' + extraNotes);
+        }
+
+        const url = 'https://wa.me/' + ADMIN_WHATSAPP + '?text=' + encodeURIComponent(lines.join('\n'));
+        window.open(url, '_blank');
+
+        const orderModalEl = document.getElementById('orderModal');
+        if (orderModalEl && window.bootstrap && bootstrap.Modal) {
+            const modalInstance = bootstrap.Modal.getInstance(orderModalEl);
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const orderModal = document.getElementById('orderModal');
+        const detailModal = document.getElementById('productDetailModal');
+        const detailOrderButton = document.getElementById('detailOrderButton');
+
+        if (orderModal) {
+            orderModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                if (!button) {
+                    return;
+                }
+
+                const productId = button.getAttribute('data-id');
+                const productName = button.getAttribute('data-name');
+                const productPrice = button.getAttribute('data-price');
+
+                document.getElementById('orderProductId').value = productId;
+                document.getElementById('orderProductName').value = productName;
+                document.getElementById('orderProductPrice').value = productPrice;
+                document.getElementById('orderQuantity').value = 1;
+
+                const form = document.getElementById('orderForm');
+                if (form) {
+                    form.reset();
+                    document.getElementById('orderProductId').value = productId;
+                    document.getElementById('orderProductName').value = productName;
+                    document.getElementById('orderProductPrice').value = productPrice;
+                    document.getElementById('orderQuantity').value = 1;
+                }
+            });
+        }
+
+        if (detailModal) {
+            detailModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                if (!button) {
+                    return;
+                }
+
+                const card = button.closest('.product-card');
+                if (!card) {
+                    return;
+                }
+
+                const name = card.dataset.name || '';
+                const price = card.dataset.price || '';
+                const image = card.dataset.image || '';
+                const category = card.dataset.category || 'Sin categoría';
+                const descriptionFull = card.querySelector('.product-card-description-full');
+
+                document.getElementById('detailProductName').textContent = name;
+                document.getElementById('detailProductPrice').textContent = price;
+                document.getElementById('detailProductImage').src = image;
+                document.getElementById('detailProductImage').alt = name;
+                document.getElementById('detailProductCategory').textContent = category;
+
+                if (descriptionFull) {
+                    document.getElementById('detailProductDescription').innerHTML = descriptionFull.innerHTML;
+                } else {
+                    document.getElementById('detailProductDescription').textContent = '';
+                }
+
+                const productId = card.dataset.id;
+                if (detailOrderButton) {
+                    detailOrderButton.setAttribute('data-id', productId);
+                    detailOrderButton.setAttribute('data-name', name);
+                    detailOrderButton.setAttribute('data-price', price);
+                }
+            });
+        }
+    });
+</script>
+</body>
+</html>

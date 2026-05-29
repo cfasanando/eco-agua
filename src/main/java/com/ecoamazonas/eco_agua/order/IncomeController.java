@@ -91,6 +91,8 @@ public class IncomeController {
         model.addAttribute("orders", orders);
         model.addAttribute("totalAmount", total);
         model.addAttribute("summaryRange", summaryRange);
+        model.addAttribute("newOrderDate", startDate);
+        model.addAttribute("newOrderReturnTo", "/income/sales");
         return "income/sales_by_date";
     }
 
@@ -121,6 +123,8 @@ public class IncomeController {
         model.addAttribute("endDate", endDate);
         model.addAttribute("orders", orders);
         model.addAttribute("totalAmount", total);
+        model.addAttribute("newOrderDate", startDate);
+        model.addAttribute("newOrderReturnTo", "/income/credit");
         return "income/credit_accounts";
     }
 

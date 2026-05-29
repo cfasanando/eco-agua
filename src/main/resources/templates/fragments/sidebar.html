@@ -6,9 +6,19 @@
   th:fragment="sidebar"
 >
   <div class="sidebar-brand">
-    <img src="/img/logo-eco.png" alt="Eco del Amazonas">
-    <div class="sidebar-brand-title">
-      SISTEMA<br>INTEGRAL
+    <img class="sidebar-brand-logo"
+         th:src="${adminBrandLogo != null and !#strings.isEmpty(adminBrandLogo) ? adminBrandLogo : (businessAdminLogo != null and !#strings.isEmpty(businessAdminLogo) ? businessAdminLogo : '/img/logo-eco.png')}"
+         th:alt="${adminBrandTitle != null and !#strings.isEmpty(adminBrandTitle) ? adminBrandTitle : (businessName != null and !#strings.isEmpty(businessName) ? businessName : 'Sistema integral')}"
+         alt="Sistema integral">
+    <div class="sidebar-brand-copy">
+      <div class="sidebar-brand-name"
+           th:text="${adminBrandTitle != null and !#strings.isEmpty(adminBrandTitle) ? adminBrandTitle : (businessName != null and !#strings.isEmpty(businessName) ? businessName : 'Sistema integral')}">
+        Productos de la Selva Belén
+      </div>
+      <div class="sidebar-brand-subtitle"
+           th:text="${adminBrandSubtitle != null and !#strings.isEmpty(adminBrandSubtitle) ? adminBrandSubtitle : (businessAdminTitle != null and !#strings.isEmpty(businessAdminTitle) ? businessAdminTitle : 'Sistema integral')}">
+        Sistema integral
+      </div>
     </div>
   </div>
 
@@ -90,7 +100,7 @@
               th:classappend="${activePage == 'clients' ? ' active' : ''}"
             >
               <span class="icon"><i class="bi bi-person-lines-fill"></i></span>
-              <span>Clientes</span>
+              <span th:text="${businessCustomerPluralLabel} ?: 'Clientes'">Clientes</span>
             </a>
           </th:block>
 
@@ -101,7 +111,7 @@
               th:classappend="${activePage == 'clients_portfolio' or activePage == 'clients' ? ' active' : ''}"
             >
               <span class="icon"><i class="bi bi-bar-chart-line"></i></span>
-              <span>Cartera de clientes</span>
+              <span th:text="${'Cartera de ' + #strings.toLowerCase(businessCustomerPluralLabel ?: 'clientes')}">Cartera de clientes</span>
             </a>
           </th:block>
 
@@ -112,7 +122,7 @@
               th:classappend="${activePage == 'client-profiles' ? ' active' : ''}"
             >
               <span class="icon"><i class="bi bi-diagram-3"></i></span>
-              <span>Perfiles de cliente</span>
+              <span th:text="${'Perfiles de ' + #strings.toLowerCase(businessCustomerLabel ?: 'cliente')}">Perfiles de cliente</span>
             </a>
           </th:block>
 
@@ -127,36 +137,36 @@
             </a>
           </th:block>
 
-          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO')">
+          <th:block th:if="${featureDelivery}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO')">
             <a
               th:href="@{/admin/delivery-zones}"
               class="menu-link submenu"
               th:classappend="${activePage == 'delivery_zones' ? ' active' : ''}"
             >
               <span class="icon"><i class="bi bi-geo-alt-fill"></i></span>
-              <span>Zonas de reparto</span>
+              <span th:text="${'Zonas de ' + #strings.toLowerCase(businessDeliveryLabel ?: 'reparto')}">Zonas de reparto</span>
             </a>
           </th:block>
 
-          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO')">
+          <th:block th:if="${featureDelivery}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO')">
             <a
               th:href="@{/delivery}"
               class="menu-link submenu"
               th:classappend="${activePage == 'delivery_daily' ? ' active' : ''}"
             >
               <span class="icon"><i class="bi bi-truck"></i></span>
-              <span>Reparto diario</span>
+              <span th:text="|${businessDeliveryLabel ?: 'Reparto'} diario|">Reparto diario</span>
             </a>
           </th:block>
 
-          <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO')">
+          <th:block th:if="${featureReorder}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO')">
             <a
               th:href="@{/reorder-agenda}"
               class="menu-link submenu"
               th:classappend="${activePage == 'reorder_agenda' ? ' active' : ''}"
             >
               <span class="icon"><i class="bi bi-arrow-repeat"></i></span>
-              <span>Agenda de reposición</span>
+              <span th:text="${'Agenda de ' + #strings.toLowerCase(businessReorderLabel ?: 'reposición')}">Agenda de reposición</span>
             </a>
           </th:block>
         </div>
@@ -274,7 +284,7 @@
               th:classappend="${activePage == 'suppliers' ? ' active' : ''}"
             >
               <span class="icon"><i class="bi bi-building"></i></span>
-              <span>Proveedores</span>
+              <span th:text="${businessSupplierPluralLabel} ?: 'Proveedores'">Proveedores</span>
             </a>
           </div>
         </div>
@@ -312,18 +322,18 @@
                 th:classappend="${activePage == 'products' ? ' active' : ''}"
               >
                 <span class="icon"><i class="bi bi-box-seam"></i></span>
-                <span>Productos</span>
+                <span th:text="${businessProductPluralLabel} ?: 'Productos'">Productos</span>
               </a>
             </th:block>
 
-            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR')">
+            <th:block th:if="${featureSupplies}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR')">
               <a
                 th:href="@{/admin/supplies}"
                 class="menu-link submenu"
                 th:classappend="${activePage == 'supplies' ? ' active' : ''}"
               >
                 <span class="icon"><i class="bi bi-droplet-half"></i></span>
-                <span>Insumos</span>
+                <span th:text="${businessSupplyPluralLabel} ?: 'Insumos'">Insumos</span>
               </a>
             </th:block>
 
@@ -350,33 +360,34 @@
             </th:block>
 
             <a
+              th:if="${featureContainers}"
               th:href="@{/containers}"
               class="menu-link submenu"
               th:classappend="${activePage == 'warehouse_containers' ? ' active' : ''}"
             >
               <span class="icon"><i class="bi bi-arrow-repeat"></i></span>
-              <span>Envases retornables</span>
+              <span th:text="|${businessContainerPluralLabel ?: 'Envases'} retornables|">Envases retornables</span>
             </a>
 
-            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR')">
+            <th:block th:if="${featureSupplies}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR')">
               <a
                 th:href="@{/warehouse/supplies-stock}"
                 class="menu-link submenu"
                 th:classappend="${activePage == 'warehouse_supplies_stock' ? ' active' : ''}"
               >
                 <span class="icon"><i class="bi bi-moisture"></i></span>
-                <span>Stock de insumos</span>
+                <span th:text="${'Stock de ' + #strings.toLowerCase(businessSupplyPluralLabel ?: 'insumos')}">Stock de insumos</span>
               </a>
             </th:block>
 
-            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR')">
+            <th:block th:if="${featureProduction}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR')">
               <a
                 th:href="@{/production}"
                 class="menu-link submenu"
                 th:classappend="${activePage == 'production' ? ' active' : ''}"
               >
                 <span class="icon"><i class="bi bi-gear-wide-connected"></i></span>
-                <span>Producción / Planta</span>
+                <span th:text="|${businessProductionLabel ?: 'Producción'} / Planta|">Producción / Planta</span>
               </a>
             </th:block>
           </div>
@@ -435,7 +446,7 @@
       </th:block>
     </th:block>
 
-    <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT')">
+    <th:block th:if="${featureMarketingSection}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT')">
       <div class="menu-section-title">Gestión de marca</div>
 
       <div
@@ -459,7 +470,7 @@
         </label>
 
         <div class="submenu-container">
-            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT')">
+            <th:block th:if="${featureMarketing}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT')">
             <a
               th:href="@{/marketing/admin/campaigns}"
               class="menu-link submenu"
@@ -470,6 +481,7 @@
             </a>
           </th:block>
           <a
+            th:if="${featureBlog}"
             th:href="@{/admin/blog}"
             class="menu-link submenu"
             th:classappend="${activePage == 'blog_posts' or activePage == 'blog' ? ' active' : ''}"
@@ -479,6 +491,7 @@
           </a>
 
           <a
+            th:if="${featureTestimonials}"
             th:href="@{/marketing/admin/testimonials}"
             class="menu-link submenu"
             th:classappend="${activePage == 'testimonials' ? ' active' : ''}"

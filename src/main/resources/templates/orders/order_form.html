@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/head_admin :: adminHead('Nuevo pedido - Eco Agua')"></head>
+<head th:replace="fragments/head_admin :: adminHead('Nuevo pedido')"></head>
 
 <body>
 
-<div class="app-layout" th:with="activePage='home'">
+<div class="app-layout" th:with="activePage=${activePage}">
     <!-- Sidebar -->
     <aside th:replace="fragments/sidebar :: sidebar"></aside>
 
@@ -17,9 +17,9 @@
         <main class="content-wrapper">
 
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h1 class="h5 mb-0">Nuevo pedido</h1>
+                <h1 class="h5 mb-0" th:text="${'Nuevo pedido - ' + (businessShortName ?: 'Negocio')}">Nuevo pedido</h1>
                 <div class="small text-muted">
-                    Fecha:
+                    Fecha actual:
                     <span th:text="${today}">2025-11-23</span>
                 </div>
             </div>
@@ -38,39 +38,54 @@
                                   method="post">
 
                                 <input type="hidden"
-                                       name="orderDate"
-                                       th:value="${today}"/>
+                                       name="returnTo"
+                                       th:value="${returnTo}"/>
 
                                 <input type="hidden"
                                        th:name="${_csrf.parameterName}"
                                        th:value="${_csrf.token}"/>
 
                                 <div class="row g-2 mb-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Repartidor</label>
+                                    <div class="col-md-4">
+                                        <label for="orderDate" class="form-label">Fecha del pedido</label>
+                                        <input type="date"
+                                               class="form-control"
+                                               id="orderDate"
+                                               name="orderDate"
+                                               th:value="${orderDate}"
+                                               required>
+                                        <small class="text-muted small">
+                                            Use esta fecha si está registrando una venta pasada.
+                                        </small>
+                                    </div>
+                                    <div class="col-md-4" th:if="${featureDelivery}">
+                                        <label class="form-label" th:text="${businessDeliveryPersonLabel} ?: 'Repartidor'">Repartidor</label>
                                         <!-- Delivery person select (only registered employees with job 'Repartidor') -->
                                         <select class="form-select"
+                                                id="deliveryPerson"
                                                 name="deliveryPerson"
                                                 required>
-                                            <option value="">Seleccione un repartidor</option>
+                                            <option value="" th:text="${'Seleccione ' + #strings.toLowerCase(businessDeliveryPersonLabel ?: 'un repartidor')}">Seleccione un repartidor</option>
                                             <option th:each="emp : ${deliveryEmployees}"
                                                     th:value="${emp.firstName + ' ' + emp.lastName}"
                                                     th:text="${emp.firstName + ' ' + emp.lastName}">
                                                 Repartidor
                                             </option>
                                         </select>
-                                        <small class="text-muted small">
+                                        <small class="text-muted small" th:text="${'Solo se muestran colaboradores activos configurados como ' + #strings.toLowerCase(businessDeliveryPersonLabel ?: 'repartidor') + '.'}">
                                             Solo se muestran colaboradores activos con cargo de repartidor.
                                         </small>
                                     </div>
-                                    <div class="col-md-6">
-                                        <label for="clientSearch" class="form-label">Cliente</label>
+                                    <input type="hidden" name="deliveryPerson" value="" th:if="${!featureDelivery}">
+                                    <div th:class="${featureDelivery} ? 'col-md-4' : 'col-md-8'">
+                                        <label for="clientSearch" class="form-label" th:text="${businessCustomerLabel} ?: 'Cliente'">Cliente</label>
 
                                         <div class="position-relative">
                                             <input
                                                 type="text"
                                                 id="clientSearch"
                                                 class="form-control"
+                                                th:placeholder="${'Escriba el nombre del ' + #strings.toLowerCase(businessCustomerLabel ?: 'cliente') + '...'}"
                                                 placeholder="Escriba el nombre del cliente..."
                                                 autocomplete="off"
                                             />
@@ -87,7 +102,7 @@
                                         </small>
 
                                         <select id="clientSelect" name="clientId" class="d-none" required>
-                                            <option value="">Seleccione un cliente</option>
+                                            <option value="" th:text="${'Seleccione un ' + #strings.toLowerCase(businessCustomerLabel ?: 'cliente')}">Seleccione un cliente</option>
                                             <option
                                                 th:each="c : ${clients}"
                                                 th:value="${c.id}"
@@ -127,7 +142,7 @@
                                         <div class="col-md-4">
                                             <strong>Precio sugerido:</strong>
                                             <span id="clSuggestedPrice">0.00</span>
-                                            <small class="text-muted d-block mt-1">
+                                            <small class="text-muted d-block mt-1" th:text="${businessProfilePriceHelpText}">
                                                 Para el producto principal de agua de mesa, este precio se aplicará automáticamente.
                                             </small>
                                         </div>
@@ -137,9 +152,10 @@
                                 <div class="row g-3 mb-3">
                                     <input type="hidden" id="borrowedBottles" name="borrowedBottles" value="0" />
 
+                                    <th:block th:if="${featureContainers}">
                                     <div class="col-md-6 col-xl-3">
                                         <div class="d-flex justify-content-between align-items-start mb-1" style="min-height: 2.75rem;">
-                                            <label class="form-label mb-0" for="currentContainerBalance">Saldo actual</label>
+                                            <label class="form-label mb-0" for="currentContainerBalance" th:text="${'Saldo actual de ' + #strings.toLowerCase(businessContainerPluralLabel ?: 'envases')}">Saldo actual</label>
                                             <span class="small invisible">Acción</span>
                                         </div>
                                         <input
@@ -149,12 +165,12 @@
                                             value="0"
                                             readonly
                                         />
-                                        <small class="text-muted d-block mt-1" style="min-height: 2.5rem;">Botellones que el cliente mantiene pendientes.</small>
+                                        <small class="text-muted d-block mt-1" style="min-height: 2.5rem;">Saldo que el cliente mantiene pendiente.</small>
                                     </div>
 
                                     <div class="col-md-6 col-xl-3">
                                         <div class="d-flex justify-content-between align-items-start mb-1" style="min-height: 2.75rem;">
-                                            <label for="containersDelivered" class="form-label mb-0">Envases entregados</label>
+                                            <label for="containersDelivered" class="form-label mb-0" th:text="|${businessContainerPluralLabel ?: 'Envases'} entregados|">Envases entregados</label>
                                             <a href="#" id="borrowedBottlesAutoLink" class="small text-decoration-none mt-1">Usar sugerido</a>
                                         </div>
                                         <input
@@ -166,12 +182,12 @@
                                             name="containersDelivered"
                                             value="0"
                                         />
-                                        <small class="text-muted d-block mt-1" style="min-height: 2.5rem;">Llenos que salen hoy hacia el cliente.</small>
+                                        <small class="text-muted d-block mt-1" style="min-height: 2.5rem;">Cantidad entregada hoy al cliente.</small>
                                     </div>
 
                                     <div class="col-md-6 col-xl-3">
                                         <div class="d-flex justify-content-between align-items-start mb-1" style="min-height: 2.75rem;">
-                                            <label for="containersReturned" class="form-label mb-0">Envases recogidos</label>
+                                            <label for="containersReturned" class="form-label mb-0" th:text="|${businessContainerPluralLabel ?: 'Envases'} recogidos|">Envases recogidos</label>
                                             <span class="small invisible">Acción</span>
                                         </div>
                                         <input
@@ -183,12 +199,12 @@
                                             name="containersReturned"
                                             value="0"
                                         />
-                                        <small class="text-muted d-block mt-1" style="min-height: 2.5rem;">Vacíos que regresan hoy desde el cliente.</small>
+                                        <small class="text-muted d-block mt-1" style="min-height: 2.5rem;">Cantidad retornada hoy desde el cliente.</small>
                                     </div>
 
                                     <div class="col-md-6 col-xl-3">
                                         <div class="d-flex justify-content-between align-items-start mb-1" style="min-height: 2.75rem;">
-                                            <label class="form-label mb-0" for="projectedContainerBalance">Saldo proyectado</label>
+                                            <label class="form-label mb-0" for="projectedContainerBalance" th:text="${'Saldo proyectado de ' + #strings.toLowerCase(businessContainerPluralLabel ?: 'envases')}">Saldo proyectado</label>
                                             <span class="small invisible">Acción</span>
                                         </div>
                                         <input
@@ -200,6 +216,8 @@
                                         />
                                         <small class="text-muted d-block mt-1" style="min-height: 2.5rem;">Saldo estimado después de registrar este pedido.</small>
                                     </div>
+
+                                    </th:block>
 
                                     <div class="col-md-12">
                                         <label class="form-label">Comentario</label>
@@ -281,7 +299,7 @@
                                         Pagar
                                     </button>
 
-                                    <a th:href="@{/home}"
+                                    <a th:href="${cancelUrl}"
                                        class="btn btn-outline-secondary">
                                         Cancelar
                                     </a>
@@ -296,7 +314,7 @@
                 <div class="col-lg-5">
                     <div class="card shadow-sm mb-3">
                         <div class="card-header bg-primary text-white">
-                            Productos
+                            <span th:text="${businessProductPluralLabel} ?: 'Productos'">Productos</span>
                         </div>
                         <div class="card-body">
 
@@ -325,6 +343,7 @@
                                 <input type="text"
                                        class="form-control form-control-sm"
                                        id="productSearch"
+                                       th:placeholder="${'Escriba para filtrar ' + #strings.toLowerCase(businessProductPluralLabel ?: 'productos') + '...'}"
                                        placeholder="Escriba para filtrar productos...">
                             </div>
 
@@ -360,7 +379,7 @@
                     </div>
 
                     <!-- Promociones -->
-                    <div class="card shadow-sm">
+                    <div class="card shadow-sm" th:if="${featureMarketing}">
                         <div class="card-header bg-success text-white">
                             Promociones del cliente
                         </div>
@@ -410,6 +429,7 @@
         const promotionsContainer = document.getElementById('promotionsContainer');
         const deliveryPersonSelect = document.getElementById('deliveryPerson');
         const clientSuggestions = document.getElementById('clientSuggestions');
+        const orderDateInput = document.getElementById('orderDate');
         const borrowedBottlesInput = document.getElementById('borrowedBottles');
         const currentContainerBalanceInput = document.getElementById('currentContainerBalance');
         const containersDeliveredInput = document.getElementById('containersDelivered');
@@ -988,7 +1008,11 @@
                 '<p class="small text-muted mb-0">Cargando promociones...</p>';
             currentClientPromotions = [];
 
-            fetch('/orders/client/' + clientId + '/promotions')
+            const orderDateQuery = orderDateInput && orderDateInput.value
+                ? '?date=' + encodeURIComponent(orderDateInput.value)
+                : '';
+
+            fetch('/orders/client/' + clientId + '/promotions' + orderDateQuery)
                 .then(function (resp) {
                     if (!resp.ok) {
                         throw new Error('HTTP ' + resp.status);
@@ -1383,6 +1407,13 @@
             clientSelect.addEventListener('change', function () {
                 updateClientInfo();
                 const clientId = clientSelect.value || null;
+                loadPromotionsForClient(clientId);
+            });
+        }
+
+        if (orderDateInput) {
+            orderDateInput.addEventListener('change', function () {
+                const clientId = clientSelect ? clientSelect.value || null : null;
                 loadPromotionsForClient(clientId);
             });
         }

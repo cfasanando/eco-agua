@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Gastos por fecha - Eco Agua')"></head>
+
+<body>
+<div class="app-layout" th:with="activePage='expenses_by_date'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Gastos por fecha</h1>
+                    <div class="text-muted small">Listado de gastos por fecha</div>
+                </div>
+
+                <button type="button"
+                        class="btn btn-primary"
+                        id="btnOpenExpenseCreateModal"
+                        data-bs-toggle="modal"
+                        data-bs-target="#expenseModal">
+                    <i class="bi bi-plus-circle me-1"></i>
+                    Agregar un gasto
+                </button>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light fw-semibold">
+                    Filtros :
+                </div>
+                <div class="card-body">
+                    <form method="get" th:action="@{/expenses/by-date}">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label">Modo</label>
+                                <select class="form-select" name="filter" id="filterMode">
+                                    <option value="DAY" th:selected="${filter == 'DAY'}">Por día</option>
+                                    <option value="PERIOD" th:selected="${filter == 'PERIOD'}">Por período</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-3" id="singleDateGroup" th:classappend="${filter == 'PERIOD'} ? ' d-none'">
+                                <label class="form-label">Fecha</label>
+                                <input type="date"
+                                       class="form-control"
+                                       name="date"
+                                       th:value="${date}">
+                            </div>
+
+                            <div class="col-md-3" id="fromDateGroup" th:classappend="${filter != 'PERIOD'} ? ' d-none'">
+                                <label class="form-label">Desde</label>
+                                <input type="date"
+                                       class="form-control"
+                                       name="from"
+                                       th:value="${fromDate}">
+                            </div>
+
+                            <div class="col-md-3" id="toDateGroup" th:classappend="${filter != 'PERIOD'} ? ' d-none'">
+                                <label class="form-label">Hasta</label>
+                                <input type="date"
+                                       class="form-control"
+                                       name="to"
+                                       th:value="${toDate}">
+                            </div>
+
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="bi bi-search me-1"></i>
+                                    Buscar
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+
+                    <div th:if="${expenses == null or #lists.isEmpty(expenses)}" class="text-muted small">
+                        No hay gastos en las fechas seleccionadas.
+                    </div>
+
+                    <div th:if="${expenses != null and !#lists.isEmpty(expenses)}" class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Categoría</th>
+                                <th>Observación</th>
+                                <th class="text-end">Monto S/.</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="e : ${expenses}">
+                                <td th:text="${#temporals.format(e.expenseDate,'dd/MM/yyyy')}">07/03/2026</td>
+                                <td th:text="${e.category != null ? e.category.name : '-'}">Categoría</td>
+                                <td th:text="${e.observation} ?: '-'">Observación</td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(e.amount,1,'POINT',2,'POINT')}">
+                                    0.00
+                                </td>
+                                <td class="text-center">
+                                    <button type="button"
+                                            class="btn btn-outline-primary btn-sm js-edit-expense"
+                                            th:data-expense-id="${e.id}">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+
+                                    <form th:action="@{'/expenses/' + ${e.id} + '/delete'}"
+                                          method="post"
+                                          class="d-inline js-delete-expense-form">
+                                        <input type="hidden"
+                                               th:name="${_csrf.parameterName}"
+                                               th:value="${_csrf.token}"/>
+                                        <input type="hidden" name="redirect" value="/expenses/by-date"/>
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            </tbody>
+                            <tfoot>
+                            <tr>
+                                <th colspan="3" class="text-end">TOTAL</th>
+                                <th class="text-end"
+                                    th:text="${#numbers.formatDecimal(totalAmount,1,'POINT',2,'POINT')}">
+                                    0.00
+                                </th>
+                                <th></th>
+                            </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<!-- Modal create -->
+<div class="modal fade" id="expenseModal" tabindex="-1" aria-labelledby="expenseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="expenseCreateForm"
+                  th:action="@{/expenses/save-simple}"
+                  method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="expenseModalLabel">Agrega un gasto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <input type="hidden"
+                           th:name="${_csrf.parameterName}"
+                           th:value="${_csrf.token}"/>
+                    <input type="hidden" name="redirect" value="BY_DATE"/>
+
+                    <div class="mb-3">
+                        <label class="form-label">Categoría</label>
+                        <select class="form-select"
+                                name="categoryId"
+                                id="expenseCategory"
+                                required>
+                            <option value="">- Seleccione -</option>
+                            <option th:each="cat : ${categories}"
+                                    th:value="${cat.id}"
+                                    th:text="${cat.name}">
+                            </option>
+                        </select>
+                        <small class="text-muted d-block mt-2" id="expenseContextHint">
+                            Selecciona una categoría para continuar.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="expenseSupplyGroup">
+                        <label class="form-label">Insumo</label>
+                        <select class="form-select" name="supplyId" id="expenseSupplyId">
+                            <option value="">- Seleccione -</option>
+                            <option th:each="supply : ${supplies}"
+                                    th:value="${supply.id}"
+                                    th:text="${supply.name}"
+                                    th:data-group="${supply.groupLabel}">
+                            </option>
+                        </select>
+                        <small class="text-muted d-block mt-2">
+                            Selecciona el insumo registrado relacionado con este gasto.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="expenseSupplierGroup">
+                        <label class="form-label">Proveedor relacionado</label>
+                        <select class="form-select" name="supplierId" id="expenseSupplierId">
+                            <option value="">- Sin proveedor específico -</option>
+                            <option th:each="sup : ${suppliers}"
+                                    th:value="${sup.id}"
+                                    th:text="${sup.name}"
+                                    th:data-category="${sup.category != null ? sup.category.name : ''}">
+                            </option>
+                        </select>
+                        <small class="text-muted d-block mt-2" id="expenseSupplierHelp">
+                            Selecciona un proveedor si aplica para este gasto.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="expenseManualSupplierGroup">
+                        <label class="form-label">Referencia adicional</label>
+                        <input type="text"
+                               class="form-control"
+                               name="manualSupplierName"
+                               id="expenseManualSupplierName"
+                               placeholder="Ej: cochera, grifo eventual, servicio puntual, etc.">
+                    </div>
+
+                    <div class="mb-3 d-none" id="expenseEmployeeGroup">
+                        <label class="form-label">Personal</label>
+                        <select class="form-select" name="employeeId" id="expenseEmployeeId">
+                            <option value="">- Seleccione -</option>
+                            <option th:each="emp : ${employees}"
+                                    th:value="${emp.id}"
+                                    th:text="${(emp.firstName != null ? emp.firstName : '') + (emp.lastName != null ? ' ' + emp.lastName : '')}"
+                                    th:data-position="${emp.jobPosition != null ? emp.jobPosition.name : ''}">
+                            </option>
+                        </select>
+                        <small class="text-muted d-block mt-2" id="expenseEmployeeHelp">
+                            Selecciona el personal activo relacionado con este gasto.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="expenseEmployeePaymentTypeGroup">
+                        <label class="form-label">Tipo de pago</label>
+                        <select class="form-select" name="employeePaymentType" id="expenseEmployeePaymentType">
+                            <option value="">- Seleccione -</option>
+                            <option value="SALARY">Salario</option>
+                            <option value="ADVANCE">Adelanto</option>
+                            <option value="DISCOUNT">Descuento</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Costo S/.</label>
+                        <input type="number"
+                               name="amount"
+                               id="expenseAmount"
+                               class="form-control"
+                               min="0"
+                               step="0.01"
+                               required>
+                        <small class="text-muted d-block mt-2" id="expenseAmountHint">
+                            Ingresa el costo manualmente o deja que el sistema lo sugiera para pagos de personal.
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Observación</label>
+                        <textarea class="form-control"
+                                  name="observation"
+                                  id="expenseObservation"
+                                  rows="2"
+                                  placeholder="Ej: gasolina, mantenimiento, servicio, etc."></textarea>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label">Fecha</label>
+                        <input type="date"
+                               class="form-control"
+                               name="expenseDate"
+                               id="expenseDate"
+                               th:value="${date != null ? date : #temporals.createToday()}">
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="btn btn-primary">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal edit -->
+<div class="modal fade" id="editExpenseModal" tabindex="-1" aria-labelledby="editExpenseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="editExpenseForm" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editExpenseModalLabel">Editar gasto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <input type="hidden"
+                           th:name="${_csrf.parameterName}"
+                           th:value="${_csrf.token}"/>
+                    <input type="hidden" name="redirect" value="/expenses/by-date"/>
+
+                    <div class="mb-3">
+                        <label class="form-label">Categoría</label>
+                        <select class="form-select" name="categoryId" id="editExpenseCategory" required>
+                            <option value="">- Seleccione -</option>
+                            <option th:each="cat : ${categories}"
+                                    th:value="${cat.id}"
+                                    th:text="${cat.name}">
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Costo S/.</label>
+                        <input type="number"
+                               class="form-control"
+                               name="amount"
+                               id="editExpenseAmount"
+                               min="0"
+                               step="0.01"
+                               required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Observación</label>
+                        <textarea class="form-control"
+                                  name="observation"
+                                  id="editExpenseObservation"
+                                  rows="3"
+                                  placeholder="Detalle del gasto"></textarea>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label">Fecha</label>
+                        <input type="date"
+                               class="form-control"
+                               name="expenseDate"
+                               id="editExpenseDate"
+                               required>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="btn btn-primary">
+                        Guardar cambios
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        const filterMode = document.getElementById('filterMode');
+        const singleDateGroup = document.getElementById('singleDateGroup');
+        const fromDateGroup = document.getElementById('fromDateGroup');
+        const toDateGroup = document.getElementById('toDateGroup');
+
+        function updateFilterUi() {
+            const isPeriod = filterMode && filterMode.value === 'PERIOD';
+
+            singleDateGroup.classList.toggle('d-none', isPeriod);
+            fromDateGroup.classList.toggle('d-none', !isPeriod);
+            toDateGroup.classList.toggle('d-none', !isPeriod);
+        }
+
+        if (filterMode) {
+            filterMode.addEventListener('change', updateFilterUi);
+            updateFilterUi();
+        }
+
+        const createModalButton = document.getElementById('btnOpenExpenseCreateModal');
+        const createForm = document.getElementById('expenseCreateForm');
+
+        const editExpenseModalEl = document.getElementById('editExpenseModal');
+        const editExpenseForm = document.getElementById('editExpenseForm');
+        const editExpenseButtons = document.querySelectorAll('.js-edit-expense');
+        const deleteExpenseForms = document.querySelectorAll('.js-delete-expense-form');
+
+        const editExpenseCategory = document.getElementById('editExpenseCategory');
+        const editExpenseAmount = document.getElementById('editExpenseAmount');
+        const editExpenseObservation = document.getElementById('editExpenseObservation');
+        const editExpenseDate = document.getElementById('editExpenseDate');
+
+        let editExpenseModal = null;
+        if (editExpenseModalEl && typeof bootstrap !== 'undefined') {
+            editExpenseModal = new bootstrap.Modal(editExpenseModalEl);
+        }
+
+        function resetCreateExpenseForm() {
+            if (!createForm) {
+                return;
+            }
+
+            createForm.reset();
+            createForm.setAttribute('action', '/expenses/save-simple');
+
+            const redirectInput = createForm.querySelector('input[name="redirect"]');
+            if (redirectInput) {
+                redirectInput.value = 'BY_DATE';
+            }
+
+            const categoryField = document.getElementById('expenseCategory');
+            if (categoryField) {
+                categoryField.dispatchEvent(new Event('change'));
+            }
+        }
+
+        if (createModalButton) {
+            createModalButton.addEventListener('click', function () {
+                resetCreateExpenseForm();
+            });
+        }
+
+        async function fetchExpenseData(expenseId) {
+            const response = await fetch('/expenses/' + expenseId, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Could not load expense data.');
+            }
+
+            return response.json();
+        }
+
+        async function openEditExpenseModal(expenseId) {
+            const expense = await fetchExpenseData(expenseId);
+
+            if (!editExpenseForm || !editExpenseModal) {
+                return;
+            }
+
+            editExpenseForm.setAttribute('action', '/expenses/' + expense.id + '/update');
+            editExpenseCategory.value = expense.categoryId != null ? String(expense.categoryId) : '';
+            editExpenseAmount.value = expense.amount != null ? expense.amount : '';
+            editExpenseObservation.value = expense.observation != null ? expense.observation : '';
+            editExpenseDate.value = expense.expenseDate != null ? expense.expenseDate : '';
+
+            editExpenseModal.show();
+        }
+
+        editExpenseButtons.forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                const expenseId = this.getAttribute('data-expense-id');
+                if (!expenseId) {
+                    return;
+                }
+
+                try {
+                    await openEditExpenseModal(expenseId);
+                } catch (error) {
+                    if (window.Swal) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'No se pudo cargar el gasto',
+                            text: 'Ocurrió un problema al obtener los datos para edición.'
+                        });
+                    } else {
+                        alert('No se pudo cargar el gasto.');
+                    }
+                }
+            });
+        });
+
+        deleteExpenseForms.forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                const confirmed = window.confirm('¿Seguro que deseas eliminar este gasto?');
+                if (!confirmed) {
+                    event.preventDefault();
+                }
+            });
+        });
+
+        function initExpenseContextForm(config) {
+            const form = document.getElementById(config.formId);
+            const categorySelect = document.getElementById(config.categorySelectId);
+            const contextHint = document.getElementById(config.contextHintId);
+            const supplierGroup = document.getElementById(config.supplierGroupId);
+            const supplierSelect = document.getElementById(config.supplierSelectId);
+            const supplierHelp = document.getElementById(config.supplierHelpId);
+            const manualGroup = document.getElementById(config.manualGroupId);
+            const manualInput = document.getElementById(config.manualInputId);
+            const supplyGroup = document.getElementById(config.supplyGroupId);
+            const supplySelect = document.getElementById(config.supplySelectId);
+            const employeeGroup = document.getElementById(config.employeeGroupId);
+            const employeeSelect = document.getElementById(config.employeeSelectId);
+            const employeeHelp = document.getElementById(config.employeeHelpId);
+            const employeePaymentTypeGroup = document.getElementById(config.employeePaymentTypeGroupId);
+            const employeePaymentTypeSelect = document.getElementById(config.employeePaymentTypeSelectId);
+            const amountInput = document.getElementById(config.amountInputId);
+            const amountHint = document.getElementById(config.amountHintId);
+            const expenseDateInput = document.getElementById(config.expenseDateInputId);
+            const personnelPreviewUrl = config.personnelPreviewUrl;
+
+            if (!form || !categorySelect) {
+                return;
+            }
+
+            const supplierOptions = supplierSelect
+                ? Array.from(supplierSelect.options).filter(function (option) { return option.value; })
+                : [];
+            const employeeOptions = employeeSelect
+                ? Array.from(employeeSelect.options).filter(function (option) { return option.value; })
+                : [];
+
+            function normalizeLookupText(value) {
+                return (value || '')
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .trim();
+            }
+
+            function getMeaningfulTokens(value) {
+                const stopWords = ['de', 'del', 'la', 'las', 'el', 'los', 'por', 'con', 'y'];
+                return normalizeLookupText(value)
+                    .split(/\s+/)
+                    .filter(function (token) {
+                        return token.length >= 3 && !stopWords.includes(token);
+                    });
+            }
+
+            function getSelectedCategoryText() {
+                if (!categorySelect || categorySelect.selectedIndex < 0) {
+                    return '';
+                }
+
+                return categorySelect.options[categorySelect.selectedIndex].text || '';
+            }
+
+            function resolveExpenseContext(categoryText) {
+                const normalized = normalizeLookupText(categoryText);
+
+                if (!normalized) {
+                    return 'NONE';
+                }
+
+                if (normalized.includes('insumo')) {
+                    return 'SUPPLY';
+                }
+
+                if (
+                    normalized.includes('personal') ||
+                    normalized.includes('repartidor') ||
+                    normalized.includes('llenador') ||
+                    normalized.includes('lavador')
+                ) {
+                    return 'PERSONNEL';
+                }
+
+                return 'SUPPLIER';
+            }
+
+            function toggleGroup(element, show) {
+                if (!element) {
+                    return;
+                }
+
+                element.classList.toggle('d-none', !show);
+            }
+
+            function resetSelect(select) {
+                if (select) {
+                    select.value = '';
+                }
+            }
+
+            function restoreOptions(options) {
+                options.forEach(function (option) {
+                    option.hidden = false;
+                    option.disabled = false;
+                });
+            }
+
+            function setAmountHint(message, isMuted, isError) {
+                if (!amountHint) {
+                    return;
+                }
+
+                amountHint.textContent = message || '';
+                amountHint.classList.remove('text-muted', 'text-danger', 'text-success');
+
+                if (isError) {
+                    amountHint.classList.add('text-danger');
+                    return;
+                }
+
+                if (isMuted) {
+                    amountHint.classList.add('text-muted');
+                    return;
+                }
+
+                amountHint.classList.add('text-success');
+            }
+
+            function parseMoney(value) {
+                const numberValue = Number(value || 0);
+                if (!Number.isFinite(numberValue)) {
+                    return 0;
+                }
+
+                return Math.round(numberValue * 100) / 100;
+            }
+
+            function formatMoney(value) {
+                return parseMoney(value).toFixed(2);
+            }
+
+            function filterSuppliers(categoryText) {
+                if (!supplierSelect) {
+                    return;
+                }
+
+                restoreOptions(supplierOptions);
+                const tokens = getMeaningfulTokens(categoryText);
+
+                if (!tokens.length) {
+                    if (supplierHelp) {
+                        supplierHelp.textContent = 'Selecciona un proveedor si aplica para este gasto.';
+                    }
+                    return;
+                }
+
+                let matches = 0;
+
+                supplierOptions.forEach(function (option) {
+                    const haystack = normalizeLookupText(option.getAttribute('data-category')) + ' ' +
+                        normalizeLookupText(option.textContent);
+
+                    const matched = tokens.some(function (token) {
+                        return haystack.includes(token);
+                    });
+
+                    option.hidden = !matched;
+                    option.disabled = !matched;
+
+                    if (matched) {
+                        matches++;
+                    }
+                });
+
+                if (matches === 0) {
+                    restoreOptions(supplierOptions);
+                    if (supplierHelp) {
+                        supplierHelp.textContent = 'No se encontraron proveedores sugeridos para esta categoría. Puedes dejarlo vacío y usar la referencia adicional.';
+                    }
+                } else if (supplierHelp) {
+                    supplierHelp.textContent = 'Se muestran proveedores sugeridos según la categoría elegida.';
+                }
+
+                const selectedOption = supplierSelect.selectedOptions.length
+                    ? supplierSelect.selectedOptions[0]
+                    : null;
+
+                if (selectedOption && selectedOption.hidden) {
+                    supplierSelect.value = '';
+                }
+            }
+
+            function filterEmployees(categoryText) {
+                if (!employeeSelect) {
+                    return;
+                }
+
+                restoreOptions(employeeOptions);
+
+                const normalizedCategory = normalizeLookupText(categoryText);
+                const isGeneralPersonnel = normalizedCategory.includes('personal');
+                const tokens = getMeaningfulTokens(categoryText);
+
+                if (isGeneralPersonnel || !tokens.length) {
+                    if (employeeHelp) {
+                        employeeHelp.textContent = 'Se muestra todo el personal activo para esta categoría.';
+                    }
+                    return;
+                }
+
+                let matches = 0;
+
+                employeeOptions.forEach(function (option) {
+                    const haystack = normalizeLookupText(option.getAttribute('data-position')) + ' ' +
+                        normalizeLookupText(option.textContent);
+
+                    const matched = tokens.some(function (token) {
+                        return haystack.includes(token);
+                    });
+
+                    option.hidden = !matched;
+                    option.disabled = !matched;
+
+                    if (matched) {
+                        matches++;
+                    }
+                });
+
+                if (matches === 0) {
+                    restoreOptions(employeeOptions);
+                    if (employeeHelp) {
+                        employeeHelp.textContent = 'No se encontró personal específico para esta categoría. Se muestra todo el personal activo.';
+                    }
+                } else if (employeeHelp) {
+                    employeeHelp.textContent = 'Se muestra el personal sugerido según la categoría elegida.';
+                }
+
+                const selectedOption = employeeSelect.selectedOptions.length
+                    ? employeeSelect.selectedOptions[0]
+                    : null;
+
+                if (selectedOption && selectedOption.hidden) {
+                    employeeSelect.value = '';
+                }
+            }
+
+            function updateContextHint(context) {
+                if (!contextHint) {
+                    return;
+                }
+
+                if (context === 'SUPPLY') {
+                    contextHint.textContent = 'Esta categoría se registrará como gasto de insumos. Selecciona el insumo usado y, si aplica, el proveedor relacionado.';
+                    return;
+                }
+
+                if (context === 'PERSONNEL') {
+                    contextHint.textContent = 'Esta categoría se registrará como gasto de personal. Selecciona al trabajador y el tipo de pago.';
+                    return;
+                }
+
+                if (context === 'SUPPLIER') {
+                    contextHint.textContent = 'Esta categoría se registrará como gasto general por proveedor o servicio. Puedes seleccionar un proveedor o dejar solo una referencia adicional.';
+                    return;
+                }
+
+                contextHint.textContent = 'Selecciona una categoría para continuar.';
+            }
+
+            async function updatePersonnelPreview(context) {
+                if (!amountInput) {
+                    return;
+                }
+
+                if (context !== 'PERSONNEL') {
+                    setAmountHint('Ingresa el costo manualmente o deja que el sistema lo sugiera para pagos de personal.', true, false);
+                    return;
+                }
+
+                const employeeId = employeeSelect ? employeeSelect.value : '';
+                const paymentType = employeePaymentTypeSelect ? employeePaymentTypeSelect.value : '';
+                const expenseDate = expenseDateInput ? expenseDateInput.value : '';
+
+                if (!employeeId) {
+                    setAmountHint('Selecciona un trabajador para poder sugerir el costo.', true, false);
+                    return;
+                }
+
+                if (!paymentType) {
+                    setAmountHint('Selecciona el tipo de pago para continuar.', true, false);
+                    return;
+                }
+
+                if (paymentType !== 'SALARY') {
+                    setAmountHint('Para adelantos o descuentos, el costo se registra manualmente.', true, false);
+                    return;
+                }
+
+                if (!expenseDate) {
+                    setAmountHint('Selecciona la fecha para calcular el monto sugerido.', true, false);
+                    return;
+                }
+
+                setAmountHint('Calculando costo sugerido según ventas pagadas del día...', true, false);
+
+                try {
+                    const url = new URL(personnelPreviewUrl, window.location.origin);
+                    url.searchParams.set('employeeId', employeeId);
+                    url.searchParams.set('paymentType', paymentType);
+                    url.searchParams.set('expenseDate', expenseDate);
+
+                    const response = await fetch(url.toString(), {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Could not calculate personnel expense preview.');
+                    }
+
+                    const preview = await response.json();
+
+                    if (!preview || !preview.autoFilled) {
+                        setAmountHint(
+                            preview && preview.message
+                                ? preview.message
+                                : 'No se pudo calcular automáticamente el costo para este trabajador.',
+                            false,
+                            true
+                        );
+                        return;
+                    }
+
+                    amountInput.value = formatMoney(preview.suggestedAmount);
+
+                    const totalSales = formatMoney(preview.totalSales);
+                    const fixedComponent = formatMoney(preview.fixedComponent);
+                    const commissionComponent = formatMoney(preview.commissionComponent);
+                    const commissionRate = formatMoney(preview.commissionRate);
+
+                    let detailMessage = 'Costo sugerido: S/ ' + formatMoney(preview.suggestedAmount);
+
+                    if (preview.paymentMode === 'COMMISSION') {
+                        detailMessage += ' = ' + commissionRate + '% de ventas pagadas del día (S/ ' + totalSales + ').';
+                    } else if (preview.paymentMode === 'MIXED') {
+                        detailMessage += ' = fijo S/ ' + fixedComponent + ' + comisión S/ ' + commissionComponent +
+                            ' sobre ventas del día (S/ ' + totalSales + ').';
+                    } else {
+                        detailMessage += ' = monto fijo diario según el cargo.';
+                    }
+
+                    setAmountHint(detailMessage, false, false);
+                } catch (error) {
+                    setAmountHint(
+                        'No se pudo calcular automáticamente el costo. Puedes ingresar el monto manualmente.',
+                        false,
+                        true
+                    );
+                }
+            }
+
+            function updateExpenseFormUi() {
+                const categoryText = getSelectedCategoryText();
+                const context = resolveExpenseContext(categoryText);
+                const showSupplier = context === 'SUPPLIER' || context === 'SUPPLY';
+                const showSupply = context === 'SUPPLY';
+                const showPersonnel = context === 'PERSONNEL';
+
+                updateContextHint(context);
+
+                toggleGroup(supplierGroup, showSupplier);
+                toggleGroup(manualGroup, showSupplier);
+                toggleGroup(supplyGroup, showSupply);
+                toggleGroup(employeeGroup, showPersonnel);
+                toggleGroup(employeePaymentTypeGroup, showPersonnel);
+
+                if (supplierSelect) {
+                    supplierSelect.required = false;
+                    if (showSupplier) {
+                        filterSuppliers(categoryText);
+                    } else {
+                        resetSelect(supplierSelect);
+                    }
+                }
+
+                if (manualInput && !showSupplier) {
+                    manualInput.value = '';
+                }
+
+                if (supplySelect) {
+                    supplySelect.required = showSupply;
+                    if (!showSupply) {
+                        resetSelect(supplySelect);
+                    }
+                }
+
+                if (employeeSelect) {
+                    employeeSelect.required = showPersonnel;
+                    if (showPersonnel) {
+                        filterEmployees(categoryText);
+                    } else {
+                        resetSelect(employeeSelect);
+                    }
+                }
+
+                if (employeePaymentTypeSelect) {
+                    employeePaymentTypeSelect.required = showPersonnel;
+                    if (!showPersonnel) {
+                        resetSelect(employeePaymentTypeSelect);
+                    }
+                }
+
+                updatePersonnelPreview(context);
+            }
+
+            categorySelect.addEventListener('change', updateExpenseFormUi);
+
+            if (employeeSelect) {
+                employeeSelect.addEventListener('change', updateExpenseFormUi);
+            }
+
+            if (employeePaymentTypeSelect) {
+                employeePaymentTypeSelect.addEventListener('change', updateExpenseFormUi);
+            }
+
+            if (expenseDateInput) {
+                expenseDateInput.addEventListener('change', updateExpenseFormUi);
+            }
+
+            form.addEventListener('submit', updateExpenseFormUi);
+            updateExpenseFormUi();
+        }
+
+        initExpenseContextForm({
+            formId: 'expenseCreateForm',
+            categorySelectId: 'expenseCategory',
+            contextHintId: 'expenseContextHint',
+            supplierGroupId: 'expenseSupplierGroup',
+            supplierSelectId: 'expenseSupplierId',
+            supplierHelpId: 'expenseSupplierHelp',
+            manualGroupId: 'expenseManualSupplierGroup',
+            manualInputId: 'expenseManualSupplierName',
+            supplyGroupId: 'expenseSupplyGroup',
+            supplySelectId: 'expenseSupplyId',
+            employeeGroupId: 'expenseEmployeeGroup',
+            employeeSelectId: 'expenseEmployeeId',
+            employeeHelpId: 'expenseEmployeeHelp',
+            employeePaymentTypeGroupId: 'expenseEmployeePaymentTypeGroup',
+            employeePaymentTypeSelectId: 'expenseEmployeePaymentType',
+            amountInputId: 'expenseAmount',
+            amountHintId: 'expenseAmountHint',
+            expenseDateInputId: 'expenseDate',
+            personnelPreviewUrl: /*[[@{/expenses/personnel-preview}]]*/ '/expenses/personnel-preview'
+        });
+
+        const flashMessage = /*[[${message}]]*/ null;
+        const flashType = /*[[${messageType}]]*/ null;
+        if (flashMessage && flashMessage !== 'null' && String(flashMessage).trim() !== '') {
+            if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
+                window.ecoAdmin.showFlashMessage(flashMessage, flashType);
+            } else {
+                alert(flashMessage);
+            }
+        }
+    });
+</script>
+</body>
+</html>

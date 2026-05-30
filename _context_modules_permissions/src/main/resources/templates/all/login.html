@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${businessShortName != null ? businessShortName + ' - Acceso' : 'Eco Agua - Acceso'}">Eco Agua - Acceso</title>
+
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" th:href="@{/css/login.css}">
+</head>
+<body th:style="|--login-primary-color: ${loginPrimaryColor}; --login-primary-hover: ${loginPrimaryHoverColor};|">
+
+<div class="login-bg" th:style="'background-image: url(' + @{${loginBackgroundImage}} + ');'"></div>
+<div class="login-overlay"></div>
+
+<main class="login-page-shell">
+    <section class="login-card">
+        <div class="login-logo-circle">
+            <img th:src="@{${loginLogo}}"
+                 th:alt="${businessName} ?: 'Eco Agua'"
+                 alt="Eco Agua">
+        </div>
+
+        <h1 class="login-title" th:text="${loginTitle}">Acceso</h1>
+        <p class="login-subtitle" th:text="${loginSubtitle}">Ingresa con tu usuario para continuar.</p>
+
+        <div th:if="${param.error}" class="alert alert-danger py-2 mb-3 small">
+            Usuario o contraseña incorrectos.
+        </div>
+        <div th:if="${param.logout}" class="alert alert-success py-2 mb-3 small">
+            Has cerrado sesión correctamente.
+        </div>
+        <div th:if="${passwordResetSuccess}" class="alert alert-success py-2 mb-3 small" th:text="${passwordResetSuccess}">
+            La contraseña fue actualizada correctamente.
+        </div>
+
+        <form th:action="@{/login}" method="post" autocomplete="off">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+            <div class="mb-3">
+                <label for="username" class="form-label" th:text="${loginUsernameLabel}">Usuario</label>
+                <input id="username" name="username" type="text" class="form-control"
+                       th:placeholder="${loginUsernamePlaceholder}"
+                       placeholder="Ingresa tu usuario" required autofocus>
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label" th:text="${loginPasswordLabel}">Contraseña</label>
+                <input id="password" name="password" type="password" class="form-control"
+                       th:placeholder="${loginPasswordPlaceholder}"
+                       placeholder="Ingresa tu contraseña" required>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-3 gap-3">
+                <div class="form-check">
+                    <input id="remember-me" name="remember-me" class="form-check-input" type="checkbox">
+                    <label class="form-check-label" for="remember-me" th:text="${loginRememberLabel}">
+                        Recordarme
+                    </label>
+                </div>
+                <a class="login-inline-link" th:href="@{/password-reset/request}" th:text="${loginForgotLabel}">
+                    ¿Olvidaste tu contraseña?
+                </a>
+            </div>
+
+            <button type="submit" class="btn btn-login" th:text="${loginSubmitLabel}">
+                Acceder
+            </button>
+
+            <div class="login-footer-links mt-3">
+                <a th:href="@{/portal}" th:text="${loginBackToPublicLabel}">Volver al portal</a>
+            </div>
+        </form>
+    </section>
+</main>
+
+</body>
+</html>

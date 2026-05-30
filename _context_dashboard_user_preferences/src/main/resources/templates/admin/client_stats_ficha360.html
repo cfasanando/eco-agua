@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Ficha 360 del cliente - Eco Agua')"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='clients'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Ficha 360 comercial</div>
+                    <h1 class="h4 mb-1" th:text="${snapshot.client.name}">Cliente</h1>
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <span class="badge text-bg-light border">
+                            Perfil:
+                            <span th:text="${snapshot.client.profile != null ? snapshot.client.profile.name : 'Sin perfil'}">Perfil</span>
+                        </span>
+                        <span class="badge text-bg-light border" th:if="${snapshot.client.active}">Activo</span>
+                        <span class="badge text-bg-secondary" th:if="${!snapshot.client.active}">Inactivo</span>
+                        <span class="badge" th:classappend="${snapshot.healthBadgeClass}" th:text="${snapshot.healthLabel}">Salud</span>
+                    </div>
+                    <div class="small text-muted d-flex flex-wrap gap-3">
+                        <span>
+                            Registro:
+                            <strong th:text="${snapshot.client.registrationDate != null ? #temporals.format(snapshot.client.registrationDate, 'dd/MM/yyyy') : '-'}">01/03/2026</strong>
+                        </span>
+                        <span>
+                            Teléfono:
+                            <strong th:text="${snapshot.client.phone != null && !#strings.isEmpty(snapshot.client.phone) ? snapshot.client.phone : 'Sin teléfono'}">999999999</strong>
+                        </span>
+                        <span>
+                            Documento:
+                            <strong th:text="${snapshot.client.docType != null ? snapshot.client.docType : '-'}">DNI</strong>
+                            <strong th:text="${snapshot.client.docNumber != null && !#strings.isEmpty(snapshot.client.docNumber) ? snapshot.client.docNumber : ''}">12345678</strong>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <a th:href="@{/admin/clients}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-arrow-left"></i> Volver a clientes
+                    </a>
+                    <a th:href="@{|/admin/clients/portfolio?from=${snapshot.fromDate}&to=${snapshot.toDate}|}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-people"></i> Ver cartera
+                    </a>
+                    <a th:href="@{/orders/new}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-lg"></i> Nuevo pedido
+                    </a>
+                    <a th:if="${snapshot.client.phone != null and !#strings.isEmpty(snapshot.client.phone)}"
+                       th:href="@{|https://wa.me/51${snapshot.client.phone}|}"
+                       target="_blank"
+                       rel="noopener"
+                       class="btn btn-success btn-sm">
+                        <i class="bi bi-whatsapp"></i> WhatsApp
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-8">
+                    <div class="card shadow-sm h-100 border-0">
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="small text-muted mb-1">Dirección</div>
+                                    <div class="fw-semibold" th:text="${snapshot.client.address != null && !#strings.isEmpty(snapshot.client.address) ? snapshot.client.address : 'Sin dirección registrada'}">Dirección</div>
+                                    <div class="small text-muted mt-1" th:if="${snapshot.client.reference != null && !#strings.isEmpty(snapshot.client.reference)}" th:text="${snapshot.client.reference}">Referencia</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="small text-muted mb-1">Promociones activas del cliente</div>
+                                    <div class="d-flex flex-wrap gap-2" th:if="${snapshot.client.promotions != null and !snapshot.client.promotions.isEmpty()}">
+                                        <span class="badge text-bg-warning" th:each="promo : ${snapshot.client.promotions}" th:text="${promo.name}">Promo</span>
+                                    </div>
+                                    <div class="text-muted small" th:if="${snapshot.client.promotions == null or snapshot.client.promotions.isEmpty()}">
+                                        No tiene promociones asignadas actualmente.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="my-3">
+
+                            <div class="row g-3 align-items-stretch">
+                                <div class="col-md-4">
+                                    <div class="rounded border p-3 h-100 bg-light-subtle">
+                                        <div class="small text-muted mb-1">Acción sugerida hoy</div>
+                                        <div class="fw-semibold mb-2" th:text="${snapshot.recommendedAction}">Recomendación</div>
+                                        <div class="small text-muted">
+                                            Puntaje comercial:
+                                            <strong th:text="|${snapshot.healthScore}/100|">80/100</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="rounded border p-3 h-100">
+                                        <div class="small text-muted mb-1">Última compra</div>
+                                        <div class="fw-semibold" th:text="${snapshot.lastOrderDate != null ? #temporals.format(snapshot.lastOrderDate, 'dd/MM/yyyy') : 'Sin ventas'}">08/03/2026</div>
+                                        <div class="small text-muted" th:if="${snapshot.daysSinceLastOrder >= 0}" th:text="|Hace ${snapshot.daysSinceLastOrder} día(s)|">Hace 2 días</div>
+                                        <div class="small text-muted" th:text="${snapshot.lastOrderStatusLabel != null ? snapshot.lastOrderStatusLabel : '-'}">Pagado</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="rounded border p-3 h-100">
+                                        <div class="small text-muted mb-1">Frecuencia estimada</div>
+                                        <div class="fw-semibold" th:text="|Cada ${snapshot.averageIntervalDays} día(s)|">Cada 4 días</div>
+                                        <div class="small text-muted">
+                                            Primera venta:
+                                            <span th:text="${snapshot.firstCommercialOrderDate != null ? #temporals.format(snapshot.firstCommercialOrderDate, 'dd/MM/yyyy') : '-'}">01/03/2026</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100 border-0">
+                        <div class="card-header bg-light">Panel rápido de decisiones</div>
+                        <div class="card-body d-flex flex-column gap-3">
+                            <div class="rounded border p-3">
+                                <div class="small text-muted mb-1">Fiado pendiente</div>
+                                <div class="fs-5 fw-semibold">
+                                    S/.
+                                    <span th:text="${#numbers.formatDecimal(snapshot.creditPendingAllTime, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                </div>
+                                <div class="small text-muted">Si es alto, prioriza cobranza antes de una nueva venta al crédito.</div>
+                            </div>
+
+                            <div class="rounded border p-3">
+                                <div class="small text-muted mb-1">Botellones prestados</div>
+                                <div class="fs-5 fw-semibold" th:text="${snapshot.borrowedBottlesAllTime}">0</div>
+                                <div class="small text-muted">Útil para decidir si toca recompra, seguimiento o recuperación de envases.</div>
+                            </div>
+
+                            <div class="rounded border p-3 bg-light-subtle">
+                                <div class="small text-muted mb-2">Acciones rápidas</div>
+                                <div class="d-grid gap-2">
+                                    <a th:href="@{/orders/new}" class="btn btn-primary btn-sm">
+                                        <i class="bi bi-plus-lg"></i> Crear pedido
+                                    </a>
+                                    <a th:href="@{|/admin/clients/portfolio?from=${snapshot.fromDate}&to=${snapshot.toDate}|}" class="btn btn-outline-dark btn-sm">
+                                        <i class="bi bi-bar-chart-line"></i> Ver cartera en este período
+                                    </a>
+                                    <a th:href="@{/admin/promotions}" class="btn btn-outline-warning btn-sm">
+                                        <i class="bi bi-gift"></i> Revisar promociones
+                                    </a>
+                                    <a th:if="${snapshot.client.phone != null and !#strings.isEmpty(snapshot.client.phone)}"
+                                       th:href="@{|https://wa.me/51${snapshot.client.phone}|}"
+                                       target="_blank"
+                                       rel="noopener"
+                                       class="btn btn-outline-success btn-sm">
+                                        <i class="bi bi-whatsapp"></i> Contactar ahora
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3 border-0">
+                <div class="card-body d-flex flex-column gap-3 gap-lg-0 flex-lg-row justify-content-between align-items-lg-center">
+                    <div>
+                        <div class="small text-muted mb-1">Período analizado</div>
+                        <div class="fw-semibold">
+                            <span th:text="${#temporals.format(snapshot.fromDate, 'dd/MM/yyyy')}">01/03/2026</span>
+                            -
+                            <span th:text="${#temporals.format(snapshot.toDate, 'dd/MM/yyyy')}">30/03/2026</span>
+                            <span class="text-muted" th:text="|'(${currentRangeDays} días)'|">(30 días)</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <a th:href="@{|/admin/clients/${snapshot.client.id}/stats?days=30|}"
+                           class="btn btn-sm"
+                           th:classappend="${selectedPresetDays == 30 ? ' btn-primary' : ' btn-outline-primary'}">
+                            30 días
+                        </a>
+                        <a th:href="@{|/admin/clients/${snapshot.client.id}/stats?days=60|}"
+                           class="btn btn-sm"
+                           th:classappend="${selectedPresetDays == 60 ? ' btn-primary' : ' btn-outline-primary'}">
+                            60 días
+                        </a>
+                        <a th:href="@{|/admin/clients/${snapshot.client.id}/stats?days=90|}"
+                           class="btn btn-sm"
+                           th:classappend="${selectedPresetDays == 90 ? ' btn-primary' : ' btn-outline-primary'}">
+                            90 días
+                        </a>
+                    </div>
+
+                    <form method="get" class="row g-2 align-items-end">
+                        <div class="col-auto">
+                            <label class="form-label small mb-1">Desde</label>
+                            <input type="date" name="from" class="form-control form-control-sm" th:value="${snapshot.fromDate}">
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label small mb-1">Hasta</label>
+                            <input type="date" name="to" class="form-control form-control-sm" th:value="${snapshot.toDate}">
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-sm btn-outline-dark">
+                                Aplicar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div th:if="${!snapshot.historyAvailable}" class="alert alert-info shadow-sm">
+                Este cliente todavía no tiene pedidos registrados para mostrar estadísticas reales.
+            </div>
+
+            <div th:if="${snapshot.historyAvailable}" class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-success-subtle">
+                        <div class="card-body">
+                            <div class="small text-muted mb-1">Ingresos del período</div>
+                            <div class="fs-4 fw-semibold">
+                                S/.
+                                <span th:text="${#numbers.formatDecimal(snapshot.totalRevenueInPeriod, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                Histórico:
+                                S/.
+                                <span th:text="${#numbers.formatDecimal(snapshot.totalRevenueAllTime, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-primary-subtle">
+                        <div class="card-body">
+                            <div class="small text-muted mb-1">Ganancia estimada</div>
+                            <div class="fs-4 fw-semibold">
+                                S/.
+                                <span th:text="${#numbers.formatDecimal(snapshot.estimatedProfitInPeriod, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                Margen:
+                                <span th:text="${#numbers.formatDecimal(snapshot.profitMarginPercentInPeriod, 1, 'POINT', 1, 'POINT')}">0.0</span>%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-warning-subtle">
+                        <div class="card-body">
+                            <div class="small text-muted mb-1">Ticket promedio</div>
+                            <div class="fs-4 fw-semibold">
+                                S/.
+                                <span th:text="${#numbers.formatDecimal(snapshot.averageTicketInPeriod, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                Costo estimado período:
+                                S/.
+                                <span th:text="${#numbers.formatDecimal(snapshot.estimatedCostInPeriod, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-danger-subtle">
+                        <div class="card-body">
+                            <div class="small text-muted mb-1">Ventas y fiado del período</div>
+                            <div class="fw-semibold mb-2" th:text="${snapshot.totalOrdersInPeriod}">0</div>
+                            <div class="small text-muted">
+                                Pagados: <span th:text="${snapshot.paidOrdersInPeriod}">0</span>
+                                &nbsp;|&nbsp;
+                                Fiados: <span th:text="${snapshot.creditOrdersInPeriod}">0</span>
+                            </div>
+                            <div class="small text-muted mt-1">
+                                Fiado generado:
+                                S/.
+                                <span th:text="${#numbers.formatDecimal(snapshot.creditRevenueInPeriod, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${snapshot.historyAvailable}" class="row g-3 mb-3">
+                <div class="col-lg-7">
+                    <div class="card shadow-sm h-100 border-0">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <span>Lectura comercial del cliente</span>
+                            <span class="badge text-bg-light" th:text="|${snapshot.commercialOrdersInPeriod} venta(s) cerrada(s) en el período|">0 ventas</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="small text-muted">Pedidos en período</div>
+                                        <div class="fw-semibold fs-5" th:text="${snapshot.totalOrdersInPeriod}">0</div>
+                                        <div class="small text-muted">
+                                            Comerciales: <span th:text="${snapshot.commercialOrdersInPeriod}">0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="small text-muted">Ventas históricas</div>
+                                        <div class="fw-semibold fs-5" th:text="${snapshot.commercialOrdersAllTime}">0</div>
+                                        <div class="small text-muted">
+                                            Pedidos totales: <span th:text="${snapshot.totalOrdersAllTime}">0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="small text-muted">Ganancia estimada histórica</div>
+                                        <div class="fw-semibold fs-5">
+                                            S/.
+                                            <span th:text="${#numbers.formatDecimal(snapshot.estimatedProfitAllTime, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-secondary mb-0">
+                                <div class="fw-semibold mb-2">Oportunidades y alertas</div>
+                                <ul class="mb-0 ps-3">
+                                    <li th:each="note : ${snapshot.opportunityNotes}" th:text="${note}">Nota</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="card shadow-sm h-100 border-0">
+                        <div class="card-header bg-light">Resumen comercial práctico</div>
+                        <div class="card-body d-flex flex-column gap-3">
+                            <div class="border rounded p-3">
+                                <div class="small text-muted mb-1">Objetivo recomendado</div>
+                                <div class="fw-semibold" th:text="${snapshot.recommendedAction}">Acción</div>
+                            </div>
+                            <div class="border rounded p-3">
+                                <div class="small text-muted mb-1">Qué hacer hoy</div>
+                                <div class="small text-muted">
+                                    Prioriza contacto si el cliente tiene muchos días sin comprar, alto fiado pendiente o saldo alto de botellones.
+                                </div>
+                            </div>
+                            <div class="border rounded p-3 bg-light-subtle">
+                                <div class="small text-muted mb-1">Checklist comercial</div>
+                                <ul class="small mb-0 ps-3">
+                                    <li>Confirmar si necesita reposición</li>
+                                    <li>Validar si conviene nueva promo</li>
+                                    <li>Revisar si tiene cobranza pendiente</li>
+                                    <li>Verificar situación de botellones</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${snapshot.historyAvailable}" class="row g-3 mb-3">
+                <div class="col-lg-5">
+                    <div class="card shadow-sm h-100 border-0">
+                        <div class="card-header bg-light">Productos más comprados en el período</div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th class="text-end">Cant.</th>
+                                        <th class="text-end">Ingreso</th>
+                                        <th class="text-end">Ganancia est.</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="row : ${snapshot.topProducts}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.productName}">Botellón 20L</div>
+                                            <div class="small text-muted">
+                                                Precio prom.: S/.
+                                                <span th:text="${#numbers.formatDecimal(row.averageUnitPrice, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-end" th:text="${#numbers.formatDecimal(row.quantity, 1, 'POINT', 2, 'POINT')}">0.00</td>
+                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(row.revenue, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
+                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(row.estimatedProfit, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(snapshot.topProducts)}">
+                                        <td colspan="4" class="text-center text-muted py-4">
+                                            No hay ventas cerradas en este período para calcular productos.
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <div class="card shadow-sm h-100 border-0">
+                        <div class="card-header bg-light">Historial reciente del período</div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Pedido</th>
+                                        <th>Estado</th>
+                                        <th class="text-end">Total</th>
+                                        <th class="text-end">Ganancia est.</th>
+                                        <th class="text-end">Prest.</th>
+                                        <th class="text-center">Acción</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="row : ${snapshot.recentOrders}">
+                                        <td th:text="${row.orderDate != null ? #temporals.format(row.orderDate, 'dd/MM/yyyy') : '-'}">08/03/2026</td>
+                                        <td>
+                                            <div class="fw-semibold" th:text="|#${row.orderNumber}|">#10</div>
+                                            <div class="small text-muted" th:text="${row.deliveryPerson != null && !#strings.isEmpty(row.deliveryPerson) ? row.deliveryPerson : 'Sin repartidor'}">Repartidor</div>
+                                            <div class="small text-muted" th:if="${row.comment != null && !#strings.isEmpty(row.comment)}" th:text="${row.comment}">Comentario</div>
+                                        </td>
+                                        <td>
+                                            <span class="badge" th:classappend="${row.statusBadgeClass}" th:text="${row.statusLabel}">Pagado</span>
+                                        </td>
+                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(row.totalAmount, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
+                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(row.estimatedProfit, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
+                                        <td class="text-end" th:text="${row.borrowedBottles}">0</td>
+                                        <td class="text-center">
+                                            <a th:href="@{|/orders/${row.orderId}|}" class="btn btn-sm btn-outline-secondary">
+                                                Ver
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(snapshot.recentOrders)}">
+                                        <td colspan="7" class="text-center text-muted py-4">
+                                            No hay pedidos en el rango seleccionado.
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+</body>
+</html>

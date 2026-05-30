@@ -1,0 +1,710 @@
+===== GIT STATUS =====
+ M src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java
+ M src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingAdminController.java
+ M src/main/java/com/ecoamazonas/eco_agua/security/DatabaseUserDetailsService.java
+ M src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java
+ M src/main/java/com/ecoamazonas/eco_agua/user/UserAccountRepository.java
+ M src/main/resources/templates/admin/platform_settings.html
+ M src/main/resources/templates/fragments/sidebar.html
+?? _context_dashboard_widgets/
+?? _context_modules_permissions/
+?? _context_phase6_validation/
+?? src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java
+?? src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java
+?? src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java
+?? src/main/resources/templates/admin/system_modules.html
+
+===== HOME / DASHBOARD REFERENCES =====
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:42:        addPublicLayoutSettings(model);
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:61:        addPublicLayoutSettings(model);
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:67:    private void addPublicLayoutSettings(Model model) {
+src/main/java/com/ecoamazonas/eco_agua/blog/PublicBlogController.java:89:        model.addAttribute("publicNavHomeLabel", setting("public.nav.home_label", "Inicio"));
+src/main/java/com/ecoamazonas/eco_agua/cashflow/CashflowController.java:91:            model.addAttribute("errorMessage", "Error al calcular el flujo de caja: " + ex.getMessage());
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:66:        String adminHomeBackgroundImage = platformSettingService.get("admin.home.background_image", "");
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:67:        String adminHomeBackgroundColor = platformSettingService.get("admin.home.background_color", "#f3f5f9");
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:68:        String adminHomeBackgroundOverlay = platformSettingService.get("admin.home.background_overlay", "rgba(243,245,249,0.88)");
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:75:        model.addAttribute("adminHomeBackgroundImage", adminHomeBackgroundImage);
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:76:        model.addAttribute("adminHomeBackgroundColor", adminHomeBackgroundColor);
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:77:        model.addAttribute("adminHomeBackgroundOverlay", adminHomeBackgroundOverlay);
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:83:        boolean moduleDashboard = flag(moduleFlags, "dashboard");
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:128:        model.addAttribute("moduleDashboardEnabled", moduleDashboard);
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:46:     * Ensure all settings used by the public home exist so they appear
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:115:        ensure("public.nav.home_label", "Inicio",
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:116:                "string", "public_site", "Public navigation home label");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:157:        // Public home sections
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:178:        ensure("public.blog_section.title", "Blog & consejos de hidratación", "string", "public_site", "Home blog section title");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:179:        ensure("public.blog_section.subtitle", "Información simple y útil para cuidar tu salud y la de tu familia.", "text", "public_site", "Home blog section subtitle");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:180:        ensure("public.blog_section.empty_text", "Próximamente publicaremos consejos y artículos sobre hidratación.", "text", "public_site", "Home blog empty text");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:193:        ensure("public.home.whatsapp_intro", "Hola, deseo hacer un pedido desde la web", "text", "public_site", "Home WhatsApp intro message");
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:253:        ensure("admin.home.background_image", publicHeroBackground,
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:255:        ensure("admin.home.background_color", "#f3f5f9",
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingService.java:257:        ensure("admin.home.background_overlay", "rgba(243,245,249,0.88)",
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:46:            ModuleRoute.prefix("/dashboard/business-overview", "business_overview"),
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:47:            ModuleRoute.prefix("/dashboard/monthly-followup", "monthly_followup"),
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:48:            ModuleRoute.prefix("/dashboard/commercial-daily", "commercial_daily"),
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:163:            case "Principal" -> "Core dashboards and business visibility pages.";
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:176:        modules.add(new ModuleDefinition("dashboard", "Principal", "Inicio administrativo", "Private dashboard home.", true, true, true, true, false));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:177:        modules.add(new ModuleDefinition("business_overview", "Principal", "Estado del negocio", "Business overview dashboard.", true, true, true, false, false));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:178:        modules.add(new ModuleDefinition("monthly_followup", "Principal", "Seguimiento del mes", "Monthly follow-up dashboard.", true, true, true, false, false));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:179:        modules.add(new ModuleDefinition("commercial_daily", "Principal", "Panel comercial diario", "Daily commercial dashboard.", true, true, true, false, false));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:193:        modules.add(new ModuleDefinition("cashflow", "Finanzas y contabilidad", "Flujo de caja", "Cashflow module.", true, true, true, false, false));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:194:        modules.add(new ModuleDefinition("break_even", "Finanzas y contabilidad", "Punto de equilibrio", "Break-even analysis.", true, true, false, false, false));
+src/main/java/com/ecoamazonas/eco_agua/dashboard/BusinessOverviewAlert.java:1:package com.ecoamazonas.eco_agua.dashboard;
+src/main/java/com/ecoamazonas/eco_agua/dashboard/BusinessOverviewController.java:1:package com.ecoamazonas.eco_agua.dashboard;
+src/main/java/com/ecoamazonas/eco_agua/dashboard/BusinessOverviewController.java:21:    @GetMapping("/dashboard/business-overview")
+src/main/java/com/ecoamazonas/eco_agua/dashboard/BusinessOverviewController.java:46:        return "dashboard/business_overview";
+src/main/java/com/ecoamazonas/eco_agua/dashboard/BusinessOverviewExpenseCategoryRow.java:1:package com.ecoamazonas.eco_agua.dashboard;
+src/main/java/com/ecoamazonas/eco_agua/dashboard/BusinessOverviewProductRow.java:1:package com.ecoamazonas.eco_agua.dashboard;
+src/main/java/com/ecoamazonas/eco_agua/dashboard/BusinessOverviewService.java:1:package com.ecoamazonas.eco_agua.dashboard;
+src/main/java/com/ecoamazonas/eco_agua/dashboard/BusinessOverviewService.java:306:                    "Ver flujo de caja",
+src/main/java/com/ecoamazonas/eco_agua/dashboard/BusinessOverviewService.java:337:                    "/home"
+src/main/java/com/ecoamazonas/eco_agua/dashboard/BusinessOverviewService.java:366:                    "Ver punto de equilibrio",
+src/main/java/com/ecoamazonas/eco_agua/dashboard/BusinessOverviewSnapshot.java:1:package com.ecoamazonas.eco_agua.dashboard;
+src/main/java/com/ecoamazonas/eco_agua/dashboard/BusinessOverviewStockRow.java:1:package com.ecoamazonas.eco_agua.dashboard;
+src/main/java/com/ecoamazonas/eco_agua/dashboard/CommercialDailyController.java:1:package com.ecoamazonas.eco_agua.dashboard;
+src/main/java/com/ecoamazonas/eco_agua/dashboard/CommercialDailyController.java:21:    @GetMapping("/dashboard/commercial-daily")
+src/main/java/com/ecoamazonas/eco_agua/dashboard/CommercialDailyController.java:45:        return "dashboard/commercial_daily";
+src/main/java/com/ecoamazonas/eco_agua/dashboard/CommercialDailyService.java:1:package com.ecoamazonas.eco_agua.dashboard;
+src/main/java/com/ecoamazonas/eco_agua/dashboard/CommercialDailySnapshot.java:1:package com.ecoamazonas.eco_agua.dashboard;
+src/main/java/com/ecoamazonas/eco_agua/dashboard/MonthlyFollowupController.java:1:package com.ecoamazonas.eco_agua.dashboard;
+src/main/java/com/ecoamazonas/eco_agua/dashboard/MonthlyFollowupController.java:21:    @GetMapping("/dashboard/monthly-followup")
+src/main/java/com/ecoamazonas/eco_agua/dashboard/MonthlyFollowupController.java:33:            return "dashboard/monthly_followup";
+src/main/java/com/ecoamazonas/eco_agua/dashboard/MonthlyFollowupController.java:58:        return "dashboard/monthly_followup";
+src/main/java/com/ecoamazonas/eco_agua/dashboard/MonthlyFollowupService.java:1:package com.ecoamazonas.eco_agua.dashboard;
+src/main/java/com/ecoamazonas/eco_agua/dashboard/MonthlyFollowupService.java:178:            return "Vas en ritmo frente al punto de equilibrio del mes. Mantén el promedio diario actual.";
+src/main/java/com/ecoamazonas/eco_agua/dashboard/MonthlyFollowupService.java:194:            return "Ya cubriste el punto de equilibrio estructural del mes. Desde aquí, lo adicional fortalece la utilidad.";
+src/main/java/com/ecoamazonas/eco_agua/dashboard/MonthlyFollowupSnapshot.java:1:package com.ecoamazonas.eco_agua.dashboard;
+src/main/java/com/ecoamazonas/eco_agua/expense/ExpenseController.java:180:        return "redirect:" + resolveRedirectTarget(redirect, "/home");
+src/main/java/com/ecoamazonas/eco_agua/expense/ExpenseController.java:198:        return "redirect:" + resolveRedirectTarget(redirect, "/home");
+src/main/java/com/ecoamazonas/eco_agua/expense/ExpenseController.java:424:        if ("HOME".equalsIgnoreCase(trimmed)) {
+src/main/java/com/ecoamazonas/eco_agua/expense/ExpenseController.java:425:            return "/home";
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:33:public class HomeController {
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:35:    private static final DateTimeFormatter HOME_SHORT_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:43:    public HomeController(
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:57:    @GetMapping("/home")
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:58:    public String home(Model model) {
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:198:        BreakEvenResult homeBreakEvenResult = null;
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:199:        Long homeBreakEvenProductId = null;
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:200:        Integer homeBreakEvenYear = today.getYear();
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:201:        Integer homeBreakEvenMonth = today.getMonthValue();
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:202:        String homeBreakEvenStatusLabel = "Sin datos";
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:203:        String homeBreakEvenStatusClass = "secondary";
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:204:        BigDecimal homeBreakEvenProgressPercent = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:205:        BigDecimal homeBreakEvenGapUnits = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:206:        BigDecimal homeBreakEvenUnitsPerRemainingDay = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:207:        long homeBreakEvenRemainingDays = ChronoUnit.DAYS.between(today, monthEnd) + 1;
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:212:            homeBreakEvenProductId = product.getId();
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:214:            homeBreakEvenResult = breakEvenService.calculateForProductAndPeriod(
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:215:                    homeBreakEvenProductId,
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:220:            homeBreakEvenStatusLabel = buildBreakEvenStatusLabel(homeBreakEvenResult.getStatus());
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:221:            homeBreakEvenStatusClass = buildBreakEvenStatusClass(homeBreakEvenResult.getStatus());
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:222:            homeBreakEvenProgressPercent = calculateBreakEvenProgressPercent(
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:223:                    homeBreakEvenResult.getUnitsSold(),
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:224:                    homeBreakEvenResult.getBreakEvenUnitsRounded()
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:226:            homeBreakEvenGapUnits = normalizeAmount(homeBreakEvenResult.getStructuralGapUnits(), 2);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:228:            if (homeBreakEvenGapUnits.compareTo(BigDecimal.ZERO) > 0 && homeBreakEvenRemainingDays > 0) {
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:229:                homeBreakEvenUnitsPerRemainingDay = homeBreakEvenGapUnits
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:230:                        .divide(BigDecimal.valueOf(homeBreakEvenRemainingDays), 2, RoundingMode.HALF_UP);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:234:        model.addAttribute("activePage", "home");
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:257:        model.addAttribute("homeBreakEvenResult", homeBreakEvenResult);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:258:        model.addAttribute("homeBreakEvenProductId", homeBreakEvenProductId);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:259:        model.addAttribute("homeBreakEvenYear", homeBreakEvenYear);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:260:        model.addAttribute("homeBreakEvenMonth", homeBreakEvenMonth);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:261:        model.addAttribute("homeBreakEvenStatusLabel", homeBreakEvenStatusLabel);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:262:        model.addAttribute("homeBreakEvenStatusClass", homeBreakEvenStatusClass);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:263:        model.addAttribute("homeBreakEvenProgressPercent", homeBreakEvenProgressPercent);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:264:        model.addAttribute("homeBreakEvenGapUnits", homeBreakEvenGapUnits);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:265:        model.addAttribute("homeBreakEvenUnitsPerRemainingDay", homeBreakEvenUnitsPerRemainingDay);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:266:        model.addAttribute("homeBreakEvenRemainingDays", homeBreakEvenRemainingDays);
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:274:        return "home";
+src/main/java/com/ecoamazonas/eco_agua/HomeController.java:349:                ? obligation.getIssueDate().format(HOME_SHORT_DATE_FORMAT)
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingAdminController.java:43:        // Same admin layout, but under "marketing"
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsController.java:19:    public String dashboard(Model model) {
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:97:                    "WhatsApp / Catalog / Home",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:127:                    "Home / WhatsApp / Sales support",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:132:                    "Highlight one testimonial in the public home and WhatsApp replies",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:146:                    firstNonBlank(promotion.getDescription(), "Promotion ready to be pushed to WhatsApp and the public home."),
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:197:                    "There are testimonials, but none is active for the public home.",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:234:                        "Add a banner image to '" + promotion.getName() + "' so it stands out in the public home and client channels.",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:263:                    "Activate testimonials so sales can use social proof in the public home and WhatsApp conversations.",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:289:                "Home delivery by zone"
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:297:                        "New leads / home clients",
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:342:            return "Push this promotion in WhatsApp and the public home before it expires";
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:345:            return "Add banner and highlight it in the public home";
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:367:            return "Families / home clients";
+src/main/java/com/ecoamazonas/eco_agua/marketing/MarketingCampaignsService.java:369:        if (text.contains("office") || text.contains("trabajo") || text.contains("home office")) {
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:68:        String safeReturnTo = resolveRedirectTarget(returnTo, "/home");
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:187:        return "redirect:" + resolveRedirectTarget(redirect, "/home");
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:212:        return "redirect:" + resolveRedirectTarget(redirect, "/home");
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:231:        String backUrl = resolveRedirectTarget(from, "/home");
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:238:        model.addAttribute("activePage", "home");
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:248:        String safeReturnTo = resolveRedirectTarget(returnTo, "/home");
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:260:            return "/home";
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:281:        String safeReturnTo = resolveRedirectTarget(returnTo, "/home");
+src/main/java/com/ecoamazonas/eco_agua/order/OrderController.java:291:        return "home";
+src/main/java/com/ecoamazonas/eco_agua/product/ProductRepository.java:9:    // Public home: featured products
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:65:    public String home(Model model, Authentication authentication) {
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:67:            return "redirect:/home";
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:90:        addPublicLayoutSettings(model);
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:91:        addHomeContentSettings(model);
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:94:        return "public/home";
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:102:        addPublicLayoutSettings(model);
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:137:    private void addPublicLayoutSettings(Model model) {
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:159:        model.addAttribute("publicNavHomeLabel", setting("public.nav.home_label", "Inicio"));
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:166:    private void addHomeContentSettings(Model model) {
+src/main/java/com/ecoamazonas/eco_agua/publicweb/PublicSiteController.java:221:        model.addAttribute("homeWhatsappIntro", setting("public.home.whatsapp_intro", "Hola, deseo hacer un pedido desde la web"));
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:47:    private static final String[] DASHBOARD_VIEW = authorities(
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:52:            "ver_dashboard"
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:294:                .requestMatchers("/home").hasAnyAuthority(DASHBOARD_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:295:                .requestMatchers("/dashboard/business-overview", "/dashboard/monthly-followup").hasAnyAuthority(REPORTS_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:296:                .requestMatchers("/dashboard/commercial-daily").hasAnyAuthority(SALES_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:355:                .defaultSuccessUrl("/home", true)
+src/main/resources/templates/accounting/purchase_registry.html:6:<div class="app-layout" th:with="activePage=${activePage}">
+src/main/resources/templates/accounting/sales_registry.html:6:<div class="app-layout" th:with="activePage=${activePage}">
+src/main/resources/templates/admin/blog/form.html:8:<div class="app-layout" th:with="activePage='blog_posts'">
+src/main/resources/templates/admin/blog/form.html:29:                                            <a th:href="@{/home}">Inicio</a>
+src/main/resources/templates/admin/blog/index.html:6:<div class="app-layout">
+src/main/resources/templates/admin/blog/index.html:21:                                <a th:href="@{/home}">Inicio</a>
+src/main/resources/templates/admin/blog/list.html:6:<div class="app-layout">
+src/main/resources/templates/admin/categories.html:6:<div class="app-layout" th:with="activePage='categories'">
+src/main/resources/templates/admin/categories.html:24:                    Esta configuración alimenta costos fijos mensuales y punto de equilibrio.
+src/main/resources/templates/admin/categories.html:34:                                <div class="text-muted">Entra al punto de equilibrio estructural mensual.</div>
+src/main/resources/templates/admin/categories.html:194:                                            Incluir en punto de equilibrio estructural
+src/main/resources/templates/admin/clients.html:8:<div class="app-layout" th:with="activePage='clients'">
+src/main/resources/templates/admin/client_portfolio.html:6:<div class="app-layout" th:with="activePage='clients'">
+src/main/resources/templates/admin/client_profiles.html:8:<div class="app-layout" th:with="activePage='client-profiles'">
+src/main/resources/templates/admin/client_stats.html:6:<div class="app-layout" th:with="activePage='clients'">
+src/main/resources/templates/admin/client_stats_ficha360.html:6:<div class="app-layout" th:with="activePage='clients'">
+src/main/resources/templates/admin/delivery_zones/list.html:8:<div class="app-layout" th:with="activePage='delivery_zones'">
+src/main/resources/templates/admin/job_positions.html:8:<div class="app-layout" th:with="activePage='job_positions'">
+src/main/resources/templates/admin/personnel_payments.html:8:<div class="app-layout" th:with="activePage='personnel_payments'">
+src/main/resources/templates/admin/platform_settings.html:23:                    <a th:href="@{/home}" class="btn btn-sm btn-outline-secondary">
+src/main/resources/templates/admin/price_simulator.html:7:<div class="app-layout" th:with="activePage='price_simulator'">
+src/main/resources/templates/admin/products.html:8:<div class="app-layout" th:with="activePage='products'">
+src/main/resources/templates/admin/product_cost_detail.html:6:<div class="app-layout" th:with="activePage='products'">
+src/main/resources/templates/admin/product_cost_detail.html:211:                                Ver punto de equilibrio de este producto
+src/main/resources/templates/admin/promotions.html:4:    <!-- Common admin head (Bootstrap, icons, layout CSS, etc.) -->
+src/main/resources/templates/admin/promotions.html:73:<div class="app-layout" th:with="activePage='promotions'">
+src/main/resources/templates/admin/roles_permissions.html:6:<div class="app-layout" th:with="activePage='admin_roles_permissions'">
+src/main/resources/templates/admin/suppliers.html:8:<div class="app-layout" th:with="activePage='suppliers'">
+src/main/resources/templates/admin/supplies.html:8:<div class="app-layout" th:with="activePage='supplies'">
+src/main/resources/templates/admin/system_modules.html:28:                    <a th:href="@{/home}" class="btn btn-sm btn-outline-secondary">
+src/main/resources/templates/admin/system_modules.html:180:                    <a th:href="@{/home}" class="btn btn-outline-secondary">
+src/main/resources/templates/admin/users.html:8:<div class="app-layout" th:with="activePage='admin_users'">
+src/main/resources/templates/cashflow/break_even.html:3:<head th:replace="fragments/head_admin :: adminHead('Punto de equilibrio - Eco Agua')"></head>
+src/main/resources/templates/cashflow/break_even.html:6:<div class="app-layout" th:with="activePage='cashflow_break_even'">
+src/main/resources/templates/cashflow/break_even.html:17:                    <h1 class="h4 mb-1">Punto de equilibrio</h1>
+src/main/resources/templates/cashflow/break_even.html:91:                No hay productos activos para calcular el punto de equilibrio. Crea al menos un producto activo con precio y composición de insumos.
+src/main/resources/templates/cashflow/break_even.html:95:                Selecciona producto, año y mes, y luego haz clic en <strong>Buscar</strong> para ver el punto de equilibrio.
+src/main/resources/templates/cashflow/break_even.html:107:                                            title="Precio de referencia usado como lectura base para calcular el punto de equilibrio.">
+src/main/resources/templates/cashflow/break_even.html:168:                                    <span>Punto de equilibrio principal</span>
+src/main/resources/templates/cashflow/break_even.html:202:                                        <th>Punto de equilibrio exacto</th>
+src/main/resources/templates/cashflow/break_even.html:206:                                        <th>Punto de equilibrio redondeado</th>
+src/main/resources/templates/cashflow/break_even.html:221:                                            title="Compara las unidades ya vendidas contra el punto de equilibrio calculado.">
+src/main/resources/templates/cashflow/break_even.html:228:                                        <span th:text="${result.status.name() == 'BEFORE_BREAK_EVEN' ? 'Aún no cubres el punto de equilibrio' : (result.status.name() == 'AT_BREAK_EVEN' ? 'Estás justo en equilibrio' : 'Ya superaste el punto de equilibrio')}">
+src/main/resources/templates/cashflow/break_even.html:270:                                            title="Permite comparar cómo cambia el punto de equilibrio si el precio varía por perfil o promoción.">
+src/main/resources/templates/cashflow/break_even.html:275:                                    Cada fila recalcula el punto de equilibrio con un precio distinto. En productos con venta por perfil,
+src/main/resources/templates/cashflow/break_even.html:390:                                        Como este producto se vende por perfil de cliente, el punto de equilibrio debe leerse por escenario de precio.
+src/main/resources/templates/cashflow/break_even.html:418:        aria-label="Abrir ayuda de Punto de equilibrio">
+src/main/resources/templates/cashflow/break_even.html:429:                    <h2 class="modal-title h5" id="breakEvenHelpModalLabel">Cómo usar Punto de equilibrio</h2>
+src/main/resources/templates/cashflow/break_even.html:454:                            <p>El punto de equilibrio indica la cantidad mínima de unidades para cubrir la estructura del período.</p>
+src/main/resources/templates/cashflow/cashflow.html:3:<head th:replace="fragments/head_admin :: adminHead('Flujo de caja - Eco Agua')"></head>
+src/main/resources/templates/cashflow/cashflow.html:7:<div class="app-layout" th:with="activePage='cashflow'">
+src/main/resources/templates/cashflow/cashflow.html:23:                    <h1 class="h5 mb-0">Flujo de caja</h1>
+src/main/resources/templates/cashflow/cashflow.html:233:                        No hay datos de flujo de caja para el período seleccionado.
+src/main/resources/templates/cashflow/day_detail_modal.html:4:            <h5 class="mb-0">Detalle del flujo de caja</h5>
+src/main/resources/templates/dashboard/business_overview.html:6:<div class="app-layout" th:with="activePage='business_overview'">
+src/main/resources/templates/dashboard/business_overview.html:30:                    <a th:href="@{/home}" class="btn btn-outline-secondary btn-sm">
+src/main/resources/templates/dashboard/business_overview.html:34:                        <i class="bi bi-cash-stack"></i> Flujo de caja
+src/main/resources/templates/dashboard/business_overview.html:67:                        <a th:href="@{/dashboard/business-overview(days=7)}"
+src/main/resources/templates/dashboard/business_overview.html:72:                        <a th:href="@{/dashboard/business-overview(days=30)}"
+src/main/resources/templates/dashboard/business_overview.html:77:                        <a th:href="@{/dashboard/business-overview(days=90)}"
+src/main/resources/templates/dashboard/commercial_daily.html:6:<div class="app-layout" th:with="activePage='commercial_daily'">
+src/main/resources/templates/dashboard/commercial_daily.html:77:                        <a th:href="@{/dashboard/commercial-daily(days=7)}"
+src/main/resources/templates/dashboard/commercial_daily.html:82:                        <a th:href="@{/dashboard/commercial-daily(days=30)}"
+src/main/resources/templates/dashboard/commercial_daily.html:87:                        <a th:href="@{/dashboard/commercial-daily(days=90)}"
+src/main/resources/templates/dashboard/monthly_followup.html:6:<div class="app-layout" th:with="activePage='monthly_followup'">
+src/main/resources/templates/dashboard/monthly_followup.html:19:                        Junta en una sola vista la base fija del mes, el punto de equilibrio y el ritmo real de venta.
+src/main/resources/templates/dashboard/monthly_followup.html:33:                        <i class="bi bi-graph-up-arrow"></i> Punto de equilibrio
+src/main/resources/templates/dashboard/monthly_followup.html:47:                    <form method="get" th:action="@{/dashboard/monthly-followup}" class="row g-2 align-items-end">
+src/main/resources/templates/dashboard/monthly_followup.html:88:                No hay productos activos para mostrar seguimiento mensual. Registra o activa productos para calcular metas, punto de equilibrio y ritmo de venta.
+src/main/resources/templates/dashboard/monthly_followup.html:120:                                            title="Punto de equilibrio mensual: unidades necesarias para cubrir la estructura del mes.">
+src/main/resources/templates/dashboard/monthly_followup.html:157:                                            title="Unidades que todavía faltan vender para llegar al punto de equilibrio del mes.">
+src/main/resources/templates/dashboard/monthly_followup.html:176:                                            title="Compara el avance real contra lo esperado para llegar al punto de equilibrio mensual.">
+src/main/resources/templates/dashboard/monthly_followup.html:218:                                                        title="Unidades promedio que faltan vender por día para llegar al punto de equilibrio.">
+src/main/resources/templates/dashboard/monthly_followup.html:408:                            No hay líneas de costo fijo estructural registradas para este período. Registra costos fijos del mes para obtener un punto de equilibrio más confiable.
+src/main/resources/templates/dashboard/monthly_followup.html:459:                    Esta página ayuda a saber si el mes va en buen ritmo. Compara lo que ya se vendió contra el punto de equilibrio necesario para cubrir costos fijos y operación real.
+src/main/resources/templates/delivery/daily_detail.html:5:<div class="app-layout" th:with="activePage='delivery_daily'">
+src/main/resources/templates/delivery/daily_list.html:5:<div class="app-layout" th:with="activePage='delivery_daily'">
+src/main/resources/templates/expenses/expenses_by_date.html:6:<div class="app-layout" th:with="activePage='expenses_by_date'">
+src/main/resources/templates/expenses/expenses_debts.html:6:<div class="app-layout" th:with="activePage='expenses_debts'">
+src/main/resources/templates/expenses/expenses_fixed_costs.html:6:<div class="app-layout" th:with="activePage='expenses_fixed_costs'">
+src/main/resources/templates/expenses/expenses_fixed_costs.html:18:                        Define la base mensual de costos fijos, genera los gastos del mes y úsala para tu punto de equilibrio.
+src/main/resources/templates/expenses/expenses_fixed_costs.html:32:                        Ir al punto de equilibrio
+src/main/resources/templates/expenses/expenses_fixed_costs.html:165:                                        title="Total de plantillas marcadas para entrar al cálculo del punto de equilibrio.">
+src/main/resources/templates/expenses/expenses_fixed_costs.html:174:                                Solo plantillas marcadas para entrar al punto de equilibrio.
+src/main/resources/templates/expenses/expenses_fixed_costs.html:207:                                <li>Después el punto de equilibrio ya puede trabajar con una base mensual coherente.</li>
+src/main/resources/templates/expenses/expenses_fixed_costs.html:296:                                    title="Lista de costos fijos planificados para el mes, su estado y si entran al punto de equilibrio.">
+src/main/resources/templates/expenses/expenses_fixed_costs.html:377:                        Todavía no has registrado plantillas mensuales. Crea al menos una plantilla para generar gastos fijos del mes y alimentar el punto de equilibrio.
+src/main/resources/templates/expenses/expenses_fixed_costs.html:412:                                <li>Ir al punto de equilibrio para ver cuánto te falta vender.</li>
+src/main/resources/templates/expenses/expenses_fixed_costs.html:490:                    Esta página sirve para planificar los costos fijos del mes, convertirlos en egresos reales y alimentar el punto de equilibrio.
+src/main/resources/templates/expenses/expenses_fixed_costs.html:515:                            <p>Las plantillas marcadas como PE alimentan el cálculo del punto de equilibrio para saber cuánto vender.</p>
+src/main/resources/templates/expenses/expenses_fixed_costs.html:525:                    <li>Marca PE si ese costo debe entrar al punto de equilibrio.</li>
+src/main/resources/templates/fragments/local_breadcrumb.html:10:              <li class="breadcrumb-item"><a th:href="@{/home}">Inicio</a></li>
+src/main/resources/templates/fragments/sidebar.html:29:      th:href="@{/home}"
+src/main/resources/templates/fragments/sidebar.html:31:      th:classappend="${activePage == 'home' ? ' active' : ''}"
+src/main/resources/templates/fragments/sidebar.html:40:        th:href="@{/dashboard/business-overview}"
+src/main/resources/templates/fragments/sidebar.html:50:        th:href="@{/dashboard/monthly-followup}"
+src/main/resources/templates/fragments/sidebar.html:90:              th:href="@{/dashboard/commercial-daily}"
+src/main/resources/templates/fragments/sidebar.html:449:              <span>Flujo de caja</span>
+src/main/resources/templates/home.html:7:    .home-widgets-toolbar {
+src/main/resources/templates/home.html:16:    .home-widgets-toolbar .toolbar-actions {
+src/main/resources/templates/home.html:22:    .home-widget-column {
+src/main/resources/templates/home.html:26:    .home-widget-card {
+src/main/resources/templates/home.html:30:    .home-widget-card.dragging {
+src/main/resources/templates/home.html:34:    .home-widget-placeholder {
+src/main/resources/templates/home.html:42:    .home-widget-tools {
+src/main/resources/templates/home.html:49:    .home-widget-tool-button {
+src/main/resources/templates/home.html:64:    .home-widget-tool-button:hover {
+src/main/resources/templates/home.html:70:    .home-widget-tool-button:active {
+src/main/resources/templates/home.html:74:    .widget-drag-handle {
+src/main/resources/templates/home.html:78:    .widget-drag-handle:active {
+src/main/resources/templates/home.html:82:    .widget-collapsed .card-body {
+src/main/resources/templates/home.html:86:    .widget-collapsed .card-footer {
+src/main/resources/templates/home.html:90:    .home-widget-card .card {
+src/main/resources/templates/home.html:94:    .home-widget-card .card:hover {
+src/main/resources/templates/home.html:99:        .home-widgets-toolbar {
+src/main/resources/templates/home.html:103:        .home-widgets-toolbar .toolbar-actions {
+src/main/resources/templates/home.html:107:        .home-widgets-toolbar .toolbar-actions .btn {
+src/main/resources/templates/home.html:113:<div class="app-layout" th:with="activePage='home'">
+src/main/resources/templates/home.html:119:        <main class="content-wrapper admin-home-page"
+src/main/resources/templates/home.html:120:              th:classappend="${adminHomeBackgroundImage != null and !#strings.isEmpty(adminHomeBackgroundImage)} ? ' has-admin-home-background' : ''"
+src/main/resources/templates/home.html:121:              th:style="${adminHomeBackgroundImage != null and !#strings.isEmpty(adminHomeBackgroundImage)} ? 'background-image: linear-gradient(rgba(243,245,249,0.88), rgba(243,245,249,0.88)), url(' + ${adminHomeBackgroundImage} + ');' : ''">
+src/main/resources/templates/home.html:130:            <section class="admin-home-hero mb-3">
+src/main/resources/templates/home.html:131:                <div class="admin-home-hero-copy">
+src/main/resources/templates/home.html:132:                    <span class="admin-home-kicker">Panel administrativo</span>
+src/main/resources/templates/home.html:139:                    <div class="admin-home-hero-badges">
+src/main/resources/templates/home.html:145:                <div class="admin-home-hero-logo-wrap">
+src/main/resources/templates/home.html:149:                         class="admin-home-hero-logo">
+src/main/resources/templates/home.html:153:            <div class="home-widgets-toolbar">
+src/main/resources/templates/home.html:155:                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnExpandAllWidgets">
+src/main/resources/templates/home.html:159:                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCollapseAllWidgets">
+src/main/resources/templates/home.html:163:                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnResetWidgetLayout">
+src/main/resources/templates/home.html:165:                        Restablecer layout
+src/main/resources/templates/home.html:169:                    Los widgets se pueden mover entre izquierda y derecha. El layout se guarda en este navegador.
+src/main/resources/templates/home.html:173:            <div class="row g-3" id="homeWidgetBoard">
+src/main/resources/templates/home.html:175:                    <div class="home-widget-column" data-column="left">
+src/main/resources/templates/home.html:177:                        <div class="home-widget-card" data-widget-id="operations" draggable="false">
+src/main/resources/templates/home.html:182:                                            <span>Operaciones</span>
+src/main/resources/templates/home.html:185:                                        <div class="home-widget-tools">
+src/main/resources/templates/home.html:187:                                                    class="home-widget-tool-button widget-collapse-toggle"
+src/main/resources/templates/home.html:192:                                                    class="home-widget-tool-button widget-drag-handle"
+src/main/resources/templates/home.html:193:                                                    title="Mover widget">
+src/main/resources/templates/home.html:224:                        <div class="home-widget-card" data-widget-id="possible-orders" draggable="false">
+src/main/resources/templates/home.html:229:                                            <span>Posibles pedidos</span>
+src/main/resources/templates/home.html:232:                                        <div class="home-widget-tools">
+src/main/resources/templates/home.html:234:                                                    class="home-widget-tool-button widget-collapse-toggle"
+src/main/resources/templates/home.html:239:                                                    class="home-widget-tool-button widget-drag-handle"
+src/main/resources/templates/home.html:240:                                                    title="Mover widget">
+src/main/resources/templates/home.html:350:                                                                         data-order-url=@{|/orders/new?clientId=${suggestion.clientId}&redirect=/home|}">
+src/main/resources/templates/home.html:355:                                                        <a th:href="@{|/orders/new?clientId=${suggestion.clientId}&redirect=/home|}"
+src/main/resources/templates/home.html:374:                    <div class="home-widget-column" data-column="right">
+src/main/resources/templates/home.html:376:                        <div class="home-widget-card" data-widget-id="sales-today" draggable="false">
+src/main/resources/templates/home.html:381:                                        <div class="home-widget-tools">
+src/main/resources/templates/home.html:383:                                                    class="home-widget-tool-button widget-collapse-toggle"
+src/main/resources/templates/home.html:388:                                                    class="home-widget-tool-button widget-drag-handle"
+src/main/resources/templates/home.html:389:                                                    title="Mover widget">
+src/main/resources/templates/home.html:435:                                                        <a th:href="@{|/orders/${order.id}?from=/home|}"
+src/main/resources/templates/home.html:446:                                                            <input type="hidden" name="redirect" value="/home"/>
+src/main/resources/templates/home.html:457:                                                                data-redirect="/home">
+src/main/resources/templates/home.html:471:                        <div class="home-widget-card" data-widget-id="weekly-cash-flow" draggable="false">
+src/main/resources/templates/home.html:475:                                        <span>Flujo de caja semanal</span>
+src/main/resources/templates/home.html:482:                                    <div class="home-widget-tools ms-2">
+src/main/resources/templates/home.html:484:                                                class="home-widget-tool-button widget-collapse-toggle"
+src/main/resources/templates/home.html:489:                                                class="home-widget-tool-button widget-drag-handle"
+src/main/resources/templates/home.html:490:                                                title="Mover widget">
+src/main/resources/templates/home.html:598:                        <div class="home-widget-card" data-widget-id="break-even-month" draggable="false">
+src/main/resources/templates/home.html:602:                <span>Punto de equilibrio del mes</span>
+src/main/resources/templates/home.html:604:                    <span th:if="${homeBreakEvenResult != null}"
+src/main/resources/templates/home.html:605:                          th:text="${#temporals.format(homeBreakEvenResult.periodStart, 'dd/MM')} + ' - ' + ${#temporals.format(homeBreakEvenResult.periodEnd, 'dd/MM')}">
+src/main/resources/templates/home.html:608:                    <span th:if="${homeBreakEvenResult == null}">
+src/main/resources/templates/home.html:613:            <div class="home-widget-tools ms-2">
+src/main/resources/templates/home.html:615:                        class="home-widget-tool-button widget-collapse-toggle"
+src/main/resources/templates/home.html:620:                        class="home-widget-tool-button widget-drag-handle"
+src/main/resources/templates/home.html:621:                        title="Mover widget">
+src/main/resources/templates/home.html:628:            <div th:if="${homeBreakEvenResult == null}" class="small text-muted">
+src/main/resources/templates/home.html:629:                No hay un producto activo disponible para calcular el punto de equilibrio.
+src/main/resources/templates/home.html:632:            <div th:if="${homeBreakEvenResult != null}">
+src/main/resources/templates/home.html:635:                        <div class="fw-semibold" th:text="${homeBreakEvenResult.product.name}">
+src/main/resources/templates/home.html:640:                            <span th:text="${homeBreakEvenResult.primaryScenarioLabel}">Precio promedio real del período</span>
+src/main/resources/templates/home.html:645:                                homeBreakEvenStatusClass == 'success' ? ' text-bg-success' :
+src/main/resources/templates/home.html:646:                                (homeBreakEvenStatusClass == 'warning' ? ' text-bg-warning text-dark' :
+src/main/resources/templates/home.html:647:                                (homeBreakEvenStatusClass == 'danger' ? ' text-bg-danger' : ' text-bg-secondary'))
+src/main/resources/templates/home.html:649:                          th:text="${homeBreakEvenStatusLabel}">
+src/main/resources/templates/home.html:659:                                 th:text="${#numbers.formatDecimal(homeBreakEvenResult.unitsSold,1,'POINT',0,'POINT')}">
+src/main/resources/templates/home.html:668:                                 th:text="${#numbers.formatDecimal(homeBreakEvenResult.breakEvenUnitsRounded,1,'POINT',0,'POINT')}">
+src/main/resources/templates/home.html:677:                                 th:text="${#numbers.formatDecimal(homeBreakEvenGapUnits,1,'POINT',0,'POINT')}">
+src/main/resources/templates/home.html:687:                        <strong th:text="${#numbers.formatDecimal(homeBreakEvenProgressPercent,1,'POINT',2,'POINT')} + '%'">
+src/main/resources/templates/home.html:691:                    <div class="progress" role="progressbar" aria-label="Avance del punto de equilibrio"
+src/main/resources/templates/home.html:693:                         th:attr="aria-valuenow=${homeBreakEvenProgressPercent}">
+src/main/resources/templates/home.html:696:                                homeBreakEvenStatusClass == 'success' ? ' bg-success' :
+src/main/resources/templates/home.html:697:                                (homeBreakEvenStatusClass == 'warning' ? ' bg-warning' : ' bg-danger')
+src/main/resources/templates/home.html:699:                             th:style="'width:' + ${#numbers.formatDecimal(homeBreakEvenProgressPercent,1,'POINT',2,'POINT')} + '%'">
+src/main/resources/templates/home.html:710:                                th:text="'S/ ' + ${#numbers.formatDecimal(homeBreakEvenResult.actualAverageSellingPrice,1,'POINT',2,'POINT')}">
+src/main/resources/templates/home.html:717:                                th:text="'S/ ' + ${#numbers.formatDecimal(homeBreakEvenResult.contributionMargin,1,'POINT',4,'POINT')}">
+src/main/resources/templates/home.html:724:                                th:text="'S/ ' + ${#numbers.formatDecimal(homeBreakEvenResult.fixedCosts,1,'POINT',2,'POINT')}">
+src/main/resources/templates/home.html:731:                                th:text="${#numbers.formatDecimal(homeBreakEvenResult.safetyMarginPercent,1,'POINT',2,'POINT')} + '%'">
+src/main/resources/templates/home.html:738:                                th:text="${#numbers.formatDecimal(homeBreakEvenUnitsPerRemainingDay,1,'POINT',2,'POINT')}">
+src/main/resources/templates/home.html:747:                    <span th:if="${homeBreakEvenGapUnits > 0}">
+src/main/resources/templates/home.html:749:                        <strong th:text="${#numbers.formatDecimal(homeBreakEvenGapUnits,1,'POINT',0,'POINT')}">0</strong>
+src/main/resources/templates/home.html:751:                        <strong th:text="${homeBreakEvenRemainingDays}">0</strong>
+src/main/resources/templates/home.html:754:                    <span th:if="${homeBreakEvenGapUnits <= 0}">
+src/main/resources/templates/home.html:755:                        Ya cubres el punto de equilibrio del período actual.
+src/main/resources/templates/home.html:760:                    <a th:if="${featureBreakEven}" th:href="@{/cashflow/break-even(productId=${homeBreakEvenProductId},year=${homeBreakEvenYear},month=${homeBreakEvenMonth})}"
+src/main/resources/templates/home.html:772:                        <div class="home-widget-card" data-widget-id="expenses-today" draggable="false">
+src/main/resources/templates/home.html:786:                                    <div class="home-widget-tools ms-2">
+src/main/resources/templates/home.html:788:                                                class="home-widget-tool-button widget-collapse-toggle"
+src/main/resources/templates/home.html:793:                                                class="home-widget-tool-button widget-drag-handle"
+src/main/resources/templates/home.html:794:                                                title="Mover widget">
+src/main/resources/templates/home.html:847:                                                            <input type="hidden" name="redirect" value="/home"/>
+src/main/resources/templates/home.html:873:                        <div class="home-widget-card" data-widget-id="credit-orders" draggable="false">
+src/main/resources/templates/home.html:877:                                        <span>Pedidos fiados</span>
+src/main/resources/templates/home.html:878:                                        <div class="home-widget-tools">
+src/main/resources/templates/home.html:880:                                                    class="home-widget-tool-button widget-collapse-toggle"
+src/main/resources/templates/home.html:885:                                                    class="home-widget-tool-button widget-drag-handle"
+src/main/resources/templates/home.html:886:                                                    title="Mover widget">
+src/main/resources/templates/home.html:895:                                        No hay pedidos fiados pendientes.
+src/main/resources/templates/home.html:938:                                                        <a th:href="@{|/orders/${order.id}?from=/home|}"
+src/main/resources/templates/home.html:949:                                                            <input type="hidden" name="redirect" value="/home"/>
+src/main/resources/templates/home.html:960:                                                                data-redirect="/home">
+src/main/resources/templates/home.html:974:                        <div class="home-widget-card" data-widget-id="requested-orders" draggable="false">
+src/main/resources/templates/home.html:979:                                        <div class="home-widget-tools">
+src/main/resources/templates/home.html:981:                                                    class="home-widget-tool-button widget-collapse-toggle"
+src/main/resources/templates/home.html:986:                                                    class="home-widget-tool-button widget-drag-handle"
+src/main/resources/templates/home.html:987:                                                    title="Mover widget">
+src/main/resources/templates/home.html:1021:                                                        <a th:href="@{|/orders/${order.id}?from=/home|}"
+src/main/resources/templates/home.html:1032:                                                            <input type="hidden" name="redirect" value="/home"/>
+src/main/resources/templates/home.html:1045:                                                            <input type="hidden" name="redirect" value="/home"/>
+src/main/resources/templates/home.html:1056:                                                                data-redirect="/home">
+src/main/resources/templates/home.html:1107:                    <input type="hidden" name="redirect" value="HOME"/>
+src/main/resources/templates/home.html:1253:                    <input type="hidden" name="redirect" value="/home"/>
+src/main/resources/templates/home.html:1388:        const WIDGET_STORAGE_KEY = 'ecoagua-home-widget-layout-v1';
+src/main/resources/templates/home.html:1487:                const redirectTarget = this.getAttribute('data-redirect') || '/home';
+src/main/resources/templates/home.html:1790:                redirectInput.value = 'HOME';
+src/main/resources/templates/home.html:2350:        const widgetBoard = document.getElementById('homeWidgetBoard');
+src/main/resources/templates/home.html:2351:        const widgetColumns = Array.from(document.querySelectorAll('.home-widget-column'));
+src/main/resources/templates/home.html:2352:        const widgetCards = Array.from(document.querySelectorAll('.home-widget-card'));
+src/main/resources/templates/home.html:2353:        const btnExpandAllWidgets = document.getElementById('btnExpandAllWidgets');
+src/main/resources/templates/home.html:2354:        const btnCollapseAllWidgets = document.getElementById('btnCollapseAllWidgets');
+src/main/resources/templates/home.html:2355:        const btnResetWidgetLayout = document.getElementById('btnResetWidgetLayout');
+src/main/resources/templates/home.html:2357:        const defaultLayout = {};
+src/main/resources/templates/home.html:2358:        widgetColumns.forEach(function (column) {
+src/main/resources/templates/home.html:2359:            defaultLayout[column.getAttribute('data-column')] = Array.from(
+src/main/resources/templates/home.html:2360:                column.querySelectorAll('.home-widget-card')
+src/main/resources/templates/home.html:2362:                return card.getAttribute('data-widget-id');
+src/main/resources/templates/home.html:2366:        function getWidgetBody(card) {
+src/main/resources/templates/home.html:2370:        function getWidgetCollapseButton(card) {
+src/main/resources/templates/home.html:2371:            return card ? card.querySelector('.widget-collapse-toggle') : null;
+src/main/resources/templates/home.html:2374:        function setWidgetCollapsed(card, collapsed) {
+src/main/resources/templates/home.html:2379:            card.classList.toggle('widget-collapsed', collapsed);
+src/main/resources/templates/home.html:2381:            const body = getWidgetBody(card);
+src/main/resources/templates/home.html:2386:            const collapseButton = getWidgetCollapseButton(card);
+src/main/resources/templates/home.html:2396:        function saveWidgetLayout() {
+src/main/resources/templates/home.html:2402:            widgetColumns.forEach(function (column) {
+src/main/resources/templates/home.html:2404:                payload.columns[columnKey] = Array.from(column.querySelectorAll('.home-widget-card'))
+src/main/resources/templates/home.html:2406:                        return card.getAttribute('data-widget-id');
+src/main/resources/templates/home.html:2410:            widgetCards.forEach(function (card) {
+src/main/resources/templates/home.html:2411:                payload.collapsed[card.getAttribute('data-widget-id')] = card.classList.contains('widget-collapsed');
+src/main/resources/templates/home.html:2415:                window.localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(payload));
+src/main/resources/templates/home.html:2417:                console.warn('Could not save widget layout.', error);
+src/main/resources/templates/home.html:2421:        function restoreDefaultWidgetLayout() {
+src/main/resources/templates/home.html:2422:            widgetColumns.forEach(function (column) {
+src/main/resources/templates/home.html:2424:                const ids = defaultLayout[columnKey] || [];
+src/main/resources/templates/home.html:2426:                ids.forEach(function (widgetId) {
+src/main/resources/templates/home.html:2427:                    const card = widgetBoard.querySelector('.home-widget-card[data-widget-id="' + widgetId + '"]');
+src/main/resources/templates/home.html:2434:            widgetCards.forEach(function (card) {
+src/main/resources/templates/home.html:2435:                setWidgetCollapsed(card, false);
+src/main/resources/templates/home.html:2440:            saveWidgetLayout();
+src/main/resources/templates/home.html:2443:        function applySavedWidgetLayout() {
+src/main/resources/templates/home.html:2444:            let savedLayout = null;
+src/main/resources/templates/home.html:2447:                savedLayout = JSON.parse(window.localStorage.getItem(WIDGET_STORAGE_KEY) || 'null');
+src/main/resources/templates/home.html:2449:                savedLayout = null;
+src/main/resources/templates/home.html:2452:            if (!savedLayout || typeof savedLayout !== 'object') {
+src/main/resources/templates/home.html:2458:            widgetColumns.forEach(function (column) {
+src/main/resources/templates/home.html:2460:                const ids = savedLayout.columns && Array.isArray(savedLayout.columns[columnKey])
+src/main/resources/templates/home.html:2461:                    ? savedLayout.columns[columnKey]
+src/main/resources/templates/home.html:2464:                ids.forEach(function (widgetId) {
+src/main/resources/templates/home.html:2465:                    const card = widgetBoard.querySelector('.home-widget-card[data-widget-id="' + widgetId + '"]');
+src/main/resources/templates/home.html:2468:                        placed.add(widgetId);
+src/main/resources/templates/home.html:2473:            widgetCards.forEach(function (card) {
+src/main/resources/templates/home.html:2474:                const widgetId = card.getAttribute('data-widget-id');
+src/main/resources/templates/home.html:2475:                if (placed.has(widgetId)) {
+src/main/resources/templates/home.html:2479:                for (const [columnKey, ids] of Object.entries(defaultLayout)) {
+src/main/resources/templates/home.html:2480:                    if (ids.includes(widgetId)) {
+src/main/resources/templates/home.html:2481:                        const column = widgetBoard.querySelector('.home-widget-column[data-column="' + columnKey + '"]');
+src/main/resources/templates/home.html:2490:            widgetCards.forEach(function (card) {
+src/main/resources/templates/home.html:2491:                const widgetId = card.getAttribute('data-widget-id');
+src/main/resources/templates/home.html:2492:                const collapsed = !!(savedLayout.collapsed && savedLayout.collapsed[widgetId]);
+src/main/resources/templates/home.html:2493:                setWidgetCollapsed(card, collapsed);
+src/main/resources/templates/home.html:2497:        widgetCards.forEach(function (card) {
+src/main/resources/templates/home.html:2498:            const collapseButton = card.querySelector('.widget-collapse-toggle');
+src/main/resources/templates/home.html:2501:                    const collapsed = !card.classList.contains('widget-collapsed');
+src/main/resources/templates/home.html:2502:                    setWidgetCollapsed(card, collapsed);
+src/main/resources/templates/home.html:2503:                    saveWidgetLayout();
+src/main/resources/templates/home.html:2508:        if (btnExpandAllWidgets) {
+src/main/resources/templates/home.html:2509:            btnExpandAllWidgets.addEventListener('click', function () {
+src/main/resources/templates/home.html:2510:                widgetCards.forEach(function (card) {
+src/main/resources/templates/home.html:2511:                    setWidgetCollapsed(card, false);
+src/main/resources/templates/home.html:2513:                saveWidgetLayout();
+src/main/resources/templates/home.html:2517:        if (btnCollapseAllWidgets) {
+src/main/resources/templates/home.html:2518:            btnCollapseAllWidgets.addEventListener('click', function () {
+src/main/resources/templates/home.html:2519:                widgetCards.forEach(function (card) {
+src/main/resources/templates/home.html:2520:                    setWidgetCollapsed(card, true);
+src/main/resources/templates/home.html:2522:                saveWidgetLayout();
+src/main/resources/templates/home.html:2526:        if (btnResetWidgetLayout) {
+src/main/resources/templates/home.html:2527:            btnResetWidgetLayout.addEventListener('click', function () {
+src/main/resources/templates/home.html:2528:                restoreDefaultWidgetLayout();
+src/main/resources/templates/home.html:2533:        dragPlaceholder.className = 'home-widget-placeholder';
+src/main/resources/templates/home.html:2535:        let draggedWidget = null;
+src/main/resources/templates/home.html:2539:                container.querySelectorAll('.home-widget-card:not(.dragging)')
+src/main/resources/templates/home.html:2562:        widgetCards.forEach(function (card) {
+src/main/resources/templates/home.html:2563:            const dragHandle = card.querySelector('.widget-drag-handle');
+src/main/resources/templates/home.html:2572:                    if (!draggedWidget) {
+src/main/resources/templates/home.html:2579:                    if (!draggedWidget) {
+src/main/resources/templates/home.html:2592:                draggedWidget = card;
+src/main/resources/templates/home.html:2598:                    event.dataTransfer.setData('text/plain', card.getAttribute('data-widget-id'));
+src/main/resources/templates/home.html:2606:                draggedWidget = null;
+src/main/resources/templates/home.html:2608:                saveWidgetLayout();
+src/main/resources/templates/home.html:2612:        widgetColumns.forEach(function (column) {
+src/main/resources/templates/home.html:2616:                if (!draggedWidget) {
+src/main/resources/templates/home.html:2632:                if (!draggedWidget) {
+src/main/resources/templates/home.html:2637:                    column.insertBefore(draggedWidget, dragPlaceholder);
+src/main/resources/templates/home.html:2639:                    column.appendChild(draggedWidget);
+src/main/resources/templates/home.html:2643:                saveWidgetLayout();
+src/main/resources/templates/home.html:2647:        applySavedWidgetLayout();
+src/main/resources/templates/income/credit_accounts.html:5:<div class="app-layout" th:with="activePage='income_credit'">
+src/main/resources/templates/income/credit_detail.html:5:<div class="app-layout" th:with="activePage='income_credit'">
+src/main/resources/templates/income/other_income_placeholder.html:6:<div class="app-layout" th:with="activePage='income_others'">
+src/main/resources/templates/income/sales_by_date.html:6:<div class="app-layout" th:with="activePage='income_sales'">
+src/main/resources/templates/marketing/admin_campaigns.html:6:<div class="app-layout" th:with="activePage='marketing_campaigns'">
+src/main/resources/templates/marketing/admin_campaigns.html:51:                    <a th:href="@{/dashboard/commercial-daily}" class="btn btn-primary btn-sm">
+src/main/resources/templates/marketing/admin_campaigns.html:257:                                <div class="small text-muted">Activos listos para empujar por WhatsApp, home y catálogo.</div>
+src/main/resources/templates/marketing/admin_testimonials.html:172:                                            Active (visible on public home)
+src/main/resources/templates/orders/order_detail.html:5:<div class="app-layout" th:with="activePage='home'">
+src/main/resources/templates/orders/order_detail.html:124:                <a th:if="${backUrl != '/home'}" href="/home" class="btn btn-outline-secondary">Volver a ingresos</a>
+src/main/resources/templates/orders/order_form.html:7:<div class="app-layout" th:with="activePage=${activePage}">
+src/main/resources/templates/production/detail.html:5:<div class="app-layout" th:with="activePage='production'">
+src/main/resources/templates/production/form.html:5:<div class="app-layout" th:with="activePage='production'">
+src/main/resources/templates/production/list.html:5:<div class="app-layout" th:with="activePage='production'">
+src/main/resources/templates/public/blog/detail.html:43:                    <a class="nav-link" th:href="@{/}" th:text="${publicNavHomeLabel}">Inicio</a>
+src/main/resources/templates/public/blog/detail.html:71:                    <li class="breadcrumb-item"><a th:href="@{/}" th:text="${publicNavHomeLabel}">Inicio</a></li>
+src/main/resources/templates/public/blog/list.html:43:                    <a class="nav-link" th:href="@{/}" th:text="${publicNavHomeLabel}">Inicio</a>
+src/main/resources/templates/public/catalog.html:43:                    <a class="nav-link" th:href="@{/portal}" th:text="${publicNavHomeLabel}">Inicio</a>
+src/main/resources/templates/public/catalog.html:135:                <div class="row g-4 align-items-start product-detail-layout">
+src/main/resources/templates/public/home.html:51:                    <a class="nav-link active" th:href="@{/}" th:text="${publicNavHomeLabel}">Inicio</a>
+src/main/resources/templates/public/home.html:398:                <form id="orderForm" onsubmit="sendWhatsappOrderFromHome(event)">
+src/main/resources/templates/public/home.html:655:    const HOME_WHATSAPP_INTRO = /*[[${homeWhatsappIntro} ?: 'Hola, deseo hacer un pedido desde la web']]*/ 'Hola, deseo hacer un pedido desde la web';
+src/main/resources/templates/public/home.html:658:    function sendWhatsappOrderFromHome(event) {
+src/main/resources/templates/public/home.html:684:            HOME_WHATSAPP_INTRO,
+src/main/resources/templates/reorder/agenda.html:5:<div class="app-layout" th:with="activePage='reorder_agenda'">
+src/main/resources/templates/reorder/agenda.html:20:                @{/dashboard/commercial-daily},
+src/main/resources/templates/warehouse/container_balances.html:5:<div class="app-layout" th:with="activePage='warehouse_containers'">
+src/main/resources/templates/warehouse/container_detail.html:5:<div class="app-layout" th:with="activePage='warehouse_containers'">
+src/main/resources/templates/warehouse/products_stock.html:8:<div class="app-layout" th:with="activePage='warehouse_products_stock'">
+src/main/resources/templates/warehouse/product_movements.html:8:<div class="app-layout" th:with="activePage='warehouse_products_stock'">
+src/main/resources/templates/warehouse/supplies_stock.html:8:<div class="app-layout" th:with="activePage='warehouse_supplies_stock'">
+src/main/resources/templates/warehouse/supply_movements.html:8:<div class="app-layout" th:with="activePage='warehouse_supplies_stock'">
+src/main/resources/static/css/admin.css:1:/* Global layout */
+src/main/resources/static/css/admin.css:14:.app-layout {
+src/main/resources/static/css/admin.css:481:/* Client-aware admin home */
+src/main/resources/static/css/admin.css:482:.admin-home-page {
+src/main/resources/static/css/admin.css:488:.admin-home-page > * {
+src/main/resources/static/css/admin.css:493:.admin-home-hero {
+src/main/resources/static/css/admin.css:506:.admin-home-hero::after {
+src/main/resources/static/css/admin.css:517:.admin-home-hero-copy {
+src/main/resources/static/css/admin.css:521:.admin-home-kicker {
+src/main/resources/static/css/admin.css:535:.admin-home-kicker::before {
+src/main/resources/static/css/admin.css:541:.admin-home-hero h2 {
+src/main/resources/static/css/admin.css:549:.admin-home-hero p {
+src/main/resources/static/css/admin.css:555:.admin-home-hero-badges {
+src/main/resources/static/css/admin.css:562:.admin-home-hero-badges span {
+src/main/resources/static/css/admin.css:574:.admin-home-hero-logo-wrap {
+src/main/resources/static/css/admin.css:587:.admin-home-hero-logo {
+src/main/resources/static/css/admin.css:593:.admin-home-page .card {
+src/main/resources/static/css/admin.css:599:    .admin-home-hero {
+src/main/resources/static/css/admin.css:603:    .admin-home-hero-logo-wrap {
+src/main/resources/static/css/public.css:1090:/* Public blog layout improvements */
+src/main/resources/static/js/admin-common.js:94:                    text: '<i class="bi bi-layout-three-columns"></i> Columnas',
+
+===== ROLE / PERMISSION REFERENCES =====
+src/main/java/com/ecoamazonas/eco_agua/client/ClientProfileController.java:14:@PreAuthorize("hasRole('ADMIN')")
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:23:    private static final String ROLE_OWNER = "ROLE_OWNER";
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:25:    private static final String ROLE_MARKETING = "ROLE_MARKETING";
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:26:    private static final String ROLE_SALES = "ROLE_SALES";
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:27:    private static final String ROLE_FINANCE = "ROLE_FINANCE";
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:28:    private static final String ROLE_LOGISTICS = "ROLE_LOGISTICS";
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:30:    private static final String ROLE_HR = "ROLE_HR";
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:31:    private static final String ROLE_READONLY = "ROLE_READONLY";
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:42:            ROLE_OWNER,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:48:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_SALES, ROLE_FINANCE,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:49:            ROLE_LOGISTICS, ROLE_PRODUCTION, ROLE_HR, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:52:            "ver_dashboard"
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:56:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:62:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_SALES, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:68:            ROLE_OWNER, ROLE_SALES,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:74:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_SALES, ROLE_FINANCE, ROLE_LOGISTICS, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:80:            ROLE_OWNER, ROLE_SALES,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:86:            ROLE_OWNER, ROLE_SALES, ROLE_FINANCE,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:92:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:98:            ROLE_OWNER, ROLE_FINANCE,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:104:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:110:            ROLE_OWNER, ROLE_FINANCE,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:116:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:122:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_SALES, ROLE_FINANCE, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:123:            ROLE_PRODUCTION, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:129:            ROLE_OWNER, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:135:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_LOGISTICS, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:141:            ROLE_OWNER, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:147:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_LOGISTICS, ROLE_PRODUCTION, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:153:            ROLE_OWNER, ROLE_LOGISTICS, ROLE_PRODUCTION,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:159:            ROLE_OWNER, ROLE_LOGISTICS, ROLE_PRODUCTION, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:165:            ROLE_OWNER, ROLE_LOGISTICS, ROLE_PRODUCTION,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:171:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_LOGISTICS, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:177:            ROLE_OWNER, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:183:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_SALES, ROLE_LOGISTICS, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:189:            ROLE_OWNER, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:195:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:201:            ROLE_OWNER, ROLE_MARKETING,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:207:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_PRODUCTION, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:213:            ROLE_OWNER, ROLE_PRODUCTION,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:219:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_LOGISTICS, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:225:            ROLE_OWNER, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:231:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_SALES, ROLE_LOGISTICS, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:237:            ROLE_OWNER, ROLE_SALES, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:243:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_HR, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:249:            ROLE_OWNER, ROLE_HR,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:255:            ROLE_OWNER, ROLE_HR,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:261:            ROLE_OWNER,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:267:            ROLE_OWNER,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:269:            "admin_config"
+src/main/resources/templates/fragments/sidebar.html:37:    <th:block th:if="${moduleBusinessOverviewEnabled or moduleMonthlyFollowupEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','ADMIN_RRHH','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_HR','ROLE_READONLY')">
+src/main/resources/templates/fragments/sidebar.html:59:    <th:block th:if="${moduleOperationSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:88:          <th:block th:if="${moduleCommercialDailyEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_SALES','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:99:          <th:block th:if="${moduleClientsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS')">
+src/main/resources/templates/fragments/sidebar.html:110:          <th:block th:if="${moduleClientsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_SALES','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:121:          <th:block th:if="${moduleClientsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING')">
+src/main/resources/templates/fragments/sidebar.html:132:          <th:block th:if="${modulePromotionsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING')">
+src/main/resources/templates/fragments/sidebar.html:143:          <th:block th:if="${featureDelivery}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES')">
+src/main/resources/templates/fragments/sidebar.html:154:          <th:block th:if="${featureDelivery}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES')">
+src/main/resources/templates/fragments/sidebar.html:165:          <th:block th:if="${featureReorder}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES')">
+src/main/resources/templates/fragments/sidebar.html:178:      <th:block th:if="${moduleIncomeEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:229:      <th:block th:if="${moduleExpensesEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_LOGISTICS')">
+src/main/resources/templates/fragments/sidebar.html:251:            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:262:            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:273:            <th:block th:if="${moduleFixedCostsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:297:      <th:block th:if="${moduleInventorySectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES')">
+src/main/resources/templates/fragments/sidebar.html:322:            <th:block th:if="${moduleProductsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:333:            <th:block th:if="${featureSupplies}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:344:            <th:block th:if="${moduleCategoriesEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:355:            <th:block th:if="${moduleWarehouseEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:376:            <th:block th:if="${featureSupplies}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:387:            <th:block th:if="${featureProduction}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:401:      <th:block th:if="${moduleFinanceSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:456:    <th:block th:if="${featureMarketingSection}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING')">
+src/main/resources/templates/fragments/sidebar.html:480:            <th:block th:if="${featureMarketing}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING')">
+src/main/resources/templates/fragments/sidebar.html:513:    <th:block th:if="${moduleSystemSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_HR','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:539:          <th:block th:if="${modulePlatformSettingsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ROLE_OWNER','ROLE_MANAGEMENT')">
+src/main/resources/templates/fragments/sidebar.html:551:          <th:block th:if="${modulePlatformSettingsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ROLE_OWNER','ROLE_MANAGEMENT')">
+src/main/resources/templates/fragments/sidebar.html:562:          <th:block th:if="${moduleUsersEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_HR')">
+src/main/resources/templates/fragments/sidebar.html:573:          <th:block th:if="${moduleHrEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_HR')">
+src/main/resources/templates/fragments/sidebar.html:584:          <th:block th:if="${moduleHrEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_HR','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:595:          <th:block th:if="${moduleRolesPermissionsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ROLE_OWNER','ROLE_MANAGEMENT')">
+
+===== SYSTEM MODULE REFERENCES =====
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:15:    private final SystemModuleService systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:21:            SystemModuleService systemModuleService
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:26:        this.systemModuleService = systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:81:        Map<String, Boolean> moduleFlags = systemModuleService.getModuleFlags();
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingAdminController.java:34:    private final SystemModuleService systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingAdminController.java:39:                                          SystemModuleService systemModuleService,
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingAdminController.java:43:        this.systemModuleService = systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingAdminController.java:50:        systemModuleService.ensureDefaults();
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:49:            ModuleRoute.prefix("/admin/system-modules", "platform_settings")
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:52:    private final SystemModuleService systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:54:    public SystemModuleAccessFilter(SystemModuleService systemModuleService) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:55:        this.systemModuleService = systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:65:        if (matchedRoute != null && !systemModuleService.isEnabled(matchedRoute.moduleKey())) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:14:@RequestMapping("/admin/system-modules")
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:17:    private final SystemModuleService systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:19:    public SystemModuleAdminController(SystemModuleService systemModuleService) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:20:        this.systemModuleService = systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:25:        systemModuleService.ensureDefaults();
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:27:        var modules = systemModuleService.getModuleDefinitions();
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:28:        long enabledCount = modules.stream().filter(SystemModuleService.ModuleDefinition::enabled).count();
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:29:        long belenSuggestedCount = modules.stream().filter(SystemModuleService.ModuleDefinition::recommendedForBelen).count();
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:30:        long aguaEcoSuggestedCount = modules.stream().filter(SystemModuleService.ModuleDefinition::recommendedForAguaEco).count();
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:32:        model.addAttribute("activePage", "system_modules");
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:33:        model.addAttribute("moduleGroups", systemModuleService.getModuleGroups());
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:39:        return "admin/system_modules";
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:46:            for (SystemModuleService.ModuleDefinition module : systemModuleService.getModuleDefinitions()) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:47:                if (module.locked()) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:51:                boolean enabled = requestParams.containsKey(inputName(module.key()));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:52:                systemModuleService.updateModuleFlag(module.key(), enabled);
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:60:        return "redirect:/admin/system-modules";
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:12:public class SystemModuleService {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:14:    private static final String SETTING_PREFIX = "module.";
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:16:    private static final String CATEGORY = "system_modules";
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:22:    public SystemModuleService(PlatformSettingRepository platformSettingRepository,
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:32:        moduleDefinitions().forEach(module -> modules.put(module.key(), isEnabled(module.key())));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:38:                .map(module -> module.withRuntimeState(defaultValueFor(module.key()), isEnabled(module.key())))
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:45:            groupedModules.computeIfAbsent(module.area(), ignored -> new ArrayList<>()).add(module);
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:89:                    settingName(module.key()),
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:90:                    Boolean.toString(module.locked() || defaultValueFor(module.key())),
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:93:                    module.description()
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:96:            if (module.locked() && !parseBoolean(setting.getValue(), true)) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:154:            if (module.key().equals(key)) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:193:        modules.add(new ModuleDefinition("cashflow", "Finanzas y contabilidad", "Flujo de caja", "Cashflow module.", true, true, true, false, false));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:202:        modules.add(new ModuleDefinition("containers", "Inventario y operación", "Envases retornables", "Returnable containers module.", true, false, false, false, false));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:203:        modules.add(new ModuleDefinition("production", "Inventario y operación", "Producción / planta", "Production and plant module.", true, false, false, false, false));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:208:        modules.add(new ModuleDefinition("public_site", "Marketing y portal público", "Portal público", "Public website module.", true, true, true, false, false));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:209:        modules.add(new ModuleDefinition("public_catalog", "Marketing y portal público", "Catálogo público", "Public catalog module.", true, true, true, false, false));
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:346:                .requestMatchers("/admin/system-modules/**").hasAnyAuthority(PLATFORM_ADMIN)
+src/main/resources/templates/admin/platform_settings.html:19:                    <a th:href="@{/admin/system-modules}" class="btn btn-sm btn-outline-primary">
+src/main/resources/templates/admin/platform_settings.html:146:                                    <code>platform</code>, <code>public_site</code> o <code>system_modules</code>.
+src/main/resources/templates/admin/system_modules.html:96:            <form method="post" th:action="@{/admin/system-modules}">
+src/main/resources/templates/admin/system_modules.html:134:                                                <div class="fw-semibold" th:text="${module.label()}">Módulo</div>
+src/main/resources/templates/admin/system_modules.html:135:                                                <div th:if="${module.locked()}" class="small text-muted">
+src/main/resources/templates/admin/system_modules.html:145:                                                           th:id="${'module-' + module.key()}"
+src/main/resources/templates/admin/system_modules.html:146:                                                           th:name="${'module_' + module.key()}"
+src/main/resources/templates/admin/system_modules.html:147:                                                           th:checked="${module.enabled()}"
+src/main/resources/templates/admin/system_modules.html:148:                                                           th:disabled="${module.locked()}"/>
+src/main/resources/templates/admin/system_modules.html:150:                                                           th:for="${'module-' + module.key()}"
+src/main/resources/templates/admin/system_modules.html:151:                                                           th:text="${module.enabled() ? 'Activo' : 'Inactivo'}">
+src/main/resources/templates/admin/system_modules.html:157:                                            <td class="small text-muted" th:text="${module.description()}">Descripción</td>
+src/main/resources/templates/admin/system_modules.html:161:                                                    <span th:if="${module.recommendedForBelen()}" class="badge rounded-pill text-bg-success">Belén</span>
+src/main/resources/templates/admin/system_modules.html:162:                                                    <span th:if="${module.recommendedForAguaEco()}" class="badge rounded-pill text-bg-primary">Agua Eco</span>
+src/main/resources/templates/admin/system_modules.html:163:                                                    <span th:if="${!module.recommendedForBelen() and !module.recommendedForAguaEco()}" class="badge rounded-pill text-bg-secondary">Opcional</span>
+src/main/resources/templates/admin/system_modules.html:168:                                                <code class="small" th:text="${module.settingVariable()}">module.example.enabled</code>
+src/main/resources/templates/fragments/sidebar.html:523:          or activePage == 'system_modules'}"
+src/main/resources/templates/fragments/sidebar.html:553:              th:href="@{/admin/system-modules}"
+src/main/resources/templates/fragments/sidebar.html:555:              th:classappend="${activePage == 'system_modules' ? ' active' : ''}"
+
+===== COMPILE CHECK =====
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------------< com.ecoamazonas:eco-agua >----------------------
+[INFO] Building eco-agua 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ eco-agua ---
+[INFO] Copying 99 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ eco-agua ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  2.124 s
+[INFO] Finished at: 2026-05-29T14:44:23-05:00
+[INFO] ------------------------------------------------------------------------

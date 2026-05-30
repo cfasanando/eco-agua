@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <!-- Common admin head (Bootstrap, icons, layout CSS, etc.) -->
+    <th:block th:replace="fragments/head_admin :: adminHead('Promociones - Eco Agua')"></th:block>
+
+    <!-- Page-specific styles -->
+    <style>
+        .promo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1rem;
+        }
+
+        .promo-card {
+            border-radius: 16px;
+            background: #ffffff;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+            border-left-width: 4px;
+            border-left-style: solid;
+            border-left-color: #2563eb;
+            padding: 16px 18px 10px;
+            display: flex;
+            flex-direction: column;
+            min-height: 180px;
+        }
+
+        .promo-title {
+            font-weight: 600;
+            font-size: 0.98rem;
+            color: #1f2937;
+            margin-bottom: 0.35rem;
+        }
+
+        .promo-description {
+            font-size: 0.85rem;
+            color: #4b5563;
+        }
+
+        .promo-dates {
+            font-size: 0.78rem;
+            color: #6b7280;
+            margin-top: 0.5rem;
+        }
+
+        .promo-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: auto;
+            padding-top: 0.5rem;
+        }
+
+        .promo-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+
+        .badge-small {
+            font-size: 0.7rem;
+            border-radius: 999px;
+            padding: 0.15rem 0.45rem;
+        }
+
+        .promo-actions button {
+            border-radius: 999px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-layout" th:with="activePage='promotions'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="h5 mb-0">Promociones</h1>
+
+                <button class="btn btn-primary btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#promotionModal">
+                    <i class="bi bi-plus-lg"></i> Agregar
+                </button>
+            </div>
+
+            <div class="promo-grid">
+                <div class="promo-card"
+                     th:each="promo : ${promotions}"
+                     th:style="'border-left-color:' + (${promo.colorBorder} != null ? ${promo.colorBorder} : '#2563eb')">
+                    <div>
+                        <div class="promo-title" th:text="${promo.name}">Nombre promoción</div>
+                        <div class="promo-description" th:text="${promo.description}">
+                            Descripción de la promoción.
+                        </div>
+                        <div class="promo-dates">
+                            <span th:if="${promo.startDate != null}">
+                                Del <span th:text="${#temporals.format(promo.startDate, 'dd/MM/yyyy')}">01/01/2025</span>
+                            </span>
+                            <span th:if="${promo.endDate != null}">
+                                &nbsp;hasta&nbsp;
+                                <span th:text="${#temporals.format(promo.endDate, 'dd/MM/yyyy')}">31/12/2025</span>
+                            </span>
+                        </div>
+
+                        <div class="mt-2 promo-tags">
+                            <span class="badge bg-primary-subtle text-primary badge-small"
+                                  th:if="${promo.promoNumber != null}">
+                                Promo N° [[${promo.promoNumber}]]
+                            </span>
+                            <span class="badge bg-success-subtle text-success badge-small"
+                                  th:if="${promo.enabled}">
+                                Activa
+                            </span>
+                            <span class="badge bg-secondary-subtle text-muted badge-small"
+                                  th:if="${!promo.enabled}">
+                                Inactiva
+                            </span>
+                            <span class="badge bg-info-subtle text-info badge-small"
+                                  th:if="${promo.bannerImagePath != null}">
+                                Banner configurado
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="promo-footer mt-3">
+                        <div class="small text-muted">
+                            <span th:text="${#lists.size(promo.promotionProducts)}">0</span> productos
+                        </div>
+                        <div class="promo-actions btn-group">
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    title="Configurar productos"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#promotionProductsModal"
+                                    th:attr="data-id=${promo.id},
+                                             data-name=${promo.name},
+                                             data-config=${#strings.listJoin(promo.promotionProducts.![product.id + ':' + quantity + ':' + amount], ';')}">
+                                <i class="bi bi-list-check"></i>
+                            </button>
+
+                            <button type="button"
+                                    class="btn btn-outline-primary btn-sm"
+                                    title="Editar"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#promotionModal"
+                                    th:attr="data-id=${promo.id},
+                                             data-name=${promo.name},
+                                             data-description=${promo.description},
+                                             data-start-date=${promo.startDate},
+                                             data-end-date=${promo.endDate},
+                                             data-number=${promo.promoNumber},
+                                             data-color=${promo.colorBorder},
+                                             data-enabled=${promo.enabled},
+                                             data-max-counter=${promo.maxCounter},
+                                             data-banner=${promo.bannerImagePath}">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+
+                            <form th:action="@{'/admin/promotions/' + ${promo.id} + '/delete'}"
+                                  method="post" class="d-inline delete-form-single ms-1">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button type="submit"
+                                        class="btn btn-outline-danger btn-sm"
+                                        title="Eliminar">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div th:if="${#lists.isEmpty(promotions)}" class="text-muted">
+                    No hay promociones registradas.
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<!-- Modal crear/editar promoción -->
+<div class="modal fade" id="promotionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form id="promotionForm"
+                  th:action="@{/admin/promotions/save}"
+                  method="post"
+                  enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title">Nueva promoción</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="promotionId"/>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Nombre</label>
+                            <input class="form-control" name="name" id="promotionName" required>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Descripción</label>
+                            <textarea class="form-control" name="description"
+                                      id="promotionDescription" rows="3"></textarea>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Fecha de inicio</label>
+                            <input class="form-control" type="date"
+                                   name="startDate" id="promotionStartDate">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Fecha final</label>
+                            <input class="form-control" type="date"
+                                   name="endDate" id="promotionEndDate">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">N° promoción</label>
+                            <input class="form-control" type="number" min="0"
+                                   name="promoNumber" id="promotionNumber">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Color borde</label>
+                            <input class="form-control" type="color"
+                                   name="colorBorder" id="promotionColor" value="#2563eb">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Máx. contador</label>
+                            <input class="form-control" type="number" min="0"
+                                   name="maxCounter" id="promotionMaxCounter">
+                        </div>
+
+                        <div class="col-md-3 d-flex align-items-center">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox"
+                                       id="promotionEnabled" name="enabled" value="true" checked>
+                                <label class="form-check-label" for="promotionEnabled">
+                                    Promoción activa
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Banner / infografía (opcional)</label>
+                            <input class="form-control" type="file"
+                                   name="bannerImageFile"
+                                   id="promotionBannerFile"
+                                   accept="image/*">
+                            <div class="form-text">
+                                Imagen que se mostrará en la web pública cuando el cliente haga clic en la promoción.
+                            </div>
+                        </div>
+
+                        <div class="col-12" id="promotionBannerPreviewWrapper" style="display:none;">
+                            <label class="form-label small text-muted">Banner actual</label>
+                            <div class="border rounded-3 p-2 bg-light">
+                                <img id="promotionBannerPreview"
+                                     src=""
+                                     alt="Banner de la promoción"
+                                     class="img-fluid rounded-2">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary btn-sm"
+                            data-bs-dismiss="modal">Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal configurar productos (sin cambios de lógica) -->
+<div class="modal fade" id="promotionProductsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <form id="promotionProductsForm"
+                  th:action="@{/admin/promotions/configure-products}"
+                  method="post">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Productos de la promoción</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <!-- ID de la promoción -->
+                    <input type="hidden" name="promotionId" id="ppPromotionId"/>
+
+                    <!-- CSRF -->
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th style="width: 36px;">
+                                    <input type="checkbox" id="ppCheckAll"/>
+                                </th>
+                                <th>Producto</th>
+                                <th class="text-end" style="width: 120px;">Precio S/.</th>
+                                <th class="text-end" style="width: 120px;">Cantidad</th>
+                                <th class="text-end" style="width: 130px;">Monto S/.</th>
+                            </tr>
+                            </thead>
+                            <tbody id="ppTableBody">
+                            <tr th:each="prod : ${products}"
+                                th:attr="data-product-id=${prod.id}">
+                                <td>
+                                    <input type="checkbox" class="pp-row-check">
+                                </td>
+                                <td>
+                                    <span th:text="${prod.name}">Producto</span>
+                                    <small class="text-muted d-block"
+                                           th:text="${prod.description}">Descripción</small>
+                                </td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(prod.price,1,'POINT',2,'POINT')}">
+                                    0.00
+                                </td>
+                                <td>
+                                    <input type="number"
+                                           min="0" step="1"
+                                           class="form-control form-control-sm pp-qty"
+                                           name="quantity">
+                                </td>
+                                <td>
+                                    <input type="number"
+                                           min="0" step="0.01"
+                                           class="form-control form-control-sm pp-amount"
+                                           name="amount">
+                                    <!-- este hidden es el que envía el id del producto -->
+                                    <input type="hidden" name="productId">
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="form-text">
+                        Marca los productos que pertenecen a la promoción y define
+                        cantidad y monto (si aplica).
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary btn-sm"
+                            data-bs-dismiss="modal">Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary btn-sm">Guardar productos</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Common admin scripts -->
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<!-- Page-specific JS -->
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        // Handle promotion create/edit modal
+        const promotionModal = document.getElementById('promotionModal');
+        const promotionForm = document.getElementById('promotionForm');
+
+        const bannerPreviewWrapper = document.getElementById('promotionBannerPreviewWrapper');
+        const bannerPreviewImg = document.getElementById('promotionBannerPreview');
+        const bannerFileInput = document.getElementById('promotionBannerFile');
+
+        if (promotionModal) {
+            promotionModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                if (!button) {
+                    return;
+                }
+
+                const id = button.getAttribute('data-id');
+
+                if (id) {
+                    promotionModal.querySelector('.modal-title').textContent = 'Editar promoción';
+                    document.getElementById('promotionId').value = id;
+                    document.getElementById('promotionName').value =
+                        button.getAttribute('data-name') || '';
+                    document.getElementById('promotionDescription').value =
+                        button.getAttribute('data-description') || '';
+                    document.getElementById('promotionStartDate').value =
+                        button.getAttribute('data-start-date') || '';
+                    document.getElementById('promotionEndDate').value =
+                        button.getAttribute('data-end-date') || '';
+                    document.getElementById('promotionNumber').value =
+                        button.getAttribute('data-number') || '';
+                    document.getElementById('promotionColor').value =
+                        button.getAttribute('data-color') || '#2563eb';
+                    document.getElementById('promotionMaxCounter').value =
+                        button.getAttribute('data-max-counter') || '';
+
+                    const enabledAttr = button.getAttribute('data-enabled');
+                    document.getElementById('promotionEnabled').checked =
+                        enabledAttr === 'true' || enabledAttr === '1';
+
+                    const bannerUrl = button.getAttribute('data-banner');
+
+                    if (bannerPreviewWrapper && bannerPreviewImg) {
+                        if (bannerUrl) {
+                            bannerPreviewImg.src = bannerUrl;
+                            bannerPreviewWrapper.style.display = 'block';
+                        } else {
+                            bannerPreviewImg.src = '';
+                            bannerPreviewWrapper.style.display = 'none';
+                        }
+                    }
+
+                    if (bannerFileInput) {
+                        bannerFileInput.value = '';
+                    }
+                } else {
+                    promotionModal.querySelector('.modal-title').textContent = 'Nueva promoción';
+                    promotionForm.reset();
+                    document.getElementById('promotionId').value = '';
+                    document.getElementById('promotionColor').value = '#2563eb';
+                    document.getElementById('promotionEnabled').checked = true;
+
+                    if (bannerPreviewWrapper && bannerPreviewImg) {
+                        bannerPreviewImg.src = '';
+                        bannerPreviewWrapper.style.display = 'none';
+                    }
+
+                    if (bannerFileInput) {
+                        bannerFileInput.value = '';
+                    }
+                }
+            });
+        }
+
+        // Handle "configure products" modal
+        const ppModal = document.getElementById('promotionProductsModal');
+        const ppForm = document.getElementById('promotionProductsForm');
+        const ppTableBody = document.getElementById('ppTableBody');
+        const ppCheckAll = document.getElementById('ppCheckAll');
+
+        if (ppModal && ppForm && ppTableBody) {
+            ppModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                if (!button) {
+                    return;
+                }
+
+                const promotionId = button.getAttribute('data-id');
+                const promotionName = button.getAttribute('data-name') || '';
+                const configRaw = button.getAttribute('data-config') || '';
+
+                // Dynamic title
+                ppModal.querySelector('.modal-title').textContent =
+                    'Productos de la promoción: ' + promotionName;
+
+                // Set promotionId
+                document.getElementById('ppPromotionId').value = promotionId;
+
+                // config: "productId:cantidad:monto;productId:cantidad:monto;..."
+                const configMap = new Map();
+                if (configRaw !== '') {
+                    configRaw.split(';').forEach(function (item) {
+                        const parts = item.split(':');
+                        if (parts.length >= 2) {
+                            configMap.set(parts[0], {
+                                qty: parts[1],
+                                amount: parts.length >= 3 ? parts[2] : ''
+                            });
+                        }
+                    });
+                }
+
+                // Fill rows
+                const rows = ppTableBody.querySelectorAll('tr[data-product-id]');
+                rows.forEach(function (row) {
+                    const productId = row.getAttribute('data-product-id');
+                    const checkbox = row.querySelector('.pp-row-check');
+                    const qtyInput = row.querySelector('.pp-qty');
+                    const amountInput = row.querySelector('.pp-amount');
+                    const hiddenProduct = row.querySelector('input[name="productId"]');
+
+                    const cfg = configMap.get(productId);
+
+                    if (cfg) {
+                        checkbox.checked = true;
+                        qtyInput.value = cfg.qty;
+                        amountInput.value = cfg.amount || '';
+                    } else {
+                        checkbox.checked = false;
+                        qtyInput.value = '';
+                        amountInput.value = '';
+                    }
+
+                    hiddenProduct.value = productId;
+                });
+
+                if (ppCheckAll) {
+                    ppCheckAll.checked = false;
+                }
+            });
+
+            // Check-all inside modal
+            if (ppCheckAll) {
+                ppCheckAll.addEventListener('change', function () {
+                    const checked = this.checked;
+                    document.querySelectorAll('.pp-row-check').forEach(function (chk) {
+                        chk.checked = checked;
+                    });
+                });
+            }
+
+            // Before submit disable fields of unchecked rows
+            ppForm.addEventListener('submit', function () {
+                const rows = ppTableBody.querySelectorAll('tr[data-product-id]');
+                rows.forEach(function (row) {
+                    const checkbox = row.querySelector('.pp-row-check');
+                    if (!checkbox.checked) {
+                        row.querySelectorAll('input[name="productId"], input[name="quantity"], input[name="amount"]')
+                            .forEach(function (input) {
+                                input.disabled = true;
+                            });
+                    }
+                });
+            });
+        }
+
+        // Register single delete confirmation using common helper
+        window.ecoAdmin.registerSingleDelete('.delete-form-single', '¿Eliminar esta promoción?');
+
+        // Flash message helper
+        const flashMessage = /*[[${message}]]*/ null;
+        const flashType = /*[[${messageType}]]*/ null;
+        window.ecoAdmin.showFlashMessage(flashMessage, flashType);
+    });
+</script>
+
+</body>
+</html>

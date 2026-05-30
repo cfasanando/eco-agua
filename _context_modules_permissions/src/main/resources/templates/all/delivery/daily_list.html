@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Reparto diario - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='delivery_daily'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Reparto diario</h1>
+                    <div class="text-muted small" th:text="${#temporals.format(today, 'dd/MM/yyyy')}">Fecha</div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-3"><div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Pedidos del día</div><div class="fs-4 fw-bold" th:text="${#lists.size(rows)}">0</div></div></div></div>
+                <div class="col-md-6 col-xl-3"><div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Entregados</div><div class="fs-4 fw-bold text-success" th:text="${deliveredCount}">0</div></div></div></div>
+                <div class="col-md-6 col-xl-3"><div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Pendientes</div><div class="fs-4 fw-bold text-warning" th:text="${pendingCount}">0</div></div></div></div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light"><strong>Filtros</strong></div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" th:action="@{/delivery}" method="get">
+                        <div class="col-md-3"><label class="form-label">Fecha</label><input type="date" class="form-control" name="date" th:value="${today}"></div>
+                        <div class="col-md-4">
+                            <label class="form-label">Repartidor</label>
+                            <select class="form-select" name="deliveryPerson">
+                                <option value="">Todos</option>
+                                <option th:each="employee : ${deliveryEmployees}"
+                                        th:value="${employee.firstName + ' ' + employee.lastName}"
+                                        th:selected="${selectedDeliveryPerson != null and selectedDeliveryPerson == (employee.firstName + ' ' + employee.lastName)}"
+                                        th:text="${employee.firstName + ' ' + employee.lastName}">Repartidor</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Estado</label>
+                            <select class="form-select" name="deliveryStatus">
+                                <option value="">Todos</option>
+                                <option th:each="status : ${deliveryStatuses}" th:value="${status}" th:selected="${selectedDeliveryStatus != null and selectedDeliveryStatus == status}" th:text="${status}">Estado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Buscar</button></div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-light"><strong>Pedidos del reparto</strong></div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light"><tr><th>#</th><th>Cliente</th><th>Teléfono</th><th>Dirección</th><th>Zona</th><th>Repartidor</th><th>Estado</th><th class="text-end">Total</th><th class="text-end">Botellones</th><th class="text-center">Acción</th></tr></thead>
+                            <tbody>
+                            <tr th:each="row : ${rows}">
+                                <td th:text="${row.orderNumber}">0</td>
+                                <td><div class="fw-semibold" th:text="${row.clientName}">Cliente</div><div class="small text-muted" th:if="${row.reference != null}" th:text="${row.reference}">Referencia</div></td>
+                                <td th:text="${row.phone} ?: '-'">-</td>
+                                <td th:text="${row.address} ?: '-'">-</td>
+                                <td th:text="${row.zoneName} ?: '-'">-</td>
+                                <td th:text="${row.deliveryPerson} ?: '-'">-</td>
+                                <td><span class="badge" th:classappend="${row.deliveryStatus.name() == 'DELIVERED'} ? ' bg-success' : (${row.deliveryStatus.name() == 'PENDING'} ? ' bg-warning text-dark' : (${row.deliveryStatus.name() == 'IN_ROUTE'} ? ' bg-primary' : (${row.deliveryStatus.name() == 'NOT_DELIVERED'} ? ' bg-danger' : ' bg-secondary')))" th:text="${row.deliveryStatus}">PENDING</span></td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.totalAmount, 1, 2)}">0.00</td>
+                                <td class="text-end" th:text="${row.borrowedBottles} ?: 0">0</td>
+                                <td class="text-center"><a class="btn btn-sm btn-outline-secondary" th:href="@{|/delivery/orders/${row.orderId}|}">Ver detalle</a></td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(rows)}"><td colspan="10" class="text-center text-muted">No hay pedidos para mostrar en el reparto del día.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

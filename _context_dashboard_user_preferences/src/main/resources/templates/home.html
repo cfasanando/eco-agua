@@ -1,0 +1,3166 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="fragments/head_admin :: adminHead('Inicio - Sistema integral')"></head>
+
+<body>
+<style>
+    .home-widgets-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+    }
+
+    .home-widgets-toolbar .toolbar-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .home-widget-column {
+        min-height: 140px;
+    }
+
+    .home-widget-card {
+        margin-bottom: 1rem;
+    }
+
+    .home-widget-card.dragging {
+        opacity: 0.45;
+    }
+
+    .home-widget-placeholder {
+        border: 2px dashed #0d6efd;
+        border-radius: 0.5rem;
+        background: rgba(13, 110, 253, 0.06);
+        margin-bottom: 1rem;
+        min-height: 80px;
+    }
+
+    .home-widget-tools {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-shrink: 0;
+    }
+
+    .home-widget-tool-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 0.4rem;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: rgba(255, 255, 255, 0.88);
+        color: #495057;
+        cursor: pointer;
+        padding: 0;
+        transition: all 0.15s ease-in-out;
+    }
+
+    .home-widget-tool-button:hover {
+        background: #ffffff;
+        color: #212529;
+        transform: translateY(-1px);
+    }
+
+    .home-widget-tool-button:active {
+        transform: translateY(0);
+    }
+
+    .widget-drag-handle {
+        cursor: grab;
+    }
+
+    .widget-drag-handle:active {
+        cursor: grabbing;
+    }
+
+    .widget-collapsed .card-body {
+        display: none !important;
+    }
+
+    .widget-collapsed .card-footer {
+        display: none !important;
+    }
+
+    .home-widget-card .card {
+        transition: box-shadow 0.15s ease-in-out;
+    }
+
+    .home-widget-card .card:hover {
+        box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.08);
+    }
+
+    @media (max-width: 991.98px) {
+        .home-widgets-toolbar {
+            align-items: stretch;
+        }
+
+        .home-widgets-toolbar .toolbar-actions {
+            width: 100%;
+        }
+
+        .home-widgets-toolbar .toolbar-actions .btn {
+            flex: 1 1 auto;
+        }
+    }
+</style>
+
+<div class="app-layout" th:with="activePage='home'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper admin-home-page"
+              th:classappend="${adminHomeBackgroundImage != null and !#strings.isEmpty(adminHomeBackgroundImage)} ? ' has-admin-home-background' : ''"
+              th:style="${adminHomeBackgroundImage != null and !#strings.isEmpty(adminHomeBackgroundImage)} ? 'background-image: linear-gradient(rgba(243,245,249,0.88), rgba(243,245,249,0.88)), url(' + ${adminHomeBackgroundImage} + ');' : ''">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="h5 mb-0">Inicio</h1>
+                <div class="text-muted small">
+                    <span th:text="${today}">2025-11-23</span>
+                </div>
+            </div>
+
+            <section class="admin-home-hero mb-3">
+                <div class="admin-home-hero-copy">
+                    <span class="admin-home-kicker">Panel administrativo</span>
+                    <h2 th:text="${adminBrandTitle != null and !#strings.isEmpty(adminBrandTitle) ? adminBrandTitle : (businessName != null and !#strings.isEmpty(businessName) ? businessName : 'Sistema integral')}">
+                        Productos de la Selva Belén
+                    </h2>
+                    <p th:text="${adminBrandSubtitle != null and !#strings.isEmpty(adminBrandSubtitle) ? adminBrandSubtitle : (businessAdminTitle != null and !#strings.isEmpty(businessAdminTitle) ? businessAdminTitle : 'Sistema integral')}">
+                        Sistema integral
+                    </p>
+                    <div class="admin-home-hero-badges">
+                        <span><i class="bi bi-shop-window"></i> Gestión del negocio</span>
+                        <span><i class="bi bi-whatsapp"></i> Pedidos y atención</span>
+                        <span><i class="bi bi-graph-up-arrow"></i> Control diario</span>
+                    </div>
+                </div>
+                <div class="admin-home-hero-logo-wrap">
+                    <img th:src="${adminBrandLogo != null and !#strings.isEmpty(adminBrandLogo) ? adminBrandLogo : (businessAdminLogo != null and !#strings.isEmpty(businessAdminLogo) ? businessAdminLogo : '/img/logo-eco.png')}"
+                         th:alt="${adminBrandTitle != null and !#strings.isEmpty(adminBrandTitle) ? adminBrandTitle : (businessName != null and !#strings.isEmpty(businessName) ? businessName : 'Sistema integral')}"
+                         alt="Sistema integral"
+                         class="admin-home-hero-logo">
+                </div>
+            </section>
+
+            <div class="home-widgets-toolbar">
+                <div class="toolbar-actions">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnExpandAllWidgets">
+                        <i class="bi bi-arrows-expand me-1"></i>
+                        Expandir todo
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCollapseAllWidgets">
+                        <i class="bi bi-arrows-collapse me-1"></i>
+                        Minimizar todo
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnResetWidgetLayout">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>
+                        Restablecer layout
+                    </button>
+                </div>
+                <div class="text-muted small">
+                    Los widgets se pueden mover entre izquierda y derecha. El layout se guarda en este navegador.
+                </div>
+            </div>
+
+
+
+            <div class="row g-3" id="homeWidgetBoard" th:if="${dashboardAreaRoleDashboardVisible}">
+                <div class="col-lg-7">
+                    <div class="home-widget-column" data-column="left">
+
+                        <div class="home-widget-card" data-widget-id="marketing-promotions" draggable="false"
+                             th:if="${dashboardMarketingAreaVisible and dashboardVisibleWidgets['marketing-promotions']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header area-widget-header area-widget-header-marketing">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Promociones activas</span>
+                                            <small th:text="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null ? dashboardMarketingSnapshot.campaigns.activePromotionCount + ' activa(s)' : 'Control de promociones'}">0 activa(s)</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="area-widget-metric-row mb-3">
+                                        <div class="area-widget-metric">
+                                            <strong th:text="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null ? dashboardMarketingSnapshot.campaigns.activePromotionCount : 0}">0</strong>
+                                            <span>Activas</span>
+                                        </div>
+                                        <div class="area-widget-metric">
+                                            <strong th:text="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null ? dashboardMarketingSnapshot.campaigns.promotionsEndingSoonCount : 0}">0</strong>
+                                            <span>Por vencer</span>
+                                        </div>
+                                    </div>
+
+                                    <div th:if="${dashboardMarketingSnapshot == null or dashboardMarketingSnapshot.campaigns == null or #lists.isEmpty(dashboardMarketingSnapshot.campaigns.promotionAssets)}" class="area-widget-empty">
+                                        No hay promociones activas para mostrar. Crea o activa promociones para el portal.
+                                    </div>
+
+                                    <div class="area-widget-list" th:if="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null and !#lists.isEmpty(dashboardMarketingSnapshot.campaigns.promotionAssets)}">
+                                        <div class="area-widget-list-item" th:each="asset, stat : ${dashboardMarketingSnapshot.campaigns.promotionAssets}" th:if="${stat.index < 3}">
+                                            <div>
+                                                <strong th:text="${asset.title}">Promoción</strong>
+                                                <small th:text="${asset.status}">Activa</small>
+                                            </div>
+                                            <a class="btn btn-sm btn-outline-success" th:href="@{/admin/promotions}">Ver</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-success w-100" th:href="@{/admin/promotions}">Gestionar promociones</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="marketing-campaigns" draggable="false"
+                             th:if="${dashboardMarketingAreaVisible and dashboardVisibleWidgets['marketing-campaigns']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-primary text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Campañas del mes</span>
+                                            <small>Promociones, contenido y próximas acciones</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div th:if="${dashboardMarketingSnapshot == null or dashboardMarketingSnapshot.campaigns == null or #lists.isEmpty(dashboardMarketingSnapshot.campaigns.campaignRows)}" class="area-widget-empty">
+                                        Todavía no hay campañas armadas para este mes. Usa este bloque para revisar campañas cuando estén cargadas.
+                                    </div>
+                                    <div class="area-widget-timeline" th:if="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null and !#lists.isEmpty(dashboardMarketingSnapshot.campaigns.campaignRows)}">
+                                        <div class="area-widget-timeline-item" th:each="row, stat : ${dashboardMarketingSnapshot.campaigns.campaignRows}" th:if="${stat.index < 4}">
+                                            <span class="area-widget-dot"></span>
+                                            <div>
+                                                <strong th:text="${row.name}">Campaña</strong>
+                                                <small><span th:text="${row.type}">Tipo</span> · <span th:text="${row.status}">Estado</span></small>
+                                                <p th:text="${row.nextAction}">Próxima acción</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-primary w-100" th:href="@{/marketing/admin/campaigns}">Abrir panel de campañas</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="marketing-actions" draggable="false"
+                             th:if="${dashboardMarketingAreaVisible and dashboardVisibleWidgets['marketing-actions']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-dark text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Acciones sugeridas</span>
+                                            <small>Qué revisar hoy</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="area-widget-task-list">
+                                        <th:block th:if="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null and !#lists.isEmpty(dashboardMarketingSnapshot.campaigns.pendingTasks)}">
+                                            <div class="area-widget-task" th:each="task, stat : ${dashboardMarketingSnapshot.campaigns.pendingTasks}" th:if="${stat.index < 4}">
+                                                <span class="badge text-bg-warning" th:text="${task.priority}">Media</span>
+                                                <div>
+                                                    <strong th:text="${task.title}">Tarea</strong>
+                                                    <p th:text="${task.description}">Descripción</p>
+                                                </div>
+                                            </div>
+                                        </th:block>
+                                        <div th:if="${dashboardMarketingSnapshot == null or dashboardMarketingSnapshot.campaigns == null or #lists.isEmpty(dashboardMarketingSnapshot.campaigns.pendingTasks)}">
+                                            <ul class="mb-0 small text-muted">
+                                                <li>Revisar que haya 3 promociones activas del mes.</li>
+                                                <li>Compartir un artículo del blog por WhatsApp o redes.</li>
+                                                <li>Actualizar productos destacados del catálogo.</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-outline-dark w-100" th:href="@{/marketing/admin/campaigns}">Organizar acciones</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="hr-staff" draggable="false"
+                             th:if="${dashboardHrAreaVisible and dashboardVisibleWidgets['hr-staff']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header area-widget-header area-widget-header-hr">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Personal activo</span>
+                                            <small th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.activeEmployeeCount + ' colaborador(es)' : 'Control de personal'}">0 colaborador(es)</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="area-widget-kpi-card mb-3">
+                                        <div>
+                                            <div class="area-widget-label">Colaboradores activos</div>
+                                            <h3 th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.activeEmployeeCount : 0}">0</h3>
+                                        </div>
+                                        <i class="bi bi-people area-widget-kpi-icon"></i>
+                                    </div>
+                                    <div th:if="${dashboardHrSnapshot == null or #lists.isEmpty(dashboardHrSnapshot.recentEmployees)}" class="area-widget-empty">
+                                        Todavía no hay colaboradores activos registrados.
+                                    </div>
+                                    <div class="area-widget-list" th:if="${dashboardHrSnapshot != null and !#lists.isEmpty(dashboardHrSnapshot.recentEmployees)}">
+                                        <div class="area-widget-list-item" th:each="employee, stat : ${dashboardHrSnapshot.recentEmployees}" th:if="${stat.index < 4}">
+                                            <div>
+                                                <strong th:text="${employee.fullName}">Empleado</strong>
+                                                <small th:text="${employee.jobName}">Cargo</small>
+                                            </div>
+                                            <span class="badge text-bg-light" th:text="${employee.contact}">Contacto</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-success w-100" th:href="@{/admin/personnel/payments}">Ver personal</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="hr-obligations" draggable="false"
+                             th:if="${dashboardHrAreaVisible and dashboardVisibleWidgets['hr-obligations']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-danger text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Obligaciones pendientes</span>
+                                            <small>Adelantos, préstamos o pagos internos</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="area-widget-metric-row">
+                                        <div class="area-widget-metric">
+                                            <strong th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.activeObligationCount : 0}">0</strong>
+                                            <span>Activas</span>
+                                        </div>
+                                        <div class="area-widget-metric">
+                                            <strong>S/ <span th:text="${dashboardHrSnapshot != null ? #numbers.formatDecimal(dashboardHrSnapshot.pendingObligationAmount,1,'POINT',2,'POINT') : '0.00'}">0.00</span></strong>
+                                            <span>Pendiente</span>
+                                        </div>
+                                    </div>
+                                    <div class="area-widget-empty mt-3" th:if="${dashboardHrSnapshot == null or dashboardHrSnapshot.activeObligationCount == 0}">
+                                        No hay obligaciones activas registradas por ahora.
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-outline-danger w-100" th:href="@{/admin/personnel/payments}">Revisar pagos</a>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="home-widget-column" data-column="right">
+
+                        <div class="home-widget-card" data-widget-id="marketing-blog" draggable="false"
+                             th:if="${dashboardMarketingAreaVisible and dashboardVisibleWidgets['marketing-blog']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-warning text-dark">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Blog y consejos</span>
+                                            <small th:text="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null ? dashboardMarketingSnapshot.campaigns.publishedPostCount + ' publicado(s), ' + dashboardMarketingSnapshot.campaigns.draftPostCount + ' borrador(es)' : 'Contenido del portal'}">0 publicado(s)</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div th:if="${dashboardMarketingSnapshot == null or dashboardMarketingSnapshot.campaigns == null or #lists.isEmpty(dashboardMarketingSnapshot.campaigns.contentAssets)}" class="area-widget-empty">
+                                        No hay artículos publicados o borradores recientes para mostrar.
+                                    </div>
+                                    <div class="area-widget-list" th:if="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null and !#lists.isEmpty(dashboardMarketingSnapshot.campaigns.contentAssets)}">
+                                        <div class="area-widget-list-item" th:each="asset, stat : ${dashboardMarketingSnapshot.campaigns.contentAssets}" th:if="${stat.index < 4}">
+                                            <div>
+                                                <strong th:text="${asset.title}">Artículo</strong>
+                                                <small th:text="${asset.status}">Publicado</small>
+                                            </div>
+                                            <a class="btn btn-sm btn-outline-warning" th:href="@{/admin/blog}">Ver</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-warning w-100" th:href="@{/admin/blog}">Administrar blog</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="marketing-featured-products" draggable="false"
+                             th:if="${dashboardMarketingAreaVisible and dashboardVisibleWidgets['marketing-featured-products']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-info text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Productos destacados</span>
+                                            <small>Para catálogo, reels y campañas</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div th:if="${dashboardMarketingSnapshot == null or #lists.isEmpty(dashboardMarketingSnapshot.featuredProducts)}" class="area-widget-empty">
+                                        No hay productos destacados. Marca productos como destacados o completa el catálogo.
+                                    </div>
+                                    <div class="area-widget-product-grid" th:if="${dashboardMarketingSnapshot != null and !#lists.isEmpty(dashboardMarketingSnapshot.featuredProducts)}">
+                                        <div class="area-widget-product" th:each="product, stat : ${dashboardMarketingSnapshot.featuredProducts}" th:if="${stat.index < 4}">
+                                            <img th:if="${product.imagePath != null and !#strings.isEmpty(product.imagePath)}" th:src="${product.imagePath}" th:alt="${product.name}">
+                                            <div th:if="${product.imagePath == null or #strings.isEmpty(product.imagePath)}" class="area-widget-product-placeholder"><i class="bi bi-box-seam"></i></div>
+                                            <strong th:text="${product.name}">Producto</strong>
+                                            <small>S/ <span th:text="${product.price != null ? #numbers.formatDecimal(product.price,1,'POINT',2,'POINT') : '0.00'}">0.00</span></small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-info text-white w-100" th:href="@{/admin/products}">Ver productos</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="hr-positions" draggable="false"
+                             th:if="${dashboardHrAreaVisible and dashboardVisibleWidgets['hr-positions']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-primary text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Cargos registrados</span>
+                                            <small th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.activePositionCount + ' activo(s)' : 'Organización interna'}">0 activo(s)</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div th:if="${dashboardHrSnapshot == null or #lists.isEmpty(dashboardHrSnapshot.positionRows)}" class="area-widget-empty">
+                                        No hay cargos activos configurados todavía.
+                                    </div>
+                                    <div class="area-widget-list" th:if="${dashboardHrSnapshot != null and !#lists.isEmpty(dashboardHrSnapshot.positionRows)}">
+                                        <div class="area-widget-list-item" th:each="position, stat : ${dashboardHrSnapshot.positionRows}" th:if="${stat.index < 5}">
+                                            <div>
+                                                <strong th:text="${position.displayName != null and !#strings.isEmpty(position.displayName) ? position.displayName : position.name}">Cargo</strong>
+                                                <small th:text="${position.paymentModeLabel}">Modo de pago</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-primary w-100" th:href="@{/admin/job-positions}">Administrar cargos</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="hr-users" draggable="false"
+                             th:if="${dashboardHrAreaVisible and dashboardVisibleWidgets['hr-users']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-info text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Usuarios activos</span>
+                                            <small>Accesos internos</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="area-widget-metric-row">
+                                        <div class="area-widget-metric">
+                                            <strong th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.activeUserCount : 0}">0</strong>
+                                            <span>Usuarios activos</span>
+                                        </div>
+                                        <div class="area-widget-metric">
+                                            <strong th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.roleCount : 0}">0</strong>
+                                            <span>Roles configurados</span>
+                                        </div>
+                                    </div>
+                                    <p class="small text-muted mt-3 mb-0">Mantén activos solo los usuarios que realmente necesitan acceso.</p>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-info text-white w-100" th:href="@{/admin/users}">Ver usuarios</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="hr-roles" draggable="false"
+                             th:if="${dashboardHrAreaVisible and dashboardVisibleWidgets['hr-roles']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-warning text-dark">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Roles configurados</span>
+                                            <small>Permisos y áreas</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="area-widget-kpi-card">
+                                        <div>
+                                            <div class="area-widget-label">Roles disponibles</div>
+                                            <h3 th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.roleCount : 0}">0</h3>
+                                        </div>
+                                        <i class="bi bi-shield-check area-widget-kpi-icon"></i>
+                                    </div>
+                                    <p class="small text-muted mt-3 mb-0">Los cambios de permisos deben ser revisados por administración.</p>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ROLE_OWNER','admin_config','administra_roles')">
+                                    <a class="btn btn-sm btn-warning w-100" th:href="@{/admin/roles-permissions}">Administrar roles</a>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${dashboardVisibleWidgetCount == 0 and !dashboardAreaRoleDashboardVisible}" class="card border-0 shadow-sm mb-3">
+                <div class="card-body py-4 text-center">
+                    <div class="display-6 text-muted mb-2"><i class="bi bi-grid-1x2"></i></div>
+                    <h2 class="h5 mb-2">No hay bloques visibles para este usuario</h2>
+                    <p class="text-muted mb-3">
+                        El administrador puede activar bloques para este rol desde la pantalla de widgets del inicio.
+                    </p>
+                    <a th:href="@{/admin/dashboard-widgets}"
+                       sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ROLE_OWNER','ROLE_MANAGEMENT','admin_config')"
+                       class="btn btn-outline-primary btn-sm">
+                        Configurar widgets del inicio
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-3" id="homeWidgetBoard" th:if="${dashboardVisibleWidgetCount > 0 and !dashboardAreaRoleDashboardVisible}">
+                <div class="col-lg-7">
+                    <div class="home-widget-column" data-column="left">
+
+
+
+                        <!-- Management widgets -->
+                        <div class="home-widget-card" data-widget-id="management-overview" draggable="false" th:if="${dashboardVisibleWidgets['management-overview']}">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-dark text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Estado del negocio</span><small class="d-block fw-normal">Resumen ejecutivo para gerencia</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div>
+                                <div class="card-body"><p class="small text-muted mb-2">Revisa ventas, gastos, clientes, productos y señales principales del negocio.</p><div class="area-widget-empty">Abre el resumen cuando necesites una vista rápida para tomar decisiones.</div></div>
+                                <div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-dark w-100" th:href="@{/dashboard/business-overview}">Ver estado del negocio</a></div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="management-followup" draggable="false" th:if="${dashboardVisibleWidgets['management-followup']}">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Seguimiento del mes</span><small class="d-block fw-normal">Metas y acciones del período</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div>
+                                <div class="card-body"><p class="small text-muted mb-0">Útil para gerencia, supervisión y auditoría: ventas, gastos, pendientes y avance mensual.</p></div>
+                                <div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-primary w-100" th:href="@{/dashboard/monthly-followup}">Abrir seguimiento</a></div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="management-modules" draggable="false" th:if="${dashboardVisibleWidgets['management-modules']}">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-secondary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Módulos activos</span><small class="d-block fw-normal">Configuración por cliente</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div>
+                                <div class="card-body"><p class="small text-muted mb-0">Controla qué áreas del sistema están activas para este cliente.</p></div>
+                                <div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-secondary w-100" th:href="@{/admin/system-modules}">Administrar módulos</a></div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="management-widget-config" draggable="false" th:if="${dashboardVisibleWidgets['management-widget-config']}">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-warning text-dark"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Widgets por rol</span><small class="d-block fw-normal">Home configurable</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div>
+                                <div class="card-body"><p class="small text-muted mb-0">Define qué bloques ve cada área: marketing, ventas, finanzas, logística, producción y RRHH.</p></div>
+                                <div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-warning w-100" th:href="@{/admin/dashboard-widgets}">Configurar widgets</a></div>
+                            </div>
+                        </div>
+
+                        <!-- Logistics widgets -->
+                        <div class="home-widget-card" data-widget-id="logistics-products" draggable="false" th:if="${dashboardVisibleWidgets['logistics-products']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-info text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Catálogo operativo</span><small class="d-block fw-normal">Productos disponibles</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Revisa productos antes de coordinar entregas, reposición o atención por WhatsApp.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-info text-white w-100" th:href="@{/admin/products}">Ver productos</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="logistics-stock" draggable="false" th:if="${dashboardVisibleWidgets['logistics-stock']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-dark text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Stock de productos</span><small class="d-block fw-normal">Almacén</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><div class="area-widget-empty">Consulta movimientos y disponibilidad antes de confirmar pedidos.</div></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-dark w-100" th:href="@{/warehouse/products-stock}">Ver stock</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="logistics-delivery" draggable="false" th:if="${dashboardVisibleWidgets['logistics-delivery']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-success text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Entregas pendientes</span><small class="d-block fw-normal">Despacho y coordinación</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Revisa pedidos por entregar y coordinación diaria.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-success w-100" th:href="@{/delivery}">Ver entregas</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="logistics-zones" draggable="false" th:if="${dashboardVisibleWidgets['logistics-zones']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Zonas de reparto</span><small class="d-block fw-normal">Cobertura</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Mantén actualizadas las zonas de atención y coordinación de entrega.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-primary w-100" th:href="@{/admin/delivery-zones}">Administrar zonas</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="logistics-suppliers" draggable="false" th:if="${dashboardVisibleWidgets['logistics-suppliers']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-secondary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Proveedores</span><small class="d-block fw-normal">Abastecimiento</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Consulta proveedores para compras, reposición y coordinación operativa.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-secondary w-100" th:href="@{/admin/suppliers}">Ver proveedores</a></div></div>
+                        </div>
+
+                        <!-- Production widgets -->
+                        <div class="home-widget-card" data-widget-id="production-today" draggable="false" th:if="${dashboardVisibleWidgets['production-today']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-success text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Producción del día</span><small class="d-block fw-normal">Solo si el cliente usa producción</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><div class="area-widget-empty">Registra y revisa producción cuando este módulo esté activo.</div></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-success w-100" th:href="@{/production}">Abrir producción</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="production-supplies" draggable="false" th:if="${dashboardVisibleWidgets['production-supplies']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-warning text-dark"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Insumos críticos</span><small class="d-block fw-normal">Materia prima</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Controla insumos y disponibilidad para producción.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-warning w-100" th:href="@{/admin/supplies}">Ver insumos</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="production-supply-stock" draggable="false" th:if="${dashboardVisibleWidgets['production-supply-stock']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-dark text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Stock de insumos</span><small class="d-block fw-normal">Almacén de producción</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><div class="area-widget-empty">Revisa entradas, salidas y saldos de insumos.</div></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-dark w-100" th:href="@{/warehouse/supplies-stock}">Ver stock de insumos</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="production-containers" draggable="false" th:if="${dashboardVisibleWidgets['production-containers']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-info text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Envases retornables</span><small class="d-block fw-normal">Control por cliente</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Controla envases pendientes y movimientos con clientes.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-info text-white w-100" th:href="@{/containers}">Ver envases</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="production-reorder" draggable="false" th:if="${dashboardVisibleWidgets['production-reorder']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Agenda de reposición</span><small class="d-block fw-normal">Recompras y recargas</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Seguimiento de clientes que requieren reposición frecuente.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-primary w-100" th:href="@{/reorder-agenda}">Ver agenda</a></div></div>
+                        </div>
+
+                        <!-- Read-only widgets -->
+                        <div class="home-widget-card" data-widget-id="readonly-summary" draggable="false" th:if="${dashboardVisibleWidgets['readonly-summary']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-dark text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Resumen del negocio</span><small class="d-block fw-normal">Solo lectura</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Puedes revisar información general sin modificar registros.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-dark w-100" th:href="@{/dashboard/business-overview}">Ver resumen</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="readonly-followup" draggable="false" th:if="${dashboardVisibleWidgets['readonly-followup']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Seguimiento mensual</span><small class="d-block fw-normal">Consulta</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Vista de seguimiento sin acciones de edición.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-primary w-100" th:href="@{/dashboard/monthly-followup}">Ver seguimiento</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="readonly-reports" draggable="false" th:if="${dashboardVisibleWidgets['readonly-reports']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-secondary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Reportes disponibles</span><small class="d-block fw-normal">Auditoría</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><div class="area-widget-empty">Los reportes visibles dependen de los permisos asignados a tu rol.</div></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="readonly-modules" draggable="false" th:if="${dashboardVisibleWidgets['readonly-modules']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-info text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Módulos visibles</span><small class="d-block fw-normal">Áreas habilitadas</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Consulta las áreas disponibles para revisión sin editar configuración.</p></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="readonly-actions" draggable="false" th:if="${dashboardVisibleWidgets['readonly-actions']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-warning text-dark"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Acciones permitidas</span><small class="d-block fw-normal">Modo consulta</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><ul class="small text-muted mb-0"><li>Revisar información.</li><li>No registrar ni eliminar datos.</li><li>Solicitar cambios al administrador.</li></ul></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="operations" draggable="false" th:if="${dashboardVisibleWidgets['operations']}">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-success text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div class="d-flex justify-content-between align-items-center flex-grow-1">
+                                            <span>Operaciones</span>
+                                            <small class="fw-normal">Seleccione un item para hacer un pedido</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-collapse-toggle"
+                                                    title="Minimizar / expandir">
+                                                <i class="bi bi-dash-lg"></i>
+                                            </button>
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-drag-handle"
+                                                    title="Mover widget">
+                                                <i class="bi bi-grip-vertical"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-6 col-md-4">
+                                            <a th:href="@{/orders/new}"
+                                               class="btn btn-light w-100 h-100 border d-flex flex-column align-items-center justify-content-center">
+                                                <i class="bi bi-person fs-2 mb-1"></i>
+                                                <span>Item #1</span>
+                                                <small class="text-muted">Nuevo pedido</small>
+                                            </a>
+                                        </div>
+
+                                        <div class="col-6 col-md-4" th:each="i : ${#numbers.sequence(2,6)}">
+                                            <button type="button"
+                                                    class="btn btn-outline-light w-100 h-100 border d-flex flex-column align-items-center justify-content-center"
+                                                    disabled>
+                                                <i class="bi bi-person fs-2 mb-1"></i>
+                                                <span th:text="'Item #' + ${i}">Item</span>
+                                                <small class="text-muted">Próximamente</small>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="possible-orders" draggable="false" th:if="${dashboardVisibleWidgets['possible-orders']}">
+                            <div class="card shadow-sm">
+                                <div class="card-header bg-dark text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div class="d-flex justify-content-between align-items-center flex-grow-1">
+                                            <span>Posibles pedidos</span>
+                                            <small class="fw-normal">Clientes con mayor probabilidad de compra hoy</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-collapse-toggle"
+                                                    title="Minimizar / expandir">
+                                                <i class="bi bi-dash-lg"></i>
+                                            </button>
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-drag-handle"
+                                                    title="Mover widget">
+                                                <i class="bi bi-grip-vertical"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body p-2">
+
+                                    <div th:if="${possibleOrders == null or #lists.isEmpty(possibleOrders)}"
+                                         class="small text-muted">
+                                        No hay sugerencias de compra por ahora. El sistema mostrará aquí a los clientes
+                                        con historial suficiente y mayor probabilidad de volver a comprar hoy.
+                                    </div>
+
+                                    <div th:if="${possibleOrders != null and !#lists.isEmpty(possibleOrders)}">
+                                        <div class="small text-muted mb-2">
+                                            Se consideran clientes activos con historial de compras pagadas o fiadas,
+                                            excluyendo quienes ya tienen pedido registrado hoy.
+                                        </div>
+
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped align-middle mb-0">
+                                                <thead class="table-light">
+                                                <tr>
+                                                    <th>Cliente</th>
+                                                    <th class="text-center">Prob.</th>
+                                                    <th class="text-center">Frecuencia</th>
+                                                    <th class="text-center">Última</th>
+                                                    <th class="text-center">Próx.</th>
+                                                    <th class="text-center">Estado</th>
+                                                    <th class="text-center">Acción</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                <tr th:each="suggestion : ${possibleOrders}">
+                                                    <td>
+                                                        <div class="fw-semibold" th:text="${suggestion.clientName}">Cliente</div>
+                                                        <div class="small text-muted">
+                                                            <span th:text="${suggestion.profileName}">Perfil</span>
+                                                            <span th:if="${suggestion.clientPhone != null and !#strings.isEmpty(suggestion.clientPhone)}">
+                                                                &nbsp;|&nbsp;
+                                                                <span th:text="${suggestion.clientPhone}">999999999</span>
+                                                            </span>
+                                                        </div>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <span class="badge rounded-pill"
+                                                              th:classappend="${
+                                                                    suggestion.probabilityPercent >= 85 ? ' text-bg-danger' :
+                                                                    (suggestion.probabilityPercent >= 70 ? ' text-bg-warning' :
+                                                                    (suggestion.probabilityPercent >= 55 ? ' text-bg-info' : ' text-bg-secondary'))
+                                                              }"
+                                                              th:text="${suggestion.probabilityPercent + '%'}">
+                                                            70%
+                                                        </span>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <div>
+                                                            Cada
+                                                            <strong th:text="${suggestion.averageIntervalDays}">3</strong>
+                                                            días
+                                                        </div>
+                                                        <div class="small text-muted">
+                                                            <span th:text="${suggestion.successfulOrderDays}">4</span>
+                                                            compras
+                                                        </div>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <div th:text="${#temporals.format(suggestion.lastOrderDate, 'dd/MM/yyyy')}">07/03/2026</div>
+                                                        <div class="small text-muted">
+                                                            hace
+                                                            <span th:text="${suggestion.daysSinceLastOrder}">2</span>
+                                                            día(s)
+                                                        </div>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <div th:text="${#temporals.format(suggestion.expectedNextOrderDate, 'dd/MM/yyyy')}">09/03/2026</div>
+                                                        <div class="small"
+                                                             th:classappend="${suggestion.overdueDays > 0} ? ' text-danger' : ' text-muted'">
+                                                            <span th:if="${suggestion.overdueDays > 0}"
+                                                                  th:text="'atrasado ' + ${suggestion.overdueDays} + ' día(s)'">
+                                                                atrasado 1 día
+                                                            </span>
+                                                            <span th:if="${suggestion.overdueDays == 0}">
+                                                                dentro del ciclo esperado
+                                                            </span>
+                                                        </div>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <span class="badge rounded-pill"
+                                                              th:classappend="${
+                                                                    suggestion.statusClass == 'danger' ? ' text-bg-danger' :
+                                                                    (suggestion.statusClass == 'warning' ? ' text-bg-warning text-dark' : ' text-bg-secondary')
+                                                              }"
+                                                              th:text="${suggestion.statusLabel}">
+                                                            Monitorear
+                                                        </span>
+                                                    </td>
+
+                                                    <td class="text-center">
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-success mb-1 js-possible-order-whatsapp"
+                                                                th:attr="data-phone=${suggestion.clientPhone},
+                                                                         data-client-name=${suggestion.clientName},
+                                                                         data-action-label=${suggestion.actionLabel},
+                                                                         data-order-url=@{|/orders/new?clientId=${suggestion.clientId}&redirect=/home|}">
+                                                            <i class="bi bi-whatsapp me-1"></i>
+                                                            <span th:text="${suggestion.actionLabel}">Llamar hoy</span>
+                                                        </button>
+
+                                                        <a th:href="@{|/orders/new?clientId=${suggestion.clientId}&redirect=/home|}"
+                                                           class="btn btn-sm btn-outline-primary mb-1">
+                                                            Crear pedido
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="home-widget-column" data-column="right">
+
+                        <div class="home-widget-card" data-widget-id="sales-today" draggable="false" th:if="${dashboardVisibleWidgets['sales-today']}">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-info text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <span>Ventas del día</span>
+                                        <div class="home-widget-tools">
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-collapse-toggle"
+                                                    title="Minimizar / expandir">
+                                                <i class="bi bi-dash-lg"></i>
+                                            </button>
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-drag-handle"
+                                                    title="Mover widget">
+                                                <i class="bi bi-grip-vertical"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body p-2">
+
+                                    <div th:if="${#lists.isEmpty(paidOrders)}" class="small text-muted">
+                                        No hay ventas del día (pagados).
+                                    </div>
+
+                                    <div th:if="${!#lists.isEmpty(paidOrders)}">
+                                        <div class="d-flex justify-content-between align-items-center mb-2 small">
+                                            <span th:text="'Pedidos pagados: ' + ${#lists.size(paidOrders)}">
+                                                Pedidos pagados: 0
+                                            </span>
+                                            <span>
+                                                Total S/.
+                                                <strong th:text="${#numbers.formatDecimal(totalSalesToday,1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </strong>
+                                            </span>
+                                        </div>
+
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped align-middle mb-0">
+                                                <thead class="table-light">
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Cliente</th>
+                                                    <th class="text-end">Total S/.</th>
+                                                    <th class="text-center">Acciones</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                <tr th:each="order : ${paidOrders}">
+                                                    <td th:text="${order.orderNumber}">1</td>
+                                                    <td th:text="${order.client != null ? order.client.name : 'Sin cliente'}">
+                                                        Cliente
+                                                    </td>
+                                                    <td class="text-end"
+                                                        th:text="${#numbers.formatDecimal(order.totalAmount,1,'POINT',2,'POINT')}">
+                                                        0.00
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <a th:href="@{|/orders/${order.id}?from=/home|}"
+                                                           class="btn btn-outline-primary btn-sm mb-1">
+                                                            Ver
+                                                        </a>
+
+                                                        <form th:action="@{'/orders/' + ${order.id} + '/credit'}"
+                                                              method="post"
+                                                              class="d-inline">
+                                                            <input type="hidden"
+                                                                   th:name="${_csrf.parameterName}"
+                                                                   th:value="${_csrf.token}"/>
+                                                            <input type="hidden" name="redirect" value="/home"/>
+                                                            <button type="submit"
+                                                                    class="btn btn-warning btn-sm mb-1">
+                                                                Fiado
+                                                            </button>
+                                                        </form>
+
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-danger js-cancel-order mb-1"
+                                                                th:data-order-id="${order.id}"
+                                                                th:data-order-number="${order.orderNumber}"
+                                                                data-redirect="/home">
+                                                            Anular
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="weekly-cash-flow" draggable="false" th:if="${dashboardVisibleWidgets['weekly-cash-flow']}">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                    <div class="d-flex justify-content-between align-items-center gap-2 flex-grow-1">
+                                        <span>Flujo de caja semanal</span>
+                                        <small class="fw-normal">
+                                            <span th:text="${#temporals.format(weekStart, 'dd/MM')}">10/03</span>
+                                            -
+                                            <span th:text="${#temporals.format(weekEnd, 'dd/MM')}">16/03</span>
+                                        </small>
+                                    </div>
+                                    <div class="home-widget-tools ms-2">
+                                        <button type="button"
+                                                class="home-widget-tool-button widget-collapse-toggle"
+                                                title="Minimizar / expandir">
+                                            <i class="bi bi-dash-lg"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="home-widget-tool-button widget-drag-handle"
+                                                title="Mover widget">
+                                            <i class="bi bi-grip-vertical"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body p-2">
+
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-4">
+                                            <div class="border rounded p-2 h-100 bg-light">
+                                                <div class="small text-muted">Ingresos</div>
+                                                <div class="fw-semibold"
+                                                     th:text="'S/ ' + ${#numbers.formatDecimal(weeklySalesTotal,1,'POINT',2,'POINT')}">
+                                                    S/ 0.00
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="border rounded p-2 h-100 bg-light">
+                                                <div class="small text-muted">Gastos</div>
+                                                <div class="fw-semibold"
+                                                     th:text="'S/ ' + ${#numbers.formatDecimal(weeklyExpensesTotal,1,'POINT',2,'POINT')}">
+                                                    S/ 0.00
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="border rounded p-2 h-100 bg-light">
+                                                <div class="small text-muted">Neto</div>
+                                                <div class="fw-semibold"
+                                                     th:text="'S/ ' + ${#numbers.formatDecimal(weeklyNetCashFlow,1,'POINT',2,'POINT')}">
+                                                    S/ 0.00
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="small text-muted mb-2">
+                                        Resumen de lunes a domingo. Se actualiza al registrar pedidos pagados y gastos.
+                                    </div>
+
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-striped align-middle mb-0">
+                                            <thead class="table-light">
+                                            <tr>
+                                                <th>Día</th>
+                                                <th class="text-end">Ingresos</th>
+                                                <th class="text-end">Gastos</th>
+                                                <th class="text-end">Neto</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            <tr th:each="row : ${weeklyCashFlowRows}"
+                                                th:classappend="${row['today']} ? 'table-warning' : ''">
+                                                <td>
+                                                    <div class="fw-semibold d-flex align-items-center gap-1">
+                                                        <span th:text="${row['dayLabel']}">Lun</span>
+                                                        <span th:if="${row['today']}" class="badge text-bg-warning text-dark">Hoy</span>
+                                                    </div>
+                                                    <div class="small text-muted"
+                                                         th:text="${#temporals.format(row['date'], 'dd/MM')}">
+                                                        11/03
+                                                    </div>
+                                                </td>
+                                                <td class="text-end"
+                                                    th:text="${#numbers.formatDecimal(row['sales'],1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </td>
+                                                <td class="text-end"
+                                                    th:text="${#numbers.formatDecimal(row['expenses'],1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </td>
+                                                <td class="text-end fw-semibold"
+                                                    th:text="${#numbers.formatDecimal(row['net'],1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </td>
+                                            </tr>
+                                            </tbody>
+                                            <tfoot>
+                                            <tr>
+                                                <th>Total</th>
+                                                <th class="text-end"
+                                                    th:text="${#numbers.formatDecimal(weeklySalesTotal,1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </th>
+                                                <th class="text-end"
+                                                    th:text="${#numbers.formatDecimal(weeklyExpensesTotal,1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </th>
+                                                <th class="text-end"
+                                                    th:text="${#numbers.formatDecimal(weeklyNetCashFlow,1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </th>
+                                            </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+
+                                    <div class="small text-muted mt-2">
+                                        Neto de hoy:
+                                        <strong th:text="'S/ ' + ${#numbers.formatDecimal(todayNetCashFlow,1,'POINT',2,'POINT')}">
+                                            S/ 0.00
+                                        </strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="home-widget-card" data-widget-id="break-even-month" draggable="false" th:if="${dashboardVisibleWidgets['break-even-month']}">
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-grow-1">
+                <span>Punto de equilibrio del mes</span>
+                <small class="fw-normal">
+                    <span th:if="${homeBreakEvenResult != null}"
+                          th:text="${#temporals.format(homeBreakEvenResult.periodStart, 'dd/MM')} + ' - ' + ${#temporals.format(homeBreakEvenResult.periodEnd, 'dd/MM')}">
+                        01/03 - 31/03
+                    </span>
+                    <span th:if="${homeBreakEvenResult == null}">
+                        Mes actual
+                    </span>
+                </small>
+            </div>
+            <div class="home-widget-tools ms-2">
+                <button type="button"
+                        class="home-widget-tool-button widget-collapse-toggle"
+                        title="Minimizar / expandir">
+                    <i class="bi bi-dash-lg"></i>
+                </button>
+                <button type="button"
+                        class="home-widget-tool-button widget-drag-handle"
+                        title="Mover widget">
+                    <i class="bi bi-grip-vertical"></i>
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-2">
+
+            <div th:if="${homeBreakEvenResult == null}" class="small text-muted">
+                No hay un producto activo disponible para calcular el punto de equilibrio.
+            </div>
+
+            <div th:if="${homeBreakEvenResult != null}">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <div class="fw-semibold" th:text="${homeBreakEvenResult.product.name}">
+                            Producto
+                        </div>
+                        <div class="small text-muted">
+                            Escenario principal:
+                            <span th:text="${homeBreakEvenResult.primaryScenarioLabel}">Precio promedio real del período</span>
+                        </div>
+                    </div>
+                    <span class="badge rounded-pill"
+                          th:classappend="${
+                                homeBreakEvenStatusClass == 'success' ? ' text-bg-success' :
+                                (homeBreakEvenStatusClass == 'warning' ? ' text-bg-warning text-dark' :
+                                (homeBreakEvenStatusClass == 'danger' ? ' text-bg-danger' : ' text-bg-secondary'))
+                          }"
+                          th:text="${homeBreakEvenStatusLabel}">
+                        Debajo del equilibrio
+                    </span>
+                </div>
+
+                <div class="row g-2 mb-2">
+                    <div class="col-4">
+                        <div class="border rounded p-2 h-100 bg-light">
+                            <div class="small text-muted">Vendidas</div>
+                            <div class="fw-semibold"
+                                 th:text="${#numbers.formatDecimal(homeBreakEvenResult.unitsSold,1,'POINT',0,'POINT')}">
+                                0
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border rounded p-2 h-100 bg-light">
+                            <div class="small text-muted">Objetivo</div>
+                            <div class="fw-semibold"
+                                 th:text="${#numbers.formatDecimal(homeBreakEvenResult.breakEvenUnitsRounded,1,'POINT',0,'POINT')}">
+                                0
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border rounded p-2 h-100 bg-light">
+                            <div class="small text-muted">Faltan</div>
+                            <div class="fw-semibold"
+                                 th:text="${#numbers.formatDecimal(homeBreakEvenGapUnits,1,'POINT',0,'POINT')}">
+                                0
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center small mb-1">
+                        <span>Avance del equilibrio</span>
+                        <strong th:text="${#numbers.formatDecimal(homeBreakEvenProgressPercent,1,'POINT',2,'POINT')} + '%'">
+                            0.00%
+                        </strong>
+                    </div>
+                    <div class="progress" role="progressbar" aria-label="Avance del punto de equilibrio"
+                         aria-valuemin="0" aria-valuemax="100"
+                         th:attr="aria-valuenow=${homeBreakEvenProgressPercent}">
+                        <div class="progress-bar"
+                             th:classappend="${
+                                homeBreakEvenStatusClass == 'success' ? ' bg-success' :
+                                (homeBreakEvenStatusClass == 'warning' ? ' bg-warning' : ' bg-danger')
+                             }"
+                             th:style="'width:' + ${#numbers.formatDecimal(homeBreakEvenProgressPercent,1,'POINT',2,'POINT')} + '%'">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <tbody>
+                        <tr>
+                            <th>Precio promedio real</th>
+                            <td class="text-end"
+                                th:text="'S/ ' + ${#numbers.formatDecimal(homeBreakEvenResult.actualAverageSellingPrice,1,'POINT',2,'POINT')}">
+                                S/ 0.00
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Margen de contribución</th>
+                            <td class="text-end"
+                                th:text="'S/ ' + ${#numbers.formatDecimal(homeBreakEvenResult.contributionMargin,1,'POINT',4,'POINT')}">
+                                S/ 0.0000
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Costos fijos usados</th>
+                            <td class="text-end"
+                                th:text="'S/ ' + ${#numbers.formatDecimal(homeBreakEvenResult.fixedCosts,1,'POINT',2,'POINT')}">
+                                S/ 0.00
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Margen de seguridad</th>
+                            <td class="text-end"
+                                th:text="${#numbers.formatDecimal(homeBreakEvenResult.safetyMarginPercent,1,'POINT',2,'POINT')} + '%'">
+                                0.00%
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Unidades por día restantes</th>
+                            <td class="text-end"
+                                th:text="${#numbers.formatDecimal(homeBreakEvenUnitsPerRemainingDay,1,'POINT',2,'POINT')}">
+                                0.00
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="small text-muted mt-2">
+                    <span th:if="${homeBreakEvenGapUnits > 0}">
+                        Faltan
+                        <strong th:text="${#numbers.formatDecimal(homeBreakEvenGapUnits,1,'POINT',0,'POINT')}">0</strong>
+                        unidades en
+                        <strong th:text="${homeBreakEvenRemainingDays}">0</strong>
+                        día(s) para cubrir los costos fijos del período.
+                    </span>
+                    <span th:if="${homeBreakEvenGapUnits <= 0}">
+                        Ya cubres el punto de equilibrio del período actual.
+                    </span>
+                </div>
+
+                <div class="mt-2">
+                    <a th:if="${featureBreakEven}" th:href="@{/cashflow/break-even(productId=${homeBreakEvenProductId},year=${homeBreakEvenYear},month=${homeBreakEvenMonth})}"
+                       class="btn btn-sm btn-outline-dark">
+                        <i class="bi bi-graph-up-arrow me-1"></i>
+                        Ver detalle
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+                        <div class="home-widget-card" data-widget-id="expenses-today" draggable="false" th:if="${dashboardVisibleWidgets['expenses-today']}">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                                    <div class="d-flex justify-content-between align-items-center flex-grow-1">
+                                        <span>Gastos del día</span>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-light"
+                                                id="btnOpenDailyExpenseModal"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#dailyExpenseModal">
+                                            <i class="bi bi-plus-circle me-1"></i>
+                                            Agregar
+                                        </button>
+                                    </div>
+                                    <div class="home-widget-tools ms-2">
+                                        <button type="button"
+                                                class="home-widget-tool-button widget-collapse-toggle"
+                                                title="Minimizar / expandir">
+                                            <i class="bi bi-dash-lg"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="home-widget-tool-button widget-drag-handle"
+                                                title="Mover widget">
+                                            <i class="bi bi-grip-vertical"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body p-2">
+
+                                    <div th:if="${dailyExpenses == null or #lists.isEmpty(dailyExpenses)}"
+                                         class="small text-muted">
+                                        No hay gastos en la fecha
+                                        <span th:text="${#temporals.format(today, 'dd/MM/yyyy')}">23/11/2025</span>.
+                                    </div>
+
+                                    <div th:if="${dailyExpenses != null and !#lists.isEmpty(dailyExpenses)}">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm align-middle mb-0">
+                                                <thead class="table-light">
+                                                <tr>
+                                                    <th>Categoría</th>
+                                                    <th>Observación</th>
+                                                    <th class="text-end">S/.</th>
+                                                    <th class="text-center">Acciones</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                <tr th:each="e : ${dailyExpenses}">
+                                                    <td th:text="${e.category != null ? e.category.name : '-'}">Categoría</td>
+                                                    <td th:text="${e.observation} ?: '-'">Observación</td>
+                                                    <td class="text-end"
+                                                        th:text="${#numbers.formatDecimal(e.amount,1,'POINT',2,'POINT')}">
+                                                        0.00
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <a th:if="${expenseDebtSettlementUrlByExpenseId[e.id] != null}"
+                                                           th:href="${expenseDebtSettlementUrlByExpenseId[e.id]}"
+                                                           class="btn btn-outline-info btn-sm mb-1"
+                                                           th:title="${expenseDebtSettlementHelpByExpenseId[e.id]}"
+                                                           aria-label="Abonar deuda más antigua">
+                                                            <i class="bi bi-cash-coin me-1"></i>                                                            
+                                                        </a>
+
+                                                        <button type="button"
+                                                                class="btn btn-outline-primary btn-sm js-edit-expense mb-1"
+                                                                th:data-expense-id="${e.id}">
+                                                            <i class="bi bi-pencil-square"></i>
+                                                        </button>
+
+                                                        <form th:action="@{'/expenses/' + ${e.id} + '/delete'}"
+                                                              method="post"
+                                                              class="d-inline js-delete-expense-form">
+                                                            <input type="hidden"
+                                                                   th:name="${_csrf.parameterName}"
+                                                                   th:value="${_csrf.token}"/>
+                                                            <input type="hidden" name="redirect" value="/home"/>
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm mb-1">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                                </tbody>
+                                                <tfoot>
+                                                <tr>
+                                                    <th colspan="2" class="text-end">TOTAL</th>
+                                                    <th class="text-end"
+                                                        th:text="${#numbers.formatDecimal(totalExpensesToday,1,'POINT',2,'POINT')}">
+                                                        0.00
+                                                    </th>
+                                                    <th></th>
+                                                </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="credit-orders" draggable="false" th:if="${dashboardVisibleWidgets['credit-orders']}">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-danger text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <span>Pedidos fiados</span>
+                                        <div class="home-widget-tools">
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-collapse-toggle"
+                                                    title="Minimizar / expandir">
+                                                <i class="bi bi-dash-lg"></i>
+                                            </button>
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-drag-handle"
+                                                    title="Mover widget">
+                                                <i class="bi bi-grip-vertical"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body p-2">
+
+                                    <div th:if="${#lists.isEmpty(creditOrders)}" class="small text-muted">
+                                        No hay pedidos fiados pendientes.
+                                    </div>
+
+                                    <div th:if="${!#lists.isEmpty(creditOrders)}">
+                                        <div class="d-flex justify-content-between align-items-center mb-2 small">
+                                            <span th:text="'Pendientes por cobrar: ' + ${#lists.size(creditOrders)}">
+                                                Pendientes por cobrar: 0
+                                            </span>
+                                            <span>
+                                                Total S/.
+                                                <strong th:text="${#numbers.formatDecimal(totalCreditAmount,1,'POINT',2,'POINT')}">
+                                                    0.00
+                                                </strong>
+                                            </span>
+                                        </div>
+
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped align-middle mb-0">
+                                                <thead class="table-light">
+                                                <tr>
+                                                    <th>Cliente</th>
+                                                    <th class="text-center">Días</th>
+                                                    <th class="text-end">Total S/.</th>
+                                                    <th class="text-center">Acciones</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                <tr th:each="order : ${creditOrders}">
+                                                    <td>
+                                                        <div th:text="${order.client != null ? order.client.name : 'Sin cliente'}">Cliente</div>
+                                                        <small class="text-muted">
+                                                            Desde
+                                                            <span th:text="${#temporals.format(order.orderDate,'dd/MM/yyyy')}">07/03/2026</span>
+                                                        </small>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <span th:text="${creditDaysByOrderId[order.id]}">0</span>
+                                                    </td>
+                                                    <td class="text-end"
+                                                        th:text="${#numbers.formatDecimal(order.totalAmount,1,'POINT',2,'POINT')}">
+                                                        0.00
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <a th:href="@{|/orders/${order.id}?from=/home|}"
+                                                           class="btn btn-outline-primary btn-sm mb-1">
+                                                            Ver
+                                                        </a>
+
+                                                        <form th:action="@{'/orders/' + ${order.id} + '/pay'}"
+                                                              method="post"
+                                                              class="d-inline">
+                                                            <input type="hidden"
+                                                                   th:name="${_csrf.parameterName}"
+                                                                   th:value="${_csrf.token}"/>
+                                                            <input type="hidden" name="redirect" value="/home"/>
+                                                            <button type="submit"
+                                                                    class="btn btn-success btn-sm mb-1">
+                                                                Pagar
+                                                            </button>
+                                                        </form>
+
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-danger js-cancel-order mb-1"
+                                                                th:data-order-id="${order.id}"
+                                                                th:data-order-number="${order.orderNumber}"
+                                                                data-redirect="/home">
+                                                            Anular
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="requested-orders" draggable="false" th:if="${dashboardVisibleWidgets['requested-orders']}">
+                            <div class="card shadow-sm">
+                                <div class="card-header bg-warning text-dark">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <span>Pedidos del día (x entregar)</span>
+                                        <div class="home-widget-tools">
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-collapse-toggle"
+                                                    title="Minimizar / expandir">
+                                                <i class="bi bi-dash-lg"></i>
+                                            </button>
+                                            <button type="button"
+                                                    class="home-widget-tool-button widget-drag-handle"
+                                                    title="Mover widget">
+                                                <i class="bi bi-grip-vertical"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body p-2">
+
+                                    <div th:if="${#lists.isEmpty(requestedOrders)}" class="small text-muted">
+                                        No hay pedidos por entregar.
+                                    </div>
+
+                                    <div th:if="${!#lists.isEmpty(requestedOrders)}">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped align-middle mb-0">
+                                                <thead class="table-light">
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Cliente</th>
+                                                    <th class="text-end">Total S/.</th>
+                                                    <th class="text-center">Acciones</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                <tr th:each="order : ${requestedOrders}">
+                                                    <td th:text="${order.orderNumber}">1</td>
+                                                    <td th:text="${order.client != null ? order.client.name : 'Sin cliente'}">
+                                                        Cliente
+                                                    </td>
+                                                    <td class="text-end"
+                                                        th:text="${#numbers.formatDecimal(order.totalAmount,1,'POINT',2,'POINT')}">
+                                                        0.00
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <a th:href="@{|/orders/${order.id}?from=/home|}"
+                                                           class="btn btn-outline-primary btn-sm mb-1">
+                                                            Ver
+                                                        </a>
+
+                                                        <form th:action="@{'/orders/' + ${order.id} + '/pay'}"
+                                                              method="post"
+                                                              class="d-inline">
+                                                            <input type="hidden"
+                                                                   th:name="${_csrf.parameterName}"
+                                                                   th:value="${_csrf.token}"/>
+                                                            <input type="hidden" name="redirect" value="/home"/>
+                                                            <button type="submit"
+                                                                    class="btn btn-success btn-sm mb-1">
+                                                                Pagar
+                                                            </button>
+                                                        </form>
+
+                                                        <form th:action="@{'/orders/' + ${order.id} + '/credit'}"
+                                                              method="post"
+                                                              class="d-inline">
+                                                            <input type="hidden"
+                                                                   th:name="${_csrf.parameterName}"
+                                                                   th:value="${_csrf.token}"/>
+                                                            <input type="hidden" name="redirect" value="/home"/>
+                                                            <button type="submit"
+                                                                    class="btn btn-warning btn-sm mb-1">
+                                                                Fiado
+                                                            </button>
+                                                        </form>
+
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-danger js-cancel-order mb-1"
+                                                                th:data-order-id="${order.id}"
+                                                                th:data-order-number="${order.orderNumber}"
+                                                                data-redirect="/home">
+                                                            Anular
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<form id="cancelOrderForm" method="post">
+    <input type="hidden"
+           th:name="${_csrf.parameterName}"
+           th:value="${_csrf.token}"/>
+    <input type="hidden" name="reason" id="cancelReasonInput">
+    <input type="hidden" name="returnToStock" id="cancelReturnToStockInput">
+    <input type="hidden" name="redirect" id="cancelOrderRedirectInput">
+</form>
+
+<div class="modal fade" id="dailyExpenseModal" tabindex="-1"
+     aria-labelledby="dailyExpenseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="dailyExpenseForm"
+                  th:action="@{/expenses/save-simple}"
+                  method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="dailyExpenseModalLabel">Agregar gasto del día</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                            aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+
+                    <input type="hidden"
+                           th:name="${_csrf.parameterName}"
+                           th:value="${_csrf.token}"/>
+
+                    <input type="hidden" name="redirect" value="HOME"/>
+
+                    <div class="mb-3">
+                        <label class="form-label">Categoría</label>
+                        <select class="form-select"
+                                name="categoryId"
+                                id="dailyExpenseCategory"
+                                required>
+                            <option value="">- Seleccione -</option>
+                            <option th:each="cat : ${expenseCategories}"
+                                    th:value="${cat.id}"
+                                    th:text="${cat.name}">
+                            </option>
+                        </select>
+                        <small class="text-muted d-block mt-2" id="dailyExpenseContextHint">
+                            Selecciona una categoría para continuar.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="dailyExpenseSupplyGroup">
+                        <label class="form-label">Insumo</label>
+                        <select class="form-select" name="supplyId" id="dailyExpenseSupplyId">
+                            <option value="">- Seleccione -</option>
+                            <option th:each="supply : ${supplies}"
+                                    th:value="${supply.id}"
+                                    th:text="${supply.name}"
+                                    th:data-group="${supply.groupLabel}">
+                            </option>
+                        </select>
+                        <small class="text-muted d-block mt-2">
+                            Selecciona el insumo registrado relacionado con este gasto.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="dailyExpenseSupplierSelectGroup">
+                        <label class="form-label">Proveedor relacionado</label>
+                        <select class="form-select" name="supplierId" id="dailyExpenseSupplierId">
+                            <option value="">- Sin proveedor específico -</option>
+                            <option th:each="sup : ${suppliers}"
+                                    th:value="${sup.id}"
+                                    th:text="${sup.name}"
+                                    th:data-category="${sup.category != null ? sup.category.name : ''}">
+                            </option>
+                        </select>
+                        <small class="text-muted d-block mt-2" id="dailyExpenseSupplierHelp">
+                            Selecciona un proveedor si aplica para este gasto.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="dailyExpenseManualSupplierGroup">
+                        <label class="form-label">Referencia adicional</label>
+                        <input type="text"
+                               class="form-control"
+                               name="manualSupplierName"
+                               id="dailyExpenseManualSupplierName"
+                               placeholder="Ej: cochera, grifo eventual, servicio puntual, etc.">
+                        <small class="text-muted d-block mt-2">
+                            Usa este campo si no aplica un proveedor fijo o quieres dejar una referencia rápida.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="dailyExpenseEmployeeGroup">
+                        <label class="form-label">Personal</label>
+                        <select class="form-select" name="employeeId" id="dailyExpenseEmployeeId">
+                            <option value="">- Seleccione -</option>
+                            <option th:each="emp : ${employees}"
+                                    th:value="${emp.id}"
+                                    th:text="${(emp.firstName != null ? emp.firstName : '') + (emp.lastName != null ? ' ' + emp.lastName : '')}"
+                                    th:data-position="${emp.jobPosition != null ? emp.jobPosition.name : ''}">
+                            </option>
+                        </select>
+                        <small class="text-muted d-block mt-2" id="dailyExpenseEmployeeHelp">
+                            Selecciona el personal activo relacionado con este gasto.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="dailyExpenseEmployeePaymentTypeGroup">
+                        <label class="form-label">Tipo de pago</label>
+                        <select class="form-select" name="employeePaymentType" id="dailyExpenseEmployeePaymentType">
+                            <option value="">- Seleccione -</option>
+                            <option value="SALARY">Salario</option>
+                            <option value="ADVANCE">Adelanto</option>
+                            <option value="DISCOUNT">Descuento</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Costo S/.</label>
+                        <input type="number"
+                               name="amount"
+                               id="dailyExpenseAmount"
+                               class="form-control"
+                               min="0"
+                               step="0.01"
+                               required>
+                        <small class="text-muted d-block mt-2" id="dailyExpenseAmountHint">
+                            Ingresa el costo manualmente o deja que el sistema lo sugiera para pagos de personal.
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Observación</label>
+                        <textarea class="form-control"
+                                  name="observation"
+                                  id="dailyExpenseObservation"
+                                  rows="2"
+                                  placeholder="Ej: gasolina, mantenimiento, servicio, etc."></textarea>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label">Fecha</label>
+                        <input type="date"
+                               class="form-control"
+                               name="expenseDate"
+                               id="dailyExpenseDate"
+                               th:value="${today}">
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                            class="btn btn-primary">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editExpenseModal" tabindex="-1"
+     aria-labelledby="editExpenseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="editExpenseForm" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editExpenseModalLabel">Editar gasto del día</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <input type="hidden" name="redirect" value="/home"/>
+
+                    <div class="mb-3">
+                        <label class="form-label">Categoría</label>
+                        <select class="form-select" name="categoryId" id="editExpenseCategory" required>
+                            <option value="">- Seleccione -</option>
+                            <option th:each="cat : ${expenseCategories}"
+                                    th:value="${cat.id}"
+                                    th:text="${cat.name}">
+                            </option>
+                        </select>
+                        <small class="text-muted d-block mt-2" id="editExpenseContextHint">
+                            En edición rápida puedes corregir el monto manualmente y, si es gasto de personal, recalcular el costo sugerido.
+                        </small>
+                    </div>
+
+                    <div class="mb-3 d-none" id="editExpenseEmployeeGroup">
+                        <label class="form-label">Personal (solo para recalcular)</label>
+                        <select class="form-select" id="editExpenseEmployeeId">
+                            <option value="">- Seleccione -</option>
+                            <option th:each="emp : ${employees}"
+                                    th:value="${emp.id}"
+                                    th:text="${(emp.firstName != null ? emp.firstName : '') + (emp.lastName != null ? ' ' + emp.lastName : '')}"
+                                    th:data-position="${emp.jobPosition != null ? emp.jobPosition.name : ''}">
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 d-none" id="editExpenseEmployeePaymentTypeGroup">
+                        <label class="form-label">Tipo de pago (solo para recalcular)</label>
+                        <select class="form-select" id="editExpenseEmployeePaymentType">
+                            <option value="">- Seleccione -</option>
+                            <option value="SALARY">Salario</option>
+                            <option value="ADVANCE">Adelanto</option>
+                            <option value="DISCOUNT">Descuento</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Costo S/.</label>
+                        <input type="number" class="form-control" name="amount" id="editExpenseAmount"
+                               min="0" step="0.01" required>
+                        <small class="text-muted d-block mt-2" id="editExpenseAmountHint">
+                            Puedes editar este monto manualmente.
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Observación</label>
+                        <textarea class="form-control" name="observation" id="editExpenseObservation"
+                                  rows="3" placeholder="Detalle del gasto"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Fecha</label>
+                        <input type="date" class="form-control" name="expenseDate" id="editExpenseDate" required>
+                    </div>
+
+                    <div class="mb-0 d-none" id="editExpenseRecalculateGroup">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="editExpenseRecalculateButton">
+                            <i class="bi bi-arrow-repeat me-1"></i>
+                            Recalcular costo
+                        </button>
+                        <small class="text-muted d-block mt-2">
+                            Este botón solo recalcula el monto sugerido usando la configuración actual del trabajador y las ventas pagadas de la fecha seleccionada.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        Guardar cambios
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cancelOrderModal" tabindex="-1"
+     aria-labelledby="cancelOrderModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cancelOrderModalLabel">Anular pedido</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                        aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">
+                    Estás a punto de anular el pedido
+                    <strong id="cancelOrderNumberLabel">#</strong>.
+                </p>
+                <div class="mb-3">
+                    <label for="cancelReason" class="form-label">Motivo de la anulación</label>
+                    <textarea id="cancelReason"
+                              class="form-control"
+                              rows="3"
+                              placeholder="Ej: Cliente no se encontró en domicilio, rechazó el pedido, etc."></textarea>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           id="cancelReturnToStock"
+                           checked>
+                    <label class="form-check-label" for="cancelReturnToStock">
+                        Devolver productos al almacén
+                    </label>
+                </div>
+                <small class="text-muted d-block mt-2">
+                    Si desmarcas esta opción, el stock no se reintegrará (ej: pérdida, daño, consumo interno).
+                </small>
+            </div>
+            <div class="modal-footer">
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        data-bs-dismiss="modal">
+                    Cerrar
+                </button>
+                <button type="button"
+                        class="btn btn-danger"
+                        id="confirmCancelOrder">
+                    Anular pedido
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        const WIDGET_STORAGE_KEY = 'ecoagua-home-widget-layout-v1';
+
+        function normalizeLookupText(value) {
+            return (value || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .trim();
+        }
+
+        function resolveExpenseContextByText(categoryText) {
+            const normalized = normalizeLookupText(categoryText);
+
+            if (!normalized) {
+                return 'NONE';
+            }
+
+            if (normalized.includes('insumo')) {
+                return 'SUPPLY';
+            }
+
+            if (
+                normalized.includes('personal') ||
+                normalized.includes('repartidor') ||
+                normalized.includes('llenador') ||
+                normalized.includes('lavador')
+            ) {
+                return 'PERSONNEL';
+            }
+
+            return 'SUPPLIER';
+        }
+
+        function parseMoney(value) {
+            const numberValue = Number(value || 0);
+            if (!Number.isFinite(numberValue)) {
+                return 0;
+            }
+
+            return Math.round(numberValue * 100) / 100;
+        }
+
+        function formatMoney(value) {
+            return parseMoney(value).toFixed(2);
+        }
+
+        function normalizePhoneForWhatsapp(phone) {
+            const digits = String(phone || '').replace(/\D/g, '');
+            if (digits.length < 9) {
+                return '';
+            }
+
+            if (digits.startsWith('51')) {
+                return digits;
+            }
+
+            return '51' + digits;
+        }
+
+        function buildPossibleOrderMessage(clientName, actionLabel) {
+            const safeClientName = (clientName || 'cliente').trim();
+            const normalizedAction = normalizeLookupText(actionLabel);
+
+            if (normalizedAction.includes('llamar hoy')) {
+                return 'Hola ' + safeClientName + ', te escribimos de Eco Agua. Queríamos consultar si hoy necesitas tu pedido de agua.';
+            }
+
+            if (normalizedAction.includes('record')) {
+                return 'Hola ' + safeClientName + ', te escribimos de Eco Agua para recordarte que estamos atentos si deseas realizar tu pedido de agua.';
+            }
+
+            if (normalizedAction.includes('contactar')) {
+                return 'Hola ' + safeClientName + ', te escribimos de Eco Agua. Estamos atentos por si hoy deseas tu pedido de agua.';
+            }
+
+            return 'Hola ' + safeClientName + ', te escribimos de Eco Agua. Estamos atentos por si deseas realizar tu pedido de agua.';
+        }
+
+        const cancelButtons = document.querySelectorAll('.js-cancel-order');
+        const cancelOrderForm = document.getElementById('cancelOrderForm');
+        const cancelReasonInput = document.getElementById('cancelReasonInput');
+        const cancelReturnToStockInput = document.getElementById('cancelReturnToStockInput');
+        const cancelOrderRedirectInput = document.getElementById('cancelOrderRedirectInput');
+        const cancelReason = document.getElementById('cancelReason');
+        const cancelReturnToStock = document.getElementById('cancelReturnToStock');
+        const cancelOrderNumberLabel = document.getElementById('cancelOrderNumberLabel');
+        const cancelModalEl = document.getElementById('cancelOrderModal');
+        let cancelModal = null;
+
+        if (cancelModalEl && typeof bootstrap !== 'undefined') {
+            cancelModal = new bootstrap.Modal(cancelModalEl);
+        }
+
+        let currentCancelOrderId = null;
+
+        cancelButtons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                currentCancelOrderId = this.getAttribute('data-order-id');
+                const orderNumber = this.getAttribute('data-order-number') || '';
+                const redirectTarget = this.getAttribute('data-redirect') || '/home';
+
+                if (cancelOrderNumberLabel) {
+                    cancelOrderNumberLabel.textContent = orderNumber;
+                }
+
+                if (cancelReason) {
+                    cancelReason.value = '';
+                }
+
+                if (cancelReturnToStock) {
+                    cancelReturnToStock.checked = true;
+                }
+
+                if (cancelOrderRedirectInput) {
+                    cancelOrderRedirectInput.value = redirectTarget;
+                }
+
+                if (cancelModal) {
+                    cancelModal.show();
+                }
+            });
+        });
+
+        const confirmCancelOrderBtn = document.getElementById('confirmCancelOrder');
+        if (confirmCancelOrderBtn) {
+            confirmCancelOrderBtn.addEventListener('click', function () {
+                if (!currentCancelOrderId || !cancelOrderForm) {
+                    return;
+                }
+
+                const action = '/orders/' + currentCancelOrderId + '/cancel';
+                cancelOrderForm.setAttribute('action', action);
+
+                cancelReasonInput.value = cancelReason ? cancelReason.value : '';
+                cancelReturnToStockInput.value =
+                    (cancelReturnToStock && cancelReturnToStock.checked) ? 'true' : 'false';
+
+                cancelOrderForm.submit();
+            });
+        }
+
+        document.querySelectorAll('.js-possible-order-whatsapp').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const phone = normalizePhoneForWhatsapp(this.getAttribute('data-phone'));
+                const clientName = this.getAttribute('data-client-name') || 'cliente';
+                const actionLabel = this.getAttribute('data-action-label') || '';
+                const orderUrl = this.getAttribute('data-order-url') || '/orders/new';
+
+                if (!phone) {
+                    window.location.href = orderUrl;
+                    return;
+                }
+
+                const message = buildPossibleOrderMessage(clientName, actionLabel);
+                const whatsappUrl = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
+                window.open(whatsappUrl, '_blank', 'noopener');
+            });
+        });
+
+        const addExpenseButton = document.getElementById('btnOpenDailyExpenseModal');
+        const dailyExpenseForm = document.getElementById('dailyExpenseForm');
+        const dailyExpenseModalTitle = document.getElementById('dailyExpenseModalLabel');
+        const editExpenseModalEl = document.getElementById('editExpenseModal');
+        const editExpenseForm = document.getElementById('editExpenseForm');
+        const editExpenseCategory = document.getElementById('editExpenseCategory');
+        const editExpenseAmount = document.getElementById('editExpenseAmount');
+        const editExpenseObservation = document.getElementById('editExpenseObservation');
+        const editExpenseDate = document.getElementById('editExpenseDate');
+        const editExpenseButtons = document.querySelectorAll('.js-edit-expense');
+        const deleteExpenseForms = document.querySelectorAll('.js-delete-expense-form');
+        const editExpenseContextHint = document.getElementById('editExpenseContextHint');
+        const editExpenseEmployeeGroup = document.getElementById('editExpenseEmployeeGroup');
+        const editExpenseEmployeeId = document.getElementById('editExpenseEmployeeId');
+        const editExpenseEmployeePaymentTypeGroup = document.getElementById('editExpenseEmployeePaymentTypeGroup');
+        const editExpenseEmployeePaymentType = document.getElementById('editExpenseEmployeePaymentType');
+        const editExpenseAmountHint = document.getElementById('editExpenseAmountHint');
+        const editExpenseRecalculateGroup = document.getElementById('editExpenseRecalculateGroup');
+        const editExpenseRecalculateButton = document.getElementById('editExpenseRecalculateButton');
+
+        let editExpenseModal = null;
+
+        if (editExpenseModalEl && typeof bootstrap !== 'undefined') {
+            editExpenseModal = new bootstrap.Modal(editExpenseModalEl);
+        }
+
+        function setEditAmountHint(message, type) {
+            if (!editExpenseAmountHint) {
+                return;
+            }
+
+            editExpenseAmountHint.textContent = message || '';
+            editExpenseAmountHint.classList.remove('text-muted', 'text-danger', 'text-success');
+
+            if (type === 'error') {
+                editExpenseAmountHint.classList.add('text-danger');
+                return;
+            }
+
+            if (type === 'success') {
+                editExpenseAmountHint.classList.add('text-success');
+                return;
+            }
+
+            editExpenseAmountHint.classList.add('text-muted');
+        }
+
+        function guessEditEmployeeIdFromObservation(observation) {
+            if (!editExpenseEmployeeId) {
+                return '';
+            }
+
+            const normalizedObservation = normalizeLookupText(observation);
+            if (!normalizedObservation) {
+                return '';
+            }
+
+            const options = Array.from(editExpenseEmployeeId.options).filter(function (option) {
+                return option.value;
+            });
+
+            for (const option of options) {
+                const label = normalizeLookupText(option.textContent);
+                if (label && normalizedObservation.includes(label)) {
+                    return option.value;
+                }
+            }
+
+            return '';
+        }
+
+        function guessEditPaymentTypeFromObservation(observation) {
+            const normalizedObservation = normalizeLookupText(observation);
+
+            if (normalizedObservation.includes('adelanto')) {
+                return 'ADVANCE';
+            }
+
+            if (normalizedObservation.includes('descuento')) {
+                return 'DISCOUNT';
+            }
+
+            return 'SALARY';
+        }
+
+        function updateEditExpenseUi() {
+            if (!editExpenseCategory) {
+                return;
+            }
+
+            const selectedOption = editExpenseCategory.options[editExpenseCategory.selectedIndex];
+            const categoryText = selectedOption ? selectedOption.text : '';
+            const context = resolveExpenseContextByText(categoryText);
+            const isPersonnel = context === 'PERSONNEL';
+
+            if (editExpenseContextHint) {
+                if (isPersonnel) {
+                    editExpenseContextHint.textContent = 'Esta categoría parece de personal. Puedes recalcular el costo sugerido antes de guardar.';
+                } else {
+                    editExpenseContextHint.textContent = 'En edición rápida puedes corregir el monto manualmente y, si es gasto de personal, recalcular el costo sugerido.';
+                }
+            }
+
+            if (editExpenseEmployeeGroup) {
+                editExpenseEmployeeGroup.classList.toggle('d-none', !isPersonnel);
+            }
+
+            if (editExpenseEmployeePaymentTypeGroup) {
+                editExpenseEmployeePaymentTypeGroup.classList.toggle('d-none', !isPersonnel);
+            }
+
+            if (editExpenseRecalculateGroup) {
+                editExpenseRecalculateGroup.classList.toggle('d-none', !isPersonnel);
+            }
+
+            if (!isPersonnel) {
+                if (editExpenseEmployeeId) {
+                    editExpenseEmployeeId.value = '';
+                }
+                if (editExpenseEmployeePaymentType) {
+                    editExpenseEmployeePaymentType.value = '';
+                }
+                setEditAmountHint('Puedes editar este monto manualmente.', 'muted');
+                return;
+            }
+
+            if (!editExpenseEmployeeId || !editExpenseEmployeeId.value) {
+                setEditAmountHint('Selecciona el trabajador para poder recalcular el costo.', 'muted');
+                return;
+            }
+
+            if (!editExpenseEmployeePaymentType || !editExpenseEmployeePaymentType.value) {
+                setEditAmountHint('Selecciona el tipo de pago para recalcular el costo.', 'muted');
+                return;
+            }
+
+            if (editExpenseEmployeePaymentType.value !== 'SALARY') {
+                setEditAmountHint('Para adelantos o descuentos el monto sigue siendo manual.', 'muted');
+                return;
+            }
+
+            setEditAmountHint('Pulsa "Recalcular costo" para obtener el monto sugerido según ventas pagadas del día.', 'muted');
+        }
+
+        async function recalculateEditPersonnelExpense() {
+            if (!editExpenseEmployeeId || !editExpenseEmployeePaymentType || !editExpenseDate) {
+                return;
+            }
+
+            const employeeId = editExpenseEmployeeId.value;
+            const paymentType = editExpenseEmployeePaymentType.value;
+            const expenseDate = editExpenseDate.value;
+
+            if (!employeeId) {
+                setEditAmountHint('Selecciona el trabajador para recalcular el costo.', 'error');
+                return;
+            }
+
+            if (!paymentType) {
+                setEditAmountHint('Selecciona el tipo de pago para recalcular el costo.', 'error');
+                return;
+            }
+
+            if (paymentType !== 'SALARY') {
+                setEditAmountHint('Para adelantos o descuentos el monto se mantiene manual.', 'muted');
+                return;
+            }
+
+            if (!expenseDate) {
+                setEditAmountHint('Selecciona la fecha para recalcular el costo.', 'error');
+                return;
+            }
+
+            setEditAmountHint('Calculando costo sugerido...', 'muted');
+            editExpenseRecalculateButton.disabled = true;
+
+            try {
+                const url = new URL('/expenses/personnel-preview', window.location.origin);
+                url.searchParams.set('employeeId', employeeId);
+                url.searchParams.set('paymentType', paymentType);
+                url.searchParams.set('expenseDate', expenseDate);
+
+                const response = await fetch(url.toString(), {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Could not calculate personnel expense preview.');
+                }
+
+                const preview = await response.json();
+
+                if (!preview || !preview.autoFilled) {
+                    setEditAmountHint(
+                        preview && preview.message
+                            ? preview.message
+                            : 'No se pudo calcular automáticamente el costo.',
+                        'error'
+                    );
+                    return;
+                }
+
+                editExpenseAmount.value = formatMoney(preview.suggestedAmount);
+
+                const totalSales = formatMoney(preview.totalSales);
+                const fixedComponent = formatMoney(preview.fixedComponent);
+                const commissionComponent = formatMoney(preview.commissionComponent);
+                const commissionRate = formatMoney(preview.commissionRate);
+
+                let detailMessage = 'Costo sugerido actualizado: S/ ' + formatMoney(preview.suggestedAmount);
+
+                if (preview.paymentMode === 'COMMISSION') {
+                    detailMessage += ' = ' + commissionRate + '% de ventas pagadas del día (S/ ' + totalSales + ').';
+                } else if (preview.paymentMode === 'MIXED') {
+                    detailMessage += ' = fijo S/ ' + fixedComponent + ' + comisión S/ ' + commissionComponent +
+                        ' sobre ventas del día (S/ ' + totalSales + ').';
+                } else {
+                    detailMessage += ' = monto fijo diario según el cargo.';
+                }
+
+                setEditAmountHint(detailMessage, 'success');
+            } catch (error) {
+                setEditAmountHint(
+                    'No se pudo calcular automáticamente el costo. Puedes ingresar el monto manualmente.',
+                    'error'
+                );
+            } finally {
+                editExpenseRecalculateButton.disabled = false;
+            }
+        }
+
+        function resetCreateExpenseForm() {
+            if (!dailyExpenseForm) {
+                return;
+            }
+
+            dailyExpenseForm.reset();
+            dailyExpenseForm.setAttribute('action', '/expenses/save-simple');
+
+            const redirectInput = dailyExpenseForm.querySelector('input[name="redirect"]');
+            if (redirectInput) {
+                redirectInput.value = 'HOME';
+            }
+
+            if (dailyExpenseModalTitle) {
+                dailyExpenseModalTitle.textContent = 'Agregar gasto del día';
+            }
+
+            const categoryField = document.getElementById('dailyExpenseCategory');
+            if (categoryField) {
+                categoryField.dispatchEvent(new Event('change'));
+            }
+        }
+
+        async function fetchExpenseData(expenseId) {
+            const response = await fetch('/expenses/' + expenseId, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Could not load expense data.');
+            }
+
+            return response.json();
+        }
+
+        async function openEditExpenseModal(expenseId) {
+            const expense = await fetchExpenseData(expenseId);
+
+            if (!editExpenseForm || !editExpenseModal) {
+                return;
+            }
+
+            editExpenseForm.setAttribute('action', '/expenses/' + expense.id + '/update');
+            editExpenseCategory.value = expense.categoryId != null ? String(expense.categoryId) : '';
+            editExpenseAmount.value = expense.amount != null ? expense.amount : '';
+            editExpenseObservation.value = expense.observation != null ? expense.observation : '';
+            editExpenseDate.value = expense.expenseDate != null ? expense.expenseDate : '';
+
+            if (editExpenseEmployeeId) {
+                editExpenseEmployeeId.value = guessEditEmployeeIdFromObservation(expense.observation);
+            }
+
+            if (editExpenseEmployeePaymentType) {
+                editExpenseEmployeePaymentType.value = guessEditPaymentTypeFromObservation(expense.observation);
+            }
+
+            updateEditExpenseUi();
+            editExpenseModal.show();
+        }
+
+        if (addExpenseButton) {
+            addExpenseButton.addEventListener('click', function () {
+                resetCreateExpenseForm();
+            });
+        }
+
+        editExpenseButtons.forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                const expenseId = this.getAttribute('data-expense-id');
+                if (!expenseId) {
+                    return;
+                }
+
+                try {
+                    await openEditExpenseModal(expenseId);
+                } catch (error) {
+                    if (window.Swal) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'No se pudo cargar el gasto',
+                            text: 'Ocurrió un problema al obtener los datos para edición.'
+                        });
+                    } else {
+                        alert('No se pudo cargar el gasto.');
+                    }
+                }
+            });
+        });
+
+        if (editExpenseCategory) {
+            editExpenseCategory.addEventListener('change', updateEditExpenseUi);
+        }
+
+        if (editExpenseEmployeeId) {
+            editExpenseEmployeeId.addEventListener('change', updateEditExpenseUi);
+        }
+
+        if (editExpenseEmployeePaymentType) {
+            editExpenseEmployeePaymentType.addEventListener('change', updateEditExpenseUi);
+        }
+
+        if (editExpenseDate) {
+            editExpenseDate.addEventListener('change', updateEditExpenseUi);
+        }
+
+        if (editExpenseRecalculateButton) {
+            editExpenseRecalculateButton.addEventListener('click', recalculateEditPersonnelExpense);
+        }
+
+        deleteExpenseForms.forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                const confirmed = window.confirm('¿Seguro que deseas eliminar este gasto?');
+                if (!confirmed) {
+                    event.preventDefault();
+                }
+            });
+        });
+
+        function initExpenseContextForm(config) {
+            const form = document.getElementById(config.formId);
+            const categorySelect = document.getElementById(config.categorySelectId);
+            const contextHint = document.getElementById(config.contextHintId);
+            const supplierGroup = document.getElementById(config.supplierGroupId);
+            const supplierSelect = document.getElementById(config.supplierSelectId);
+            const supplierHelp = document.getElementById(config.supplierHelpId);
+            const manualGroup = document.getElementById(config.manualGroupId);
+            const manualInput = document.getElementById(config.manualInputId);
+            const supplyGroup = document.getElementById(config.supplyGroupId);
+            const supplySelect = document.getElementById(config.supplySelectId);
+            const employeeGroup = document.getElementById(config.employeeGroupId);
+            const employeeSelect = document.getElementById(config.employeeSelectId);
+            const employeeHelp = document.getElementById(config.employeeHelpId);
+            const employeePaymentTypeGroup = document.getElementById(config.employeePaymentTypeGroupId);
+            const employeePaymentTypeSelect = document.getElementById(config.employeePaymentTypeSelectId);
+            const amountInput = document.getElementById(config.amountInputId);
+            const amountHint = document.getElementById(config.amountHintId);
+            const expenseDateInput = document.getElementById(config.expenseDateInputId);
+            const personnelPreviewUrl = config.personnelPreviewUrl;
+
+            if (!form || !categorySelect) {
+                return;
+            }
+
+            const supplierOptions = supplierSelect
+                ? Array.from(supplierSelect.options).filter(function (option) { return option.value; })
+                : [];
+            const employeeOptions = employeeSelect
+                ? Array.from(employeeSelect.options).filter(function (option) { return option.value; })
+                : [];
+
+            function normalizeLookupText(value) {
+                return (value || '')
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .trim();
+            }
+
+            function getMeaningfulTokens(value) {
+                const stopWords = ['de', 'del', 'la', 'las', 'el', 'los', 'por', 'con', 'y'];
+                return normalizeLookupText(value)
+                    .split(/\s+/)
+                    .filter(function (token) {
+                        return token.length >= 3 && !stopWords.includes(token);
+                    });
+            }
+
+            function getSelectedCategoryText() {
+                if (!categorySelect || categorySelect.selectedIndex < 0) {
+                    return '';
+                }
+
+                return categorySelect.options[categorySelect.selectedIndex].text || '';
+            }
+
+            function resolveExpenseContext(categoryText) {
+                const normalized = normalizeLookupText(categoryText);
+
+                if (!normalized) {
+                    return 'NONE';
+                }
+
+                if (normalized.includes('insumo')) {
+                    return 'SUPPLY';
+                }
+
+                if (
+                    normalized.includes('personal') ||
+                    normalized.includes('repartidor') ||
+                    normalized.includes('llenador') ||
+                    normalized.includes('lavador')
+                ) {
+                    return 'PERSONNEL';
+                }
+
+                return 'SUPPLIER';
+            }
+
+            function toggleGroup(element, show) {
+                if (!element) {
+                    return;
+                }
+
+                element.classList.toggle('d-none', !show);
+            }
+
+            function resetSelect(select) {
+                if (select) {
+                    select.value = '';
+                }
+            }
+
+            function restoreOptions(options) {
+                options.forEach(function (option) {
+                    option.hidden = false;
+                    option.disabled = false;
+                });
+            }
+
+            function setAmountHint(message, isMuted, isError) {
+                if (!amountHint) {
+                    return;
+                }
+
+                amountHint.textContent = message || '';
+                amountHint.classList.remove('text-muted', 'text-danger', 'text-success');
+
+                if (isError) {
+                    amountHint.classList.add('text-danger');
+                    return;
+                }
+
+                if (isMuted) {
+                    amountHint.classList.add('text-muted');
+                    return;
+                }
+
+                amountHint.classList.add('text-success');
+            }
+
+            function parseMoney(value) {
+                const numberValue = Number(value || 0);
+                if (!Number.isFinite(numberValue)) {
+                    return 0;
+                }
+
+                return Math.round(numberValue * 100) / 100;
+            }
+
+            function formatMoney(value) {
+                return parseMoney(value).toFixed(2);
+            }
+
+            function filterSuppliers(categoryText) {
+                if (!supplierSelect) {
+                    return;
+                }
+
+                restoreOptions(supplierOptions);
+                const tokens = getMeaningfulTokens(categoryText);
+
+                if (!tokens.length) {
+                    if (supplierHelp) {
+                        supplierHelp.textContent = 'Selecciona un proveedor si aplica para este gasto.';
+                    }
+                    return;
+                }
+
+                let matches = 0;
+
+                supplierOptions.forEach(function (option) {
+                    const haystack = normalizeLookupText(option.getAttribute('data-category')) + ' ' +
+                        normalizeLookupText(option.textContent);
+
+                    const matched = tokens.some(function (token) {
+                        return haystack.includes(token);
+                    });
+
+                    option.hidden = !matched;
+                    option.disabled = !matched;
+
+                    if (matched) {
+                        matches++;
+                    }
+                });
+
+                if (matches === 0) {
+                    restoreOptions(supplierOptions);
+                    if (supplierHelp) {
+                        supplierHelp.textContent = 'No se encontraron proveedores sugeridos para esta categoría. Puedes dejarlo vacío y usar la referencia adicional.';
+                    }
+                } else if (supplierHelp) {
+                    supplierHelp.textContent = 'Se muestran proveedores sugeridos según la categoría elegida.';
+                }
+
+                const selectedOption = supplierSelect.selectedOptions.length
+                    ? supplierSelect.selectedOptions[0]
+                    : null;
+
+                if (selectedOption && selectedOption.hidden) {
+                    supplierSelect.value = '';
+                }
+            }
+
+            function filterEmployees(categoryText) {
+                if (!employeeSelect) {
+                    return;
+                }
+
+                restoreOptions(employeeOptions);
+
+                const normalizedCategory = normalizeLookupText(categoryText);
+                const isGeneralPersonnel = normalizedCategory.includes('personal');
+                const tokens = getMeaningfulTokens(categoryText);
+
+                if (isGeneralPersonnel || !tokens.length) {
+                    if (employeeHelp) {
+                        employeeHelp.textContent = 'Se muestra todo el personal activo para esta categoría.';
+                    }
+                    return;
+                }
+
+                let matches = 0;
+
+                employeeOptions.forEach(function (option) {
+                    const haystack = normalizeLookupText(option.getAttribute('data-position')) + ' ' +
+                        normalizeLookupText(option.textContent);
+
+                    const matched = tokens.some(function (token) {
+                        return haystack.includes(token);
+                    });
+
+                    option.hidden = !matched;
+                    option.disabled = !matched;
+
+                    if (matched) {
+                        matches++;
+                    }
+                });
+
+                if (matches === 0) {
+                    restoreOptions(employeeOptions);
+                    if (employeeHelp) {
+                        employeeHelp.textContent = 'No se encontró personal específico para esta categoría. Se muestra todo el personal activo.';
+                    }
+                } else if (employeeHelp) {
+                    employeeHelp.textContent = 'Se muestra el personal sugerido según la categoría elegida.';
+                }
+
+                const selectedOption = employeeSelect.selectedOptions.length
+                    ? employeeSelect.selectedOptions[0]
+                    : null;
+
+                if (selectedOption && selectedOption.hidden) {
+                    employeeSelect.value = '';
+                }
+            }
+
+            function updateContextHint(context) {
+                if (!contextHint) {
+                    return;
+                }
+
+                if (context === 'SUPPLY') {
+                    contextHint.textContent = 'Esta categoría se registrará como gasto de insumos. Selecciona el insumo usado y, si aplica, el proveedor relacionado.';
+                    return;
+                }
+
+                if (context === 'PERSONNEL') {
+                    contextHint.textContent = 'Esta categoría se registrará como gasto de personal. Selecciona al trabajador y el tipo de pago.';
+                    return;
+                }
+
+                if (context === 'SUPPLIER') {
+                    contextHint.textContent = 'Esta categoría se registrará como gasto general por proveedor o servicio. Puedes seleccionar un proveedor o dejar solo una referencia adicional.';
+                    return;
+                }
+
+                contextHint.textContent = 'Selecciona una categoría para continuar.';
+            }
+
+            async function updatePersonnelPreview(context) {
+                if (!amountInput) {
+                    return;
+                }
+
+                if (context !== 'PERSONNEL') {
+                    setAmountHint('Ingresa el costo manualmente o deja que el sistema lo sugiera para pagos de personal.', true, false);
+                    return;
+                }
+
+                const employeeId = employeeSelect ? employeeSelect.value : '';
+                const paymentType = employeePaymentTypeSelect ? employeePaymentTypeSelect.value : '';
+                const expenseDate = expenseDateInput ? expenseDateInput.value : '';
+
+                if (!employeeId) {
+                    setAmountHint('Selecciona un trabajador para poder sugerir el costo.', true, false);
+                    return;
+                }
+
+                if (!paymentType) {
+                    setAmountHint('Selecciona el tipo de pago para continuar.', true, false);
+                    return;
+                }
+
+                if (paymentType !== 'SALARY') {
+                    setAmountHint('Para adelantos o descuentos, el costo se registra manualmente.', true, false);
+                    return;
+                }
+
+                if (!expenseDate) {
+                    setAmountHint('Selecciona la fecha para calcular el monto sugerido.', true, false);
+                    return;
+                }
+
+                setAmountHint('Calculando costo sugerido según ventas pagadas del día...', true, false);
+
+                try {
+                    const url = new URL(personnelPreviewUrl, window.location.origin);
+                    url.searchParams.set('employeeId', employeeId);
+                    url.searchParams.set('paymentType', paymentType);
+                    url.searchParams.set('expenseDate', expenseDate);
+
+                    const response = await fetch(url.toString(), {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Could not calculate personnel expense preview.');
+                    }
+
+                    const preview = await response.json();
+
+                    if (!preview || !preview.autoFilled) {
+                        setAmountHint(
+                            preview && preview.message
+                                ? preview.message
+                                : 'No se pudo calcular automáticamente el costo para este trabajador.',
+                            false,
+                            true
+                        );
+                        return;
+                    }
+
+                    amountInput.value = formatMoney(preview.suggestedAmount);
+
+                    const totalSales = formatMoney(preview.totalSales);
+                    const fixedComponent = formatMoney(preview.fixedComponent);
+                    const commissionComponent = formatMoney(preview.commissionComponent);
+                    const commissionRate = formatMoney(preview.commissionRate);
+
+                    let detailMessage = 'Costo sugerido: S/ ' + formatMoney(preview.suggestedAmount);
+
+                    if (preview.paymentMode === 'COMMISSION') {
+                        detailMessage += ' = ' + commissionRate + '% de ventas pagadas del día (S/ ' + totalSales + ').';
+                    } else if (preview.paymentMode === 'MIXED') {
+                        detailMessage += ' = fijo S/ ' + fixedComponent + ' + comisión S/ ' + commissionComponent +
+                            ' sobre ventas del día (S/ ' + totalSales + ').';
+                    } else {
+                        detailMessage += ' = monto fijo diario según el cargo.';
+                    }
+
+                    setAmountHint(detailMessage, false, false);
+                } catch (error) {
+                    setAmountHint(
+                        'No se pudo calcular automáticamente el costo. Puedes ingresar el monto manualmente.',
+                        false,
+                        true
+                    );
+                }
+            }
+
+            function updateExpenseFormUi() {
+                const categoryText = getSelectedCategoryText();
+                const context = resolveExpenseContext(categoryText);
+                const showSupplier = context === 'SUPPLIER' || context === 'SUPPLY';
+                const showSupply = context === 'SUPPLY';
+                const showPersonnel = context === 'PERSONNEL';
+
+                updateContextHint(context);
+
+                toggleGroup(supplierGroup, showSupplier);
+                toggleGroup(manualGroup, showSupplier);
+                toggleGroup(supplyGroup, showSupply);
+                toggleGroup(employeeGroup, showPersonnel);
+                toggleGroup(employeePaymentTypeGroup, showPersonnel);
+
+                if (supplierSelect) {
+                    supplierSelect.required = false;
+                    if (showSupplier) {
+                        filterSuppliers(categoryText);
+                    } else {
+                        resetSelect(supplierSelect);
+                    }
+                }
+
+                if (manualInput && !showSupplier) {
+                    manualInput.value = '';
+                }
+
+                if (supplySelect) {
+                    supplySelect.required = showSupply;
+                    if (!showSupply) {
+                        resetSelect(supplySelect);
+                    }
+                }
+
+                if (employeeSelect) {
+                    employeeSelect.required = showPersonnel;
+                    if (showPersonnel) {
+                        filterEmployees(categoryText);
+                    } else {
+                        resetSelect(employeeSelect);
+                    }
+                }
+
+                if (employeePaymentTypeSelect) {
+                    employeePaymentTypeSelect.required = showPersonnel;
+                    if (!showPersonnel) {
+                        resetSelect(employeePaymentTypeSelect);
+                    }
+                }
+
+                updatePersonnelPreview(context);
+            }
+
+            categorySelect.addEventListener('change', updateExpenseFormUi);
+
+            if (employeeSelect) {
+                employeeSelect.addEventListener('change', updateExpenseFormUi);
+            }
+
+            if (employeePaymentTypeSelect) {
+                employeePaymentTypeSelect.addEventListener('change', updateExpenseFormUi);
+            }
+
+            if (expenseDateInput) {
+                expenseDateInput.addEventListener('change', updateExpenseFormUi);
+            }
+
+            form.addEventListener('submit', updateExpenseFormUi);
+            updateExpenseFormUi();
+        }
+
+        initExpenseContextForm({
+            formId: 'dailyExpenseForm',
+            categorySelectId: 'dailyExpenseCategory',
+            contextHintId: 'dailyExpenseContextHint',
+            supplierGroupId: 'dailyExpenseSupplierSelectGroup',
+            supplierSelectId: 'dailyExpenseSupplierId',
+            supplierHelpId: 'dailyExpenseSupplierHelp',
+            manualGroupId: 'dailyExpenseManualSupplierGroup',
+            manualInputId: 'dailyExpenseManualSupplierName',
+            supplyGroupId: 'dailyExpenseSupplyGroup',
+            supplySelectId: 'dailyExpenseSupplyId',
+            employeeGroupId: 'dailyExpenseEmployeeGroup',
+            employeeSelectId: 'dailyExpenseEmployeeId',
+            employeeHelpId: 'dailyExpenseEmployeeHelp',
+            employeePaymentTypeGroupId: 'dailyExpenseEmployeePaymentTypeGroup',
+            employeePaymentTypeSelectId: 'dailyExpenseEmployeePaymentType',
+            amountInputId: 'dailyExpenseAmount',
+            amountHintId: 'dailyExpenseAmountHint',
+            expenseDateInputId: 'dailyExpenseDate',
+            personnelPreviewUrl: /*[[@{/expenses/personnel-preview}]]*/ '/expenses/personnel-preview'
+        });
+
+        const widgetBoard = document.getElementById('homeWidgetBoard');
+        const widgetColumns = Array.from(document.querySelectorAll('.home-widget-column'));
+        const widgetCards = Array.from(document.querySelectorAll('.home-widget-card'));
+        const btnExpandAllWidgets = document.getElementById('btnExpandAllWidgets');
+        const btnCollapseAllWidgets = document.getElementById('btnCollapseAllWidgets');
+        const btnResetWidgetLayout = document.getElementById('btnResetWidgetLayout');
+
+        if (!widgetBoard) {
+            return;
+        }
+
+        const defaultLayout = {};
+        widgetColumns.forEach(function (column) {
+            defaultLayout[column.getAttribute('data-column')] = Array.from(
+                column.querySelectorAll('.home-widget-card')
+            ).map(function (card) {
+                return card.getAttribute('data-widget-id');
+            });
+        });
+
+        function getWidgetBody(card) {
+            return card ? card.querySelector('.card-body') : null;
+        }
+
+        function getWidgetCollapseButton(card) {
+            return card ? card.querySelector('.widget-collapse-toggle') : null;
+        }
+
+        function setWidgetCollapsed(card, collapsed) {
+            if (!card) {
+                return;
+            }
+
+            card.classList.toggle('widget-collapsed', collapsed);
+
+            const body = getWidgetBody(card);
+            if (body) {
+                body.style.display = collapsed ? 'none' : '';
+            }
+
+            const collapseButton = getWidgetCollapseButton(card);
+            if (collapseButton) {
+                collapseButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                const icon = collapseButton.querySelector('i');
+                if (icon) {
+                    icon.className = collapsed ? 'bi bi-plus-lg' : 'bi bi-dash-lg';
+                }
+            }
+        }
+
+        function saveWidgetLayout() {
+            const payload = {
+                columns: {},
+                collapsed: {}
+            };
+
+            widgetColumns.forEach(function (column) {
+                const columnKey = column.getAttribute('data-column');
+                payload.columns[columnKey] = Array.from(column.querySelectorAll('.home-widget-card'))
+                    .map(function (card) {
+                        return card.getAttribute('data-widget-id');
+                    });
+            });
+
+            widgetCards.forEach(function (card) {
+                payload.collapsed[card.getAttribute('data-widget-id')] = card.classList.contains('widget-collapsed');
+            });
+
+            try {
+                window.localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(payload));
+            } catch (error) {
+                console.warn('Could not save widget layout.', error);
+            }
+        }
+
+        function restoreDefaultWidgetLayout() {
+            widgetColumns.forEach(function (column) {
+                const columnKey = column.getAttribute('data-column');
+                const ids = defaultLayout[columnKey] || [];
+
+                ids.forEach(function (widgetId) {
+                    const card = widgetBoard.querySelector('.home-widget-card[data-widget-id="' + widgetId + '"]');
+                    if (card) {
+                        column.appendChild(card);
+                    }
+                });
+            });
+
+            widgetCards.forEach(function (card) {
+                setWidgetCollapsed(card, false);
+                card.setAttribute('draggable', 'false');
+                delete card.dataset.dragAllowed;
+            });
+
+            saveWidgetLayout();
+        }
+
+        function applySavedWidgetLayout() {
+            let savedLayout = null;
+
+            try {
+                savedLayout = JSON.parse(window.localStorage.getItem(WIDGET_STORAGE_KEY) || 'null');
+            } catch (error) {
+                savedLayout = null;
+            }
+
+            if (!savedLayout || typeof savedLayout !== 'object') {
+                return;
+            }
+
+            const placed = new Set();
+
+            widgetColumns.forEach(function (column) {
+                const columnKey = column.getAttribute('data-column');
+                const ids = savedLayout.columns && Array.isArray(savedLayout.columns[columnKey])
+                    ? savedLayout.columns[columnKey]
+                    : [];
+
+                ids.forEach(function (widgetId) {
+                    const card = widgetBoard.querySelector('.home-widget-card[data-widget-id="' + widgetId + '"]');
+                    if (card) {
+                        column.appendChild(card);
+                        placed.add(widgetId);
+                    }
+                });
+            });
+
+            widgetCards.forEach(function (card) {
+                const widgetId = card.getAttribute('data-widget-id');
+                if (placed.has(widgetId)) {
+                    return;
+                }
+
+                for (const [columnKey, ids] of Object.entries(defaultLayout)) {
+                    if (ids.includes(widgetId)) {
+                        const column = widgetBoard.querySelector('.home-widget-column[data-column="' + columnKey + '"]');
+                        if (column) {
+                            column.appendChild(card);
+                        }
+                        break;
+                    }
+                }
+            });
+
+            widgetCards.forEach(function (card) {
+                const widgetId = card.getAttribute('data-widget-id');
+                const collapsed = !!(savedLayout.collapsed && savedLayout.collapsed[widgetId]);
+                setWidgetCollapsed(card, collapsed);
+            });
+        }
+
+        widgetCards.forEach(function (card) {
+            const collapseButton = card.querySelector('.widget-collapse-toggle');
+            if (collapseButton) {
+                collapseButton.addEventListener('click', function () {
+                    const collapsed = !card.classList.contains('widget-collapsed');
+                    setWidgetCollapsed(card, collapsed);
+                    saveWidgetLayout();
+                });
+            }
+        });
+
+        if (btnExpandAllWidgets) {
+            btnExpandAllWidgets.addEventListener('click', function () {
+                widgetCards.forEach(function (card) {
+                    setWidgetCollapsed(card, false);
+                });
+                saveWidgetLayout();
+            });
+        }
+
+        if (btnCollapseAllWidgets) {
+            btnCollapseAllWidgets.addEventListener('click', function () {
+                widgetCards.forEach(function (card) {
+                    setWidgetCollapsed(card, true);
+                });
+                saveWidgetLayout();
+            });
+        }
+
+        if (btnResetWidgetLayout) {
+            btnResetWidgetLayout.addEventListener('click', function () {
+                restoreDefaultWidgetLayout();
+            });
+        }
+
+        const dragPlaceholder = document.createElement('div');
+        dragPlaceholder.className = 'home-widget-placeholder';
+
+        let draggedWidget = null;
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = Array.from(
+                container.querySelectorAll('.home-widget-card:not(.dragging)')
+            );
+
+            let closest = {
+                offset: Number.NEGATIVE_INFINITY,
+                element: null
+            };
+
+            draggableElements.forEach(function (element) {
+                const box = element.getBoundingClientRect();
+                const offset = y - box.top - (box.height / 2);
+
+                if (offset < 0 && offset > closest.offset) {
+                    closest = {
+                        offset: offset,
+                        element: element
+                    };
+                }
+            });
+
+            return closest.element;
+        }
+
+        widgetCards.forEach(function (card) {
+            const dragHandle = card.querySelector('.widget-drag-handle');
+
+            if (dragHandle) {
+                dragHandle.addEventListener('mousedown', function () {
+                    card.dataset.dragAllowed = 'true';
+                    card.setAttribute('draggable', 'true');
+                });
+
+                dragHandle.addEventListener('mouseup', function () {
+                    if (!draggedWidget) {
+                        card.dataset.dragAllowed = 'false';
+                        card.setAttribute('draggable', 'false');
+                    }
+                });
+
+                dragHandle.addEventListener('mouseleave', function () {
+                    if (!draggedWidget) {
+                        card.dataset.dragAllowed = 'false';
+                        card.setAttribute('draggable', 'false');
+                    }
+                });
+            }
+
+            card.addEventListener('dragstart', function (event) {
+                if (card.dataset.dragAllowed !== 'true') {
+                    event.preventDefault();
+                    return;
+                }
+
+                draggedWidget = card;
+                card.classList.add('dragging');
+                dragPlaceholder.style.height = card.offsetHeight + 'px';
+
+                if (event.dataTransfer) {
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', card.getAttribute('data-widget-id'));
+                }
+            });
+
+            card.addEventListener('dragend', function () {
+                card.classList.remove('dragging');
+                card.dataset.dragAllowed = 'false';
+                card.setAttribute('draggable', 'false');
+                draggedWidget = null;
+                dragPlaceholder.remove();
+                saveWidgetLayout();
+            });
+        });
+
+        widgetColumns.forEach(function (column) {
+            column.addEventListener('dragover', function (event) {
+                event.preventDefault();
+
+                if (!draggedWidget) {
+                    return;
+                }
+
+                const afterElement = getDragAfterElement(column, event.clientY);
+
+                if (afterElement == null) {
+                    column.appendChild(dragPlaceholder);
+                } else {
+                    column.insertBefore(dragPlaceholder, afterElement);
+                }
+            });
+
+            column.addEventListener('drop', function (event) {
+                event.preventDefault();
+
+                if (!draggedWidget) {
+                    return;
+                }
+
+                if (dragPlaceholder.parentNode === column) {
+                    column.insertBefore(draggedWidget, dragPlaceholder);
+                } else {
+                    column.appendChild(draggedWidget);
+                }
+
+                dragPlaceholder.remove();
+                saveWidgetLayout();
+            });
+        });
+
+        applySavedWidgetLayout();
+
+        const flashMessage = /*[[${message}]]*/ null;
+        const flashType = /*[[${messageType}]]*/ null;
+        if (flashMessage && flashMessage !== 'null' && String(flashMessage).trim() !== '') {
+            if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
+                window.ecoAdmin.showFlashMessage(flashMessage, flashType);
+            } else {
+                alert(flashMessage);
+            }
+        }
+    });
+</script>
+</body>
+</html>

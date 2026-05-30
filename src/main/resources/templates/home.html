@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="fragments/head_admin :: adminHead('Inicio - Sistema integral')"></head>
 
 <body>
@@ -127,29 +127,6 @@
                 </div>
             </div>
 
-            <section class="admin-home-hero mb-3">
-                <div class="admin-home-hero-copy">
-                    <span class="admin-home-kicker">Panel administrativo</span>
-                    <h2 th:text="${adminBrandTitle != null and !#strings.isEmpty(adminBrandTitle) ? adminBrandTitle : (businessName != null and !#strings.isEmpty(businessName) ? businessName : 'Sistema integral')}">
-                        Productos de la Selva Belén
-                    </h2>
-                    <p th:text="${adminBrandSubtitle != null and !#strings.isEmpty(adminBrandSubtitle) ? adminBrandSubtitle : (businessAdminTitle != null and !#strings.isEmpty(businessAdminTitle) ? businessAdminTitle : 'Sistema integral')}">
-                        Sistema integral
-                    </p>
-                    <div class="admin-home-hero-badges">
-                        <span><i class="bi bi-shop-window"></i> Gestión del negocio</span>
-                        <span><i class="bi bi-whatsapp"></i> Pedidos y atención</span>
-                        <span><i class="bi bi-graph-up-arrow"></i> Control diario</span>
-                    </div>
-                </div>
-                <div class="admin-home-hero-logo-wrap">
-                    <img th:src="${adminBrandLogo != null and !#strings.isEmpty(adminBrandLogo) ? adminBrandLogo : (businessAdminLogo != null and !#strings.isEmpty(businessAdminLogo) ? businessAdminLogo : '/img/logo-eco.png')}"
-                         th:alt="${adminBrandTitle != null and !#strings.isEmpty(adminBrandTitle) ? adminBrandTitle : (businessName != null and !#strings.isEmpty(businessName) ? businessName : 'Sistema integral')}"
-                         alt="Sistema integral"
-                         class="admin-home-hero-logo">
-                </div>
-            </section>
-
             <div class="home-widgets-toolbar">
                 <div class="toolbar-actions">
                     <button type="button" class="btn btn-sm btn-outline-secondary" id="btnExpandAllWidgets">
@@ -164,17 +141,520 @@
                         <i class="bi bi-arrow-counterclockwise me-1"></i>
                         Restablecer layout
                     </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnCustomizeDashboard" data-bs-toggle="modal" data-bs-target="#dashboardWidgetPreferencesModal">
+                        <i class="bi bi-sliders me-1"></i>
+                        Personalizar mi panel
+                    </button>
                 </div>
                 <div class="text-muted small">
-                    Los widgets se pueden mover entre izquierda y derecha. El layout se guarda en este navegador.
+                    Los widgets se guardan en tu usuario: puedes moverlos, minimizarlos u ocultarlos sin afectar a otros usuarios.
                 </div>
             </div>
 
-            <div class="row g-3" id="homeWidgetBoard">
+
+
+            <div class="row g-3" id="homeWidgetBoard" th:if="${dashboardAreaRoleDashboardVisible}">
                 <div class="col-lg-7">
                     <div class="home-widget-column" data-column="left">
 
-                        <div class="home-widget-card" data-widget-id="operations" draggable="false">
+                        <div class="home-widget-card" data-widget-id="marketing-promotions" draggable="false"
+                             th:if="${dashboardMarketingAreaVisible and dashboardVisibleWidgets['marketing-promotions']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header area-widget-header area-widget-header-marketing">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Promociones activas</span>
+                                            <small th:text="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null ? dashboardMarketingSnapshot.campaigns.activePromotionCount + ' activa(s)' : 'Control de promociones'}">0 activa(s)</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="area-widget-metric-row mb-3">
+                                        <div class="area-widget-metric">
+                                            <strong th:text="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null ? dashboardMarketingSnapshot.campaigns.activePromotionCount : 0}">0</strong>
+                                            <span>Activas</span>
+                                        </div>
+                                        <div class="area-widget-metric">
+                                            <strong th:text="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null ? dashboardMarketingSnapshot.campaigns.promotionsEndingSoonCount : 0}">0</strong>
+                                            <span>Por vencer</span>
+                                        </div>
+                                    </div>
+
+                                    <div th:if="${dashboardMarketingSnapshot == null or dashboardMarketingSnapshot.campaigns == null or #lists.isEmpty(dashboardMarketingSnapshot.campaigns.promotionAssets)}" class="area-widget-empty">
+                                        No hay promociones activas para mostrar. Crea o activa promociones para el portal.
+                                    </div>
+
+                                    <div class="area-widget-list" th:if="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null and !#lists.isEmpty(dashboardMarketingSnapshot.campaigns.promotionAssets)}">
+                                        <div class="area-widget-list-item" th:each="asset, stat : ${dashboardMarketingSnapshot.campaigns.promotionAssets}" th:if="${stat.index < 3}">
+                                            <div>
+                                                <strong th:text="${asset.title}">Promoción</strong>
+                                                <small th:text="${asset.status}">Activa</small>
+                                            </div>
+                                            <a class="btn btn-sm btn-outline-success" th:href="@{/admin/promotions}">Ver</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-success w-100" th:href="@{/admin/promotions}">Gestionar promociones</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="marketing-campaigns" draggable="false"
+                             th:if="${dashboardMarketingAreaVisible and dashboardVisibleWidgets['marketing-campaigns']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-primary text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Campañas del mes</span>
+                                            <small>Promociones, contenido y próximas acciones</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div th:if="${dashboardMarketingSnapshot == null or dashboardMarketingSnapshot.campaigns == null or #lists.isEmpty(dashboardMarketingSnapshot.campaigns.campaignRows)}" class="area-widget-empty">
+                                        Todavía no hay campañas armadas para este mes. Usa este bloque para revisar campañas cuando estén cargadas.
+                                    </div>
+                                    <div class="area-widget-timeline" th:if="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null and !#lists.isEmpty(dashboardMarketingSnapshot.campaigns.campaignRows)}">
+                                        <div class="area-widget-timeline-item" th:each="row, stat : ${dashboardMarketingSnapshot.campaigns.campaignRows}" th:if="${stat.index < 4}">
+                                            <span class="area-widget-dot"></span>
+                                            <div>
+                                                <strong th:text="${row.name}">Campaña</strong>
+                                                <small><span th:text="${row.type}">Tipo</span> · <span th:text="${row.status}">Estado</span></small>
+                                                <p th:text="${row.nextAction}">Próxima acción</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-primary w-100" th:href="@{/marketing/admin/campaigns}">Abrir panel de campañas</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="marketing-actions" draggable="false"
+                             th:if="${dashboardMarketingAreaVisible and dashboardVisibleWidgets['marketing-actions']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-dark text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Acciones sugeridas</span>
+                                            <small>Qué revisar hoy</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="area-widget-task-list">
+                                        <th:block th:if="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null and !#lists.isEmpty(dashboardMarketingSnapshot.campaigns.pendingTasks)}">
+                                            <div class="area-widget-task" th:each="task, stat : ${dashboardMarketingSnapshot.campaigns.pendingTasks}" th:if="${stat.index < 4}">
+                                                <span class="badge text-bg-warning" th:text="${task.priority}">Media</span>
+                                                <div>
+                                                    <strong th:text="${task.title}">Tarea</strong>
+                                                    <p th:text="${task.description}">Descripción</p>
+                                                </div>
+                                            </div>
+                                        </th:block>
+                                        <div th:if="${dashboardMarketingSnapshot == null or dashboardMarketingSnapshot.campaigns == null or #lists.isEmpty(dashboardMarketingSnapshot.campaigns.pendingTasks)}">
+                                            <ul class="mb-0 small text-muted">
+                                                <li>Revisar que haya 3 promociones activas del mes.</li>
+                                                <li>Compartir un artículo del blog por WhatsApp o redes.</li>
+                                                <li>Actualizar productos destacados del catálogo.</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-outline-dark w-100" th:href="@{/marketing/admin/campaigns}">Organizar acciones</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="hr-staff" draggable="false"
+                             th:if="${dashboardHrAreaVisible and dashboardVisibleWidgets['hr-staff']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header area-widget-header area-widget-header-hr">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Personal activo</span>
+                                            <small th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.activeEmployeeCount + ' colaborador(es)' : 'Control de personal'}">0 colaborador(es)</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="area-widget-kpi-card mb-3">
+                                        <div>
+                                            <div class="area-widget-label">Colaboradores activos</div>
+                                            <h3 th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.activeEmployeeCount : 0}">0</h3>
+                                        </div>
+                                        <i class="bi bi-people area-widget-kpi-icon"></i>
+                                    </div>
+                                    <div th:if="${dashboardHrSnapshot == null or #lists.isEmpty(dashboardHrSnapshot.recentEmployees)}" class="area-widget-empty">
+                                        Todavía no hay colaboradores activos registrados.
+                                    </div>
+                                    <div class="area-widget-list" th:if="${dashboardHrSnapshot != null and !#lists.isEmpty(dashboardHrSnapshot.recentEmployees)}">
+                                        <div class="area-widget-list-item" th:each="employee, stat : ${dashboardHrSnapshot.recentEmployees}" th:if="${stat.index < 4}">
+                                            <div>
+                                                <strong th:text="${employee.fullName}">Empleado</strong>
+                                                <small th:text="${employee.jobName}">Cargo</small>
+                                            </div>
+                                            <span class="badge text-bg-light" th:text="${employee.contact}">Contacto</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-success w-100" th:href="@{/admin/personnel/payments}">Ver personal</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="hr-obligations" draggable="false"
+                             th:if="${dashboardHrAreaVisible and dashboardVisibleWidgets['hr-obligations']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-danger text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Obligaciones pendientes</span>
+                                            <small>Adelantos, préstamos o pagos internos</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="area-widget-metric-row">
+                                        <div class="area-widget-metric">
+                                            <strong th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.activeObligationCount : 0}">0</strong>
+                                            <span>Activas</span>
+                                        </div>
+                                        <div class="area-widget-metric">
+                                            <strong>S/ <span th:text="${dashboardHrSnapshot != null ? #numbers.formatDecimal(dashboardHrSnapshot.pendingObligationAmount,1,'POINT',2,'POINT') : '0.00'}">0.00</span></strong>
+                                            <span>Pendiente</span>
+                                        </div>
+                                    </div>
+                                    <div class="area-widget-empty mt-3" th:if="${dashboardHrSnapshot == null or dashboardHrSnapshot.activeObligationCount == 0}">
+                                        No hay obligaciones activas registradas por ahora.
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-outline-danger w-100" th:href="@{/admin/personnel/payments}">Revisar pagos</a>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="home-widget-column" data-column="right">
+
+                        <div class="home-widget-card" data-widget-id="marketing-blog" draggable="false"
+                             th:if="${dashboardMarketingAreaVisible and dashboardVisibleWidgets['marketing-blog']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-warning text-dark">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Blog y consejos</span>
+                                            <small th:text="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null ? dashboardMarketingSnapshot.campaigns.publishedPostCount + ' publicado(s), ' + dashboardMarketingSnapshot.campaigns.draftPostCount + ' borrador(es)' : 'Contenido del portal'}">0 publicado(s)</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div th:if="${dashboardMarketingSnapshot == null or dashboardMarketingSnapshot.campaigns == null or #lists.isEmpty(dashboardMarketingSnapshot.campaigns.contentAssets)}" class="area-widget-empty">
+                                        No hay artículos publicados o borradores recientes para mostrar.
+                                    </div>
+                                    <div class="area-widget-list" th:if="${dashboardMarketingSnapshot != null and dashboardMarketingSnapshot.campaigns != null and !#lists.isEmpty(dashboardMarketingSnapshot.campaigns.contentAssets)}">
+                                        <div class="area-widget-list-item" th:each="asset, stat : ${dashboardMarketingSnapshot.campaigns.contentAssets}" th:if="${stat.index < 4}">
+                                            <div>
+                                                <strong th:text="${asset.title}">Artículo</strong>
+                                                <small th:text="${asset.status}">Publicado</small>
+                                            </div>
+                                            <a class="btn btn-sm btn-outline-warning" th:href="@{/admin/blog}">Ver</a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-warning w-100" th:href="@{/admin/blog}">Administrar blog</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="marketing-featured-products" draggable="false"
+                             th:if="${dashboardMarketingAreaVisible and dashboardVisibleWidgets['marketing-featured-products']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-info text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Productos destacados</span>
+                                            <small>Para catálogo, reels y campañas</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div th:if="${dashboardMarketingSnapshot == null or #lists.isEmpty(dashboardMarketingSnapshot.featuredProducts)}" class="area-widget-empty">
+                                        No hay productos destacados. Marca productos como destacados o completa el catálogo.
+                                    </div>
+                                    <div class="area-widget-product-grid" th:if="${dashboardMarketingSnapshot != null and !#lists.isEmpty(dashboardMarketingSnapshot.featuredProducts)}">
+                                        <div class="area-widget-product" th:each="product, stat : ${dashboardMarketingSnapshot.featuredProducts}" th:if="${stat.index < 4}">
+                                            <img th:if="${product.imagePath != null and !#strings.isEmpty(product.imagePath)}" th:src="${product.imagePath}" th:alt="${product.name}">
+                                            <div th:if="${product.imagePath == null or #strings.isEmpty(product.imagePath)}" class="area-widget-product-placeholder"><i class="bi bi-box-seam"></i></div>
+                                            <strong th:text="${product.name}">Producto</strong>
+                                            <small>S/ <span th:text="${product.price != null ? #numbers.formatDecimal(product.price,1,'POINT',2,'POINT') : '0.00'}">0.00</span></small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-info text-white w-100" th:href="@{/admin/products}">Ver productos</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="hr-positions" draggable="false"
+                             th:if="${dashboardHrAreaVisible and dashboardVisibleWidgets['hr-positions']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-primary text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Cargos registrados</span>
+                                            <small th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.activePositionCount + ' activo(s)' : 'Organización interna'}">0 activo(s)</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div th:if="${dashboardHrSnapshot == null or #lists.isEmpty(dashboardHrSnapshot.positionRows)}" class="area-widget-empty">
+                                        No hay cargos activos configurados todavía.
+                                    </div>
+                                    <div class="area-widget-list" th:if="${dashboardHrSnapshot != null and !#lists.isEmpty(dashboardHrSnapshot.positionRows)}">
+                                        <div class="area-widget-list-item" th:each="position, stat : ${dashboardHrSnapshot.positionRows}" th:if="${stat.index < 5}">
+                                            <div>
+                                                <strong th:text="${position.displayName != null and !#strings.isEmpty(position.displayName) ? position.displayName : position.name}">Cargo</strong>
+                                                <small th:text="${position.paymentModeLabel}">Modo de pago</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-primary w-100" th:href="@{/admin/job-positions}">Administrar cargos</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="hr-users" draggable="false"
+                             th:if="${dashboardHrAreaVisible and dashboardVisibleWidgets['hr-users']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-info text-white">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Usuarios activos</span>
+                                            <small>Accesos internos</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="area-widget-metric-row">
+                                        <div class="area-widget-metric">
+                                            <strong th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.activeUserCount : 0}">0</strong>
+                                            <span>Usuarios activos</span>
+                                        </div>
+                                        <div class="area-widget-metric">
+                                            <strong th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.roleCount : 0}">0</strong>
+                                            <span>Roles configurados</span>
+                                        </div>
+                                    </div>
+                                    <p class="small text-muted mt-3 mb-0">Mantén activos solo los usuarios que realmente necesitan acceso.</p>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0">
+                                    <a class="btn btn-sm btn-info text-white w-100" th:href="@{/admin/users}">Ver usuarios</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="hr-roles" draggable="false"
+                             th:if="${dashboardHrAreaVisible and dashboardVisibleWidgets['hr-roles']}">
+                            <div class="card shadow-sm mb-3 area-widget-card">
+                                <div class="card-header bg-warning text-dark">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <div>
+                                            <span>Roles configurados</span>
+                                            <small>Permisos y áreas</small>
+                                        </div>
+                                        <div class="home-widget-tools">
+                                            <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                                            <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="area-widget-kpi-card">
+                                        <div>
+                                            <div class="area-widget-label">Roles disponibles</div>
+                                            <h3 th:text="${dashboardHrSnapshot != null ? dashboardHrSnapshot.roleCount : 0}">0</h3>
+                                        </div>
+                                        <i class="bi bi-shield-check area-widget-kpi-icon"></i>
+                                    </div>
+                                    <p class="small text-muted mt-3 mb-0">Los cambios de permisos deben ser revisados por administración.</p>
+                                </div>
+                                <div class="card-footer bg-white border-0 pt-0" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ROLE_OWNER','admin_config','administra_roles')">
+                                    <a class="btn btn-sm btn-warning w-100" th:href="@{/admin/roles-permissions}">Administrar roles</a>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${dashboardVisibleWidgetCount == 0 and !dashboardAreaRoleDashboardVisible}" class="card border-0 shadow-sm mb-3">
+                <div class="card-body py-4 text-center">
+                    <div class="display-6 text-muted mb-2"><i class="bi bi-grid-1x2"></i></div>
+                    <h2 class="h5 mb-2">No hay bloques visibles para este usuario</h2>
+                    <p class="text-muted mb-3">
+                        El administrador puede activar bloques para este rol desde la pantalla de widgets del inicio.
+                    </p>
+                    <a th:href="@{/admin/dashboard-widgets}"
+                       sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ROLE_OWNER','ROLE_MANAGEMENT','admin_config')"
+                       class="btn btn-outline-primary btn-sm">
+                        Configurar widgets del inicio
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-3" id="homeWidgetBoard" th:if="${dashboardVisibleWidgetCount > 0 and !dashboardAreaRoleDashboardVisible}">
+                <div class="col-lg-7">
+                    <div class="home-widget-column" data-column="left">
+
+
+
+                        <!-- Management widgets -->
+                        <div class="home-widget-card" data-widget-id="management-overview" draggable="false" th:if="${dashboardVisibleWidgets['management-overview']}">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-dark text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Estado del negocio</span><small class="d-block fw-normal">Resumen ejecutivo para gerencia</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div>
+                                <div class="card-body"><p class="small text-muted mb-2">Revisa ventas, gastos, clientes, productos y señales principales del negocio.</p><div class="area-widget-empty">Abre el resumen cuando necesites una vista rápida para tomar decisiones.</div></div>
+                                <div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-dark w-100" th:href="@{/dashboard/business-overview}">Ver estado del negocio</a></div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="management-followup" draggable="false" th:if="${dashboardVisibleWidgets['management-followup']}">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Seguimiento del mes</span><small class="d-block fw-normal">Metas y acciones del período</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div>
+                                <div class="card-body"><p class="small text-muted mb-0">Útil para gerencia, supervisión y auditoría: ventas, gastos, pendientes y avance mensual.</p></div>
+                                <div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-primary w-100" th:href="@{/dashboard/monthly-followup}">Abrir seguimiento</a></div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="management-modules" draggable="false" th:if="${dashboardVisibleWidgets['management-modules']}">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-secondary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Módulos activos</span><small class="d-block fw-normal">Configuración por cliente</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div>
+                                <div class="card-body"><p class="small text-muted mb-0">Controla qué áreas del sistema están activas para este cliente.</p></div>
+                                <div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-secondary w-100" th:href="@{/admin/system-modules}">Administrar módulos</a></div>
+                            </div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="management-widget-config" draggable="false" th:if="${dashboardVisibleWidgets['management-widget-config']}">
+                            <div class="card shadow-sm mb-3">
+                                <div class="card-header bg-warning text-dark"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Widgets por rol</span><small class="d-block fw-normal">Home configurable</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div>
+                                <div class="card-body"><p class="small text-muted mb-0">Define qué bloques ve cada área: marketing, ventas, finanzas, logística, producción y RRHH.</p></div>
+                                <div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-warning w-100" th:href="@{/admin/dashboard-widgets}">Configurar widgets</a></div>
+                            </div>
+                        </div>
+
+                        <!-- Logistics widgets -->
+                        <div class="home-widget-card" data-widget-id="logistics-products" draggable="false" th:if="${dashboardVisibleWidgets['logistics-products']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-info text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Catálogo operativo</span><small class="d-block fw-normal">Productos disponibles</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Revisa productos antes de coordinar entregas, reposición o atención por WhatsApp.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-info text-white w-100" th:href="@{/admin/products}">Ver productos</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="logistics-stock" draggable="false" th:if="${dashboardVisibleWidgets['logistics-stock']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-dark text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Stock de productos</span><small class="d-block fw-normal">Almacén</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><div class="area-widget-empty">Consulta movimientos y disponibilidad antes de confirmar pedidos.</div></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-dark w-100" th:href="@{/warehouse/products-stock}">Ver stock</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="logistics-delivery" draggable="false" th:if="${dashboardVisibleWidgets['logistics-delivery']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-success text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Entregas pendientes</span><small class="d-block fw-normal">Despacho y coordinación</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Revisa pedidos por entregar y coordinación diaria.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-success w-100" th:href="@{/delivery}">Ver entregas</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="logistics-zones" draggable="false" th:if="${dashboardVisibleWidgets['logistics-zones']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Zonas de reparto</span><small class="d-block fw-normal">Cobertura</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Mantén actualizadas las zonas de atención y coordinación de entrega.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-primary w-100" th:href="@{/admin/delivery-zones}">Administrar zonas</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="logistics-suppliers" draggable="false" th:if="${dashboardVisibleWidgets['logistics-suppliers']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-secondary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Proveedores</span><small class="d-block fw-normal">Abastecimiento</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Consulta proveedores para compras, reposición y coordinación operativa.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-secondary w-100" th:href="@{/admin/suppliers}">Ver proveedores</a></div></div>
+                        </div>
+
+                        <!-- Production widgets -->
+                        <div class="home-widget-card" data-widget-id="production-today" draggable="false" th:if="${dashboardVisibleWidgets['production-today']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-success text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Producción del día</span><small class="d-block fw-normal">Solo si el cliente usa producción</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><div class="area-widget-empty">Registra y revisa producción cuando este módulo esté activo.</div></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-success w-100" th:href="@{/production}">Abrir producción</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="production-supplies" draggable="false" th:if="${dashboardVisibleWidgets['production-supplies']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-warning text-dark"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Insumos críticos</span><small class="d-block fw-normal">Materia prima</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Controla insumos y disponibilidad para producción.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-warning w-100" th:href="@{/admin/supplies}">Ver insumos</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="production-supply-stock" draggable="false" th:if="${dashboardVisibleWidgets['production-supply-stock']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-dark text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Stock de insumos</span><small class="d-block fw-normal">Almacén de producción</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><div class="area-widget-empty">Revisa entradas, salidas y saldos de insumos.</div></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-dark w-100" th:href="@{/warehouse/supplies-stock}">Ver stock de insumos</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="production-containers" draggable="false" th:if="${dashboardVisibleWidgets['production-containers']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-info text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Envases retornables</span><small class="d-block fw-normal">Control por cliente</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Controla envases pendientes y movimientos con clientes.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-info text-white w-100" th:href="@{/containers}">Ver envases</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="production-reorder" draggable="false" th:if="${dashboardVisibleWidgets['production-reorder']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Agenda de reposición</span><small class="d-block fw-normal">Recompras y recargas</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Seguimiento de clientes que requieren reposición frecuente.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-primary w-100" th:href="@{/reorder-agenda}">Ver agenda</a></div></div>
+                        </div>
+
+                        <!-- Read-only widgets -->
+                        <div class="home-widget-card" data-widget-id="readonly-summary" draggable="false" th:if="${dashboardVisibleWidgets['readonly-summary']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-dark text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Resumen del negocio</span><small class="d-block fw-normal">Solo lectura</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Puedes revisar información general sin modificar registros.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-dark w-100" th:href="@{/dashboard/business-overview}">Ver resumen</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="readonly-followup" draggable="false" th:if="${dashboardVisibleWidgets['readonly-followup']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-primary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Seguimiento mensual</span><small class="d-block fw-normal">Consulta</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Vista de seguimiento sin acciones de edición.</p></div><div class="card-footer bg-white border-0 pt-0"><a class="btn btn-sm btn-primary w-100" th:href="@{/dashboard/monthly-followup}">Ver seguimiento</a></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="readonly-reports" draggable="false" th:if="${dashboardVisibleWidgets['readonly-reports']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-secondary text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Reportes disponibles</span><small class="d-block fw-normal">Auditoría</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><div class="area-widget-empty">Los reportes visibles dependen de los permisos asignados a tu rol.</div></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="readonly-modules" draggable="false" th:if="${dashboardVisibleWidgets['readonly-modules']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-info text-white"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Módulos visibles</span><small class="d-block fw-normal">Áreas habilitadas</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><p class="small text-muted mb-0">Consulta las áreas disponibles para revisión sin editar configuración.</p></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="readonly-actions" draggable="false" th:if="${dashboardVisibleWidgets['readonly-actions']}">
+                            <div class="card shadow-sm mb-3"><div class="card-header bg-warning text-dark"><div class="d-flex justify-content-between align-items-center gap-2"><div><span>Acciones permitidas</span><small class="d-block fw-normal">Modo consulta</small></div><div class="home-widget-tools"><button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button><button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button></div></div></div><div class="card-body"><ul class="small text-muted mb-0"><li>Revisar información.</li><li>No registrar ni eliminar datos.</li><li>Solicitar cambios al administrador.</li></ul></div></div>
+                        </div>
+
+                        <div class="home-widget-card" data-widget-id="operations" draggable="false" th:if="${dashboardVisibleWidgets['operations']}">
                             <div class="card shadow-sm mb-3">
                                 <div class="card-header bg-success text-white">
                                     <div class="d-flex justify-content-between align-items-center gap-2">
@@ -221,7 +701,7 @@
                             </div>
                         </div>
 
-                        <div class="home-widget-card" data-widget-id="possible-orders" draggable="false">
+                        <div class="home-widget-card" data-widget-id="possible-orders" draggable="false" th:if="${dashboardVisibleWidgets['possible-orders']}">
                             <div class="card shadow-sm">
                                 <div class="card-header bg-dark text-white">
                                     <div class="d-flex justify-content-between align-items-center gap-2">
@@ -367,13 +847,14 @@
                             </div>
                         </div>
 
+
                     </div>
                 </div>
 
                 <div class="col-lg-5">
                     <div class="home-widget-column" data-column="right">
 
-                        <div class="home-widget-card" data-widget-id="sales-today" draggable="false">
+                        <div class="home-widget-card" data-widget-id="sales-today" draggable="false" th:if="${dashboardVisibleWidgets['sales-today']}">
                             <div class="card shadow-sm mb-3">
                                 <div class="card-header bg-info text-white">
                                     <div class="d-flex justify-content-between align-items-center gap-2">
@@ -468,7 +949,7 @@
                             </div>
                         </div>
 
-                        <div class="home-widget-card" data-widget-id="weekly-cash-flow" draggable="false">
+                        <div class="home-widget-card" data-widget-id="weekly-cash-flow" draggable="false" th:if="${dashboardVisibleWidgets['weekly-cash-flow']}">
                             <div class="card shadow-sm mb-3">
                                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                                     <div class="d-flex justify-content-between align-items-center gap-2 flex-grow-1">
@@ -595,7 +1076,7 @@
                             </div>
                         </div>
                         
-                        <div class="home-widget-card" data-widget-id="break-even-month" draggable="false">
+                        <div class="home-widget-card" data-widget-id="break-even-month" draggable="false" th:if="${dashboardVisibleWidgets['break-even-month']}">
     <div class="card shadow-sm mb-3">
         <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
             <div class="d-flex justify-content-between align-items-center gap-2 flex-grow-1">
@@ -769,7 +1250,7 @@
     </div>
 </div>
 
-                        <div class="home-widget-card" data-widget-id="expenses-today" draggable="false">
+                        <div class="home-widget-card" data-widget-id="expenses-today" draggable="false" th:if="${dashboardVisibleWidgets['expenses-today']}">
                             <div class="card shadow-sm mb-3">
                                 <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
                                     <div class="d-flex justify-content-between align-items-center flex-grow-1">
@@ -870,7 +1351,7 @@
                             </div>
                         </div>
 
-                        <div class="home-widget-card" data-widget-id="credit-orders" draggable="false">
+                        <div class="home-widget-card" data-widget-id="credit-orders" draggable="false" th:if="${dashboardVisibleWidgets['credit-orders']}">
                             <div class="card shadow-sm mb-3">
                                 <div class="card-header bg-danger text-white">
                                     <div class="d-flex justify-content-between align-items-center gap-2">
@@ -971,7 +1452,7 @@
                             </div>
                         </div>
 
-                        <div class="home-widget-card" data-widget-id="requested-orders" draggable="false">
+                        <div class="home-widget-card" data-widget-id="requested-orders" draggable="false" th:if="${dashboardVisibleWidgets['requested-orders']}">
                             <div class="card shadow-sm">
                                 <div class="card-header bg-warning text-dark">
                                     <div class="d-flex justify-content-between align-items-center gap-2">
@@ -1066,6 +1547,7 @@
                                 </div>
                             </div>
                         </div>
+
 
                     </div>
                 </div>
@@ -1376,6 +1858,42 @@
                         id="confirmCancelOrder">
                     Anular pedido
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="dashboardWidgetPreferencesModal" tabindex="-1" aria-labelledby="dashboardWidgetPreferencesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="dashboardWidgetPreferencesModalLabel">Personalizar mi panel</h5>
+                    <p class="small text-muted mb-0">Oculta o muestra solo los widgets permitidos para tu rol. Los permisos reales no cambian.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info small mb-3">
+                    <strong>Importante:</strong> esta configuración es personal. Si ocultas un widget, puedes volver a activarlo desde esta ventana.
+                </div>
+                <div id="dashboardWidgetPreferenceList" class="dashboard-preference-list">
+                    <div class="text-muted small">Cargando widgets disponibles...</div>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-danger" id="btnResetPersonalDashboard">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>
+                    Restablecer mi panel
+                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary" id="btnSaveDashboardPreferences">
+                        <i class="bi bi-check2-circle me-1"></i>
+                        Guardar cambios
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -2354,6 +2872,10 @@
         const btnCollapseAllWidgets = document.getElementById('btnCollapseAllWidgets');
         const btnResetWidgetLayout = document.getElementById('btnResetWidgetLayout');
 
+        if (!widgetBoard) {
+            return;
+        }
+
         const defaultLayout = {};
         widgetColumns.forEach(function (column) {
             defaultLayout[column.getAttribute('data-column')] = Array.from(
@@ -2655,6 +3177,335 @@
                 alert(flashMessage);
             }
         }
+    });
+</script>
+
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        const board = document.getElementById('homeWidgetBoard');
+        const preferenceList = document.getElementById('dashboardWidgetPreferenceList');
+        const savePreferencesButton = document.getElementById('btnSaveDashboardPreferences');
+        const resetPersonalDashboardButton = document.getElementById('btnResetPersonalDashboard');
+        const resetLayoutButton = document.getElementById('btnResetWidgetLayout');
+        const preferenceUrl = /*[[@{/dashboard/widget-preferences}]]*/ '/dashboard/widget-preferences';
+        const resetPreferenceUrl = /*[[@{/dashboard/widget-preferences/reset}]]*/ '/dashboard/widget-preferences/reset';
+        const csrfHeader = /*[[${_csrf != null ? _csrf.headerName : 'X-CSRF-TOKEN'}]]*/ 'X-CSRF-TOKEN';
+        const csrfToken = /*[[${_csrf != null ? _csrf.token : ''}]]*/ '';
+        const localStorageKey = 'ecoagua-home-widget-layout-v1';
+        let preferenceState = {
+            allowedWidgets: [],
+            columns: {},
+            collapsed: {},
+            hidden: {}
+        };
+        let saveTimer = null;
+        let applyingPreferences = false;
+
+        function csrfHeaders() {
+            const headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            };
+            if (csrfHeader && csrfToken) {
+                headers[csrfHeader] = csrfToken;
+            }
+            return headers;
+        }
+
+        function collectCurrentLayout() {
+            const payload = {
+                columns: {},
+                collapsed: {},
+                hidden: Object.assign({}, preferenceState.hidden || {})
+            };
+
+            if (!board) {
+                return payload;
+            }
+
+            board.querySelectorAll('.home-widget-column').forEach(function (column) {
+                const columnKey = column.getAttribute('data-column') || 'left';
+                payload.columns[columnKey] = Array.from(column.querySelectorAll('.home-widget-card'))
+                    .filter(function (card) {
+                        return !card.classList.contains('d-none');
+                    })
+                    .map(function (card) {
+                        return card.getAttribute('data-widget-id');
+                    })
+                    .filter(Boolean);
+            });
+
+            board.querySelectorAll('.home-widget-card').forEach(function (card) {
+                const widgetId = card.getAttribute('data-widget-id');
+                if (!widgetId) {
+                    return;
+                }
+                payload.collapsed[widgetId] = card.classList.contains('widget-collapsed');
+            });
+
+            return payload;
+        }
+
+        function saveCurrentPreferences() {
+            if (applyingPreferences) {
+                return;
+            }
+
+            const payload = collectCurrentLayout();
+            preferenceState.columns = payload.columns;
+            preferenceState.collapsed = payload.collapsed;
+            preferenceState.hidden = payload.hidden;
+
+            fetch(preferenceUrl, {
+                method: 'POST',
+                headers: csrfHeaders(),
+                body: JSON.stringify(payload)
+            }).catch(function (error) {
+                console.warn('Could not save dashboard preferences.', error);
+            });
+        }
+
+        function schedulePreferenceSave() {
+            window.clearTimeout(saveTimer);
+            saveTimer = window.setTimeout(saveCurrentPreferences, 350);
+        }
+
+        function setWidgetCollapsed(card, collapsed) {
+            if (!card) {
+                return;
+            }
+
+            card.classList.toggle('widget-collapsed', collapsed);
+            const icon = card.querySelector('.widget-collapse-toggle i');
+            if (icon) {
+                icon.className = collapsed ? 'bi bi-plus-lg' : 'bi bi-dash-lg';
+            }
+        }
+
+        function applyPreferenceLayout(preferences) {
+            if (!board || !preferences) {
+                return;
+            }
+
+            applyingPreferences = true;
+            const columns = preferences.columns || {};
+            const collapsed = preferences.collapsed || {};
+            const hidden = preferences.hidden || {};
+
+            Object.entries(columns).forEach(function (entry) {
+                const columnKey = entry[0];
+                const ids = Array.isArray(entry[1]) ? entry[1] : [];
+                const column = board.querySelector('.home-widget-column[data-column="' + columnKey + '"]');
+                if (!column) {
+                    return;
+                }
+
+                ids.forEach(function (widgetId) {
+                    const card = board.querySelector('.home-widget-card[data-widget-id="' + widgetId + '"]');
+                    if (card && !hidden[widgetId]) {
+                        column.appendChild(card);
+                    }
+                });
+            });
+
+            board.querySelectorAll('.home-widget-card').forEach(function (card) {
+                const widgetId = card.getAttribute('data-widget-id');
+                if (!widgetId) {
+                    return;
+                }
+                if (hidden[widgetId]) {
+                    card.classList.add('d-none');
+                } else {
+                    card.classList.remove('d-none');
+                }
+                setWidgetCollapsed(card, !!collapsed[widgetId]);
+            });
+
+            applyingPreferences = false;
+        }
+
+        function groupWidgetsByArea(widgets) {
+            return widgets.reduce(function (groups, widget) {
+                const area = widget.area || 'General';
+                if (!groups[area]) {
+                    groups[area] = [];
+                }
+                groups[area].push(widget);
+                return groups;
+            }, {});
+        }
+
+        function renderPreferenceList() {
+            if (!preferenceList) {
+                return;
+            }
+
+            const widgets = preferenceState.allowedWidgets || [];
+            if (widgets.length === 0) {
+                preferenceList.innerHTML = '<div class="text-muted small">No hay widgets permitidos para este usuario.</div>';
+                return;
+            }
+
+            const hidden = preferenceState.hidden || {};
+            const groups = groupWidgetsByArea(widgets);
+            let html = '';
+
+            Object.entries(groups).forEach(function (entry) {
+                const area = entry[0];
+                const areaWidgets = entry[1];
+                html += '<div class="dashboard-preference-area">';
+                html += '<h6>' + escapeHtml(area) + '</h6>';
+                areaWidgets.forEach(function (widget) {
+                    const checked = hidden[widget.key] ? '' : ' checked';
+                    html += '<label class="dashboard-preference-item">';
+                    html += '<input type="checkbox" class="form-check-input dashboard-widget-visible-toggle" data-widget-id="' + escapeHtml(widget.key) + '"' + checked + '>';
+                    html += '<span><strong>' + escapeHtml(widget.title || widget.key) + '</strong>';
+                    html += '<small>' + escapeHtml(widget.description || '') + '</small></span>';
+                    html += '</label>';
+                });
+                html += '</div>';
+            });
+
+            preferenceList.innerHTML = html;
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function addHideButtons() {
+            if (!board) {
+                return;
+            }
+
+            board.querySelectorAll('.home-widget-card').forEach(function (card) {
+                const tools = card.querySelector('.home-widget-tools');
+                if (!tools || tools.querySelector('.widget-hide-toggle')) {
+                    return;
+                }
+
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'home-widget-tool-button widget-hide-toggle';
+                button.title = 'Ocultar de mi panel';
+                button.innerHTML = '<i class="bi bi-eye-slash"></i>';
+
+                button.addEventListener('click', function () {
+                    const widgetId = card.getAttribute('data-widget-id');
+                    if (!widgetId) {
+                        return;
+                    }
+                    preferenceState.hidden = preferenceState.hidden || {};
+                    preferenceState.hidden[widgetId] = true;
+                    card.classList.add('d-none');
+                    renderPreferenceList();
+                    saveCurrentPreferences();
+                });
+
+                tools.insertBefore(button, tools.firstChild);
+            });
+        }
+
+        function bindPreferenceSaveEvents() {
+            if (!board) {
+                return;
+            }
+
+            board.querySelectorAll('.widget-collapse-toggle').forEach(function (button) {
+                button.addEventListener('click', schedulePreferenceSave);
+            });
+
+            board.querySelectorAll('.home-widget-card').forEach(function (card) {
+                card.addEventListener('dragend', schedulePreferenceSave);
+            });
+
+            board.querySelectorAll('.home-widget-column').forEach(function (column) {
+                column.addEventListener('drop', schedulePreferenceSave);
+            });
+
+            ['btnExpandAllWidgets', 'btnCollapseAllWidgets', 'btnResetWidgetLayout'].forEach(function (buttonId) {
+                const button = document.getElementById(buttonId);
+                if (button) {
+                    button.addEventListener('click', schedulePreferenceSave);
+                }
+            });
+        }
+
+        if (savePreferencesButton) {
+            savePreferencesButton.addEventListener('click', function () {
+                const hidden = Object.assign({}, preferenceState.hidden || {});
+                preferenceList.querySelectorAll('.dashboard-widget-visible-toggle').forEach(function (input) {
+                    const widgetId = input.getAttribute('data-widget-id');
+                    if (!widgetId) {
+                        return;
+                    }
+                    hidden[widgetId] = !input.checked;
+                });
+                preferenceState.hidden = hidden;
+                saveCurrentPreferences();
+                window.setTimeout(function () {
+                    window.location.reload();
+                }, 250);
+            });
+        }
+
+        if (resetPersonalDashboardButton) {
+            resetPersonalDashboardButton.addEventListener('click', function () {
+                if (!window.confirm('¿Restablecer tu panel personal? Se mostrarán nuevamente los widgets permitidos por tu rol.')) {
+                    return;
+                }
+
+                fetch(resetPreferenceUrl, {
+                    method: 'POST',
+                    headers: csrfHeaders(),
+                    body: '{}'
+                }).then(function () {
+                    try {
+                        window.localStorage.removeItem(localStorageKey);
+                    } catch (error) {
+                        console.warn('Could not clear local dashboard layout.', error);
+                    }
+                    window.location.reload();
+                }).catch(function (error) {
+                    console.warn('Could not reset dashboard preferences.', error);
+                });
+            });
+        }
+
+        if (resetLayoutButton) {
+            resetLayoutButton.addEventListener('click', function () {
+                window.setTimeout(saveCurrentPreferences, 450);
+            });
+        }
+
+        fetch(preferenceUrl, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        }).then(function (response) {
+            if (!response.ok) {
+                throw new Error('Preference request failed.');
+            }
+            return response.json();
+        }).then(function (preferences) {
+            preferenceState = Object.assign(preferenceState, preferences || {});
+            applyPreferenceLayout(preferenceState);
+            renderPreferenceList();
+            addHideButtons();
+            bindPreferenceSaveEvents();
+        }).catch(function (error) {
+            console.warn('Could not load dashboard preferences.', error);
+            addHideButtons();
+            bindPreferenceSaveEvents();
+        });
     });
 </script>
 </body>

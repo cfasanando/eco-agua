@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Detalle de producción - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='production'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-1" th:text="'Producción #' + ${order.id}">Producción</h1>
+                    <div class="text-muted small" th:text="${order.product != null ? order.product.name : '-'}">Producto</div>
+                </div>
+                <a class="btn btn-outline-secondary" th:href="@{/production}">Volver</a>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}">OK</div>
+            <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}">Error</div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Cabecera</strong></div>
+                        <div class="card-body small">
+                            <p class="mb-1"><strong>Fecha:</strong> <span th:text="${#temporals.format(order.productionDate, 'dd/MM/yyyy')}">-</span></p>
+                            <p class="mb-1"><strong>Producto:</strong> <span th:text="${order.product != null ? order.product.name : '-'}">-</span></p>
+                            <p class="mb-1"><strong>Cantidad producida:</strong> <span th:text="${#numbers.formatDecimal(order.quantityProduced, 1, 2)}">0.00</span></p>
+                            <p class="mb-1"><strong>Estado:</strong> <span th:text="${order.status}">DRAFT</span></p>
+                            <p class="mb-0"><strong>Observación:</strong> <span th:text="${order.observation} ?: '-'">-</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Costos</strong></div>
+                        <div class="card-body small">
+                            <p class="mb-1"><strong>Costo total insumos:</strong> <span th:text="${#numbers.formatDecimal(order.totalInputCost, 1, 2)}">0.00</span></p>
+                            <p class="mb-1"><strong>Costo unitario estimado:</strong> <span th:text="${#numbers.formatDecimal(order.unitCostEstimated, 1, 4)}">0.0000</span></p>
+                            <p class="mb-0 text-muted">El stock se mueve recién al confirmar la producción.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light"><strong>Insumos usados</strong></div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light"><tr><th>Insumo</th><th class="text-end">Cantidad</th><th class="text-end">Costo unitario</th><th class="text-end">Subtotal</th></tr></thead>
+                            <tbody>
+                            <tr th:each="line : ${order.supplies}">
+                                <td th:text="${line.supply != null ? line.supply.name : '-'}">Insumo</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(line.quantityUsed, 1, 4)}">0.0000</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(line.unitCostSnapshot, 1, 6)}">0.000000</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(line.lineTotal, 1, 2)}">0.00</td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(order.supplies)}"><td colspan="4" class="text-center text-muted">No hay líneas de insumos registradas.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2" th:if="${order.status.name() != 'CANCELED'}">
+                <form th:if="${order.status.name() == 'DRAFT'}" th:action="@{|/production/${order.id}/confirm|}" method="post">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                    <button type="submit" class="btn btn-success">Confirmar producción</button>
+                </form>
+
+                <form th:if="${order.status.name() == 'DRAFT'}"
+                      th:action="@{|/production/${order.id}/delete|}"
+                      method="post"
+                      onsubmit="return confirm('¿Eliminar este borrador de producción?');">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                    <button type="submit" class="btn btn-outline-danger">Eliminar borrador</button>
+                </form>
+
+                <form th:action="@{|/production/${order.id}/cancel|}" method="post">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                    <button type="submit" class="btn btn-outline-secondary">Cancelar</button>
+                </form>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

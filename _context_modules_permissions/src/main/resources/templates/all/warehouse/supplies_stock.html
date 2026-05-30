@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="fragments/head_admin :: adminHead('Stock de insumos - Eco Agua')"></head>
+
+<body>
+
+<div class="app-layout" th:with="activePage='warehouse_supplies_stock'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="h5 mb-0">Stock de insumos</h1>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <table id="suppliesStockTable"
+                           class="table table-striped table-sm align-middle"
+                           style="width:100%">
+                        <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Nombre</th>
+                            <th>Unidad</th>
+                            <th class="text-end">Stock</th>
+                            <th class="text-end">Costo base S/.</th>
+                            <th class="text-center">Acciones</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="supply, stat : ${supplies}">
+                            <td th:text="${stat.index + 1}">1</td>
+                            <td>
+                                <span th:text="${supply.name}">Insumo</span>
+                                <small class="text-muted d-block"
+                                       th:text="${supply.description}">Descripción</small>
+                            </td>
+                            <td th:text="${supply.unit}">unidad</td>
+                            <td class="text-end"
+                                th:text="${#numbers.formatDecimal(supply.stock,1,'POINT',2,'POINT')}">
+                                0.00
+                            </td>
+                            <td class="text-end"
+                                th:text="${#numbers.formatDecimal(supply.baseCost,1,'POINT',2,'POINT')}">
+                                0.00
+                            </td>
+                            <td class="text-center">
+                                <!-- Adjust stock -->
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary me-1"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#adjustSupplyStockModal"
+                                        th:attr="data-id=${supply.id},
+                                                 data-name=${supply.name},
+                                                 data-stock=${supply.stock}">
+                                    <i class="bi bi-calculator"></i>
+                                </button>
+
+                                <!-- Movements -->
+                                <a th:href="@{'/warehouse/supplies-stock/' + ${supply.id} + '/movements'}"
+                                   class="btn btn-sm btn-outline-secondary"
+                                   title="Ver movimientos">
+                                    <i class="bi bi-chevron-double-right"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<!-- Modal adjust stock -->
+<div class="modal fade" id="adjustSupplyStockModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="adjustSupplyStockForm"
+                  th:action="@{/warehouse/supplies-stock/adjust}"
+                  method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title">Ajustar stock</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="supplyId" id="assSupplyId"/>
+
+                    <div class="mb-3">
+                        <label class="form-label">Insumo</label>
+                        <input type="text" class="form-control" id="assSupplyName" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Stock actual</label>
+                        <input type="text" class="form-control" id="assCurrentStock" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Cantidad</label>
+                        <input type="number" step="0.01" min="0"
+                               class="form-control"
+                               name="quantity"
+                               id="assQuantity"
+                               required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Fecha</label>
+                        <input type="date"
+                               class="form-control"
+                               name="movementDate"
+                               id="assMovementDate"
+                               required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Observación</label>
+                        <textarea class="form-control"
+                                  name="observation"
+                                  id="assObservation"
+                                  rows="2"></textarea>
+                    </div>
+
+                    <input type="hidden" name="action" id="assAction" value="IN">
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-success btn-sm"
+                            onclick="window.ecoWarehouse.submitSupplyStockForm('IN')">
+                        <i class="bi bi-plus-circle"></i> Agregar
+                    </button>
+                    <button type="button"
+                            class="btn btn-danger btn-sm"
+                            onclick="window.ecoWarehouse.submitSupplyStockForm('OUT')">
+                        <i class="bi bi-dash-circle"></i> Quitar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        window.ecoAdmin.initStandardDataTable('#suppliesStockTable', []);
+
+        const adjustModal = document.getElementById('adjustSupplyStockModal');
+        const form = document.getElementById('adjustSupplyStockForm');
+
+        const inputId = document.getElementById('assSupplyId');
+        const inputName = document.getElementById('assSupplyName');
+        const inputCurrentStock = document.getElementById('assCurrentStock');
+        const inputQuantity = document.getElementById('assQuantity');
+        const inputDate = document.getElementById('assMovementDate');
+        const inputObs = document.getElementById('assObservation');
+
+        if (!window.ecoWarehouse) {
+            window.ecoWarehouse = window.ecoWarehouse || {};
+        }
+
+        window.ecoWarehouse.submitSupplyStockForm = function (action) {
+            document.getElementById('assAction').value = action;
+            form.submit();
+        };
+
+        if (adjustModal) {
+            adjustModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                if (!button) {
+                    return;
+                }
+
+                const id = button.getAttribute('data-id');
+                const name = button.getAttribute('data-name') || '';
+                const stock = button.getAttribute('data-stock') || '0.00';
+
+                adjustModal.querySelector('.modal-title').textContent =
+                    'Ajustar stock: ' + name;
+
+                inputId.value = id;
+                inputName.value = name;
+                inputCurrentStock.value = stock;
+                inputQuantity.value = '';
+                inputObs.value = '';
+
+                const today = new Date().toISOString().substring(0, 10);
+                inputDate.value = today;
+            });
+        }
+
+        // Flash message
+        const flashMessage = /*[[${message}]]*/ null;
+        const flashType = /*[[${messageType}]]*/ null;
+        if (flashMessage && flashMessage !== 'null' && flashMessage !== '') {
+            window.ecoAdmin.showFlashMessage(flashMessage, flashType);
+        }
+    });
+</script>
+
+</body>
+</html>

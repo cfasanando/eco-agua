@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Nueva producción - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='production'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Nueva producción</h1>
+                    <div class="text-muted small">Registrar borrador usando la receta configurada del producto</div>
+                </div>
+                <a class="btn btn-outline-secondary" th:href="@{/production}">Volver</a>
+            </div>
+
+            <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}">Error</div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-light"><strong>Datos de producción</strong></div>
+                <div class="card-body">
+                    <form th:action="@{/production}" method="post" id="productionForm">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Fecha</label>
+                                <input type="date" class="form-control" name="productionDate" th:value="${today}" required>
+                            </div>
+
+                            <div class="col-md-5">
+                                <label class="form-label">Producto terminado</label>
+                                <select class="form-select" name="productId" id="productId" required>
+                                    <option value="">Seleccione</option>
+                                    <option th:each="product : ${products}" th:value="${product.id}" th:text="${product.name}">Producto</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Cantidad producida</label>
+                                <input type="number" min="0.01" step="0.01" class="form-control" name="quantityProduced" id="quantityProduced" value="1" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Observación</label>
+                            <input type="text" class="form-control" name="observation" maxlength="255">
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <label class="form-label mb-0">Insumos consumidos</label>
+                                <div class="small text-muted">Se cargan desde la receta del producto y puedes ajustar cantidades antes de guardar.</div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="loadRecipeBtn">
+                                Cargar receta
+                            </button>
+                        </div>
+
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm align-middle">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Insumo</th>
+                                    <th class="text-end">Receta por unidad</th>
+                                    <th class="text-end">Costo unitario</th>
+                                    <th class="text-end">Cantidad usada</th>
+                                    <th class="text-end">Subtotal</th>
+                                </tr>
+                                </thead>
+                                <tbody id="recipeLinesBody">
+                                <tr id="recipeEmptyRow">
+                                    <td colspan="5" class="text-center text-muted">
+                                        Selecciona un producto y cantidad para cargar su receta.
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a class="btn btn-outline-secondary" th:href="@{/production}">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">Guardar borrador</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+(function () {
+    const productInput = document.getElementById('productId');
+    const quantityInput = document.getElementById('quantityProduced');
+    const loadRecipeBtn = document.getElementById('loadRecipeBtn');
+    const recipeLinesBody = document.getElementById('recipeLinesBody');
+    const form = document.getElementById('productionForm');
+
+    function formatNumber(value, decimals) {
+        const number = Number(value || 0);
+        return number.toFixed(decimals);
+    }
+
+    function renderEmpty(message) {
+        recipeLinesBody.innerHTML = `
+            <tr id="recipeEmptyRow">
+                <td colspan="5" class="text-center text-muted">${message}</td>
+            </tr>
+        `;
+    }
+
+    function buildRow(line) {
+        return `
+            <tr>
+                <td>
+                    <div class="fw-semibold">${line.supplyName ?? '-'}</div>
+                    <div class="small text-muted">${line.unit ?? '-'}</div>
+                    <input type="hidden" name="supplyId" value="${line.supplyId}">
+                </td>
+                <td class="text-end">${formatNumber(line.recipeQuantityPerUnit, 4)}</td>
+                <td class="text-end">${formatNumber(line.unitCost, 6)}</td>
+                <td class="text-end">
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.0001"
+                        class="form-control text-end quantity-used-input"
+                        name="quantityUsed"
+                        value="${formatNumber(line.calculatedQuantity, 4)}"
+                        data-unit-cost="${line.unitCost ?? 0}"
+                    >
+                </td>
+                <td class="text-end line-total-cell">${formatNumber(line.lineTotal, 2)}</td>
+            </tr>
+        `;
+    }
+
+    function recalcTotals() {
+        recipeLinesBody.querySelectorAll('tr').forEach(function (row) {
+            const qtyInput = row.querySelector('.quantity-used-input');
+            const totalCell = row.querySelector('.line-total-cell');
+
+            if (!qtyInput || !totalCell) {
+                return;
+            }
+
+            const qty = Number(qtyInput.value || 0);
+            const unitCost = Number(qtyInput.dataset.unitCost || 0);
+            totalCell.textContent = formatNumber(qty * unitCost, 2);
+        });
+    }
+
+    async function loadRecipe() {
+        const productId = productInput?.value;
+        const quantityProduced = quantityInput?.value;
+
+        if (!productId) {
+            renderEmpty('Selecciona un producto para cargar la receta.');
+            return;
+        }
+
+        if (!quantityProduced || Number(quantityProduced) <= 0) {
+            renderEmpty('Ingresa una cantidad producida válida.');
+            return;
+        }
+
+        renderEmpty('Cargando receta...');
+
+        try {
+            const response = await fetch(`/production/product/${productId}/recipe?quantityProduced=${encodeURIComponent(quantityProduced)}`);
+            if (!response.ok) {
+                throw new Error('Unable to load recipe.');
+            }
+
+            const lines = await response.json();
+
+            if (!Array.isArray(lines) || lines.length === 0) {
+                renderEmpty('Este producto no tiene insumos configurados en su receta.');
+                return;
+            }
+
+            recipeLinesBody.innerHTML = lines.map(buildRow).join('');
+            recalcTotals();
+        } catch (error) {
+            renderEmpty('No se pudo cargar la receta del producto.');
+        }
+    }
+
+    loadRecipeBtn?.addEventListener('click', loadRecipe);
+    productInput?.addEventListener('change', loadRecipe);
+    quantityInput?.addEventListener('change', loadRecipe);
+
+    recipeLinesBody?.addEventListener('input', function (event) {
+        if (event.target.classList.contains('quantity-used-input')) {
+            recalcTotals();
+        }
+    });
+
+    form?.addEventListener('submit', function (event) {
+        const rows = recipeLinesBody.querySelectorAll('input[name="supplyId"]');
+        if (!rows.length) {
+            event.preventDefault();
+            alert('Debes cargar la receta o ingresar al menos una línea de insumo.');
+        }
+    });
+})();
+</script>
+</body>
+</html>

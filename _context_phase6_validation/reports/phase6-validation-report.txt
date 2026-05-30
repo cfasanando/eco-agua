@@ -1,0 +1,253 @@
+===== GIT STATUS =====
+ M src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java
+ M src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingAdminController.java
+ M src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java
+ M src/main/resources/templates/admin/platform_settings.html
+ M src/main/resources/templates/fragments/sidebar.html
+?? _context_modules_permissions/
+?? _context_phase6_validation/
+?? src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java
+?? src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java
+?? src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java
+?? src/main/resources/templates/admin/system_modules.html
+
+===== SECURITY CONFIG =====
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:3:import com.ecoamazonas.eco_agua.config.SystemModuleAccessFilter;
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:273:    private final SystemModuleAccessFilter systemModuleAccessFilter;
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:276:                          SystemModuleAccessFilter systemModuleAccessFilter) {
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:278:        this.systemModuleAccessFilter = systemModuleAccessFilter;
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:284:            .addFilterBefore(systemModuleAccessFilter, AuthorizationFilter.class)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:285:            .authorizeHttpRequests(auth -> auth
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:286:                .requestMatchers("/", "/portal", "/catalogo", "/order/whatsapp").permitAll()
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:287:                .requestMatchers("/blog", "/blog/**").permitAll()
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:288:                .requestMatchers("/css/**", "/js/**", "/img/**", "/uploads/**", "/webjars/**").permitAll()
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:289:                .requestMatchers("/login", "/error").permitAll()
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:290:                .requestMatchers(HttpMethod.GET, "/logout").permitAll()
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:291:                .requestMatchers(HttpMethod.GET, "/password-reset/request", "/password-reset").permitAll()
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:292:                .requestMatchers(HttpMethod.POST, "/password-reset/request", "/password-reset").permitAll()
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:294:                .requestMatchers("/home").hasAnyAuthority(DASHBOARD_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:295:                .requestMatchers("/dashboard/business-overview", "/dashboard/monthly-followup").hasAnyAuthority(REPORTS_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:296:                .requestMatchers("/dashboard/commercial-daily").hasAnyAuthority(SALES_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:298:                .requestMatchers(HttpMethod.POST, "/orders/**").hasAnyAuthority(SALES_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:299:                .requestMatchers("/orders/**").hasAnyAuthority(SALES_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:300:                .requestMatchers(HttpMethod.POST, "/income/credit/**").hasAnyAuthority(RECEIVABLES_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:301:                .requestMatchers("/income/credit/**").hasAnyAuthority(SALES_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:302:                .requestMatchers(HttpMethod.POST, "/income/others/**").hasAnyAuthority(INCOME_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:303:                .requestMatchers("/income/others/**", "/income/sales").hasAnyAuthority(INCOME_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:304:                .requestMatchers("/income/**").hasAnyAuthority(INCOME_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:306:                .requestMatchers(HttpMethod.POST, "/expenses/**").hasAnyAuthority(EXPENSE_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:307:                .requestMatchers("/expenses/**").hasAnyAuthority(EXPENSE_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:309:                .requestMatchers("/accounting/**", "/cashflow/**", "/admin/price-simulator/**").hasAnyAuthority(FINANCE_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:311:                .requestMatchers(HttpMethod.POST, "/admin/clients/**", "/admin/client-profiles/**").hasAnyAuthority(CLIENTS_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:312:                .requestMatchers("/admin/clients/**", "/admin/client-profiles/**").hasAnyAuthority(CLIENTS_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:314:                .requestMatchers(HttpMethod.POST, "/admin/products/**").hasAnyAuthority(PRODUCTS_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:315:                .requestMatchers("/admin/products/**").hasAnyAuthority(PRODUCTS_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:316:                .requestMatchers(HttpMethod.POST, "/admin/categories/**").hasAnyAuthority(CATEGORIES_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:317:                .requestMatchers("/admin/categories/**").hasAnyAuthority(CATEGORIES_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:318:                .requestMatchers(HttpMethod.POST, "/warehouse/products-stock/**").hasAnyAuthority(STOCK_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:319:                .requestMatchers("/warehouse/products-stock/**").hasAnyAuthority(STOCK_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:320:                .requestMatchers(HttpMethod.POST, "/warehouse/supplies-stock/**").hasAnyAuthority(STOCK_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:321:                .requestMatchers("/warehouse/supplies-stock/**").hasAnyAuthority(STOCK_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:322:                .requestMatchers(HttpMethod.POST, "/admin/supplies/**").hasAnyAuthority(SUPPLIES_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:323:                .requestMatchers("/admin/supplies/**").hasAnyAuthority(SUPPLIES_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:324:                .requestMatchers(HttpMethod.POST, "/admin/suppliers/**").hasAnyAuthority(SUPPLIERS_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:325:                .requestMatchers("/admin/suppliers/**").hasAnyAuthority(SUPPLIERS_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:327:                .requestMatchers(HttpMethod.POST, "/delivery/**", "/admin/delivery-zones/**").hasAnyAuthority(DELIVERY_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:328:                .requestMatchers("/delivery/**", "/admin/delivery-zones/**").hasAnyAuthority(DELIVERY_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:329:                .requestMatchers(HttpMethod.POST, "/containers/**").hasAnyAuthority(CONTAINERS_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:330:                .requestMatchers("/containers/**").hasAnyAuthority(CONTAINERS_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:331:                .requestMatchers(HttpMethod.POST, "/reorder-agenda/**").hasAnyAuthority(REORDER_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:332:                .requestMatchers("/reorder-agenda/**").hasAnyAuthority(REORDER_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:334:                .requestMatchers(HttpMethod.POST, "/production/**").hasAnyAuthority(PRODUCTION_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:335:                .requestMatchers("/production/**").hasAnyAuthority(PRODUCTION_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:337:                .requestMatchers(HttpMethod.POST, "/admin/promotions/**", "/marketing/admin/**", "/admin/blog/**").hasAnyAuthority(MARKETING_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:338:                .requestMatchers("/admin/promotions/**", "/marketing/admin/**", "/admin/blog/**").hasAnyAuthority(MARKETING_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:340:                .requestMatchers(HttpMethod.POST, "/admin/personnel/**", "/admin/job-positions/**").hasAnyAuthority(HR_WRITE)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:341:                .requestMatchers("/admin/personnel/**", "/admin/job-positions/**").hasAnyAuthority(HR_VIEW)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:342:                .requestMatchers("/admin/users/**").hasAnyAuthority(USERS_ADMIN)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:343:                .requestMatchers("/admin/roles-permissions/**").hasAnyAuthority(ROLES_ADMIN)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:344:                .requestMatchers("/admin/system-modules/**").hasAnyAuthority(PLATFORM_ADMIN)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:345:                .requestMatchers("/admin/platform-settings/**").hasAnyAuthority(PLATFORM_ADMIN)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:347:                .requestMatchers("/admin/**").hasAnyAuthority(ADMINISTRATORS)
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:357:            .rememberMe(remember -> remember
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:358:                .rememberMeParameter("remember-me")
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:359:                .rememberMeCookieName("remember-me")
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:14:public class SystemModuleAccessFilter extends OncePerRequestFilter {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:54:    public SystemModuleAccessFilter(SystemModuleService systemModuleService) {
+
+===== SYSTEM MODULE REFERENCES =====
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:15:    private final SystemModuleService systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:21:            SystemModuleService systemModuleService
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:26:        this.systemModuleService = systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java:81:        Map<String, Boolean> moduleFlags = systemModuleService.getModuleFlags();
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingAdminController.java:34:    private final SystemModuleService systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingAdminController.java:39:                                          SystemModuleService systemModuleService,
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingAdminController.java:43:        this.systemModuleService = systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/PlatformSettingAdminController.java:50:        systemModuleService.ensureDefaults();
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:49:            ModuleRoute.prefix("/admin/system-modules", "platform_settings")
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:52:    private final SystemModuleService systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:54:    public SystemModuleAccessFilter(SystemModuleService systemModuleService) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:55:        this.systemModuleService = systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAccessFilter.java:65:        if (matchedRoute != null && !systemModuleService.isEnabled(matchedRoute.moduleKey())) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:14:@RequestMapping("/admin/system-modules")
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:15:public class SystemModuleAdminController {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:17:    private final SystemModuleService systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:19:    public SystemModuleAdminController(SystemModuleService systemModuleService) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:20:        this.systemModuleService = systemModuleService;
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:25:        systemModuleService.ensureDefaults();
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:27:        var modules = systemModuleService.getModuleDefinitions();
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:28:        long enabledCount = modules.stream().filter(SystemModuleService.ModuleDefinition::enabled).count();
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:29:        long belenSuggestedCount = modules.stream().filter(SystemModuleService.ModuleDefinition::recommendedForBelen).count();
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:30:        long aguaEcoSuggestedCount = modules.stream().filter(SystemModuleService.ModuleDefinition::recommendedForAguaEco).count();
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:32:        model.addAttribute("activePage", "system_modules");
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:33:        model.addAttribute("moduleGroups", systemModuleService.getModuleGroups());
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:39:        return "admin/system_modules";
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:46:            for (SystemModuleService.ModuleDefinition module : systemModuleService.getModuleDefinitions()) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:47:                if (module.locked()) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:51:                boolean enabled = requestParams.containsKey(inputName(module.key()));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:52:                systemModuleService.updateModuleFlag(module.key(), enabled);
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java:60:        return "redirect:/admin/system-modules";
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:12:public class SystemModuleService {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:14:    private static final String SETTING_PREFIX = "module.";
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:16:    private static final String CATEGORY = "system_modules";
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:22:    public SystemModuleService(PlatformSettingRepository platformSettingRepository,
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:32:        moduleDefinitions().forEach(module -> modules.put(module.key(), isEnabled(module.key())));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:38:                .map(module -> module.withRuntimeState(defaultValueFor(module.key()), isEnabled(module.key())))
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:45:            groupedModules.computeIfAbsent(module.area(), ignored -> new ArrayList<>()).add(module);
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:89:                    settingName(module.key()),
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:90:                    Boolean.toString(module.locked() || defaultValueFor(module.key())),
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:93:                    module.description()
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:96:            if (module.locked() && !parseBoolean(setting.getValue(), true)) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:154:            if (module.key().equals(key)) {
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:193:        modules.add(new ModuleDefinition("cashflow", "Finanzas y contabilidad", "Flujo de caja", "Cashflow module.", true, true, true, false, false));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:202:        modules.add(new ModuleDefinition("containers", "Inventario y operación", "Envases retornables", "Returnable containers module.", true, false, false, false, false));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:203:        modules.add(new ModuleDefinition("production", "Inventario y operación", "Producción / planta", "Production and plant module.", true, false, false, false, false));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:208:        modules.add(new ModuleDefinition("public_site", "Marketing y portal público", "Portal público", "Public website module.", true, true, true, false, false));
+src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java:209:        modules.add(new ModuleDefinition("public_catalog", "Marketing y portal público", "Catálogo público", "Public catalog module.", true, true, true, false, false));
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:344:                .requestMatchers("/admin/system-modules/**").hasAnyAuthority(PLATFORM_ADMIN)
+src/main/resources/templates/admin/platform_settings.html:19:                    <a th:href="@{/admin/system-modules}" class="btn btn-sm btn-outline-primary">
+src/main/resources/templates/admin/platform_settings.html:146:                                    <code>platform</code>, <code>public_site</code> o <code>system_modules</code>.
+src/main/resources/templates/admin/system_modules.html:96:            <form method="post" th:action="@{/admin/system-modules}">
+src/main/resources/templates/admin/system_modules.html:134:                                                <div class="fw-semibold" th:text="${module.label()}">Módulo</div>
+src/main/resources/templates/admin/system_modules.html:135:                                                <div th:if="${module.locked()}" class="small text-muted">
+src/main/resources/templates/admin/system_modules.html:145:                                                           th:id="${'module-' + module.key()}"
+src/main/resources/templates/admin/system_modules.html:146:                                                           th:name="${'module_' + module.key()}"
+src/main/resources/templates/admin/system_modules.html:147:                                                           th:checked="${module.enabled()}"
+src/main/resources/templates/admin/system_modules.html:148:                                                           th:disabled="${module.locked()}"/>
+src/main/resources/templates/admin/system_modules.html:150:                                                           th:for="${'module-' + module.key()}"
+src/main/resources/templates/admin/system_modules.html:151:                                                           th:text="${module.enabled() ? 'Activo' : 'Inactivo'}">
+src/main/resources/templates/admin/system_modules.html:157:                                            <td class="small text-muted" th:text="${module.description()}">Descripción</td>
+src/main/resources/templates/admin/system_modules.html:161:                                                    <span th:if="${module.recommendedForBelen()}" class="badge rounded-pill text-bg-success">Belén</span>
+src/main/resources/templates/admin/system_modules.html:162:                                                    <span th:if="${module.recommendedForAguaEco()}" class="badge rounded-pill text-bg-primary">Agua Eco</span>
+src/main/resources/templates/admin/system_modules.html:163:                                                    <span th:if="${!module.recommendedForBelen() and !module.recommendedForAguaEco()}" class="badge rounded-pill text-bg-secondary">Opcional</span>
+src/main/resources/templates/admin/system_modules.html:168:                                                <code class="small" th:text="${module.settingVariable()}">module.example.enabled</code>
+src/main/resources/templates/fragments/sidebar.html:523:          or activePage == 'system_modules'}"
+src/main/resources/templates/fragments/sidebar.html:553:              th:href="@{/admin/system-modules}"
+src/main/resources/templates/fragments/sidebar.html:555:              th:classappend="${activePage == 'system_modules' ? ' active' : ''}"
+
+===== ROLE / PERMISSION REFERENCES =====
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:23:    private static final String ROLE_OWNER = "ROLE_OWNER";
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:25:    private static final String ROLE_MARKETING = "ROLE_MARKETING";
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:26:    private static final String ROLE_SALES = "ROLE_SALES";
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:27:    private static final String ROLE_FINANCE = "ROLE_FINANCE";
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:28:    private static final String ROLE_LOGISTICS = "ROLE_LOGISTICS";
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:31:    private static final String ROLE_READONLY = "ROLE_READONLY";
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:42:            ROLE_OWNER,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:48:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_SALES, ROLE_FINANCE,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:49:            ROLE_LOGISTICS, ROLE_PRODUCTION, ROLE_HR, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:56:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:62:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_SALES, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:68:            ROLE_OWNER, ROLE_SALES,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:74:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_SALES, ROLE_FINANCE, ROLE_LOGISTICS, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:76:            "ver_ventas", "ver_ingresos"
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:80:            ROLE_OWNER, ROLE_SALES,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:86:            ROLE_OWNER, ROLE_SALES, ROLE_FINANCE,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:92:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:94:            "ver_ingresos", "ver_ventas"
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:98:            ROLE_OWNER, ROLE_FINANCE,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:104:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:106:            "ver_egresos"
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:110:            ROLE_OWNER, ROLE_FINANCE,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:116:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:122:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_SALES, ROLE_FINANCE, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:123:            ROLE_PRODUCTION, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:129:            ROLE_OWNER, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:135:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_LOGISTICS, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:141:            ROLE_OWNER, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:147:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_LOGISTICS, ROLE_PRODUCTION, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:153:            ROLE_OWNER, ROLE_LOGISTICS, ROLE_PRODUCTION,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:159:            ROLE_OWNER, ROLE_LOGISTICS, ROLE_PRODUCTION, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:165:            ROLE_OWNER, ROLE_LOGISTICS, ROLE_PRODUCTION,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:171:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_LOGISTICS, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:177:            ROLE_OWNER, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:183:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_SALES, ROLE_LOGISTICS, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:189:            ROLE_OWNER, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:195:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:197:            "ver_marketing", "ver_promociones", "ver_blog", "ver_testimonios"
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:201:            ROLE_OWNER, ROLE_MARKETING,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:207:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_PRODUCTION, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:213:            ROLE_OWNER, ROLE_PRODUCTION,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:219:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_LOGISTICS, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:225:            ROLE_OWNER, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:231:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_SALES, ROLE_LOGISTICS, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:237:            ROLE_OWNER, ROLE_SALES, ROLE_LOGISTICS,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:243:            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_HR, ROLE_READONLY,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:249:            ROLE_OWNER, ROLE_HR,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:255:            ROLE_OWNER, ROLE_HR,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:257:            "administra_usuarios"
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:261:            ROLE_OWNER,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:267:            ROLE_OWNER,
+src/main/java/com/ecoamazonas/eco_agua/security/SecurityConfig.java:269:            "admin_config"
+src/main/java/com/ecoamazonas/eco_agua/user/Permission.java:16:    // Permission code, e.g. "ver_ingresos"
+src/main/resources/templates/fragments/sidebar.html:37:    <th:block th:if="${moduleBusinessOverviewEnabled or moduleMonthlyFollowupEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','ADMIN_RRHH','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_HR','ROLE_READONLY')">
+src/main/resources/templates/fragments/sidebar.html:59:    <th:block th:if="${moduleOperationSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:88:          <th:block th:if="${moduleCommercialDailyEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_SALES','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:99:          <th:block th:if="${moduleClientsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS')">
+src/main/resources/templates/fragments/sidebar.html:110:          <th:block th:if="${moduleClientsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_SALES','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:121:          <th:block th:if="${moduleClientsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING')">
+src/main/resources/templates/fragments/sidebar.html:132:          <th:block th:if="${modulePromotionsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING')">
+src/main/resources/templates/fragments/sidebar.html:143:          <th:block th:if="${featureDelivery}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES')">
+src/main/resources/templates/fragments/sidebar.html:154:          <th:block th:if="${featureDelivery}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES')">
+src/main/resources/templates/fragments/sidebar.html:165:          <th:block th:if="${featureReorder}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES')">
+src/main/resources/templates/fragments/sidebar.html:178:      <th:block th:if="${moduleIncomeEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:229:      <th:block th:if="${moduleExpensesEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_LOGISTICS')">
+src/main/resources/templates/fragments/sidebar.html:251:            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:262:            <th:block sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:273:            <th:block th:if="${moduleFixedCostsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:297:      <th:block th:if="${moduleInventorySectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES')">
+src/main/resources/templates/fragments/sidebar.html:322:            <th:block th:if="${moduleProductsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:333:            <th:block th:if="${featureSupplies}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:344:            <th:block th:if="${moduleCategoriesEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:355:            <th:block th:if="${moduleWarehouseEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:376:            <th:block th:if="${featureSupplies}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:387:            <th:block th:if="${featureProduction}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+src/main/resources/templates/fragments/sidebar.html:401:      <th:block th:if="${moduleFinanceSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:456:    <th:block th:if="${featureMarketingSection}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING')">
+src/main/resources/templates/fragments/sidebar.html:480:            <th:block th:if="${featureMarketing}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING')">
+src/main/resources/templates/fragments/sidebar.html:513:    <th:block th:if="${moduleSystemSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_HR','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:539:          <th:block th:if="${modulePlatformSettingsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ROLE_OWNER','ROLE_MANAGEMENT')">
+src/main/resources/templates/fragments/sidebar.html:551:          <th:block th:if="${modulePlatformSettingsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ROLE_OWNER','ROLE_MANAGEMENT')">
+src/main/resources/templates/fragments/sidebar.html:562:          <th:block th:if="${moduleUsersEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_HR')">
+src/main/resources/templates/fragments/sidebar.html:573:          <th:block th:if="${moduleHrEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_HR')">
+src/main/resources/templates/fragments/sidebar.html:584:          <th:block th:if="${moduleHrEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_HR','ROLE_FINANCE')">
+src/main/resources/templates/fragments/sidebar.html:595:          <th:block th:if="${moduleRolesPermissionsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ROLE_OWNER','ROLE_MANAGEMENT')">
+
+===== COMPILE CHECK =====
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------------< com.ecoamazonas:eco-agua >----------------------
+[INFO] Building eco-agua 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ eco-agua ---
+[INFO] Copying 99 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ eco-agua ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  1.307 s
+[INFO] Finished at: 2026-05-29T12:27:56-05:00
+[INFO] ------------------------------------------------------------------------

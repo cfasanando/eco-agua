@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_public :: publicHead(${post.title} + ' - ' + ${platformName})}"></head>
+
+<body th:style="'--eco-primary:' + ${publicPrimaryColor} + '; --eco-secondary:' + ${publicSecondaryColor} + ';'">
+
+<div class="top-bar text-white py-1">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center small">
+        <span>
+            <i class="bi bi-geo-alt-fill me-1"></i>
+            <span th:text="${topbarLocation}">Atención en Iquitos y alrededores</span>
+        </span>
+        <span class="d-flex align-items-center">
+            <i class="bi bi-telephone-fill me-1"></i>
+            <span class="me-3"><span th:text="${topbarPhoneLabel}">Central:</span> <span th:text="${topbarPhone}">(065) 000000</span></span>
+            <i class="bi bi-whatsapp me-1"></i>
+            <a class="text-white text-decoration-none fw-semibold" th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank">
+                <span th:text="${topbarWhatsappLabel}">Pedidos por WhatsApp</span>
+            </a>
+        </span>
+    </div>
+</div>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm sticky-top">
+    <div class="container">
+        <a class="navbar-brand fw-bold d-flex align-items-center" th:href="@{/}">
+            <img th:src="@{${platformLogo}}" th:alt="${platformName}" height="40" class="me-2">
+            <span>
+                <span class="d-block brand-title" th:text="${platformName}">Eco del Amazonas</span>
+                <span class="d-block brand-subtitle" th:text="${platformTagline}">Agua de mesa</span>
+            </span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#mainNavbar" aria-controls="mainNavbar"
+                aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNavbar">
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/}" th:text="${publicNavHomeLabel}">Inicio</a>
+                </li>
+                <li class="nav-item" th:if="${featurePublicCatalog}">
+                    <a class="nav-link" th:href="@{/catalogo}" th:text="${publicNavCatalogLabel}">Catálogo</a>
+                </li>
+                <li class="nav-item" th:if="${featureBlog}">
+                    <a class="nav-link active" th:href="@{/blog}" th:text="${publicNavBlogLabel}">Blog & consejos</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank" th:text="${publicNavWhatsappLabel}">
+                        Pedir por WhatsApp
+                    </a>
+                </li>
+                <li class="nav-item mt-2 mt-lg-0">
+                    <a class="btn btn-outline-primary btn-sm ms-lg-3" th:href="@{/login}" th:text="${publicAccessLabel}">
+                        Acceso colaboradores
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<main class="public-blog-page bg-light">
+    <section class="blog-detail-hero border-bottom">
+        <div class="container">
+            <nav aria-label="breadcrumb" class="small mb-3">
+                <ol class="breadcrumb blog-breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a th:href="@{/}" th:text="${publicNavHomeLabel}">Inicio</a></li>
+                    <li class="breadcrumb-item"><a th:href="@{/blog}" th:text="${publicNavBlogLabel}">Blog / consejos</a></li>
+                    <li class="breadcrumb-item active" aria-current="page" th:text="${post.title}">Artículo</li>
+                </ol>
+            </nav>
+
+            <div class="row g-4 align-items-center">
+                <div class="col-lg-7">
+                    <span class="blog-kicker"><i class="bi bi-bookmark-star"></i> Consejo amazónico</span>
+                    <h1 class="display-6 fw-bold mb-3" th:text="${post.title}">Título del artículo</h1>
+                    <p class="blog-detail-summary" th:if="${post.summary != null}" th:text="${post.summary}">
+                        Resumen del artículo.
+                    </p>
+                    <div class="blog-detail-meta">
+                        <span th:if="${post.publishedAt != null}">
+                            <i class="bi bi-calendar3"></i>
+                            <span th:text="${#temporals.format(post.publishedAt,'dd MMM yyyy')}">01 ene 2025</span>
+                        </span>
+                        <span><i class="bi bi-leaf"></i> Blog <span th:text="${platformName}">Eco del Amazonas</span></span>
+                    </div>
+                </div>
+                <div class="col-lg-5">
+                    <div class="blog-detail-cover-wrap" th:if="${post.coverImagePath != null}">
+                        <img th:src="@{${post.coverImagePath}}"
+                             th:alt="${post.title}"
+                             class="blog-detail-cover">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-5">
+        <div class="container">
+            <div class="row g-4 align-items-start">
+                <div class="col-lg-8">
+                    <article class="blog-content blog-content-enhanced">
+                        <div th:utext="${post.content}">Contenido HTML del artículo...</div>
+                    </article>
+
+                    <div class="blog-article-cta mt-4">
+                        <div>
+                            <span class="blog-kicker"><i class="bi bi-whatsapp"></i> Consulta directa</span>
+                            <h2 class="h5 mb-2">¿Quieres consultar disponibilidad?</h2>
+                            <p class="mb-0" th:text="${blogArticleCtaText}">
+                                ¿Te sirvió esta información? Escríbenos por WhatsApp.
+                            </p>
+                        </div>
+                        <a class="btn btn-success" th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank">
+                            <i class="bi bi-whatsapp me-1"></i>
+                            <span th:text="${blogArticleCtaButtonLabel}">Pedir por WhatsApp</span>
+                        </a>
+                    </div>
+                </div>
+
+                <aside class="col-lg-4">
+                    <div class="blog-sidebar sticky-lg-top">
+                        <div class="blog-sidebar-card blog-sidebar-highlight mb-3">
+                            <div class="blog-sidebar-highlight-icon"><i class="bi bi-whatsapp"></i></div>
+                            <h3 class="h6 mb-2" th:text="${blogCtaTitle}">¿Necesitas consultar un producto?</h3>
+                            <p class="small mb-3" th:text="${blogCtaText}">Escríbenos por WhatsApp y coordinamos tu atención.</p>
+                            <a class="btn btn-success btn-sm w-100" th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank">
+                                <i class="bi bi-whatsapp me-1"></i>
+                                <span th:text="${blogCtaButtonLabel}">Consultar por WhatsApp</span>
+                            </a>
+                        </div>
+
+                        <div class="blog-sidebar-card mb-3">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <h3 class="h6 mb-0">Artículos relacionados</h3>
+                                <i class="bi bi-link-45deg text-success"></i>
+                            </div>
+                            <div th:if="${#lists.isEmpty(latestPosts)}" class="small text-muted">
+                                Aún no hay artículos relacionados.
+                            </div>
+                            <div class="latest-post-list" th:if="${!#lists.isEmpty(latestPosts)}">
+                                <a th:each="p : ${latestPosts}"
+                                   th:href="@{|/blog/${p.slug}|}"
+                                   class="latest-post-item">
+                                    <img th:if="${p.coverImagePath != null}" th:src="@{${p.coverImagePath}}" th:alt="${p.title}">
+                                    <span th:if="${p.coverImagePath == null}" class="latest-post-placeholder"><i class="bi bi-file-text"></i></span>
+                                    <span>
+                                        <strong th:text="${p.title}">Otro artículo</strong>
+                                        <small th:if="${p.publishedAt != null}" th:text="${#temporals.format(p.publishedAt,'dd/MM/yyyy')}">01/01/2025</small>
+                                    </span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="blog-sidebar-card mb-3">
+                            <h3 class="h6 mb-3">Guía rápida</h3>
+                            <div class="blog-mini-checklist">
+                                <span><i class="bi bi-check-circle-fill"></i> Confirma stock antes de comprar.</span>
+                                <span><i class="bi bi-check-circle-fill"></i> Pregunta presentación y cantidad.</span>
+                                <span><i class="bi bi-check-circle-fill"></i> Coordina entrega por WhatsApp.</span>
+                            </div>
+                        </div>
+
+                        <div class="blog-sidebar-card mb-3">
+                            <h3 class="h6 mb-2" th:text="${blogQuickTipTitle}">Consejo rápido</h3>
+                            <p class="small text-muted mb-0" th:text="${blogQuickTipText}">
+                                Consulta siempre disponibilidad antes de pedir.
+                            </p>
+                        </div>
+
+                        <div class="blog-sidebar-card blog-local-ad">
+                            <span class="blog-kicker"><i class="bi bi-basket2-fill"></i> Catálogo</span>
+                            <h3 class="h6 mb-2">Productos amazónicos disponibles</h3>
+                            <p class="small mb-3">Revisa pescados, ahumados, hojas, frutas y productos por temporada.</p>
+                            <a class="btn btn-outline-success btn-sm w-100" th:href="@{/catalogo}">
+                                Ver catálogo completo
+                            </a>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer class="border-top py-3 bg-white">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center small text-muted">
+        <span>
+            © <span th:text="${#temporals.format(#temporals.createNow(), 'yyyy')}">2024</span>
+            <span th:text="${platformName}">Eco del Amazonas</span>
+            -
+            <span th:text="${platformTagline}">Agua de mesa</span>
+        </span>
+        <span th:text="${footerRight}">Servicio a domicilio - Iquitos, Perú</span>
+    </div>
+</footer>
+
+<script th:src="@{https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js}"></script>
+</body>
+</html>

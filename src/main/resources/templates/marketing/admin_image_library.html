@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Biblioteca de imágenes de marketing - Eco Agua')}"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='marketing_image_library'">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+            <th:block
+                th:replace="~{fragments/local_breadcrumb :: trail(
+                    'Gestión de marca',
+                    null,
+                    'Marketing y contenido',
+                    null,
+                    'Biblioteca de imágenes',
+                    null,
+                    null,
+                    'Ordena fotos, banners, portadas y recursos visuales para campañas, catálogo, blog, redes sociales y WhatsApp.'
+                )}"
+            ></th:block>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Herramientas de marketing</div>
+                    <h1 class="h4 mb-1">Biblioteca de imágenes</h1>
+                    <div class="small text-muted">
+                        Guarda y clasifica recursos visuales para reutilizarlos en publicaciones, campañas, portal público, catálogo, blog y WhatsApp.
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#imageLibraryHelpModal">
+                        <i class="bi bi-question-circle"></i> Ayuda
+                    </button>
+                    <a th:href="@{/marketing/admin/promotions}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-gift"></i> Promociones
+                    </a>
+                    <a th:href="@{/marketing/admin/featured-products}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-star"></i> Productos destacados
+                    </a>
+                    <a th:href="@{/marketing/admin/campaigns}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-calendar2-week"></i> Campañas
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <span th:text="${successMessage}">Imagen guardada correctamente.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                <span th:text="${errorMessage}">No se pudo guardar la imagen.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small mb-3" role="alert">
+                <div class="fw-semibold mb-1"><i class="bi bi-info-circle"></i> Cómo usar esta pantalla</div>
+                <div>
+                    Sube una imagen o registra una ruta existente. Luego clasifícala por tipo, canal recomendado y relación comercial para ubicar rápido qué recurso usar en cada campaña.
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <div class="fw-semibold" th:text="${isImageEdit} ? 'Editar imagen' : 'Nueva imagen'">Nueva imagen</div>
+                            <div class="small text-muted">Registra el archivo y su uso recomendado.</div>
+                        </div>
+                        <div class="card-body">
+                            <form th:action="@{/marketing/admin/image-library/save}" th:object="${imageForm}" method="post" enctype="multipart/form-data" class="marketing-strategy-form">
+                                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <input type="hidden" th:field="*{id}">
+
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label">Título</label>
+                                        <input type="text" th:field="*{title}" class="form-control" required maxlength="180"
+                                               placeholder="Ejemplo: Banner San Juan - hojas de bijao">
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Archivo de imagen</label>
+                                        <input type="file" name="imageFile" class="form-control" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml">
+                                        <div class="form-text">Formatos permitidos: JPG, PNG, WEBP, GIF o SVG. Tamaño recomendado menor a 10 MB.</div>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Ruta actual o externa</label>
+                                        <input type="text" th:field="*{imagePath}" class="form-control"
+                                               placeholder="/uploads/marketing/library/imagen.jpg">
+                                        <div class="form-text">Si subes un archivo nuevo, esta ruta se actualizará automáticamente. También puedes pegar una ruta ya existente.</div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Tipo de recurso</label>
+                                        <select th:field="*{assetType}" class="form-select">
+                                            <option th:each="type : ${assetTypes}"
+                                                    th:value="${type}"
+                                                    th:text="${type.label}">Foto de producto</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Canal recomendado</label>
+                                        <select th:field="*{recommendedChannel}" class="form-select">
+                                            <option th:each="channel : ${recommendedChannels}"
+                                                    th:value="${channel}"
+                                                    th:text="${channel.label}">Todos los canales</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Estado</label>
+                                        <select th:field="*{status}" class="form-select">
+                                            <option th:each="statusItem : ${imageStatuses}"
+                                                    th:value="${statusItem}"
+                                                    th:text="${statusItem.label}">Activo</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Producto relacionado</label>
+                                        <select name="productId" class="form-select">
+                                            <option value="">Sin producto específico</option>
+                                            <option th:each="product : ${products}"
+                                                    th:value="${product.id}"
+                                                    th:text="${product.name}"
+                                                    th:selected="${selectedProductId != null and selectedProductId == product.id}">Producto</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Campaña relacionada</label>
+                                        <select name="campaignId" class="form-select">
+                                            <option value="">Sin campaña específica</option>
+                                            <option th:each="campaign : ${campaigns}"
+                                                    th:value="${campaign.id}"
+                                                    th:text="${campaign.name}"
+                                                    th:selected="${selectedCampaignId != null and selectedCampaignId == campaign.id}">Campaña</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Promoción relacionada</label>
+                                        <select name="promotionId" class="form-select">
+                                            <option value="">Sin promoción específica</option>
+                                            <option th:each="promotion : ${promotions}"
+                                                    th:value="${promotion.id}"
+                                                    th:text="${promotion.name}"
+                                                    th:selected="${selectedPromotionId != null and selectedPromotionId == promotion.id}">Promoción</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Descripción</label>
+                                        <textarea th:field="*{description}" class="form-control" rows="3"
+                                                  placeholder="Describe para qué se puede usar esta imagen."></textarea>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Observaciones internas</label>
+                                        <textarea th:field="*{observations}" class="form-control" rows="3"
+                                                  placeholder="Notas internas: autor, campaña, calidad, pendiente de edición, versión final, etc."></textarea>
+                                    </div>
+                                </div>
+
+                                <div th:if="${isImageEdit and imageForm.imagePath != null and !#strings.isEmpty(imageForm.imagePath)}" class="mt-3">
+                                    <div class="small text-muted mb-1">Vista previa actual</div>
+                                    <img th:src="${imageForm.imagePath}" alt="Vista previa" class="img-fluid rounded border" style="max-height: 180px; object-fit: contain;">
+                                </div>
+
+                                <div class="d-flex flex-wrap gap-2 mt-4">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="bi bi-save"></i> Guardar imagen
+                                    </button>
+                                    <a th:href="@{/marketing/admin/image-library}" class="btn btn-outline-secondary" th:if="${isImageEdit}">Cancelar edición</a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
+                            <div>
+                                <div class="fw-semibold">Imágenes registradas</div>
+                                <div class="small text-muted">Galería simple para ubicar recursos listos, archivados o relacionados a campañas.</div>
+                            </div>
+                            <span class="badge text-bg-light border" th:text="${#lists.size(imageRows)} + ' registros'">0 registros</span>
+                        </div>
+                        <div class="card-body">
+                            <div th:if="${#lists.isEmpty(imageRows)}" class="p-4 text-center text-muted">
+                                <i class="bi bi-images display-6 d-block mb-2"></i>
+                                Aún no hay imágenes registradas. Sube el primer recurso visual de marketing.
+                            </div>
+
+                            <div th:if="${!#lists.isEmpty(imageRows)}" class="row g-3">
+                                <div class="col-md-6" th:each="row : ${imageRows}">
+                                    <div class="card h-100 border-0 shadow-sm">
+                                        <div class="ratio ratio-16x9 bg-light rounded-top overflow-hidden">
+                                            <img th:src="${row.imagePath}" th:alt="${row.title}" class="w-100 h-100" style="object-fit: cover;">
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                                <div class="fw-semibold" th:text="${row.title}">Imagen</div>
+                                                <span class="badge" th:classappend="${row.statusBadgeClass}" th:text="${row.statusLabel}">Activo</span>
+                                            </div>
+
+                                            <div class="small text-muted mb-2" th:text="${row.descriptionPreview}">Descripción</div>
+
+                                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                                <span class="badge text-bg-light border" th:text="${row.assetTypeLabel}">Tipo</span>
+                                                <span class="badge text-bg-light border" th:text="${row.recommendedChannelLabel}">Canal</span>
+                                            </div>
+
+                                            <div class="small mb-1">
+                                                <i class="bi bi-link-45deg"></i>
+                                                <span th:text="${row.relationText}">Sin relación</span>
+                                            </div>
+                                            <div class="small text-muted" th:if="${row.observationsPreview != null}" th:text="${row.observationsPreview}">Observaciones</div>
+                                            <div class="small text-muted mt-1" th:text="${'Actualizado: ' + row.updatedAtText}">Actualizado</div>
+                                        </div>
+                                        <div class="card-footer bg-white">
+                                            <div class="d-flex flex-wrap gap-1 justify-content-end">
+                                                <a th:href="@{/marketing/admin/image-library(id=${row.id})}" class="btn btn-outline-dark btn-sm">Editar</a>
+                                                <a th:href="${row.imagePath}" target="_blank" class="btn btn-outline-primary btn-sm">Abrir</a>
+                                                <form th:if="${row.active}" th:action="@{/marketing/admin/image-library/{id}/archive(id=${row.id})}" method="post">
+                                                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                                    <button type="submit" class="btn btn-outline-secondary btn-sm">Archivar</button>
+                                                </form>
+                                                <form th:if="${row.archived}" th:action="@{/marketing/admin/image-library/{id}/restore(id=${row.id})}" method="post">
+                                                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                                    <button type="submit" class="btn btn-outline-success btn-sm">Reactivar</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div class="modal fade" id="imageLibraryHelpModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ayuda: Biblioteca de imágenes</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body small">
+                <p class="mb-2">
+                    Esta herramienta sirve para no perder fotos, banners o portadas entre carpetas sueltas. Cada imagen queda registrada con una clasificación y una relación opcional.
+                </p>
+                <ul class="mb-3">
+                    <li><strong>Foto de producto:</strong> úsala para catálogo, productos destacados o publicaciones.</li>
+                    <li><strong>Banner:</strong> úsalo para campañas del portal, promociones o fechas especiales.</li>
+                    <li><strong>Portada de blog:</strong> recurso pensado para artículos o consejos.</li>
+                    <li><strong>Imagen para redes:</strong> pieza lista o referencial para Facebook, TikTok o WhatsApp.</li>
+                    <li><strong>Archivado:</strong> oculta recursos antiguos sin borrar el historial.</li>
+                </ul>
+                <div class="alert alert-warning mb-0">
+                    Esta fase solo ordena y almacena imágenes. No edita imágenes, no genera diseños automáticamente y no cambia productos, precios ni promociones.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/scripts_admin :: adminScripts}"></th:block>
+</body>
+</html>

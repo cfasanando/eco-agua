@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Campañas marketing - Eco Agua')"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='marketing_campaigns'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <th:block
+              th:replace="~{fragments/local_breadcrumb :: trail(
+                'Gestión de marca',
+                null,
+                'Marketing y contenido',
+                null,
+                'Panel campañas',
+                null,
+                null,
+                'Vista operativa para coordinar promociones, contenido, testimonios y CTA comerciales sin salir del área de marketing.'
+              )}"
+            ></th:block>
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Gestión de marca / marketing</div>
+                    <h1 class="h4 mb-1">Panel de campañas marketing</h1>
+                    <div class="small text-muted">
+                        Vista operativa para coordinar promociones, contenido, testimonios y CTA comerciales sin salir del área de marketing.
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button"
+                            class="btn btn-outline-info btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#marketingCampaignsHelpModal">
+                        <i class="bi bi-question-circle"></i> Ayuda
+                    </button>
+                    <a th:href="@{/admin/promotions}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-gift"></i> Promociones
+                    </a>
+                    <a th:href="@{/admin/blog}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-journal-text"></i> Blog
+                    </a>
+                    <a th:href="@{/marketing/admin/testimonials}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-chat-quote"></i> Testimonials
+                    </a>
+                    <a th:href="@{/dashboard/commercial-daily}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-bullseye"></i> Panel comercial
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-warning-subtle">
+                        <div class="card-body">
+                                                        <div class="help-label small text-muted mb-1">
+                                <span>Promos activas</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Cantidad de promociones vigentes hoy y listas para usarse en ventas o publicaciones.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-4 fw-semibold" th:text="${snapshot.activePromotionCount}">0</div>
+                            <div class="small text-muted">Campañas vigentes hoy</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-primary-subtle">
+                        <div class="card-body">
+                                                        <div class="help-label small text-muted mb-1">
+                                <span>Posts publicados</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Contenido ya publicado que puede ayudar a generar confianza y atraer consultas.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-4 fw-semibold" th:text="${snapshot.publishedPostCount}">0</div>
+                            <div class="small text-muted">Activos para awareness</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-secondary-subtle">
+                        <div class="card-body">
+                                                        <div class="help-label small text-muted mb-1">
+                                <span>Drafts pendientes</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Publicaciones guardadas que todavía requieren revisión antes de publicarse.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-4 fw-semibold" th:text="${snapshot.draftPostCount}">0</div>
+                            <div class="small text-muted">Contenido por revisar</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-success-subtle">
+                        <div class="card-body">
+                                                        <div class="help-label small text-muted mb-1">
+                                <span>Testimonials activos</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Testimonios disponibles para reforzar confianza y cerrar objeciones.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-4 fw-semibold" th:text="${snapshot.activeTestimonialCount}">0</div>
+                            <div class="small text-muted">Prueba social lista</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-danger-subtle">
+                        <div class="card-body">
+                                                        <div class="help-label small text-muted mb-1">
+                                <span>Promos por vencer</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Promociones que terminan en los próximos 7 días y necesitan empuje comercial.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-4 fw-semibold" th:text="${snapshot.promotionsEndingSoonCount}">0</div>
+                            <div class="small text-muted">Próximos 7 días</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-info-subtle">
+                        <div class="card-body">
+                                                        <div class="help-label small text-muted mb-1">
+                                <span>Fecha de corte</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Fecha usada como referencia para calcular el estado actual del panel.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-5 fw-semibold" th:text="${#temporals.format(snapshot.today, 'dd/MM/yyyy')}">01/04/2026</div>
+                            <div class="small text-muted">Estado actual del área</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-8">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="help-label fw-semibold">
+                                    <span>Campañas en curso</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Promociones, posts y testimonios que ya pueden moverse comercialmente.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="small text-muted">Promociones, contenido y prueba social que ya puedes mover hoy.</div>
+                            </div>
+                            <a th:href="@{/admin/promotions}" class="btn btn-outline-dark btn-sm">Gestionar</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Campaña</th>
+                                        <th>Tipo</th>
+                                        <th>Segmento</th>
+                                        <th>Canal</th>
+                                        <th>Estado</th>
+                                        <th>Acción siguiente</th>
+                                        <th class="text-end">Abrir</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:if="${#lists.isEmpty(snapshot.campaignRows)}">
+                                        <td colspan="7" class="text-center text-muted py-4">No hay campañas para mostrar. Registra promociones, contenido o testimonios para alimentar este panel.</td>
+                                    </tr>
+                                    <tr th:each="row : ${snapshot.campaignRows}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.name}">Promo abril</div>
+                                            <div class="small text-muted">
+                                                <span th:if="${row.startDate != null}" th:text="${#temporals.format(row.startDate, 'dd/MM/yyyy')}">01/04/2026</span>
+                                                <span th:if="${row.endDate != null}">- <span th:text="${#temporals.format(row.endDate, 'dd/MM/yyyy')}">07/04/2026</span></span>
+                                            </div>
+                                        </td>
+                                        <td><span class="badge text-bg-light border" th:text="${row.type}">Promotion</span></td>
+                                        <td th:text="${row.targetSegment}">General audience</td>
+                                        <td th:text="${row.channel}">WhatsApp</td>
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.status}">Active</div>
+                                            <div class="small text-muted" th:text="${row.cta}">Drive orders</div>
+                                        </td>
+                                        <td class="small" th:text="${row.nextAction}">Push campaign</td>
+                                        <td class="text-end">
+                                            <a th:href="@{${row.adminUrl}}" class="btn btn-outline-dark btn-sm">Abrir</a>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <div class="help-label fw-semibold">
+                                    <span>Agenda de trabajo marketing</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Tareas sugeridas para mantener campañas, contenido y activos comerciales al día.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                            <div class="small text-muted">Pendientes concretos para hoy y esta semana.</div>
+                        </div>
+                        <div class="card-body d-flex flex-column gap-3">
+                            <div th:if="${#lists.isEmpty(snapshot.pendingTasks)}" class="text-muted small">No hay tareas pendientes. Revisa promociones, drafts y testimonios para mantener el calendario activo.</div>
+                            <div th:each="task : ${snapshot.pendingTasks}" class="border rounded p-3">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                    <div class="fw-semibold" th:text="${task.title}">Task title</div>
+                                    <span class="badge"
+                                          th:classappend="${task.priority == 'High'} ? ' text-bg-danger' : (${task.priority == 'Medium'} ? ' text-bg-warning' : ' text-bg-secondary')"
+                                          th:text="${task.priority}">High</span>
+                                </div>
+                                <div class="small text-muted mb-3" th:text="${task.description}">Task description</div>
+                                <a th:href="@{${task.actionUrl}}" class="btn btn-outline-dark btn-sm" th:text="${task.actionLabel}">Open</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="help-label fw-semibold">
+                                    <span>Promociones activas</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Ofertas listas para usar en WhatsApp, catálogo o conversaciones con clientes.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="small text-muted">Activos listos para empujar por WhatsApp, home y catálogo.</div>
+                            </div>
+                            <a th:href="@{/admin/promotions}" class="btn btn-outline-dark btn-sm">Ver todo</a>
+                        </div>
+                        <div class="card-body d-flex flex-column gap-3">
+                            <div th:if="${#lists.isEmpty(snapshot.promotionAssets)}" class="text-muted small">No hay promociones activas.</div>
+                            <div th:each="asset : ${snapshot.promotionAssets}" class="border rounded p-3">
+                                <div class="d-flex justify-content-between gap-2 align-items-start">
+                                    <div>
+                                        <div class="fw-semibold" th:text="${asset.title}">Promo</div>
+                                        <div class="small text-muted" th:text="${asset.status}">Active</div>
+                                    </div>
+                                    <div class="small text-muted" th:if="${asset.publishedDate != null}" th:text="${#temporals.format(asset.publishedDate, 'dd/MM/yyyy')}">01/04/2026</div>
+                                </div>
+                                <div class="small text-muted my-2" th:text="${asset.description}">Description</div>
+                                <a th:href="@{${asset.actionUrl}}" class="btn btn-outline-dark btn-sm" th:text="${asset.actionLabel}">Open</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="help-label fw-semibold">
+                                    <span>Contenido blog</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Publicaciones que ayudan a educar, generar confianza y responder objeciones.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="small text-muted">Publicaciones para awareness, confianza y objeciones.</div>
+                            </div>
+                            <a th:href="@{/admin/blog}" class="btn btn-outline-dark btn-sm">Gestionar</a>
+                        </div>
+                        <div class="card-body d-flex flex-column gap-3">
+                            <div th:if="${#lists.isEmpty(snapshot.contentAssets)}" class="text-muted small">No hay contenido para mostrar.</div>
+                            <div th:each="asset : ${snapshot.contentAssets}" class="border rounded p-3">
+                                <div class="d-flex justify-content-between gap-2 align-items-start">
+                                    <div>
+                                        <div class="fw-semibold" th:text="${asset.title}">Post</div>
+                                        <div class="small text-muted" th:text="${asset.status}">Published</div>
+                                    </div>
+                                    <div class="small text-muted" th:if="${asset.publishedDate != null}" th:text="${#temporals.format(asset.publishedDate, 'dd/MM/yyyy')}">01/04/2026</div>
+                                </div>
+                                <div class="small text-muted my-2" th:text="${asset.description}">Summary</div>
+                                <a th:href="@{${asset.actionUrl}}" class="btn btn-outline-dark btn-sm" th:text="${asset.actionLabel}">Open</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="help-label fw-semibold">
+                                    <span>Testimonials y prueba social</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Testimonios que pueden reforzar credibilidad antes de cerrar una venta.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="small text-muted">Activos que ayudan a cerrar objeciones y reforzar confianza.</div>
+                            </div>
+                            <a th:href="@{/marketing/admin/testimonials}" class="btn btn-outline-dark btn-sm">Gestionar</a>
+                        </div>
+                        <div class="card-body d-flex flex-column gap-3">
+                            <div th:if="${#lists.isEmpty(snapshot.testimonialAssets)}" class="text-muted small">No hay testimonials para mostrar.</div>
+                            <div th:each="asset : ${snapshot.testimonialAssets}" class="border rounded p-3">
+                                <div class="d-flex justify-content-between gap-2 align-items-start">
+                                    <div>
+                                        <div class="fw-semibold" th:text="${asset.title}">Testimonial</div>
+                                        <div class="small text-muted" th:text="${asset.status}">Active</div>
+                                    </div>
+                                    <div class="small text-muted" th:if="${asset.publishedDate != null}" th:text="${#temporals.format(asset.publishedDate, 'dd/MM/yyyy')}">01/04/2026</div>
+                                </div>
+                                <div class="small text-muted my-2" th:text="${asset.description}">Content</div>
+                                <a th:href="@{${asset.actionUrl}}" class="btn btn-outline-dark btn-sm" th:text="${asset.actionLabel}">Open</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <div class="help-label fw-semibold">
+                                    <span>Segmentos sugeridos</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Grupos de clientes o públicos a los que conviene dirigir campañas.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                            <div class="small text-muted">Ideas rápidas para orientar campañas y mensajes comerciales.</div>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex flex-wrap gap-2">
+                                <span th:each="segment : ${snapshot.suggestedSegments}" class="badge rounded-pill text-bg-light border" th:text="${segment}">New clients</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <div class="help-label fw-semibold">
+                                    <span>Plantillas CTA para WhatsApp</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Mensajes base que puedes copiar o adaptar para campañas y seguimiento comercial.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                            <div class="small text-muted">Mensajes listos para campañas de primera compra, recompra y reactivación.</div>
+                        </div>
+                        <div class="card-body d-flex flex-column gap-3">
+                            <div th:each="cta : ${snapshot.ctaTemplates}" class="border rounded p-3">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                    <div>
+                                        <div class="fw-semibold" th:text="${cta.title}">First purchase</div>
+                                        <div class="small text-muted" th:text="${cta.audience}">New leads</div>
+                                    </div>
+                                </div>
+                                <div class="small text-muted" th:text="${cta.message}">Message</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+
+<button type="button"
+        class="btn btn-info page-help-floating"
+        data-bs-toggle="modal"
+        data-bs-target="#marketingCampaignsHelpModal"
+        aria-label="Abrir ayuda de Panel de campañas marketing">
+    <i class="bi bi-question-circle"></i>
+    <span>Ayuda</span>
+</button>
+
+<div class="modal fade" id="marketingCampaignsHelpModal" tabindex="-1" aria-labelledby="marketingCampaignsHelpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content help-modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="small text-muted">Guía rápida</div>
+                    <h2 class="modal-title h5" id="marketingCampaignsHelpModalLabel">Cómo usar el Panel de campañas marketing</h2>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-4">
+                    Esta página agrupa promociones, contenido, testimonios y mensajes comerciales para saber qué puedes mover hoy en redes, WhatsApp o atención al cliente.
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-gift"></i> 1. Revisa promociones</div>
+                            <p>Identifica ofertas activas o por vencer para priorizar publicaciones y mensajes de venta.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-journal-text"></i> 2. Usa contenido</div>
+                            <p>Los posts publicados y drafts sirven para educar al cliente y sostener presencia digital.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-chat-quote"></i> 3. Refuerza confianza</div>
+                            <p>Los testimonios ayudan a reducir dudas antes de cerrar una venta.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-whatsapp"></i> 4. Aplica CTAs</div>
+                            <p>Usa las plantillas de WhatsApp como base para primera compra, recompra o reactivación.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h3 class="h6">Qué hacer si la página se ve vacía</h3>
+                <ul class="mb-0">
+                    <li>Crea promociones activas desde el módulo Promociones.</li>
+                    <li>Publica o prepara posts desde el módulo Blog.</li>
+                    <li>Registra testimonios activos para reforzar confianza.</li>
+                    <li>Revisa que las fechas de inicio y fin de promociones estén vigentes.</li>
+                    <li>Usa el Panel comercial para convertir campañas en acciones de venta.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+</body>
+</html>

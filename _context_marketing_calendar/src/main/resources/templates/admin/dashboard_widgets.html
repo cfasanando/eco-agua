@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="fragments/head_admin :: adminHead('Widgets del inicio')"></head>
+
+<body class="bg-light">
+
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="text-uppercase text-muted small fw-semibold mb-1">Panel por rol</div>
+                    <h1 class="h4 mb-1">Widgets del inicio</h1>
+                    <p class="text-muted small mb-0">
+                        Define qué bloques del inicio se muestran para cada rol. Esto no reemplaza permisos ni seguridad de rutas.
+                    </p>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <a th:href="@{/admin/system-modules}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-ui-checks-grid me-1"></i>
+                        Módulos del sistema
+                    </a>
+                    <a th:href="@{/home}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i>
+                        Volver al inicio
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <span th:text="${successMessage}">Dashboard widget visibility was updated successfully.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Roles configurables</div>
+                            <div class="display-6 fw-bold" th:text="${#lists.size(roles)}">0</div>
+                            <div class="small text-muted">Roles disponibles actualmente en esta base de datos.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Widgets actuales</div>
+                            <div class="display-6 fw-bold" th:text="${widgetDefinitionCount}">0</div>
+                            <div class="small text-muted">Primero configuramos los bloques existentes del inicio.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Regla de seguridad</div>
+                            <div class="h5 fw-bold mb-1">Rol + permiso + módulo</div>
+                            <div class="small text-muted">Un widget no aparece si el módulo está apagado o el usuario no tiene permiso.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small" role="alert">
+                <div class="fw-semibold mb-1">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Cómo funciona
+                </div>
+                Esta pantalla controla lo que el administrador quiere mostrar por rol. Más adelante se puede agregar personalización por usuario para que cada persona oculte bloques permitidos.
+            </div>
+
+            <form method="post" th:action="@{/admin/dashboard-widgets}">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                <div class="accordion shadow-sm" id="dashboardWidgetsAccordion">
+                    <div class="accordion-item" th:each="group, groupStat : ${widgetGroups}">
+                        <h2 class="accordion-header" th:id="${'widget-group-heading-' + groupStat.index}">
+                            <button class="accordion-button"
+                                    th:classappend="${groupStat.index > 0 ? ' collapsed' : ''}"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    th:attr="data-bs-target=${'#widget-group-collapse-' + groupStat.index},aria-expanded=${groupStat.index == 0 ? 'true' : 'false'},aria-controls=${'widget-group-collapse-' + groupStat.index}">
+                                <span class="fw-semibold" th:text="${group.area()}">Área</span>
+                                <span class="badge text-bg-light ms-2" th:text="${#lists.size(group.widgets()) + ' widgets'}">0 widgets</span>
+                            </button>
+                        </h2>
+
+                        <div th:id="${'widget-group-collapse-' + groupStat.index}"
+                             class="accordion-collapse collapse"
+                             th:classappend="${groupStat.index == 0 ? ' show' : ''}"
+                             th:attr="aria-labelledby=${'widget-group-heading-' + groupStat.index}"
+                             data-bs-parent="#dashboardWidgetsAccordion">
+                            <div class="accordion-body bg-white">
+                                <p class="text-muted small mb-3" th:text="${group.summary()}">Resumen</p>
+
+                                <div class="table-responsive dashboard-widget-role-table-wrapper">
+                                    <table class="table table-sm align-middle mb-0 dashboard-widget-role-table">
+                                        <thead class="table-light">
+                                        <tr>
+                                            <th class="sticky-widget-column">Widget</th>
+                                            <th th:each="role : ${roles}" class="text-center">
+                                                <span th:text="${role.title}">Rol</span>
+                                                <div class="small text-muted" th:text="${role.code}">ROLE</div>
+                                            </th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="widget : ${group.widgets()}">
+                                            <td class="sticky-widget-column bg-white">
+                                                <div class="fw-semibold" th:text="${widget.title()}">Widget</div>
+                                                <div class="small text-muted" th:text="${widget.description()}">Descripción</div>
+                                                <div class="small mt-1">
+                                                    <span class="badge rounded-pill text-bg-light" th:text="${widget.moduleKey()}">module</span>
+                                                    <code class="ms-1" th:text="${widget.key()}">widget-key</code>
+                                                </div>
+                                            </td>
+
+                                            <td th:each="role : ${roles}" class="text-center">
+                                                <div class="form-check form-switch d-inline-flex justify-content-center">
+                                                    <input class="form-check-input"
+                                                           type="checkbox"
+                                                           role="switch"
+                                                           th:id="${'widget-' + role.code + '-' + widget.key()}"
+                                                           th:name="${'widget_' + role.code + '__' + widget.key()}"
+                                                           th:checked="${roleWidgetMatrix[role.code][widget.key()]}"/>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <a th:href="@{/home}" class="btn btn-outline-secondary">
+                        Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-1"></i>
+                        Guardar widgets
+                    </button>
+                </div>
+            </form>
+        </main>
+
+        <div th:replace="fragments/scripts_admin :: adminScripts"></div>
+    </div>
+</div>
+
+</body>
+</html>

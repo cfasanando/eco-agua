@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Configuración de la plataforma')"></head>
+
+<body class="bg-light">
+
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+
+        <div th:replace="fragments/topbar :: topbar"></div>
+
+        <main class="container-fluid mt-4 flex-grow-1">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="h4 mb-0">Configuración de la plataforma</h1>
+                <div class="d-flex gap-2">
+                    <a th:href="@{/admin/system-modules}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-ui-checks-grid"></i>
+                        Módulos del sistema
+                    </a>
+                    <a th:href="@{/home}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i>
+                        Volver al panel
+                    </a>
+                </div>
+            </div>
+
+            <p class="text-muted small mb-3">
+                Edita los valores de configuración generales, del sitio público y de módulos activos por cliente.
+                Los módulos se usan para mostrar u ocultar áreas completas del sistema según el negocio.
+            </p>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <span th:text="${successMessage}">Settings updated successfully.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+
+            <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                <span th:text="${errorMessage}">Settings could not be updated.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+
+            <form id="settingsForm" method="post" th:action="@{/admin/platform-settings}">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            </form>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th style="width: 9%;">Categoría</th>
+                                <th style="width: 23%;">Variable</th>
+                                <th style="width: 28%;">Valor</th>
+                                <th style="width: 22%;">Image preview</th>
+                                <th style="width: 18%;">Descripción</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="setting : ${settings}"
+                                th:with="variableLower=${setting.variable == null ? '' : #strings.toLowerCase(setting.variable)},
+                                         valueLower=${setting.value == null ? '' : #strings.toLowerCase(setting.value)},
+                                         typeLower=${setting.type == null ? '' : #strings.toLowerCase(setting.type)},
+                                         isImageSetting=${typeLower == 'image' or #strings.contains(variableLower, 'image') or #strings.contains(variableLower, 'logo') or #strings.contains(variableLower, 'favicon')},
+                                         hasImageValue=${setting.value != null and !#strings.isEmpty(setting.value) and (#strings.endsWith(valueLower, '.jpg') or #strings.endsWith(valueLower, '.jpeg') or #strings.endsWith(valueLower, '.png') or #strings.endsWith(valueLower, '.webp') or #strings.endsWith(valueLower, '.svg'))}">
+                                <td class="text-muted small" th:text="${setting.category}">platform</td>
+
+                                <td class="font-monospace small">
+                                    <input type="hidden" name="id" th:value="${setting.id}" form="settingsForm"/>
+                                    <span th:text="${setting.variable}">platform.name</span>
+                                </td>
+
+                                <td>
+                                    <select th:if="${typeLower == 'boolean'}"
+                                            class="form-select form-select-sm"
+                                            name="value"
+                                            form="settingsForm">
+                                        <option value="true" th:selected="${setting.value == 'true'}">Activo</option>
+                                        <option value="false" th:selected="${setting.value == 'false'}">Inactivo</option>
+                                    </select>
+
+                                    <input th:if="${typeLower != 'boolean'}"
+                                           type="text"
+                                           class="form-control form-control-sm"
+                                           name="value"
+                                           th:value="${setting.value}"
+                                           form="settingsForm"/>
+                                    <div th:if="${isImageSetting}" class="form-text">
+                                        Puedes editar la ruta manualmente o subir una imagen desde el bloque de preview.
+                                    </div>
+                                    <div th:if="${typeLower == 'boolean'}" class="form-text">
+                                        Se aplica al menú y a las secciones visibles del cliente actual.
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <div th:if="${isImageSetting}" class="d-flex gap-3 align-items-start">
+                                        <div class="border rounded bg-white d-flex align-items-center justify-content-center overflow-hidden"
+                                             style="width: 112px; height: 72px;">
+                                            <img class="setting-image-preview w-100 h-100"
+                                                 th:src="${hasImageValue ? setting.value : ''}"
+                                                 th:alt="${setting.variable}"
+                                                 th:style="${hasImageValue ? 'object-fit: contain;' : 'display: none; object-fit: contain;'}"
+                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"/>
+                                            <div class="setting-image-placeholder text-muted small text-center w-100 h-100 align-items-center justify-content-center"
+                                                 th:style="${hasImageValue ? 'display: none;' : 'display: flex;'}">
+                                                No image
+                                            </div>
+                                        </div>
+                                        <form class="flex-grow-1"
+                                              method="post"
+                                              enctype="multipart/form-data"
+                                              th:action="@{/admin/platform-settings}">
+                                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <input type="hidden" name="id" th:value="${setting.id}"/>
+                                            <input type="hidden" name="value" th:value="${setting.value}"/>
+                                            <input type="file"
+                                                   class="form-control form-control-sm setting-image-input"
+                                                   th:name="${'imageFile_' + setting.id}"
+                                                   accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"/>
+                                            <div class="d-flex justify-content-between align-items-center mt-1 gap-2">
+                                                <div class="form-text mb-0">
+                                                    JPG, PNG or WEBP. Max 5 MB.
+                                                </div>
+                                                <button type="submit" class="btn btn-outline-primary btn-sm">
+                                                    <i class="bi bi-upload me-1"></i>
+                                                    Subir
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                    <span th:if="${!isImageSetting}" class="text-muted small">—</span>
+                                </td>
+
+                                <td class="small text-muted" th:text="${setting.description}">
+                                    Descripción
+                                </td>
+                            </tr>
+
+                            <tr th:if="${#lists.isEmpty(settings)}">
+                                <td colspan="5" class="text-center text-muted py-3">
+                                    No hay configuraciones registradas en las categorías
+                                    <code>platform</code>, <code>public_site</code> o <code>system_modules</code>.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card-footer d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary btn-sm" form="settingsForm">
+                        <i class="bi bi-save me-1"></i>
+                        Guardar cambios de texto
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <div th:replace="fragments/scripts_admin :: adminScripts"></div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.setting-image-input').forEach(function (input) {
+            input.addEventListener('change', function () {
+                const file = input.files && input.files.length > 0 ? input.files[0] : null;
+                const row = input.closest('tr');
+                const preview = row ? row.querySelector('.setting-image-preview') : null;
+                const placeholder = row ? row.querySelector('.setting-image-placeholder') : null;
+
+                if (!file || !preview || !placeholder) {
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    preview.src = event.target.result;
+                    preview.style.display = 'block';
+                    placeholder.style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<th:block th:fragment="marketingLeftWidgets">
+    <div class="home-widget-card" data-widget-id="marketing-promotions" draggable="false"
+         th:if="${dashboardVisibleWidgets['marketing-promotions']}">
+        <div class="card shadow-sm mb-3 area-widget-card area-widget-marketing">
+            <div class="card-header area-widget-header area-widget-header-marketing">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="fw-semibold">Promociones activas</div>
+                        <small>Campañas vigentes para impulsar consultas</small>
+                    </div>
+                    <div class="home-widget-tools">
+                        <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="area-widget-metric-row mb-3">
+                    <div>
+                        <span class="area-widget-metric"
+                              th:text="${marketingDashboard != null and marketingDashboard.campaigns != null ? marketingDashboard.campaigns.activePromotionCount : 0}">0</span>
+                        <span class="area-widget-label">activas</span>
+                    </div>
+                    <div>
+                        <span class="area-widget-metric text-warning"
+                              th:text="${marketingDashboard != null and marketingDashboard.campaigns != null ? marketingDashboard.campaigns.promotionsEndingSoonCount : 0}">0</span>
+                        <span class="area-widget-label">por vencer</span>
+                    </div>
+                </div>
+
+                <div th:if="${marketingDashboard != null and marketingDashboard.campaigns != null and !#lists.isEmpty(marketingDashboard.campaigns.promotionAssets)}"
+                     class="area-widget-list">
+                    <div class="area-widget-list-item"
+                         th:each="promotion, stat : ${marketingDashboard.campaigns.promotionAssets}"
+                         th:if="${stat.index < 3}">
+                        <div>
+                            <div class="fw-semibold" th:text="${promotion.title}">Promoción</div>
+                            <small class="text-muted" th:text="${promotion.status}">Estado</small>
+                        </div>
+                        <a th:href="${promotion.actionUrl}" class="btn btn-sm btn-outline-success" th:text="${promotion.actionLabel}">Abrir</a>
+                    </div>
+                </div>
+
+                <div th:if="${marketingDashboard == null or marketingDashboard.campaigns == null or #lists.isEmpty(marketingDashboard.campaigns.promotionAssets)}"
+                     class="area-widget-empty">
+                    No hay promociones registradas para mostrar todavía. Puedes crear o revisar promociones desde marketing.
+                </div>
+
+                <a th:href="@{/marketing/admin/campaigns}" class="btn btn-sm btn-success mt-3">
+                    <i class="bi bi-megaphone me-1"></i> Ir a campañas
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="home-widget-card" data-widget-id="marketing-campaigns" draggable="false"
+         th:if="${dashboardVisibleWidgets['marketing-campaigns']}">
+        <div class="card shadow-sm mb-3 area-widget-card area-widget-marketing">
+            <div class="card-header area-widget-header area-widget-header-marketing">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="fw-semibold">Campañas del mes</div>
+                        <small>Acciones, canales y próximos pasos</small>
+                    </div>
+                    <div class="home-widget-tools">
+                        <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div th:if="${marketingDashboard != null and marketingDashboard.campaigns != null and !#lists.isEmpty(marketingDashboard.campaigns.campaignRows)}"
+                     class="area-widget-timeline">
+                    <div class="area-widget-timeline-item"
+                         th:each="campaign, stat : ${marketingDashboard.campaigns.campaignRows}"
+                         th:if="${stat.index < 4}">
+                        <div class="area-widget-dot"></div>
+                        <div>
+                            <div class="fw-semibold" th:text="${campaign.name}">Campaña</div>
+                            <small class="text-muted">
+                                <span th:text="${campaign.type}">Tipo</span>
+                                ·
+                                <span th:text="${campaign.channel}">Canal</span>
+                            </small>
+                            <div class="small mt-1" th:text="${campaign.nextAction}">Siguiente acción</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div th:if="${marketingDashboard == null or marketingDashboard.campaigns == null or #lists.isEmpty(marketingDashboard.campaigns.campaignRows)}"
+                     class="area-widget-empty">
+                    No hay campañas del mes todavía. Define una campaña simple para redes, catálogo o WhatsApp.
+                </div>
+
+                <a th:href="@{/marketing/admin/campaigns}" class="btn btn-sm btn-outline-success mt-3">
+                    Gestionar campañas
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="home-widget-card" data-widget-id="marketing-blog" draggable="false"
+         th:if="${dashboardVisibleWidgets['marketing-blog']}">
+        <div class="card shadow-sm mb-3 area-widget-card area-widget-marketing">
+            <div class="card-header area-widget-header area-widget-header-marketing">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="fw-semibold">Últimos artículos del blog</div>
+                        <small>Contenido útil para generar confianza</small>
+                    </div>
+                    <div class="home-widget-tools">
+                        <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="area-widget-metric-row mb-3">
+                    <div>
+                        <span class="area-widget-metric"
+                              th:text="${marketingDashboard != null and marketingDashboard.campaigns != null ? marketingDashboard.campaigns.publishedPostCount : 0}">0</span>
+                        <span class="area-widget-label">publicados</span>
+                    </div>
+                    <div>
+                        <span class="area-widget-metric text-secondary"
+                              th:text="${marketingDashboard != null and marketingDashboard.campaigns != null ? marketingDashboard.campaigns.draftPostCount : 0}">0</span>
+                        <span class="area-widget-label">borradores</span>
+                    </div>
+                </div>
+
+                <div th:if="${marketingDashboard != null and marketingDashboard.campaigns != null and !#lists.isEmpty(marketingDashboard.campaigns.contentAssets)}"
+                     class="area-widget-list">
+                    <div class="area-widget-list-item"
+                         th:each="post, stat : ${marketingDashboard.campaigns.contentAssets}"
+                         th:if="${stat.index < 3}">
+                        <div>
+                            <div class="fw-semibold" th:text="${post.title}">Artículo</div>
+                            <small class="text-muted" th:text="${post.status}">Estado</small>
+                        </div>
+                        <a th:href="${post.actionUrl}" class="btn btn-sm btn-outline-success">Gestionar</a>
+                    </div>
+                </div>
+
+                <div th:if="${marketingDashboard == null or marketingDashboard.campaigns == null or #lists.isEmpty(marketingDashboard.campaigns.contentAssets)}"
+                     class="area-widget-empty">
+                    No hay artículos cargados para mostrar. Crea consejos, recetas o guías para reforzar el catálogo.
+                </div>
+
+                <a th:href="@{/blog/admin/posts}" class="btn btn-sm btn-outline-success mt-3">
+                    Administrar blog
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="home-widget-card" data-widget-id="hr-staff" draggable="false"
+         th:if="${dashboardVisibleWidgets['hr-staff']}">
+        <div class="card shadow-sm mb-3 area-widget-card area-widget-hr">
+            <div class="card-header area-widget-header area-widget-header-hr">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="fw-semibold">Personal activo</div>
+                        <small>Colaboradores registrados y disponibles</small>
+                    </div>
+                    <div class="home-widget-tools">
+                        <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="area-widget-metric-row mb-3">
+                    <div>
+                        <span class="area-widget-metric" th:text="${hrDashboard != null ? hrDashboard.activeEmployeeCount : 0}">0</span>
+                        <span class="area-widget-label">activos</span>
+                    </div>
+                    <a th:href="@{/admin/personnel/payments}" class="btn btn-sm btn-outline-primary">Gestionar</a>
+                </div>
+
+                <div th:if="${hrDashboard != null and !#lists.isEmpty(hrDashboard.recentEmployees)}" class="area-widget-list">
+                    <div class="area-widget-list-item" th:each="employee, stat : ${hrDashboard.recentEmployees}" th:if="${stat.index < 4}">
+                        <div>
+                            <div class="fw-semibold" th:text="${employee.fullName}">Empleado</div>
+                            <small class="text-muted" th:text="${employee.jobName}">Cargo</small>
+                        </div>
+                        <small class="text-muted" th:text="${employee.contact}">Contacto</small>
+                    </div>
+                </div>
+
+                <div th:if="${hrDashboard == null or #lists.isEmpty(hrDashboard.recentEmployees)}" class="area-widget-empty">
+                    No hay personal cargado todavía. Registra colaboradores para empezar a controlar cargos, pagos y obligaciones.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="home-widget-card" data-widget-id="hr-positions" draggable="false"
+         th:if="${dashboardVisibleWidgets['hr-positions']}">
+        <div class="card shadow-sm mb-3 area-widget-card area-widget-hr">
+            <div class="card-header area-widget-header area-widget-header-hr">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="fw-semibold">Cargos registrados</div>
+                        <small>Puestos y formas de pago configuradas</small>
+                    </div>
+                    <div class="home-widget-tools">
+                        <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="area-widget-metric-row mb-3">
+                    <div>
+                        <span class="area-widget-metric" th:text="${hrDashboard != null ? hrDashboard.activePositionCount : 0}">0</span>
+                        <span class="area-widget-label">cargos activos</span>
+                    </div>
+                    <a th:href="@{/admin/job-positions}" class="btn btn-sm btn-outline-primary">Ver cargos</a>
+                </div>
+
+                <div th:if="${hrDashboard != null and !#lists.isEmpty(hrDashboard.positionRows)}" class="area-widget-list">
+                    <div class="area-widget-list-item" th:each="position, stat : ${hrDashboard.positionRows}" th:if="${stat.index < 4}">
+                        <div>
+                            <div class="fw-semibold" th:text="${position.displayName}">Cargo</div>
+                            <small class="text-muted" th:text="${position.paymentModeLabel}">Forma de pago</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div th:if="${hrDashboard == null or #lists.isEmpty(hrDashboard.positionRows)}" class="area-widget-empty">
+                    No hay cargos registrados todavía. Define cargos para ordenar funciones y pagos.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="home-widget-card" data-widget-id="hr-users" draggable="false"
+         th:if="${dashboardVisibleWidgets['hr-users']}">
+        <div class="card shadow-sm mb-3 area-widget-card area-widget-hr">
+            <div class="card-header area-widget-header area-widget-header-hr">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="fw-semibold">Usuarios activos</div>
+                        <small>Accesos internos del sistema</small>
+                    </div>
+                    <div class="home-widget-tools">
+                        <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="area-widget-kpi-card">
+                    <div>
+                        <div class="text-muted small">Usuarios habilitados</div>
+                        <div class="display-6 fw-bold" th:text="${hrDashboard != null ? hrDashboard.activeUserCount : 0}">0</div>
+                    </div>
+                    <i class="bi bi-person-check area-widget-kpi-icon"></i>
+                </div>
+                <p class="text-muted small mt-3 mb-0" th:if="${hrDashboard == null or hrDashboard.activeUserCount == 0}">
+                    No hay datos de usuarios cargados para este panel.
+                </p>
+                <a th:href="@{/admin/users}" class="btn btn-sm btn-primary mt-3">Administrar usuarios</a>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<th:block th:fragment="marketingRightWidgets">
+    <div class="home-widget-card" data-widget-id="marketing-featured-products" draggable="false"
+         th:if="${dashboardVisibleWidgets['marketing-featured-products']}">
+        <div class="card shadow-sm mb-3 area-widget-card area-widget-marketing">
+            <div class="card-header area-widget-header area-widget-header-marketing">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="fw-semibold">Productos destacados</div>
+                        <small>Base para posts, banners y catálogo</small>
+                    </div>
+                    <div class="home-widget-tools">
+                        <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div th:if="${marketingDashboard != null and !#lists.isEmpty(marketingDashboard.featuredProducts)}" class="area-widget-product-grid">
+                    <div class="area-widget-product" th:each="product : ${marketingDashboard.featuredProducts}">
+                        <img th:if="${product.imagePath != null and !#strings.isEmpty(product.imagePath)}"
+                             th:src="${product.imagePath}"
+                             th:alt="${product.name}">
+                        <div class="area-widget-product-placeholder" th:if="${product.imagePath == null or #strings.isEmpty(product.imagePath)}">
+                            <i class="bi bi-box-seam"></i>
+                        </div>
+                        <div class="fw-semibold small mt-2" th:text="${product.name}">Producto</div>
+                    </div>
+                </div>
+
+                <div th:if="${marketingDashboard == null or #lists.isEmpty(marketingDashboard.featuredProducts)}" class="area-widget-empty">
+                    No hay productos destacados todavía. Marca productos importantes para usarlos en campañas y portal.
+                </div>
+
+                <a th:href="@{/admin/products}" class="btn btn-sm btn-outline-success mt-3">Ver productos</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="home-widget-card" data-widget-id="marketing-actions" draggable="false"
+         th:if="${dashboardVisibleWidgets['marketing-actions']}">
+        <div class="card shadow-sm mb-3 area-widget-card area-widget-marketing">
+            <div class="card-header area-widget-header area-widget-header-marketing">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="fw-semibold">Acciones sugeridas de contenido</div>
+                        <small>Tareas rápidas para mantener movimiento</small>
+                    </div>
+                    <div class="home-widget-tools">
+                        <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div th:if="${marketingDashboard != null and marketingDashboard.campaigns != null and !#lists.isEmpty(marketingDashboard.campaigns.pendingTasks)}"
+                     class="area-widget-list">
+                    <div class="area-widget-list-item"
+                         th:each="task, stat : ${marketingDashboard.campaigns.pendingTasks}"
+                         th:if="${stat.index < 4}">
+                        <div>
+                            <div class="fw-semibold" th:text="${task.title}">Tarea</div>
+                            <small class="text-muted" th:text="${task.description}">Detalle</small>
+                        </div>
+                        <a th:href="${task.actionUrl}" class="btn btn-sm btn-outline-success" th:text="${task.actionLabel}">Abrir</a>
+                    </div>
+                </div>
+
+                <div th:if="${marketingDashboard == null or marketingDashboard.campaigns == null or #lists.isEmpty(marketingDashboard.campaigns.pendingTasks)}"
+                     class="area-widget-empty">
+                    No hay acciones pendientes. Revisa imágenes, promociones o artículos para mantener el portal activo.
+                </div>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<th:block th:fragment="hrRightWidgets">
+    <div class="home-widget-card" data-widget-id="hr-roles" draggable="false"
+         th:if="${dashboardVisibleWidgets['hr-roles']}">
+        <div class="card shadow-sm mb-3 area-widget-card area-widget-hr">
+            <div class="card-header area-widget-header area-widget-header-hr">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="fw-semibold">Roles configurados</div>
+                        <small>Permisos disponibles para accesos seguros</small>
+                    </div>
+                    <div class="home-widget-tools">
+                        <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="area-widget-kpi-card">
+                    <div>
+                        <div class="text-muted small">Roles disponibles</div>
+                        <div class="display-6 fw-bold" th:text="${hrDashboard != null ? hrDashboard.roleCount : 0}">0</div>
+                    </div>
+                    <i class="bi bi-shield-lock area-widget-kpi-icon"></i>
+                </div>
+                <p class="text-muted small mt-3 mb-0" th:if="${hrDashboard == null or hrDashboard.roleCount == 0}">
+                    No hay datos de roles cargados para este panel.
+                </p>
+                <a th:href="@{/admin/roles-permissions}" class="btn btn-sm btn-primary mt-3">Ver roles</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="home-widget-card" data-widget-id="hr-obligations" draggable="false"
+         th:if="${dashboardVisibleWidgets['hr-obligations']}">
+        <div class="card shadow-sm mb-3 area-widget-card area-widget-hr">
+            <div class="card-header area-widget-header area-widget-header-hr">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="fw-semibold">Obligaciones pendientes</div>
+                        <small>Adelantos, préstamos o pendientes internos</small>
+                    </div>
+                    <div class="home-widget-tools">
+                        <button type="button" class="home-widget-tool-button widget-collapse-toggle" title="Minimizar / expandir"><i class="bi bi-dash-lg"></i></button>
+                        <button type="button" class="home-widget-tool-button widget-drag-handle" title="Mover widget"><i class="bi bi-grip-vertical"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="area-widget-metric-row mb-3">
+                    <div>
+                        <span class="area-widget-metric" th:text="${hrDashboard != null ? hrDashboard.activeObligationCount : 0}">0</span>
+                        <span class="area-widget-label">pendientes</span>
+                    </div>
+                    <div>
+                        <span class="area-widget-metric text-danger"
+                              th:text="${hrDashboard != null and hrDashboard.pendingObligationAmount != null ? 'S/ ' + #numbers.formatDecimal(hrDashboard.pendingObligationAmount, 1, 'POINT', 2, 'POINT') : 'S/ 0.00'}">S/ 0.00</span>
+                        <span class="area-widget-label">saldo</span>
+                    </div>
+                </div>
+                <div class="area-widget-empty" th:if="${hrDashboard == null or hrDashboard.activeObligationCount == 0}">
+                    No hay obligaciones pendientes registradas.
+                </div>
+                <a th:href="@{/admin/personnel/payments}" class="btn btn-sm btn-outline-primary mt-3">Ver pagos</a>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+</body>
+</html>

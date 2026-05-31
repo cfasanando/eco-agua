@@ -20,21 +20,25 @@ public class MarketingCampaignsService {
     private final PromotionService promotionService;
     private final BlogPostRepository blogPostRepository;
     private final TestimonialRepository testimonialRepository;
+    private final MarketingCampaignCalendarRepository campaignCalendarRepository;
 
     public MarketingCampaignsService(
             PromotionService promotionService,
             BlogPostRepository blogPostRepository,
-            TestimonialRepository testimonialRepository
+            TestimonialRepository testimonialRepository,
+            MarketingCampaignCalendarRepository campaignCalendarRepository
     ) {
         this.promotionService = promotionService;
         this.blogPostRepository = blogPostRepository;
         this.testimonialRepository = testimonialRepository;
+        this.campaignCalendarRepository = campaignCalendarRepository;
     }
 
     @Transactional(readOnly = true)
     public MarketingCampaignsSnapshot buildSnapshot() {
         LocalDate today = LocalDate.now();
 
+        List<MarketingCampaignCalendarItem> calendarItems = safeCampaignCalendarList(campaignCalendarRepository.findAllForAdmin());
         List<Promotion> allPromotions = safePromotionList(promotionService.findAll());
         List<Promotion> activePromotions = allPromotions.stream()
                 .filter(this::isPromotionActive)
@@ -71,17 +75,18 @@ public class MarketingCampaignsService {
                 draftPosts.size(),
                 activeTestimonials.size(),
                 promotionsEndingSoonCount,
-                buildCampaignRows(activePromotions, publishedPosts, activeTestimonials, today),
+                buildCampaignRows(calendarItems, activePromotions, publishedPosts, activeTestimonials, today),
                 buildPromotionAssets(activePromotions, today),
                 buildContentAssets(publishedPosts, draftPosts),
                 buildTestimonialAssets(activeTestimonials, allTestimonials),
-                buildPendingTasks(activePromotions, publishedPosts, draftPosts, activeTestimonials, today),
+                buildPendingTasks(calendarItems, activePromotions, publishedPosts, draftPosts, activeTestimonials, today),
                 buildSuggestedSegments(),
                 buildCtaTemplates()
         );
     }
 
     private List<MarketingCampaignsSnapshot.CampaignRow> buildCampaignRows(
+            List<MarketingCampaignCalendarItem> calendarItems,
             List<Promotion> activePromotions,
             List<BlogPost> publishedPosts,
             List<Testimonial> activeTestimonials,
@@ -89,47 +94,65 @@ public class MarketingCampaignsService {
     ) {
         List<MarketingCampaignsSnapshot.CampaignRow> rows = new ArrayList<>();
 
-        for (Promotion promotion : activePromotions.stream().limit(5).collect(Collectors.toList())) {
+        for (MarketingCampaignCalendarItem campaign : calendarItems.stream()
+                .filter(campaign -> campaign.getStatus() != MarketingCampaignCalendarItem.Status.ARCHIVED)
+                .limit(5)
+                .collect(Collectors.toList())) {
+            rows.add(new MarketingCampaignsSnapshot.CampaignRow(
+                    campaign.getName(),
+                    campaign.getTypeLabel(),
+                    firstNonBlank(campaign.getTargetSegment(), "Público general"),
+                    firstNonBlank(campaign.getChannel(), "WhatsApp / redes / portal"),
+                    campaign.getStartDate(),
+                    campaign.getEndDate(),
+                    campaign.getStatusLabel(),
+                    firstNonBlank(campaign.getObjective(), "Coordinar campaña con objetivo comercial definido"),
+                    firstNonBlank(campaign.getNextAction(), "Definir publicación, diseño o mensaje de WhatsApp"),
+                    "/marketing/admin/campaigns?id=" + campaign.getId()
+            ));
+        }
+
+        for (Promotion promotion : activePromotions.stream().limit(3).collect(Collectors.toList())) {
             rows.add(new MarketingCampaignsSnapshot.CampaignRow(
                     promotion.getName(),
-                    "Promotion",
+                    "Promoción",
                     inferPromotionSegment(promotion),
-                    "WhatsApp / Catalog / Home",
+                    "WhatsApp / catálogo / inicio",
                     promotion.getStartDate(),
                     promotion.getEndDate(),
                     buildPromotionStatus(promotion, today),
-                    "Drive orders to WhatsApp and catalog",
+                    "Llevar consultas hacia WhatsApp y catálogo",
                     buildPromotionNextAction(promotion, today),
                     "/admin/promotions"
             ));
         }
 
-        for (BlogPost post : publishedPosts.stream().limit(3).collect(Collectors.toList())) {
+        for (BlogPost post : publishedPosts.stream().limit(2).collect(Collectors.toList())) {
             rows.add(new MarketingCampaignsSnapshot.CampaignRow(
                     post.getTitle(),
-                    "Content",
+                    "Contenido",
                     inferContentAudience(post),
-                    "Blog / WhatsApp / Social",
+                    "Blog / WhatsApp / redes",
                     post.getPublishedAt() != null ? post.getPublishedAt().toLocalDate() : null,
                     null,
-                    "Published",
-                    "Use post as awareness and trust asset",
-                    "Share in WhatsApp and reuse in campaigns",
+                    "Publicado",
+                    "Usar como contenido de confianza y atracción",
+                    "Compartir por WhatsApp y reutilizar en campañas",
                     "/admin/blog"
             ));
         }
 
         if (!activeTestimonials.isEmpty()) {
             rows.add(new MarketingCampaignsSnapshot.CampaignRow(
-                    "Social proof rotation",
-                    "Testimonials",
-                    "Cold leads / first purchase",
-                    "Home / WhatsApp / Sales support",
+                    "Rotación de prueba social",
+                    "Testimonios",
+                    "Clientes nuevos / primera compra",
+                    "Inicio / WhatsApp / soporte comercial",
                     null,
                     null,
-                    "Ready",
-                    "Use testimonials to reduce objections",
-                    "Highlight one testimonial in the public home and WhatsApp replies",
+                    "Listo",
+                    "Usar testimonios para reducir objeciones",
+                    "Destacar un testimonio en el portal público y respuestas de WhatsApp",
                     "/marketing/admin/testimonials"
             ));
         }
@@ -143,8 +166,8 @@ public class MarketingCampaignsService {
             rows.add(new MarketingCampaignsSnapshot.AssetRow(
                     promotion.getName(),
                     buildPromotionStatus(promotion, today),
-                    firstNonBlank(promotion.getDescription(), "Promotion ready to be pushed to WhatsApp and the public home."),
-                    "Open promotion",
+                    firstNonBlank(promotion.getDescription(), "Promoción lista para mover por WhatsApp y el portal público."),
+                    "Abrir promoción",
                     "/admin/promotions",
                     promotion.getStartDate()
             ));
@@ -157,9 +180,9 @@ public class MarketingCampaignsService {
         for (BlogPost post : publishedPosts.stream().limit(4).collect(Collectors.toList())) {
             rows.add(new MarketingCampaignsSnapshot.AssetRow(
                     post.getTitle(),
-                    "Published",
-                    firstNonBlank(post.getSummary(), "Published content ready to support campaigns."),
-                    "Manage post",
+                    "Publicado",
+                    firstNonBlank(post.getSummary(), "Contenido publicado listo para apoyar campañas."),
+                    "Gestionar post",
                     "/admin/blog",
                     post.getPublishedAt() != null ? post.getPublishedAt().toLocalDate() : null
             ));
@@ -167,9 +190,9 @@ public class MarketingCampaignsService {
         for (BlogPost post : draftPosts.stream().limit(2).collect(Collectors.toList())) {
             rows.add(new MarketingCampaignsSnapshot.AssetRow(
                     post.getTitle(),
-                    "Draft",
-                    firstNonBlank(post.getSummary(), "Draft content pending publication."),
-                    "Review draft",
+                    "Borrador",
+                    firstNonBlank(post.getSummary(), "Contenido pendiente de revisión antes de publicar."),
+                    "Revisar borrador",
                     "/admin/blog",
                     post.getCreatedAt() != null ? post.getCreatedAt().toLocalDate() : null
             ));
@@ -181,10 +204,10 @@ public class MarketingCampaignsService {
         List<MarketingCampaignsSnapshot.AssetRow> rows = new ArrayList<>();
         for (Testimonial testimonial : activeTestimonials.stream().limit(4).collect(Collectors.toList())) {
             rows.add(new MarketingCampaignsSnapshot.AssetRow(
-                    firstNonBlank(testimonial.getAuthorName(), "Anonymous testimonial"),
-                    "Active",
-                    firstNonBlank(testimonial.getContent(), "Customer trust asset."),
-                    "Manage testimonial",
+                    firstNonBlank(testimonial.getAuthorName(), "Testimonio anónimo"),
+                    "Activo",
+                    firstNonBlank(testimonial.getContent(), "Activo de confianza del cliente."),
+                    "Gestionar testimonio",
                     "/marketing/admin/testimonials",
                     testimonial.getCreatedAt() != null ? testimonial.getCreatedAt().toLocalDate() : null
             ));
@@ -192,10 +215,10 @@ public class MarketingCampaignsService {
         if (rows.isEmpty() && !allTestimonials.isEmpty()) {
             Testimonial testimonial = allTestimonials.get(0);
             rows.add(new MarketingCampaignsSnapshot.AssetRow(
-                    firstNonBlank(testimonial.getAuthorName(), "Testimonial"),
-                    "Inactive",
-                    "There are testimonials, but none is active for the public home.",
-                    "Activate testimonial",
+                    firstNonBlank(testimonial.getAuthorName(), "Testimonio"),
+                    "Inactivo",
+                    "Hay testimonios registrados, pero ninguno está activo para el portal público.",
+                    "Activar testimonio",
                     "/marketing/admin/testimonials",
                     testimonial.getCreatedAt() != null ? testimonial.getCreatedAt().toLocalDate() : null
             ));
@@ -204,6 +227,7 @@ public class MarketingCampaignsService {
     }
 
     private List<MarketingCampaignsSnapshot.TaskRow> buildPendingTasks(
+            List<MarketingCampaignCalendarItem> calendarItems,
             List<Promotion> activePromotions,
             List<BlogPost> publishedPosts,
             List<BlogPost> draftPosts,
@@ -212,16 +236,37 @@ public class MarketingCampaignsService {
     ) {
         List<MarketingCampaignsSnapshot.TaskRow> rows = new ArrayList<>();
 
+        if (calendarItems.stream().noneMatch(this::isOpenCalendarCampaign)) {
+            rows.add(new MarketingCampaignsSnapshot.TaskRow(
+                    "Alta",
+                    "Planificar campaña en calendario",
+                    "Registra al menos una campaña planificada o activa para ordenar publicaciones, canales y mensajes.",
+                    "Crear campaña",
+                    "/marketing/admin/campaigns"
+            ));
+        }
+
+        calendarItems.stream()
+                .filter(campaign -> campaign.getStatus() == MarketingCampaignCalendarItem.Status.PREPARING)
+                .findFirst()
+                .ifPresent(campaign -> rows.add(new MarketingCampaignsSnapshot.TaskRow(
+                        "Media",
+                        "Campaña en preparación",
+                        "Completa la campaña '" + campaign.getName() + "' y actívala cuando ya tenga mensaje, canal y siguiente acción.",
+                        "Abrir campaña",
+                        "/marketing/admin/campaigns?id=" + campaign.getId()
+                )));
+
         activePromotions.stream()
                 .filter(promotion -> promotion.getEndDate() != null)
                 .filter(promotion -> !promotion.getEndDate().isBefore(today))
                 .filter(promotion -> !promotion.getEndDate().isAfter(today.plusDays(7)))
                 .findFirst()
                 .ifPresent(promotion -> rows.add(new MarketingCampaignsSnapshot.TaskRow(
-                        "High",
-                        "Promotion is ending soon",
-                        "Review and reinforce the promotion '" + promotion.getName() + "' before it expires.",
-                        "Open promotions",
+                        "Alta",
+                        "Promoción por vencer",
+                        "Revisa y refuerza la promoción '" + promotion.getName() + "' antes de que termine.",
+                        "Abrir promociones",
                         "/admin/promotions"
                 )));
 
@@ -229,39 +274,39 @@ public class MarketingCampaignsService {
                 .filter(promotion -> isBlank(promotion.getBannerImagePath()))
                 .findFirst()
                 .ifPresent(promotion -> rows.add(new MarketingCampaignsSnapshot.TaskRow(
-                        "Medium",
-                        "Promotion without banner",
-                        "Add a banner image to '" + promotion.getName() + "' so it stands out in the public home and client channels.",
-                        "Edit promotion",
+                        "Media",
+                        "Promoción sin banner",
+                        "Agrega un banner a '" + promotion.getName() + "' para que destaque en el portal público y canales comerciales.",
+                        "Editar promoción",
                         "/admin/promotions"
                 )));
 
         if (!draftPosts.isEmpty()) {
             rows.add(new MarketingCampaignsSnapshot.TaskRow(
-                    "Medium",
-                    "Draft content pending publication",
-                    "You have " + draftPosts.size() + " draft post(s) ready to review and publish.",
-                    "Open blog",
+                    "Media",
+                    "Contenido en borrador pendiente",
+                    "Tienes " + draftPosts.size() + " post(s) en borrador para revisar y publicar.",
+                    "Abrir blog",
                     "/admin/blog"
             ));
         }
 
         if (publishedPosts.isEmpty()) {
             rows.add(new MarketingCampaignsSnapshot.TaskRow(
-                    "High",
-                    "No published content",
-                    "Publish at least one blog post to support trust and awareness campaigns.",
-                    "Create post",
+                    "Alta",
+                    "No hay contenido publicado",
+                    "Publica al menos un post para apoyar confianza y atracción de campañas.",
+                    "Crear post",
                     "/admin/blog/new"
             ));
         }
 
         if (activeTestimonials.isEmpty()) {
             rows.add(new MarketingCampaignsSnapshot.TaskRow(
-                    "Medium",
-                    "No active testimonials",
-                    "Activate testimonials so sales can use social proof in the public home and WhatsApp conversations.",
-                    "Open testimonials",
+                    "Media",
+                    "No hay testimonios activos",
+                    "Activa testimonios para usar prueba social en el portal público y conversaciones de WhatsApp.",
+                    "Abrir testimonios",
                     "/marketing/admin/testimonials"
             ));
         }
@@ -269,9 +314,9 @@ public class MarketingCampaignsService {
         if (rows.isEmpty()) {
             rows.add(new MarketingCampaignsSnapshot.TaskRow(
                     "Normal",
-                    "Marketing area looks healthy",
-                    "Keep promotions, content and testimonials aligned with this week's sales focus.",
-                    "Review campaigns",
+                    "Marketing está ordenado",
+                    "Mantén campañas, contenido y testimonios alineados con el enfoque comercial de esta semana.",
+                    "Revisar campañas",
                     "/marketing/admin/campaigns"
             ));
         }
@@ -281,33 +326,42 @@ public class MarketingCampaignsService {
 
     private List<String> buildSuggestedSegments() {
         return List.of(
-                "New clients - first purchase",
-                "Clients due for reorder",
-                "Dormant clients to reactivate",
-                "Bodega / store segment",
-                "Restaurant / bar segment",
-                "Home delivery by zone"
+                "Clientes nuevos - primera compra",
+                "Clientes próximos a recomprar",
+                "Clientes inactivos para reactivar",
+                "Bodegas y tiendas",
+                "Restaurantes y negocios de comida",
+                "Delivery por zona"
         );
     }
 
     private List<MarketingCampaignsSnapshot.CtaTemplateRow> buildCtaTemplates() {
         return List.of(
                 new MarketingCampaignsSnapshot.CtaTemplateRow(
-                        "First purchase",
-                        "New leads / home clients",
-                        "Hello! We have a special first-order option for purified water delivery. Would you like prices and available schedules?"
+                        "Primera compra",
+                        "Clientes nuevos / hogares",
+                        "Hola, tenemos productos disponibles para pedido por WhatsApp. ¿Deseas que te enviemos catálogo, disponibilidad y coordinación de entrega?"
                 ),
                 new MarketingCampaignsSnapshot.CtaTemplateRow(
-                        "Reorder reminder",
-                        "Frequent clients",
-                        "Hello! It looks like your next water reorder may be due. Would you like us to schedule your delivery for today or tomorrow?"
+                        "Recordatorio de recompra",
+                        "Clientes frecuentes",
+                        "Hola, estamos tomando pedidos para esta semana. ¿Deseas separar tus productos y coordinar entrega por WhatsApp?"
                 ),
                 new MarketingCampaignsSnapshot.CtaTemplateRow(
-                        "Cold client recovery",
-                        "Dormant clients",
-                        "Hello! We have a campaign for returning clients this week. Would you like to see the current refill and bottle options?"
+                        "Reactivación de cliente",
+                        "Clientes inactivos",
+                        "Hola, esta semana tenemos campaña activa y atención por WhatsApp. ¿Te enviamos las opciones disponibles?"
                 )
         );
+    }
+
+    private boolean isOpenCalendarCampaign(MarketingCampaignCalendarItem campaign) {
+        if (campaign == null || campaign.getStatus() == null) {
+            return false;
+        }
+        return campaign.getStatus() == MarketingCampaignCalendarItem.Status.PLANNED
+                || campaign.getStatus() == MarketingCampaignCalendarItem.Status.PREPARING
+                || campaign.getStatus() == MarketingCampaignCalendarItem.Status.ACTIVE;
     }
 
     private boolean isPromotionActive(Promotion promotion) {
@@ -323,53 +377,53 @@ public class MarketingCampaignsService {
 
     private String buildPromotionStatus(Promotion promotion, LocalDate today) {
         if (!promotion.isEnabled()) {
-            return "Disabled";
+            return "Desactivada";
         }
         if (promotion.getStartDate() != null && promotion.getStartDate().isAfter(today)) {
-            return "Scheduled";
+            return "Programada";
         }
         if (promotion.getEndDate() != null && promotion.getEndDate().isBefore(today)) {
-            return "Expired";
+            return "Vencida";
         }
         if (promotion.getEndDate() != null && !promotion.getEndDate().isAfter(today.plusDays(7))) {
-            return "Ending soon";
+            return "Por vencer";
         }
-        return "Active";
+        return "Activa";
     }
 
     private String buildPromotionNextAction(Promotion promotion, LocalDate today) {
         if (promotion.getEndDate() != null && !promotion.getEndDate().isAfter(today.plusDays(7))) {
-            return "Push this promotion in WhatsApp and the public home before it expires";
+            return "Impulsar esta promoción por WhatsApp y portal público antes de que termine";
         }
         if (isBlank(promotion.getBannerImagePath())) {
-            return "Add banner and highlight it in the public home";
+            return "Agregar banner y destacarla en el portal público";
         }
-        return "Keep it visible in WhatsApp and client-facing channels";
+        return "Mantener visible en WhatsApp y canales de atención";
     }
 
     private String inferPromotionSegment(Promotion promotion) {
         String text = (firstNonBlank(promotion.getName(), "") + " " + firstNonBlank(promotion.getDescription(), "")).toLowerCase(Locale.ROOT);
-        if (text.contains("restaurant") || text.contains("bar")) {
-            return "Restaurants / bars";
+        if (text.contains("restaurant") || text.contains("restaurante") || text.contains("bar")) {
+            return "Restaurantes y negocios de comida";
         }
         if (text.contains("bodega") || text.contains("store") || text.contains("tienda")) {
-            return "Stores / bodegas";
+            return "Tiendas y bodegas";
         }
-        if (text.contains("refill") || text.contains("recarga")) {
-            return "Frequent refill clients";
+        if (text.contains("famil") || text.contains("hogar") || text.contains("casa")) {
+            return "Familias y hogares";
         }
-        return "General audience / reorder push";
+        return "Público general / campaña comercial";
     }
 
     private String inferContentAudience(BlogPost post) {
         String text = (firstNonBlank(post.getTitle(), "") + " " + firstNonBlank(post.getSummary(), "")).toLowerCase(Locale.ROOT);
         if (text.contains("children") || text.contains("hijos") || text.contains("famil")) {
-            return "Families / home clients";
+            return "Familias y hogares";
         }
-        if (text.contains("office") || text.contains("trabajo") || text.contains("home office")) {
-            return "Workers / offices";
+        if (text.contains("restaurant") || text.contains("restaurante") || text.contains("negocio")) {
+            return "Restaurantes y negocios";
         }
-        return "Trust and awareness campaigns";
+        return "Campañas de confianza y atracción";
     }
 
     private String firstNonBlank(String value, String fallback) {
@@ -393,5 +447,10 @@ public class MarketingCampaignsService {
     @SuppressWarnings("unchecked")
     private List<Testimonial> safeTestimonialList(List<?> testimonials) {
         return testimonials == null ? List.of() : (List<Testimonial>) testimonials;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<MarketingCampaignCalendarItem> safeCampaignCalendarList(List<?> campaigns) {
+        return campaigns == null ? List.of() : (List<MarketingCampaignCalendarItem>) campaigns;
     }
 }

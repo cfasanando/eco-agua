@@ -21,8 +21,6 @@ public class SystemModuleAccessFilter extends OncePerRequestFilter {
             ModuleRoute.prefix("/admin/blog", "blog"),
             ModuleRoute.prefix("/marketing/admin/campaigns", "marketing"),
             ModuleRoute.prefix("/marketing/admin/strategy", "marketing"),
-            ModuleRoute.prefix("/marketing/admin/ideas", "marketing"),
-            ModuleRoute.prefix("/marketing/admin/publication-plan", "marketing"),
             ModuleRoute.prefix("/marketing/admin/testimonials", "testimonials"),
             ModuleRoute.prefix("/admin/promotions", "promotions"),
             ModuleRoute.prefix("/admin/clients", "clients"),

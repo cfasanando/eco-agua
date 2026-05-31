@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Banco de ideas - Eco Agua')"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='marketing_ideas'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <th:block
+              th:replace="~{fragments/local_breadcrumb :: trail(
+                'Gestión de marca',
+                null,
+                'Marketing y contenido',
+                null,
+                'Banco de ideas',
+                null,
+                null,
+                'Espacio para guardar ideas de contenido antes de convertirlas en publicaciones, campañas o piezas para WhatsApp.'
+              )}"
+            ></th:block>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Gestión de marca / marketing</div>
+                    <h1 class="h4 mb-1">Banco de ideas de contenido</h1>
+                    <div class="small text-muted">
+                        Guarda ideas para redes, WhatsApp, blog, catálogo y campañas antes de pasarlas al plan mensual.
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button"
+                            class="btn btn-outline-info btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#marketingIdeasHelpModal">
+                        <i class="bi bi-question-circle"></i> Ayuda
+                    </button>
+                    <a th:href="@{/marketing/admin/campaigns}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-calendar2-week"></i> Calendario de campañas
+                    </a>
+                    <a th:href="@{/marketing/admin/strategy}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-diagram-3"></i> Estrategia 5P
+                    </a>
+                    <a th:href="@{/admin/blog}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-journal-text"></i> Blog
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <span th:text="${successMessage}">Idea guardada correctamente.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <div class="fw-semibold" th:text="${isIdeaEdit} ? 'Editar idea de contenido' : 'Nueva idea de contenido'">Nueva idea de contenido</div>
+                            <div class="small text-muted">Registra ideas sueltas y decide luego cuáles pasan a preparación o publicación.</div>
+                        </div>
+                        <div class="card-body">
+                            <form th:action="@{/marketing/admin/ideas/save}" th:object="${ideaForm}" method="post" class="marketing-strategy-form">
+                                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <input type="hidden" th:field="*{id}">
+
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label">Título de la idea</label>
+                                        <input type="text" th:field="*{title}" class="form-control" required placeholder="Ejemplo: ¿Eres de la selva y vives en Lima?">
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Canal</label>
+                                        <select th:field="*{channel}" class="form-select">
+                                            <option th:each="channelItem : ${ideaChannels}"
+                                                    th:value="${channelItem}"
+                                                    th:text="${channelItem.label}">TikTok / Reels</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Tipo de contenido</label>
+                                        <select th:field="*{contentType}" class="form-select">
+                                            <option th:each="typeItem : ${ideaTypes}"
+                                                    th:value="${typeItem}"
+                                                    th:text="${typeItem.label}">Video corto</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Estado</label>
+                                        <select th:field="*{status}" class="form-select">
+                                            <option th:each="statusItem : ${ideaStatuses}"
+                                                    th:value="${statusItem}"
+                                                    th:text="${statusItem.label}">Nueva</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Prioridad</label>
+                                        <select th:field="*{priority}" class="form-select">
+                                            <option th:each="priorityItem : ${ideaPriorities}"
+                                                    th:value="${priorityItem}"
+                                                    th:text="${priorityItem.label}">Media</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Fecha sugerida</label>
+                                        <input type="date" th:field="*{suggestedDate}" class="form-control">
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Público objetivo</label>
+                                        <input type="text" th:field="*{targetSegment}" class="form-control" placeholder="Familias, restaurantes, clientes de Lima Este">
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Producto relacionado</label>
+                                        <select name="productId" class="form-select">
+                                            <option value="">Idea general</option>
+                                            <option th:each="product : ${products}"
+                                                    th:value="${product.id}"
+                                                    th:text="${product.name}"
+                                                    th:selected="${ideaForm.product != null and ideaForm.product.id == product.id}">Producto</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Campaña relacionada</label>
+                                        <select name="campaignId" class="form-select">
+                                            <option value="">Sin campaña vinculada</option>
+                                            <option th:each="campaign : ${campaigns}"
+                                                    th:value="${campaign.id}"
+                                                    th:text="${campaign.name}"
+                                                    th:selected="${ideaForm.campaign != null and ideaForm.campaign.id == campaign.id}">Campaña</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Estrategia 5P relacionada</label>
+                                        <select name="strategyId" class="form-select">
+                                            <option value="">Sin estrategia vinculada</option>
+                                            <option th:each="strategy : ${strategies}"
+                                                    th:value="${strategy.id}"
+                                                    th:text="${strategy.title}"
+                                                    th:selected="${ideaForm.strategy != null and ideaForm.strategy.id == strategy.id}">Estrategia</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Gancho inicial</label>
+                                        <input type="text" th:field="*{hook}" class="form-control" placeholder="Ejemplo: ¿Vas a preparar juanes y todavía no tienes hoja de bijao?">
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Mensaje principal</label>
+                                        <textarea th:field="*{mainMessage}" class="form-control" rows="3" placeholder="Mensaje base de la publicación, reel, blog o WhatsApp."></textarea>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Llamada a la acción</label>
+                                        <input type="text" th:field="*{callToAction}" class="form-control" placeholder="Ejemplo: consulta disponibilidad por WhatsApp">
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Siguiente acción</label>
+                                        <input type="text" th:field="*{nextAction}" class="form-control" placeholder="Ejemplo: grabar video, tomar foto, validar stock o preparar diseño">
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Observaciones</label>
+                                        <textarea th:field="*{observations}" class="form-control" rows="2" placeholder="Notas internas, pendientes, stock, formato o mejoras."></textarea>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-between gap-2 mt-4">
+                                    <a th:href="@{/marketing/admin/ideas}" class="btn btn-outline-secondary">Limpiar</a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-save"></i> Guardar idea
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center gap-3">
+                            <div>
+                                <div class="fw-semibold">Ideas guardadas</div>
+                                <div class="small text-muted">Ideas priorizadas para redes, WhatsApp, blog, catálogo o campañas.</div>
+                            </div>
+                            <span class="badge bg-light text-dark border" th:text="${#lists.size(ideas)} + ' registros'">0 registros</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div th:if="${#lists.isEmpty(ideas)}" class="p-4 text-center text-muted">
+                                <i class="bi bi-lightbulb fs-1 d-block mb-2"></i>
+                                Aún no hay ideas guardadas. Registra la primera idea desde el formulario.
+                            </div>
+
+                            <div th:unless="${#lists.isEmpty(ideas)}" class="table-responsive">
+                                <table class="table align-middle mb-0 marketing-strategy-table">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Idea</th>
+                                        <th>Relación</th>
+                                        <th>Canal</th>
+                                        <th>Estado</th>
+                                        <th>Siguiente acción</th>
+                                        <th class="text-end">Acciones</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="idea : ${ideas}">
+                                        <td class="strategy-title-cell">
+                                            <div class="fw-semibold" th:text="${idea.title}">Idea</div>
+                                            <div class="small text-muted" th:text="${idea.hook} ?: 'Sin gancho definido todavía.'">Gancho</div>
+                                            <div class="small text-muted" th:if="${idea.suggestedDate != null}">
+                                                Fecha sugerida: <span th:text="${#temporals.format(idea.suggestedDate, 'dd/MM/yyyy')}">01/06/2026</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div th:if="${idea.product != null}" class="small"><strong>Producto:</strong> <span th:text="${idea.product.name}">Producto</span></div>
+                                            <div th:if="${idea.campaign != null}" class="small"><strong>Campaña:</strong> <span th:text="${idea.campaign.name}">Campaña</span></div>
+                                            <div th:if="${idea.strategy != null}" class="small"><strong>5P:</strong> <span th:text="${idea.strategy.title}">Estrategia</span></div>
+                                            <div th:if="${idea.product == null and idea.campaign == null and idea.strategy == null}" class="small text-muted">Idea general</div>
+                                        </td>
+                                        <td>
+                                            <span class="badge text-bg-light border" th:text="${idea.channelLabel}">TikTok / Reels</span>
+                                            <div class="small text-muted mt-1" th:text="${idea.contentTypeLabel}">Video corto</div>
+                                        </td>
+                                        <td>
+                                            <span class="badge"
+                                                  th:classappend="${idea.status != null and idea.status.name() == 'PUBLISHED'} ? ' text-bg-success' : (${idea.status != null and idea.status.name() == 'PREPARING'} ? ' text-bg-warning' : (${idea.status != null and idea.status.name() == 'DISCARDED'} ? ' text-bg-secondary' : ' text-bg-info'))"
+                                                  th:text="${idea.statusLabel}">Nueva</span>
+                                            <div class="small mt-1"
+                                                 th:classappend="${idea.priority != null and idea.priority.name() == 'HIGH'} ? ' text-danger' : ' text-muted'"
+                                                 th:text="${'Prioridad ' + idea.priorityLabel}">Prioridad media</div>
+                                        </td>
+                                        <td class="small" th:text="${idea.nextAction} ?: 'Sin siguiente acción.'">Siguiente acción</td>
+                                        <td class="text-end">
+                                            <div class="d-flex flex-wrap justify-content-end gap-1">
+                                                <a th:href="@{/marketing/admin/ideas(id=${idea.id})}" class="btn btn-outline-dark btn-sm">Editar</a>
+                                                <form th:if="${idea.status == null or idea.status.name() == 'NEW'}" th:action="@{/marketing/admin/ideas/{id}/select(id=${idea.id})}" method="post">
+                                                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                                    <button type="submit" class="btn btn-outline-primary btn-sm">Seleccionar</button>
+                                                </form>
+                                                <form th:if="${idea.status != null and idea.status.name() != 'PREPARING' and idea.status.name() != 'PUBLISHED' and idea.status.name() != 'DISCARDED'}" th:action="@{/marketing/admin/ideas/{id}/prepare(id=${idea.id})}" method="post">
+                                                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                                    <button type="submit" class="btn btn-outline-warning btn-sm">Preparar</button>
+                                                </form>
+                                                <form th:if="${idea.status != null and idea.status.name() != 'PUBLISHED' and idea.status.name() != 'DISCARDED'}" th:action="@{/marketing/admin/ideas/{id}/publish(id=${idea.id})}" method="post">
+                                                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                                    <button type="submit" class="btn btn-outline-success btn-sm">Publicar</button>
+                                                </form>
+                                                <form th:if="${idea.status == null or idea.status.name() != 'DISCARDED'}" th:action="@{/marketing/admin/ideas/{id}/discard(id=${idea.id})}" method="post">
+                                                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                                    <button type="submit" class="btn btn-outline-secondary btn-sm">Descartar</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <div class="fw-semibold">Cómo usar esta pantalla</div>
+                            <div class="small text-muted">Sirve como libreta organizada antes del plan mensual.</div>
+                        </div>
+                        <div class="card-body small text-muted">
+                            <p class="mb-2"><strong>1.</strong> Registra ideas aunque todavía no estén listas.</p>
+                            <p class="mb-2"><strong>2.</strong> Relaciónalas con una campaña, producto o estrategia 5P cuando aplique.</p>
+                            <p class="mb-0"><strong>3.</strong> Marca como seleccionada o en preparación solo lo que realmente se trabajará.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <div class="fw-semibold">Ejemplo para reel</div>
+                            <div class="small text-muted">Formato corto para TikTok o Facebook.</div>
+                        </div>
+                        <div class="card-body small">
+                            <div class="fw-semibold mb-1">¿Eres de la selva y vives en Lima?</div>
+                            <div class="text-muted mb-2">Gancho: ¿Vas a preparar juanes y todavía no tienes hoja de bijao?</div>
+                            <div class="text-muted mb-2">Mensaje: consulta con anticipación productos para San Juan.</div>
+                            <div class="text-muted">CTA: escríbenos por WhatsApp.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <div class="fw-semibold">Qué pasa después</div>
+                            <div class="small text-muted">Conecta con la siguiente fase.</div>
+                        </div>
+                        <div class="card-body small text-muted">
+                            Las ideas seleccionadas servirán como entrada para la Fase 9D: plan mensual de publicaciones. No todas las ideas deben publicarse; algunas pueden quedarse como reserva o descartarse.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<div class="modal fade" id="marketingIdeasHelpModal" tabindex="-1" aria-labelledby="marketingIdeasHelpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="marketingIdeasHelpModalLabel">Ayuda - Banco de ideas de contenido</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p>Esta pantalla sirve para guardar ideas antes de convertirlas en publicaciones reales. Ayuda a evitar improvisar todos los días y permite ordenar contenido por campaña, producto, canal y prioridad.</p>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                        <tr>
+                            <th>Campo</th>
+                            <th>Uso recomendado</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>Título</td>
+                            <td>Resumen corto de la idea. Debe ser fácil de reconocer.</td>
+                        </tr>
+                        <tr>
+                            <td>Canal</td>
+                            <td>Dónde podría publicarse: TikTok, Facebook, WhatsApp, blog o catálogo.</td>
+                        </tr>
+                        <tr>
+                            <td>Gancho inicial</td>
+                            <td>Primera frase que debe captar la atención del cliente.</td>
+                        </tr>
+                        <tr>
+                            <td>Mensaje principal</td>
+                            <td>Idea central que se comunicará en la pieza.</td>
+                        </tr>
+                        <tr>
+                            <td>Estado</td>
+                            <td>Permite separar ideas nuevas, seleccionadas, en preparación, publicadas o descartadas.</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="alert alert-warning mb-0">
+                    No publiques ideas que mencionen stock, precio o entrega sin validarlo primero. El banco de ideas puede contener borradores, pero el contenido final debe respetar disponibilidad real.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+</body>
+</html>

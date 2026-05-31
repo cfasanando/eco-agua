@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="fragments/head_admin :: adminHead(${form.id} != null ? 'Editar artículo' : 'Nuevo artículo')"></head>
+
+<body>
+
+<div class="app-layout" th:with="activePage='blog_posts'">
+    <!-- Sidebar -->
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <!-- Main -->
+    <div class="main-content">
+        <!-- Topbar -->
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <!-- Contenido principal -->
+        <main class="content-wrapper">
+            <div class="container-fluid py-3">
+                <div class="row">
+                    <div class="col-12">
+
+                        <!-- Breadcrumb + título -->
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <nav aria-label="breadcrumb">
+                                    <ol class="breadcrumb mb-1 small">
+                                        <li class="breadcrumb-item">
+                                            <a th:href="@{/home}">Inicio</a>
+                                        </li>
+                                        <li class="breadcrumb-item">
+                                            <a th:href="@{/admin/blog}">Blog / consejos</a>
+                                        </li>
+                                        <li class="breadcrumb-item active" aria-current="page"
+                                            th:text="${form.id} != null ? 'Editar artículo' : 'Nuevo artículo'">
+                                            Nuevo artículo
+                                        </li>
+                                    </ol>
+                                </nav>
+                                <h1 class="h4 mb-0"
+                                    th:text="${form.id} != null ? 'Editar artículo' : 'Nuevo artículo'">
+                                    Nuevo artículo
+                                </h1>
+                                <p class="text-muted small mb-0">
+                                    Completa el contenido que se mostrará en la sección de blog de la web.
+                                </p>
+                            </div>
+                            <div>
+                                <a class="btn btn-outline-secondary btn-sm" th:href="@{/admin/blog}">
+                                    <i class="bi bi-arrow-left"></i> Volver al listado
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Card principal -->
+                        <div class="card shadow-sm">
+                            <div class="card-body">
+                                <form th:object="${form}"
+                                      th:action="@{/admin/blog/save}"
+                                      method="post"
+                                      enctype="multipart/form-data">
+
+                                    <!-- CSRF -->
+                                    <input type="hidden"
+                                           th:name="${_csrf.parameterName}"
+                                           th:value="${_csrf.token}"/>
+
+                                    <!-- ID del artículo (clave para que sea UPDATE y no INSERT) -->
+                                    <input type="hidden" th:field="*{id}"/>
+
+                                    <div class="row g-3">
+
+                                        <!-- Columna izquierda -->
+                                        <div class="col-lg-8">
+
+                                            <div class="mb-3">
+                                                <label for="title" class="form-label">Título</label>
+                                                <input id="title" type="text"
+                                                       th:field="*{title}"
+                                                       class="form-control"
+                                                       placeholder="Ej. ¿Cuánta agua debo tomar al día?">
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label for="slug" class="form-label">Slug (opcional)</label>
+                                                <input id="slug" type="text"
+                                                       th:field="*{slug}"
+                                                       class="form-control"
+                                                       placeholder="se-generará-automaticamente-si-lo-dejas-vacio">
+                                                <div class="form-text">
+                                                    Si lo dejas vacío, se generará automáticamente a partir del título.
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label for="summary" class="form-label">Resumen</label>
+                                                <textarea id="summary"
+                                                          th:field="*{summary}"
+                                                          class="form-control"
+                                                          rows="2"
+                                                          placeholder="Resumen corto que se verá en la tarjeta del blog..."></textarea>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label for="content" class="form-label">
+                                                    Contenido (se permite HTML)
+                                                </label>
+                                                <!-- TinyMCE se engancha por esta clase -->
+                                                <textarea id="content"
+                                                          th:field="*{content}"
+                                                          class="form-control js-rich-text"
+                                                          rows="10"
+                                                          placeholder="Contenido completo del artículo..."></textarea>
+                                                <div class="form-text">
+                                                    Puedes usar formato enriquecido y, si lo necesitas,
+                                                    ver/editar el código HTML.
+                                                </div>
+                                            </div>
+
+                                        </div>
+
+                                        <!-- Columna derecha -->
+                                        <div class="col-lg-4">
+
+                                            <div class="mb-3">
+                                                <label for="coverFile" class="form-label">Imagen de portada</label>
+                                                <input id="coverFile"
+                                                       type="file"
+                                                       name="coverFile"
+                                                       class="form-control">
+                                                <div class="form-text">
+                                                    Si subes una nueva imagen, reemplazará la portada actual.
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3" th:if="${form.coverImagePath != null}">
+                                                <label class="form-label">Portada actual</label>
+                                                <div class="border rounded p-2 text-center bg-light">
+                                                    <img th:src="@{${form.coverImagePath}}"
+                                                         alt="Portada actual"
+                                                         class="img-fluid rounded">
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label for="status" class="form-label">Estado</label>
+                                                <select id="status" th:field="*{status}" class="form-select">
+                                                    <option th:value="DRAFT">Borrador</option>
+                                                    <option th:value="PUBLISHED">Publicado</option>
+                                                    <option th:value="SCHEDULED">Programado</option>
+                                                </select>
+                                            </div>
+
+                                            <div class="d-grid">
+                                                <button type="submit" class="btn btn-primary">
+                                                    <i class="bi bi-save me-1"></i> Guardar artículo
+                                                </button>
+                                            </div>
+
+                                        </div>
+                                    </div>
+
+                                </form>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Scripts comunes (bootstrap, ecoAdmin, etc.) -->
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<!-- TinyMCE igual que en productos -->
+<script src="https://cdn.jsdelivr.net/npm/tinymce@6.8.3/tinymce.min.js"
+        referrerpolicy="origin"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Editor rich text
+        if (window.tinymce) {
+            tinymce.init({
+                selector: 'textarea.js-rich-text',
+                menubar: false,
+                plugins: 'lists link code',
+                toolbar: 'bold italic underline | bullist numlist | link removeformat | code',
+                branding: false,
+                height: 420,
+                language: 'es',
+                convert_urls: false
+            });
+        }
+
+        // Sincronizar contenido antes de enviar
+        const form = document.querySelector('form');
+        if (form && window.tinymce) {
+            form.addEventListener('submit', function () {
+                tinymce.triggerSave();
+            });
+        }
+    });
+</script>
+
+</body>
+</html>

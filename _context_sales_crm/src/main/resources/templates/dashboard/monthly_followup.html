@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Seguimiento del mes - Eco Agua')}"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='monthly_followup'">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Control gerencial</div>
+                    <h1 class="h4 mb-1">Seguimiento del mes</h1>
+                    <div class="small text-muted">
+                        Junta en una sola vista la base fija del mes, el punto de equilibrio y el ritmo real de venta.
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button"
+                            class="btn btn-outline-info btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#monthlyFollowupHelpModal">
+                        <i class="bi bi-question-circle"></i> Ayuda
+                    </button>
+                    <a th:href="@{/expenses/fixed-costs(year=${year},month=${month})}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-receipt-cutoff"></i> Costos fijos
+                    </a>
+                    <a th:if="${featureBreakEven}" th:href="@{/cashflow/break-even(productId=${selectedProductId},year=${year},month=${month})}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-graph-up-arrow"></i> Punto de equilibrio
+                    </a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light d-flex align-items-center justify-content-between gap-2">
+                    <strong>Filtros</strong>
+                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                            title="Selecciona el producto y el mes que quieres analizar. Toda la pantalla se recalcula con esos datos.">
+                        <i class="bi bi-info-circle"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <form method="get" th:action="@{/dashboard/monthly-followup}" class="row g-2 align-items-end">
+                        <div class="col-lg-4">
+                            <label class="form-label">Producto</label>
+                            <select class="form-select" name="productId">
+                                <option th:each="p : ${products}"
+                                        th:value="${p.id}"
+                                        th:selected="${selectedProductId == p.id}"
+                                        th:text="${p.name}">Producto</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Año</label>
+                            <input type="number" class="form-control" name="year" min="2020" max="2100" th:value="${year}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Mes</label>
+                            <select class="form-select" name="month">
+                                <option value="1" th:selected="${month == 1}">Enero</option>
+                                <option value="2" th:selected="${month == 2}">Febrero</option>
+                                <option value="3" th:selected="${month == 3}">Marzo</option>
+                                <option value="4" th:selected="${month == 4}">Abril</option>
+                                <option value="5" th:selected="${month == 5}">Mayo</option>
+                                <option value="6" th:selected="${month == 6}">Junio</option>
+                                <option value="7" th:selected="${month == 7}">Julio</option>
+                                <option value="8" th:selected="${month == 8}">Agosto</option>
+                                <option value="9" th:selected="${month == 9}">Setiembre</option>
+                                <option value="10" th:selected="${month == 10}">Octubre</option>
+                                <option value="11" th:selected="${month == 11}">Noviembre</option>
+                                <option value="12" th:selected="${month == 12}">Diciembre</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Actualizar lectura
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div th:if="${snapshot == null}" class="alert alert-info shadow-sm">
+                No hay productos activos para mostrar seguimiento mensual. Registra o activa productos para calcular metas, punto de equilibrio y ritmo de venta.
+            </div>
+
+            <th:block th:if="${snapshot != null}">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6 col-xl-3">
+                        <div class="card shadow-sm h-100 border-primary-subtle">
+                            <div class="card-body">
+                                <div class="help-label small text-muted mb-1">
+                                    <span>Base fija oficial</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Suma de costos fijos del mes que el negocio debe cubrir aunque venda poco.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="fs-4 fw-semibold">
+                                    S/. <span th:text="${#numbers.formatDecimal(snapshot.baseFixedMonth, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                </div>
+                                <div class="small text-muted">
+                                    Mes analizado:
+                                    <span th:text="${snapshot.periodStart != null ? #temporals.format(snapshot.periodStart, 'MMMM yyyy') : '-'}">marzo 2026</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-xl-3">
+                        <div class="card shadow-sm h-100 border-success-subtle">
+                            <div class="card-body">
+                                <div class="help-label small text-muted mb-1">
+                                    <span>PE del mes</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Punto de equilibrio mensual: unidades necesarias para cubrir la estructura del mes.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="fs-4 fw-semibold"
+                                     th:text="${#numbers.formatDecimal(snapshot.breakEvenUnits, 1, 'POINT', 0, 'POINT')}">0</div>
+                                <div class="small text-muted">botellones para cubrir la estructura</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-xl-3">
+                        <div class="card shadow-sm h-100 border-info-subtle">
+                            <div class="card-body">
+                                <div class="help-label small text-muted mb-1">
+                                    <span>Vendidas acumuladas</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Cantidad vendida del producto seleccionado durante el mes analizado.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="fs-4 fw-semibold"
+                                     th:text="${#numbers.formatDecimal(snapshot.soldUnits, 1, 'POINT', 2, 'POINT')}">0.00</div>
+                                <div class="small text-muted">
+                                    Avance:
+                                    <span th:text="${#numbers.formatDecimal(snapshot.soldProgressPercent, 1, 'POINT', 1, 'POINT')}">0.0</span>% del PE
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-xl-3">
+                        <div class="card shadow-sm h-100 border-warning-subtle">
+                            <div class="card-body">
+                                <div class="help-label small text-muted mb-1">
+                                    <span>Faltante estructural</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Unidades que todavía faltan vender para llegar al punto de equilibrio del mes.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="fs-4 fw-semibold"
+                                     th:text="${#numbers.formatDecimal(snapshot.missingUnits, 1, 'POINT', 2, 'POINT')}">0.00</div>
+                                <div class="small text-muted">botellones aún por cubrir</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-lg-8">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <span class="d-inline-flex align-items-center gap-2">
+                                    <strong>Meta del mes</strong>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Compara el avance real contra lo esperado para llegar al punto de equilibrio mensual.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </span>
+                                <span class="badge"
+                                      th:classappend="${snapshot.paceBadgeClass}"
+                                      th:text="${snapshot.paceLabel}">En ritmo</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-4">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="help-label small text-muted">
+                                                <span>Esperado a la fecha</span>
+                                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                                        title="Cantidad que deberías haber vendido hasta hoy para mantener el ritmo del mes.">
+                                                    <i class="bi bi-info-circle"></i>
+                                                </button>
+                                            </div>
+                                            <div class="fw-semibold fs-5"
+                                                 th:text="${#numbers.formatDecimal(snapshot.expectedUnitsByToday, 1, 'POINT', 2, 'POINT')}">0.00</div>
+                                            <div class="small text-muted">según ritmo mensual</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="help-label small text-muted">
+                                                <span>Días restantes</span>
+                                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                                        title="Días disponibles para alcanzar la meta dentro del mes seleccionado.">
+                                                    <i class="bi bi-info-circle"></i>
+                                                </button>
+                                            </div>
+                                            <div class="fw-semibold fs-5" th:text="${snapshot.remainingDays}">0</div>
+                                            <div class="small text-muted">de <span th:text="${snapshot.daysInMonth}">31</span> días del mes</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="help-label small text-muted">
+                                                <span>Meta diaria restante</span>
+                                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                                        title="Unidades promedio que faltan vender por día para llegar al punto de equilibrio.">
+                                                    <i class="bi bi-info-circle"></i>
+                                                </button>
+                                            </div>
+                                            <div class="fw-semibold fs-5"
+                                                 th:text="${#numbers.formatDecimal(snapshot.targetUnitsPerRemainingDay, 1, 'POINT', 2, 'POINT')}">0.00</div>
+                                            <div class="small text-muted">botellones por día</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-secondary mb-2">
+                                    <div class="fw-semibold mb-1">Lectura rápida</div>
+                                    <div th:text="${snapshot.paceSummary}">Resumen</div>
+                                </div>
+
+                                <div class="alert alert-light border mb-0">
+                                    <div class="fw-semibold mb-1">Qué hacer ahora</div>
+                                    <div th:text="${snapshot.mainRecommendation}">Recomendación</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-light d-flex align-items-center justify-content-between gap-2">
+                                <strong>Lectura comercial</strong>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Resume precio promedio, ventas acumuladas, margen y meta diaria en soles.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="small text-muted">Precio promedio real</div>
+                                    <div class="fw-semibold fs-5">
+                                        S/. <span th:text="${#numbers.formatDecimal(snapshot.averageSellingPrice, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="small text-muted">Ventas brutas acumuladas</div>
+                                    <div class="fw-semibold fs-5">
+                                        S/. <span th:text="${#numbers.formatDecimal(snapshot.totalRevenue, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="small text-muted">Margen de contribución promedio</div>
+                                    <div class="fw-semibold fs-5">
+                                        S/. <span th:text="${#numbers.formatDecimal(snapshot.contributionMarginUnit, 1, 'POINT', 4, 'POINT')}">0.0000</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="small text-muted">Meta de venta diaria</div>
+                                    <div class="fw-semibold fs-5">
+                                        S/. <span th:text="${#numbers.formatDecimal(snapshot.targetSalesPerRemainingDay, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-light d-flex align-items-center justify-content-between gap-2">
+                            <strong>Lectura operativa real del período</strong>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Muestra costos variables reales, aporte antes de fijos y resultado luego de cubrir estructura.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                            <div class="card-body">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Operativo total acumulado</div>
+                                            <div class="fw-semibold fs-5">
+                                                S/. <span th:text="${#numbers.formatDecimal(snapshot.operationalVariableTotal, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Costo operativo por unidad</div>
+                                            <div class="fw-semibold fs-5">
+                                                S/. <span th:text="${#numbers.formatDecimal(snapshot.operationalVariableUnitCost, 1, 'POINT', 4, 'POINT')}">0.0000</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Gasolina y otros no personales</div>
+                                            <div class="fw-semibold fs-5">
+                                                S/. <span th:text="${#numbers.formatDecimal(snapshot.operationalVariableNonPersonnelTotal, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Personal variable</div>
+                                            <div class="fw-semibold fs-5">
+                                                S/. <span th:text="${#numbers.formatDecimal(snapshot.operationalVariablePersonnelTotal, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Aporte operativo antes de fijos</div>
+                                            <div class="fw-semibold fs-5">
+                                                S/. <span th:text="${#numbers.formatDecimal(snapshot.operationalContributionBeforeFixed, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="border rounded p-3 h-100">
+                                            <div class="small text-muted">Resultado del período después de fijos</div>
+                                            <div class="fw-semibold fs-5"
+                                                 th:classappend="${snapshot.operationalResultAfterFixed.signum() >= 0 ? ' text-success' : ' text-danger'}">
+                                                S/. <span th:text="${#numbers.formatDecimal(snapshot.operationalResultAfterFixed, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <span class="d-inline-flex align-items-center gap-2">
+                                    <strong>Detalle operativo acumulado</strong>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Agrupa los costos operativos variables por rubro para ver dónde se está gastando más.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </span>
+                                <span class="badge text-bg-light"
+                                      th:text="${snapshot.operationalVariableByCategory != null ? snapshot.operationalVariableByCategory.size() : 0} + ' rubro(s)'">0</span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div th:if="${snapshot.operationalVariableByCategory == null or #maps.isEmpty(snapshot.operationalVariableByCategory)}"
+                                     class="p-3 text-muted small">
+                                    Todavía no hay egresos operativos acumulados en el período. Registra gastos variables para calcular mejor el costo operativo real.
+                                </div>
+
+                                <div class="table-responsive"
+                                     th:if="${snapshot.operationalVariableByCategory != null and !#maps.isEmpty(snapshot.operationalVariableByCategory)}">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead class="table-light">
+                                        <tr>
+                                            <th>Rubro</th>
+                                            <th class="text-end">Monto</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="entry : ${snapshot.operationalVariableByCategory}">
+                                            <td th:text="${entry.key}">Gasolina</td>
+                                            <td class="text-end">
+                                                S/. <span th:text="${#numbers.formatDecimal(entry.value, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <span class="d-inline-flex align-items-center gap-2">
+                            <strong>Base estructural realmente usada</strong>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Detalle de costos fijos considerados para calcular la base estructural del mes.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </span>
+                        <span class="small text-muted"
+                              th:text="${snapshot.product != null ? 'Producto: ' + snapshot.product.name : 'Producto'}">Producto</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div th:if="${snapshot.breakEvenResult == null or #lists.isEmpty(snapshot.breakEvenResult.fixedCostLines)}"
+                             class="p-3 text-muted small">
+                            No hay líneas de costo fijo estructural registradas para este período. Registra costos fijos del mes para obtener un punto de equilibrio más confiable.
+                        </div>
+
+                        <div class="table-responsive"
+                             th:if="${snapshot.breakEvenResult != null and !#lists.isEmpty(snapshot.breakEvenResult.fixedCostLines)}">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Rubro fijo</th>
+                                    <th class="text-end">Monto</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="line : ${snapshot.breakEvenResult.fixedCostLines}">
+                                    <td th:text="${line.categoryName}">Luz local</td>
+                                    <td class="text-end">
+                                        S/. <span th:text="${#numbers.formatDecimal(line.totalAmount, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </th:block>
+
+        </main>
+    </div>
+</div>
+
+<button type="button"
+        class="btn btn-info page-help-floating"
+        data-bs-toggle="modal"
+        data-bs-target="#monthlyFollowupHelpModal"
+        aria-label="Abrir ayuda de Seguimiento del mes">
+    <i class="bi bi-question-circle"></i>
+    <span>Ayuda</span>
+</button>
+
+<div class="modal fade" id="monthlyFollowupHelpModal" tabindex="-1" aria-labelledby="monthlyFollowupHelpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content help-modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="small text-muted">Guía rápida</div>
+                    <h2 class="modal-title h5" id="monthlyFollowupHelpModalLabel">Cómo usar Seguimiento del mes</h2>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-4">
+                    Esta página ayuda a saber si el mes va en buen ritmo. Compara lo que ya se vendió contra el punto de equilibrio necesario para cubrir costos fijos y operación real.
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-funnel"></i> 1. Elige producto y mes</div>
+                            <p>El producto seleccionado define las unidades, precio promedio y margen. El mes define ventas acumuladas, días restantes y base fija.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-bullseye"></i> 2. Mira el PE del mes</div>
+                            <p>El PE indica cuántos botellones se necesitan vender para cubrir la estructura del mes. Si vendiste menos, todavía falta cubrir costos.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-speedometer2"></i> 3. Revisa el ritmo</div>
+                            <p>La meta diaria restante muestra cuánto necesitas vender por día desde hoy hasta fin de mes para alcanzar el objetivo.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-tools"></i> 4. Ajusta datos base</div>
+                            <p>Si los números no parecen reales, revisa costos fijos, gastos operativos, precios, pedidos registrados y producto seleccionado.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h3 class="h6">Qué hacer si la pantalla aparece vacía o en cero</h3>
+                <ul class="mb-0">
+                    <li>Verifica que existan productos activos.</li>
+                    <li>Registra ventas del producto en el mes seleccionado.</li>
+                    <li>Registra costos fijos del mes.</li>
+                    <li>Registra gastos operativos para mejorar la lectura real.</li>
+                    <li>Confirma que el año y mes del filtro sean correctos.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block th:replace="~{fragments/scripts_admin :: adminScripts}"></th:block>
+</body>
+</html>

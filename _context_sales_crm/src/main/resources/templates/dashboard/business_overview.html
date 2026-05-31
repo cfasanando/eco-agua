@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Estado del negocio - Eco Agua')"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='business_overview'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Panel gerencial</div>
+                    <h1 class="h4 mb-1">Estado del negocio</h1>
+                    <div class="small text-muted">
+                        Vista ejecutiva para seguir ingresos, gastos, ventas, cartera, alertas y focos de mejora.
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button"
+                            class="btn btn-outline-info btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#businessOverviewHelpModal">
+                        <i class="bi bi-question-circle"></i> Ayuda
+                    </button>
+                    <a th:href="@{/home}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-arrow-left"></i> Volver al inicio
+                    </a>
+                    <a th:href="@{/cashflow}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-cash-stack"></i> Flujo de caja
+                    </a>
+                    <a th:href="@{/orders/new}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-lg"></i> Nuevo pedido
+                    </a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body d-flex flex-column gap-3 gap-lg-0 flex-lg-row justify-content-between align-items-lg-center">
+                    <div>
+                        <div class="help-label small text-muted mb-1">
+                            <span>Período analizado</span>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Rango de fechas usado para calcular todos los indicadores de esta pantalla.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="fw-semibold">
+                            <span th:text="${#temporals.format(snapshot.fromDate, 'dd/MM/yyyy')}">01/03/2026</span>
+                            -
+                            <span th:text="${#temporals.format(snapshot.toDate, 'dd/MM/yyyy')}">30/03/2026</span>
+                            <span class="text-muted" th:text="|'(${currentRangeDays} días)'|">(30 días)</span>
+                        </div>
+                        <div class="small text-muted">
+                            Comparado con
+                            <span th:text="${#temporals.format(snapshot.previousFromDate, 'dd/MM/yyyy')}">01/02/2026</span>
+                            -
+                            <span th:text="${#temporals.format(snapshot.previousToDate, 'dd/MM/yyyy')}">29/02/2026</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <a th:href="@{/dashboard/business-overview(days=7)}"
+                           class="btn btn-sm"
+                           th:classappend="${selectedPresetDays == 7 ? ' btn-primary' : ' btn-outline-primary'}">
+                            7 días
+                        </a>
+                        <a th:href="@{/dashboard/business-overview(days=30)}"
+                           class="btn btn-sm"
+                           th:classappend="${selectedPresetDays == 30 ? ' btn-primary' : ' btn-outline-primary'}">
+                            30 días
+                        </a>
+                        <a th:href="@{/dashboard/business-overview(days=90)}"
+                           class="btn btn-sm"
+                           th:classappend="${selectedPresetDays == 90 ? ' btn-primary' : ' btn-outline-primary'}">
+                            90 días
+                        </a>
+                    </div>
+
+                    <form method="get" class="row g-2 align-items-end">
+                        <div class="col-auto">
+                            <label class="form-label small mb-1">Desde</label>
+                            <input type="date" name="from" class="form-control form-control-sm" th:value="${snapshot.fromDate}">
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label small mb-1">Hasta</label>
+                            <input type="date" name="to" class="form-control form-control-sm" th:value="${snapshot.toDate}">
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-sm btn-outline-dark">Aplicar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body d-flex flex-column flex-lg-row justify-content-between align-items-start gap-3">
+                    <div>
+                        <div class="help-label small text-muted mb-1">
+                            <span>Lectura general</span>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Resume la salud del negocio según ventas, gastos, cartera, stock y clientes del período.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="badge" th:classappend="${snapshot.overallHealthBadgeClass}" th:text="${snapshot.overallHealthLabel}">Estable</span>
+                            <span class="fw-semibold" th:text="|${snapshot.overallScore}/100|">80/100</span>
+                        </div>
+                        <div class="text-muted" th:text="${snapshot.overallHealthSummary}">
+                            Resumen general del negocio.
+                        </div>
+                    </div>
+
+                    <div class="row g-2 w-100 w-lg-auto">
+                        <div class="col-sm-6 col-lg-auto">
+                            <div class="border rounded-3 px-3 py-2 h-100">
+                                <div class="help-label small text-muted">
+                                    <span>Venta comercial</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Monto vendido en pedidos comerciales dentro del período seleccionado.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="fw-semibold">
+                                    S/. <span th:text="${#numbers.formatDecimal(snapshot.commercialSales, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                </div>
+                                <div class="small text-muted">
+                                    <span th:text="${#numbers.formatDecimal(snapshot.commercialSalesChangePercent, 1, 'POINT', 1, 'POINT')}">0.0</span>% vs período previo
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-lg-auto">
+                            <div class="border rounded-3 px-3 py-2 h-100">
+                                <div class="help-label small text-muted">
+                                    <span>Clientes con venta</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Cantidad de clientes que compraron al menos una vez en el período.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="fw-semibold" th:text="${snapshot.clientsWithSales}">0</div>
+                                <div class="small text-muted">
+                                    Activos: <span th:text="${snapshot.activeClients}">0</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-lg-auto">
+                            <div class="border rounded-3 px-3 py-2 h-100">
+                                <div class="help-label small text-muted">
+                                    <span>Stock crítico</span>
+                                    <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Productos activos que están por debajo de su nivel mínimo o requieren reposición.">
+                                        <i class="bi bi-info-circle"></i>
+                                    </button>
+                                </div>
+                                <div class="fw-semibold" th:text="${snapshot.lowStockCount}">0</div>
+                                <div class="small text-muted">productos</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-success-subtle">
+                        <div class="card-body">
+                            <div class="help-label small text-muted mb-1">
+                                <span>Ingresos totales</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Suma de ventas pagadas, cobros de fiados y otros ingresos registrados en el período.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-4 fw-semibold">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.totalIncomes, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                Cambio: <span th:text="${#numbers.formatDecimal(snapshot.incomeChangePercent, 1, 'POINT', 1, 'POINT')}">0.0</span>%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-danger-subtle">
+                        <div class="card-body">
+                            <div class="help-label small text-muted mb-1">
+                                <span>Gastos registrados</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Total de egresos registrados dentro del período analizado.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-4 fw-semibold">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.totalExpenses, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                Cambio: <span th:text="${#numbers.formatDecimal(snapshot.expenseChangePercent, 1, 'POINT', 1, 'POINT')}">0.0</span>%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-primary-subtle">
+                        <div class="card-body">
+                            <div class="help-label small text-muted mb-1">
+                                <span>Resultado neto</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Diferencia entre ingresos y gastos del período. Si es negativo, los gastos superan a los ingresos.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-4 fw-semibold">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.netResult, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                Cambio: <span th:text="${#numbers.formatDecimal(snapshot.netChangePercent, 1, 'POINT', 1, 'POINT')}">0.0</span>%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-warning-subtle">
+                        <div class="card-body">
+                            <div class="help-label small text-muted mb-1">
+                                <span>Fiado pendiente</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Monto total que todavía falta cobrar a clientes por ventas fiadas.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-4 fw-semibold">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.totalCreditPending, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                Riesgo: <span th:text="${snapshot.creditRiskCount}">0</span> cliente(s)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="help-label small text-muted mb-1">
+                                <span>Cobrado en caja</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Dinero efectivamente cobrado en ventas pagadas o pagos recibidos dentro del período.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-5 fw-semibold">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.cashCollected, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                Pagados: <span th:text="${snapshot.paidOrdersCount}">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="help-label small text-muted mb-1">
+                                <span>Fiado generado</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Monto de ventas registradas como fiado durante el período seleccionado.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-5 fw-semibold">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.creditGeneratedInPeriod, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                Fiados: <span th:text="${snapshot.creditOrdersCount}">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-3" th:if="${featureDelivery}">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="help-label small text-muted mb-1">
+                                <span>Pedidos por entregar</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Pedidos solicitados que aún siguen pendientes de entrega.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-5 fw-semibold" th:text="${snapshot.requestedOrdersCount}">0</div>
+                            <div class="small text-muted">
+                                Monto: S/. <span th:text="${#numbers.formatDecimal(snapshot.pendingDeliveryAmount, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="help-label small text-muted mb-1">
+                                <span>Venta diaria promedio</span>
+                                <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Promedio diario de venta comercial calculado con el rango seleccionado.">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                            <div class="fs-5 fw-semibold">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.averageDailyCommercialSales, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted" th:if="${featureContainers}">
+                                Prestados: <span th:text="${snapshot.totalBorrowedBottlesInPeriod}">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex align-items-center justify-content-between gap-2">
+                            <span>Alertas y prioridades</span>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Muestra riesgos o acciones recomendadas generadas a partir de la información registrada.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex flex-column gap-3">
+                                <div th:each="alert : ${snapshot.alerts}" class="border rounded-3 p-3">
+                                    <div class="d-flex flex-wrap justify-content-between gap-2 align-items-start mb-1">
+                                        <div class="fw-semibold" th:text="${alert.title}">Título</div>
+                                        <span class="badge"
+                                              th:classappend="${alert.severity == 'danger' ? ' text-bg-danger' : (alert.severity == 'warning' ? ' text-bg-warning' : (alert.severity == 'success' ? ' text-bg-success' : ' text-bg-info'))}"
+                                              th:text="${alert.severity == 'danger' ? 'Urgente' : (alert.severity == 'warning' ? 'Atención' : (alert.severity == 'success' ? 'Bien' : 'Info'))}">Atención</span>
+                                    </div>
+                                    <div class="text-muted small mb-2" th:text="${alert.message}">Mensaje</div>
+                                    <a th:if="${alert.actionUrl != null && !#strings.isEmpty(alert.actionUrl)}"
+                                       th:attr="href=${alert.actionUrl}"
+                                       class="btn btn-sm btn-outline-secondary"
+                                       th:text="${alert.actionLabel}">Ir</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex align-items-center justify-content-between gap-2">
+                            <span>Lectura rápida del período</span>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Lista conclusiones prácticas para interpretar el período sin revisar toda la tabla.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <ul class="mb-0 ps-3">
+                                <li th:each="note : ${snapshot.keyTakeaways}" th:text="${note}">Nota.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex align-items-center justify-content-between gap-2">
+                            <span>Productos con mejor aporte</span>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Productos que generan más ingreso o ganancia estimada según ventas cerradas del período.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th class="text-end">Cant.</th>
+                                        <th class="text-end">Ingreso</th>
+                                        <th class="text-end">Ganancia est.</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="row : ${snapshot.topProducts}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.productName}">Producto</div>
+                                            <div class="small text-muted">
+                                                Precio prom.: S/. <span th:text="${#numbers.formatDecimal(row.averageUnitPrice, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-end" th:text="${#numbers.formatDecimal(row.quantity, 1, 'POINT', 2, 'POINT')}">0.00</td>
+                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(row.revenue, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
+                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(row.estimatedProfit, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(snapshot.topProducts)}">
+                                        <td colspan="4" class="text-center text-muted py-4">No hay ventas cerradas en el período. Registra pedidos pagados o ajusta el rango de fechas.</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex align-items-center justify-content-between gap-2">
+                            <span>Categorías de gasto más pesadas</span>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Rubros de egreso con mayor peso dentro del gasto total del período.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Categoría</th>
+                                        <th class="text-end">Monto</th>
+                                        <th class="text-end">Peso</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="row : ${snapshot.topExpenseCategories}">
+                                        <td class="fw-semibold" th:text="${row.categoryName}">Categoría</td>
+                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(row.amount, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
+                                        <td class="text-end"><span th:text="${#numbers.formatDecimal(row.sharePercent, 1, 'POINT', 1, 'POINT')}">0.0</span>%</td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(snapshot.topExpenseCategories)}">
+                                        <td colspan="3" class="text-center text-muted py-4">No hay gastos en el período. Registra egresos para comparar costos y resultado neto.</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex align-items-center justify-content-between gap-2">
+                            <span>Top clientes por ingreso</span>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Clientes que más compraron en soles dentro del período seleccionado.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div th:if="${#lists.isEmpty(snapshot.topRevenueClients)}" class="p-3 text-muted small">
+                                No hay clientes con ventas en el período. Registra pedidos o revisa el filtro de fechas.
+                            </div>
+                            <ul class="list-group list-group-flush" th:if="${!#lists.isEmpty(snapshot.topRevenueClients)}">
+                                <li class="list-group-item" th:each="row : ${snapshot.topRevenueClients}">
+                                    <div class="d-flex justify-content-between gap-3">
+                                        <div>
+                                            <div class="fw-semibold" th:text="${row.clientName}">Cliente</div>
+                                            <div class="small text-muted" th:text="${row.profileName}">Perfil</div>
+                                        </div>
+                                        <div class="text-end small">
+                                            <div class="fw-semibold">S/. <span th:text="${#numbers.formatDecimal(row.totalRevenueInPeriod, 1, 'POINT', 2, 'POINT')}">0.00</span></div>
+                                            <a th:href="@{|/admin/clients/${row.clientId}/stats?from=${snapshot.fromDate}&to=${snapshot.toDate}|}" class="small text-decoration-none">Ver cliente</a>
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex align-items-center justify-content-between gap-2">
+                            <span>Clientes para reactivar</span>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Clientes que llevan más días de lo esperado sin volver a comprar.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div th:if="${#lists.isEmpty(snapshot.reactivationCandidates)}" class="p-3 text-muted small">
+                                No hay clientes fuera de ciclo para reactivar. Esta lista aparecerá cuando existan clientes sin comprar fuera de su ciclo esperado.
+                            </div>
+                            <ul class="list-group list-group-flush" th:if="${!#lists.isEmpty(snapshot.reactivationCandidates)}">
+                                <li class="list-group-item" th:each="row : ${snapshot.reactivationCandidates}">
+                                    <div class="d-flex justify-content-between gap-3">
+                                        <div>
+                                            <div class="fw-semibold" th:text="${row.clientName}">Cliente</div>
+                                            <div class="small text-muted" th:text="${row.strategyNote}">Nota</div>
+                                        </div>
+                                        <div class="text-end small">
+                                            <div><strong th:text="|${row.overdueDays} día(s)|">5 días</strong></div>
+                                            <div class="text-muted">fuera de ciclo</div>
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex align-items-center justify-content-between gap-2">
+                            <span>Stock crítico</span>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Lista productos con nivel de stock bajo para priorizar reposición.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div th:if="${#lists.isEmpty(snapshot.lowStockProducts)}" class="p-3 text-muted small">
+                                No hay productos activos con stock crítico. Si el stock no se muestra, revisa mínimos y movimientos de almacén.
+                            </div>
+                            <ul class="list-group list-group-flush" th:if="${!#lists.isEmpty(snapshot.lowStockProducts)}">
+                                <li class="list-group-item" th:each="row : ${snapshot.lowStockProducts}">
+                                    <div class="d-flex justify-content-between gap-3 align-items-center">
+                                        <div>
+                                            <div class="fw-semibold" th:text="${row.productName}">Producto</div>
+                                            <div class="small text-muted">Stock: <span th:text="${#numbers.formatDecimal(row.stock, 1, 'POINT', 2, 'POINT')}">0.00</span></div>
+                                        </div>
+                                        <span class="badge" th:classappend="${row.badgeClass}" th:text="${row.stockLabel}">Bajo</span>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex align-items-center justify-content-between gap-2">
+                            <span>Top clientes por ganancia estimada</span>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Clientes que dejan mayor margen estimado, no solo mayor venta bruta.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div th:if="${#lists.isEmpty(snapshot.topProfitClients)}" class="p-3 text-muted small">
+                                Todavía no hay margen positivo para comparar. Registra ventas y costos para estimar ganancia por cliente.
+                            </div>
+                            <div class="table-responsive" th:if="${!#lists.isEmpty(snapshot.topProfitClients)}">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Cliente</th>
+                                        <th class="text-end">Ganancia</th>
+                                        <th class="text-end">Margen</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="row : ${snapshot.topProfitClients}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.clientName}">Cliente</div>
+                                            <div class="small text-muted" th:text="${row.profileName}">Perfil</div>
+                                        </td>
+                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(row.estimatedProfitInPeriod, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
+                                        <td class="text-end"><span th:text="${#numbers.formatDecimal(row.profitMarginPercentInPeriod, 1, 'POINT', 1, 'POINT')}">0.0</span>%</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex align-items-center justify-content-between gap-2">
+                            <span>Clientes con presión de cobranza</span>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Clientes con deuda pendiente que requieren seguimiento de cobro.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div th:if="${#lists.isEmpty(snapshot.creditRiskClients)}" class="p-3 text-muted small">
+                                No hay clientes con fiado pendiente para vigilar. Las ventas fiadas aparecerán aquí hasta ser cobradas.
+                            </div>
+                            <div class="table-responsive" th:if="${!#lists.isEmpty(snapshot.creditRiskClients)}">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Cliente</th>
+                                        <th class="text-end">Pendiente</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="row : ${snapshot.creditRiskClients}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.clientName}">Cliente</div>
+                                            <div class="small text-muted" th:text="${row.profileName}">Perfil</div>
+                                        </td>
+                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(row.creditPendingAllTime, 1, 'POINT', 2, 'POINT')}">0.00</span></td>
+                                        <td class="small" th:text="${row.recommendedAction}">Acción</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<button type="button"
+        class="btn btn-info page-help-floating"
+        data-bs-toggle="modal"
+        data-bs-target="#businessOverviewHelpModal"
+        aria-label="Abrir ayuda de Estado del negocio">
+    <i class="bi bi-question-circle"></i>
+    <span>Ayuda</span>
+</button>
+
+<div class="modal fade" id="businessOverviewHelpModal" tabindex="-1" aria-labelledby="businessOverviewHelpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content help-modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="small text-muted">Guía rápida</div>
+                    <h2 class="modal-title h5" id="businessOverviewHelpModalLabel">Cómo usar Estado del negocio</h2>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-4">
+                    Esta página sirve para mirar la salud general del negocio en un rango de fechas. Primero elige 7, 30, 90 días o un rango personalizado; luego revisa ingresos, gastos, resultado, fiados, stock y clientes que requieren atención.
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-calendar-range"></i> 1. Define el período</div>
+                            <p>El rango de fechas controla todos los indicadores. Si una venta, gasto o cobro no está dentro de esas fechas, no entra en la lectura.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-activity"></i> 2. Lee el resultado general</div>
+                            <p>La lectura general resume si el negocio está sano, estable o con alertas según ventas, gastos, cartera pendiente, clientes y stock.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-cash-coin"></i> 3. Revisa dinero real</div>
+                            <p>Ingresos, gastos y resultado neto ayudan a saber si el período dejó ganancia o pérdida. El fiado pendiente no siempre significa dinero disponible en caja.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-exclamation-triangle"></i> 4. Prioriza acciones</div>
+                            <p>Usa alertas, clientes para reactivar, presión de cobranza y stock crítico para decidir qué hacer primero: cobrar, vender, reponer o contactar clientes.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h3 class="h6">Qué información alimenta esta página</h3>
+                <ul class="mb-0">
+                    <li>Pedidos y ventas registradas.</li>
+                    <li>Cobros de ventas fiadas.</li>
+                    <li>Gastos y costos registrados.</li>
+                    <li>Clientes, perfiles comerciales y ciclos de recompra.</li>
+                    <li>Stock, mínimos y movimientos de almacén.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+</body>
+</html>

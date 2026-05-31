@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Detalle de cobranza - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='income_credit'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-1">
+                        Cobranza del pedido #<span th:text="${order.orderNumber}">1</span>
+                    </h1>
+                    <div class="small text-muted">
+                        Cliente:
+                        <span th:text="${order.client != null ? order.client.name : '-'}">Cliente</span>
+                        &nbsp;|&nbsp;
+                        Fecha pedido:
+                        <span th:text="${#temporals.format(order.orderDate,'dd/MM/yyyy')}">01/01/2026</span>
+                    </div>
+                </div>
+                <a th:href="${backUrl}" class="btn btn-outline-secondary">Volver</a>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light">Resumen</div>
+                        <div class="card-body small">
+                            <p class="mb-1"><strong>Estado:</strong> <span th:text="${order.status}">CREDIT</span></p>
+                            <p class="mb-1"><strong>Total:</strong> S/. <span th:text="${#numbers.formatDecimal(order.totalAmount,1,'POINT',2,'POINT')}">0.00</span></p>
+                            <p class="mb-1"><strong>Abonado:</strong> S/. <span th:text="${#numbers.formatDecimal(order.paidAmount,1,'POINT',2,'POINT')}">0.00</span></p>
+                            <p class="mb-1"><strong>Saldo pendiente:</strong> <span class="fw-bold text-danger">S/. <span th:text="${#numbers.formatDecimal(order.pendingAmount,1,'POINT',2,'POINT')}">0.00</span></span></p>
+                            <p class="mb-1"><strong>Teléfono:</strong> <span th:text="${order.client != null ? order.client.phone : '-'}">-</span></p>
+                            <p class="mb-1"><strong>Dirección:</strong> <span th:text="${order.client != null ? order.client.address : '-'}">-</span></p>
+                            <p class="mb-1"><strong>Perfil:</strong> <span th:text="${order.client != null && order.client.profile != null ? order.client.profile.name : '-'}">-</span></p>
+                            <p class="mb-1"><strong>Fecha de vencimiento:</strong>
+                                <span th:if="${order.dueDate != null}" th:text="${#temporals.format(order.dueDate,'dd/MM/yyyy')}">-</span>
+                                <span th:if="${order.dueDate == null}" class="text-muted">Sin fecha</span>
+                            </p>
+                            <p class="mb-0"><strong>Días de atraso:</strong>
+                                <span th:if="${order.overdueDays > 0}" class="badge bg-danger" th:text="${order.overdueDays + ' días'}">0 días</span>
+                                <span th:if="${order.overdueDays == 0}" class="badge bg-success">Al día</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light">Definir vencimiento</div>
+                        <div class="card-body">
+                            <form th:action="@{|/income/credit/${order.id}/due-date|}" method="post" class="row g-2 align-items-end">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <input type="hidden" name="back" th:value="${backUrl}"/>
+                                <div class="col-md-8">
+                                    <label class="form-label">Fecha de vencimiento</label>
+                                    <input type="date" class="form-control" name="dueDate" th:value="${order.dueDate}">
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="submit" class="btn btn-outline-primary w-100">Guardar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-5">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light">Registrar abono</div>
+                        <div class="card-body">
+                            <form th:action="@{|/income/credit/${order.id}/payments|}" method="post" class="row g-3">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <input type="hidden" name="back" th:value="${backUrl}"/>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Fecha</label>
+                                    <input type="date" class="form-control" name="paymentDate" th:value="${#temporals.format(T(java.time.LocalDate).now(),'yyyy-MM-dd')}">
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Monto</label>
+                                    <input type="number" step="0.01" min="0.01" class="form-control" name="amount" th:attr="max=${order.pendingAmount}">
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Método</label>
+                                    <select class="form-select" name="paymentMethod">
+                                        <option value="CASH">Efectivo</option>
+                                        <option value="TRANSFER">Transferencia</option>
+                                        <option value="YAPE">Yape</option>
+                                        <option value="PLIN">Plin</option>
+                                        <option value="CARD">Tarjeta</option>
+                                        <option value="OTHER">Otro</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Referencia</label>
+                                    <input type="text" class="form-control" name="reference" maxlength="100">
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Observación</label>
+                                    <textarea class="form-control" name="observation" rows="3" maxlength="255"></textarea>
+                                </div>
+
+                                <div class="col-12 d-flex justify-content-end">
+                                    <button type="submit" class="btn btn-success" th:disabled="${order.pendingAmount <= 0}">
+                                        Registrar abono
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light">Historial de abonos</div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Fecha</th>
+                                        <th>Método</th>
+                                        <th>Referencia</th>
+                                        <th>Observación</th>
+                                        <th class="text-end">Monto S/.</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="p, stat : ${order.payments}">
+                                        <td th:text="${stat.count}">1</td>
+                                        <td th:text="${#temporals.format(p.paymentDate,'dd/MM/yyyy')}">01/01/2026</td>
+                                        <td th:text="${p.paymentMethod}">CASH</td>
+                                        <td th:text="${p.reference} ?: '-'">-</td>
+                                        <td th:text="${p.observation} ?: '-'">-</td>
+                                        <td class="text-end" th:text="${#numbers.formatDecimal(p.amount,1,'POINT',2,'POINT')}">0.00</td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(order.payments)}">
+                                        <td colspan="6" class="text-center text-muted">No hay abonos registrados.</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+</body>
+</html>

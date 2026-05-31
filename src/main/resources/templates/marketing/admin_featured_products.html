@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Productos destacados de marketing - Eco Agua')"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='marketing_featured_products'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <th:block
+                th:replace="~{fragments/local_breadcrumb :: trail(
+                    'Gestión de marca',
+                    null,
+                    'Marketing y contenido',
+                    null,
+                    'Productos destacados',
+                    null,
+                    null,
+                    'Selecciona qué productos se empujarán en el portal, catálogo, redes sociales y WhatsApp.'
+                )}"
+            ></th:block>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Herramientas de marketing</div>
+                    <h1 class="h4 mb-1">Productos destacados</h1>
+                    <div class="small text-muted">
+                        Usa esta herramienta para decidir qué productos deben recibir más visibilidad en campañas, catálogo, publicaciones y portal público.
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#featuredProductsHelpModal">
+                        <i class="bi bi-question-circle"></i> Ayuda
+                    </button>
+                    <a th:href="@{/marketing/admin/actions-report}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-clipboard-data"></i> Reporte de acciones
+                    </a>
+                    <a th:href="@{/marketing/admin/publication-plan}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-calendar-check"></i> Plan mensual
+                    </a>
+                    <a th:href="@{/marketing/admin/campaigns}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-calendar2-week"></i> Campañas
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <span th:text="${successMessage}">Producto destacado guardado correctamente.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small mb-3" role="alert">
+                <div class="fw-semibold mb-1"><i class="bi bi-info-circle"></i> Cómo usar esta pantalla</div>
+                <div>
+                    Registra el producto que quieres impulsar, define un mensaje corto y activa solo los productos que realmente deben aparecer como destacados. Al activar un registro, el producto queda marcado como destacado para el portal público.
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <div class="fw-semibold" th:text="${isFeaturedEdit} ? 'Editar producto destacado' : 'Nuevo producto destacado'">Nuevo producto destacado</div>
+                            <div class="small text-muted">Elige un producto existente y define cómo se promocionará.</div>
+                        </div>
+                        <div class="card-body">
+                            <form th:action="@{/marketing/admin/featured-products/save}" th:object="${featuredForm}" method="post" class="marketing-strategy-form">
+                                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <input type="hidden" th:field="*{id}">
+
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label">Producto</label>
+                                        <select name="productId" class="form-select" required>
+                                            <option value="">Selecciona un producto activo</option>
+                                            <option th:each="product : ${products}"
+                                                    th:value="${product.id}"
+                                                    th:text="${product.name}"
+                                                    th:selected="${selectedProductId != null and selectedProductId == product.id}">Producto</option>
+                                        </select>
+                                        <div class="form-text">No se crean productos nuevos aquí. Solo se seleccionan productos ya registrados.</div>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Título para mostrar</label>
+                                        <input type="text" th:field="*{title}" class="form-control" required maxlength="180"
+                                               placeholder="Ejemplo: Agua de mesa para tu hogar">
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Texto corto de marketing</label>
+                                        <textarea th:field="*{shortText}" class="form-control" rows="3"
+                                                  placeholder="Mensaje corto para usar en catálogo, portal, redes o WhatsApp."></textarea>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Estado</label>
+                                        <select th:field="*{status}" class="form-select">
+                                            <option th:each="statusItem : ${featuredStatuses}"
+                                                    th:value="${statusItem}"
+                                                    th:text="${statusItem.label}">Planificado</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Destino principal</label>
+                                        <select th:field="*{displayPlace}" class="form-select">
+                                            <option th:each="place : ${displayPlaces}"
+                                                    th:value="${place}"
+                                                    th:text="${place.label}">Inicio</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label">Prioridad</label>
+                                        <input type="number" th:field="*{priority}" class="form-control" min="1" max="99" step="1">
+                                        <div class="form-text">Mayor número = mayor prioridad.</div>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label">Inicio</label>
+                                        <input type="date" th:field="*{startDate}" class="form-control">
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label">Fin</label>
+                                        <input type="date" th:field="*{endDate}" class="form-control">
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Llamada a la acción</label>
+                                        <input type="text" th:field="*{callToAction}" class="form-control" maxlength="180"
+                                               placeholder="Ejemplo: Consultar disponibilidad por WhatsApp">
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Observaciones internas</label>
+                                        <textarea th:field="*{observations}" class="form-control" rows="3"
+                                                  placeholder="Notas internas: stock, temporada, público objetivo o validaciones pendientes."></textarea>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex flex-wrap gap-2 mt-4">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="bi bi-save"></i> Guardar producto destacado
+                                    </button>
+                                    <a th:href="@{/marketing/admin/featured-products}" class="btn btn-outline-secondary" th:if="${isFeaturedEdit}">Cancelar edición</a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
+                            <div>
+                                <div class="fw-semibold">Productos destacados registrados</div>
+                                <div class="small text-muted">Controla qué productos están activos, pausados o archivados para marketing.</div>
+                            </div>
+                            <span class="badge text-bg-light border" th:text="${#lists.size(featuredRows)} + ' registros'">0 registros</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div th:if="${#lists.isEmpty(featuredRows)}" class="p-4 text-center text-muted">
+                                <i class="bi bi-star display-6 d-block mb-2"></i>
+                                Aún no hay productos destacados. Guarda el primer producto para empezar a organizar la promoción.
+                            </div>
+
+                            <div th:if="${!#lists.isEmpty(featuredRows)}" class="table-responsive">
+                                <table class="table align-middle mb-0 marketing-strategy-table">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>Mensaje</th>
+                                        <th>Destino</th>
+                                        <th>Estado</th>
+                                        <th>Periodo</th>
+                                        <th class="text-end">Acciones</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="row : ${featuredRows}">
+                                        <td class="strategy-title-cell">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <img th:if="${row.imagePath != null}" th:src="${row.imagePath}" alt="Producto" class="rounded border" style="width:48px;height:48px;object-fit:cover;">
+                                                <div th:if="${row.imagePath == null}" class="rounded border bg-light d-flex align-items-center justify-content-center" style="width:48px;height:48px;">
+                                                    <i class="bi bi-image text-muted"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-semibold" th:text="${row.productName} ?: 'Producto no disponible'">Producto</div>
+                                                    <div class="small text-muted" th:text="${row.productPriceText}">S/ 0.00</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.title}">Título</div>
+                                            <div class="small text-muted" th:if="${row.shortTextPreview != null}" th:text="${row.shortTextPreview}">Texto corto</div>
+                                            <div class="small text-muted" th:if="${row.shortTextPreview == null}">Sin mensaje corto.</div>
+                                            <div class="small mt-1"><strong>CTA:</strong> <span th:text="${row.callToActionDisplay}">Consultar por WhatsApp</span></div>
+                                        </td>
+                                        <td>
+                                            <span class="badge text-bg-light border" th:text="${row.displayPlaceLabel}">Inicio</span>
+                                            <div class="small text-muted mt-1">Prioridad <span th:text="${row.priorityText}">5</span></div>
+                                            <div class="small mt-1">
+                                                <span th:if="${row.productMarkedFeatured}" class="badge text-bg-warning">Marcado en portal</span>
+                                                <span th:if="${!row.productMarkedFeatured}" class="badge text-bg-light border">No visible en portal</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge" th:classappend="${row.statusBadgeClass}" th:text="${row.statusLabel}">Planificado</span>
+                                        </td>
+                                        <td class="small" th:text="${row.dateRangeText}">Sin fechas definidas</td>
+                                        <td class="text-end">
+                                            <div class="d-flex flex-wrap justify-content-end gap-1">
+                                                <a th:href="@{/marketing/admin/featured-products(id=${row.id})}" class="btn btn-outline-dark btn-sm">Editar</a>
+                                                <form th:if="${row.canActivate}" th:action="@{/marketing/admin/featured-products/{id}/activate(id=${row.id})}" method="post">
+                                                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                                    <button type="submit" class="btn btn-outline-success btn-sm">Activar</button>
+                                                </form>
+                                                <form th:if="${row.canPause}" th:action="@{/marketing/admin/featured-products/{id}/pause(id=${row.id})}" method="post">
+                                                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                                    <button type="submit" class="btn btn-outline-warning btn-sm">Pausar</button>
+                                                </form>
+                                                <form th:if="${row.canFinish}" th:action="@{/marketing/admin/featured-products/{id}/finish(id=${row.id})}" method="post">
+                                                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                                    <button type="submit" class="btn btn-outline-primary btn-sm">Finalizar</button>
+                                                </form>
+                                                <form th:if="${row.canArchive}" th:action="@{/marketing/admin/featured-products/{id}/archive(id=${row.id})}" method="post">
+                                                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                                    <button type="submit" class="btn btn-outline-secondary btn-sm">Archivar</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div class="modal fade" id="featuredProductsHelpModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-question-circle"></i> Ayuda: productos destacados</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <h6 class="fw-semibold">¿Para qué sirve?</h6>
+                    <p class="mb-0">
+                        Sirve para decidir qué productos merecen más visibilidad en marketing. No reemplaza el catálogo ni el inventario; solo ayuda a priorizar qué producto empujar en campañas, publicaciones, WhatsApp y portal público.
+                    </p>
+                </div>
+
+                <div class="mb-3">
+                    <h6 class="fw-semibold">Flujo recomendado</h6>
+                    <ol class="mb-0">
+                        <li>Selecciona un producto ya registrado.</li>
+                        <li>Escribe un título comercial y un texto corto.</li>
+                        <li>Define el destino principal: inicio, catálogo, redes, WhatsApp o todos los canales.</li>
+                        <li>Guárdalo como planificado si todavía falta validar stock o material.</li>
+                        <li>Actívalo cuando esté listo para mostrarse como producto destacado.</li>
+                    </ol>
+                </div>
+
+                <div class="alert alert-warning small mb-0">
+                    <strong>Importante:</strong> antes de activar un producto, confirma stock, precio y disponibilidad. Evita promocionar productos no confirmados.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

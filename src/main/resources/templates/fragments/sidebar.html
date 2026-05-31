@@ -459,6 +459,7 @@
       <div
         class="menu-group"
         th:with="isMarketingActive=${activePage == 'marketing_campaigns'
+        or activePage == 'marketing_promotions'
         or activePage == 'marketing_strategy'
         or activePage == 'marketing_ideas'
         or activePage == 'marketing_publication_plan'
@@ -490,6 +491,16 @@
             >
               <span class="icon"><i class="bi bi-megaphone-fill"></i></span>
               <span>Panel campañas</span>
+            </a>
+          </th:block>
+          <th:block th:if="${featureMarketing and modulePromotionsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING')">
+            <a
+              th:href="@{/marketing/admin/promotions}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'marketing_promotions' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-gift"></i></span>
+              <span>Promociones por temporada</span>
             </a>
           </th:block>
           <th:block th:if="${featureMarketing}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING')">

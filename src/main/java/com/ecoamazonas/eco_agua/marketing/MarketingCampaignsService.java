@@ -123,7 +123,7 @@ public class MarketingCampaignsService {
                     buildPromotionStatus(promotion, today),
                     "Llevar consultas hacia WhatsApp y catálogo",
                     buildPromotionNextAction(promotion, today),
-                    "/admin/promotions"
+                    "/marketing/admin/promotions"
             ));
         }
 
@@ -168,7 +168,7 @@ public class MarketingCampaignsService {
                     buildPromotionStatus(promotion, today),
                     firstNonBlank(promotion.getDescription(), "Promoción lista para mover por WhatsApp y el portal público."),
                     "Abrir promoción",
-                    "/admin/promotions",
+                    "/marketing/admin/promotions",
                     promotion.getStartDate()
             ));
         }
@@ -267,7 +267,7 @@ public class MarketingCampaignsService {
                         "Promoción por vencer",
                         "Revisa y refuerza la promoción '" + promotion.getName() + "' antes de que termine.",
                         "Abrir promociones",
-                        "/admin/promotions"
+                        "/marketing/admin/promotions"
                 )));
 
         activePromotions.stream()
@@ -278,7 +278,7 @@ public class MarketingCampaignsService {
                         "Promoción sin banner",
                         "Agrega un banner a '" + promotion.getName() + "' para que destaque en el portal público y canales comerciales.",
                         "Editar promoción",
-                        "/admin/promotions"
+                        "/marketing/admin/promotions"
                 )));
 
         if (!draftPosts.isEmpty()) {

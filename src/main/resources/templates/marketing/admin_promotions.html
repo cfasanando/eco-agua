@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Promociones por temporada - Eco Agua')"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='marketing_promotions'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <th:block
+                th:replace="~{fragments/local_breadcrumb :: trail(
+                    'Gestión de marca',
+                    null,
+                    'Marketing y contenido',
+                    null,
+                    'Promociones por temporada',
+                    null,
+                    null,
+                    'Planifica promociones, combos y mensajes comerciales por campaña o fecha especial.'
+                )}"
+            ></th:block>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Herramientas de marketing</div>
+                    <h1 class="h4 mb-1">Promociones por temporada</h1>
+                    <div class="small text-muted">
+                        Controla promociones para fechas fuertes, productos que se quieren mover más rápido, combos y mensajes para WhatsApp, redes y portal público.
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#seasonalPromotionsHelpModal">
+                        <i class="bi bi-question-circle"></i> Ayuda
+                    </button>
+                    <a th:href="@{/marketing/admin/featured-products}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-star"></i> Productos destacados
+                    </a>
+                    <a th:href="@{/marketing/admin/campaigns}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-calendar2-week"></i> Campañas
+                    </a>
+                    <a th:href="@{/admin/promotions}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-tools"></i> Vista clásica
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <span th:text="${successMessage}">Promoción guardada correctamente.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small mb-3" role="alert">
+                <div class="fw-semibold mb-1"><i class="bi bi-info-circle"></i> Cómo usar esta pantalla</div>
+                <div>
+                    Esta vista reutiliza las promociones existentes del sistema. Sirve para ordenarlas con enfoque de marketing, sin cambiar todavía precios de venta, caja ni pedidos.
+                    Configura productos solo como referencia comercial antes de publicar una promoción.
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <div class="fw-semibold" th:text="${isPromotionEdit} ? 'Editar promoción de temporada' : 'Nueva promoción de temporada'">Nueva promoción de temporada</div>
+                            <div class="small text-muted">Registra la idea comercial, fecha, mensaje y estado de la promoción.</div>
+                        </div>
+                        <div class="card-body">
+                            <form th:action="@{/marketing/admin/promotions/save}" method="post" class="marketing-seasonal-promotion-form">
+                                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <input type="hidden" name="id" th:value="${promotionForm.id}">
+
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label">Nombre de la promoción</label>
+                                        <input type="text" name="name" class="form-control" required maxlength="250"
+                                               th:value="${promotionForm.name}"
+                                               placeholder="Ejemplo: Campaña San Juan - hojas y paiche seco">
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label">Mensaje promocional</label>
+                                        <textarea name="description" class="form-control" rows="4"
+                                                  placeholder="Mensaje para usar en WhatsApp, Facebook, TikTok o portal público."
+                                                  th:text="${promotionForm.description}"></textarea>
+                                        <div class="form-text">Evita prometer stock, precio o entrega si todavía no está confirmado.</div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Fecha de inicio</label>
+                                        <input type="date" name="startDate" class="form-control" th:value="${promotionForm.startDate}">
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Fecha final</label>
+                                        <input type="date" name="endDate" class="form-control" th:value="${promotionForm.endDate}">
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label">Código / prioridad</label>
+                                        <input type="number" name="promoNumber" class="form-control" min="0" step="1" th:value="${promotionForm.promoNumber}"
+                                               placeholder="20260601">
+                                        <div class="form-text">Útil para ordenar campañas por temporada.</div>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label">Límite referencial</label>
+                                        <input type="number" name="maxCounter" class="form-control" min="0" step="1" th:value="${promotionForm.maxCounter}"
+                                               placeholder="Opcional">
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label">Color visual</label>
+                                        <input type="color" name="colorBorder" class="form-control form-control-color w-100"
+                                               th:value="${promotionForm.colorBorder != null ? promotionForm.colorBorder : '#166534'}">
+                                    </div>
+
+                                    <div class="col-12">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" name="enabled" value="true" id="promotionEnabled"
+                                                   th:checked="${promotionForm.enabled}">
+                                            <label class="form-check-label" for="promotionEnabled">Promoción activa o visible</label>
+                                        </div>
+                                        <div class="form-text">Si está apagada, queda como pausa interna y no debe empujarse en canales públicos.</div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex flex-wrap gap-2 mt-4">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="bi bi-save"></i> Guardar promoción
+                                    </button>
+                                    <a th:href="@{/marketing/admin/promotions}" class="btn btn-outline-secondary" th:if="${isPromotionEdit}">Cancelar edición</a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
+                            <div>
+                                <div class="fw-semibold">Promociones registradas</div>
+                                <div class="small text-muted">Revisa qué está activo, por vencer, pausado o pendiente de reforzar.</div>
+                            </div>
+                            <span class="badge text-bg-light border" th:text="${#lists.size(promotionRows)} + ' registros'">0 registros</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div th:if="${#lists.isEmpty(promotionRows)}" class="p-4 text-center text-muted">
+                                <i class="bi bi-megaphone display-6 d-block mb-2"></i>
+                                Aún no hay promociones. Crea una promoción para ordenar campañas por temporada.
+                            </div>
+
+                            <div th:if="${!#lists.isEmpty(promotionRows)}" class="table-responsive">
+                                <table class="table align-middle mb-0 marketing-strategy-table">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Promoción</th>
+                                        <th>Producto / alcance</th>
+                                        <th>Estado</th>
+                                        <th>Periodo</th>
+                                        <th class="text-end">Acciones</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="row : ${promotionRows}">
+                                        <td class="strategy-title-cell">
+                                            <div class="fw-semibold" th:text="${row.name}">Promoción</div>
+                                            <div class="small text-muted" th:text="${row.descriptionPreview}">Mensaje</div>
+                                            <div class="small mt-1">
+                                                <span class="badge text-bg-light border" th:text="${'Código: ' + row.campaignCodeText}">Código</span>
+                                                <span class="badge text-bg-light border" th:text="${row.maxCounterText}">Sin límite</span>
+                                                <span th:if="${row.hasBanner}" class="badge text-bg-info">Con banner</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="small" th:text="${row.productSummary}">Sin productos</div>
+                                            <div class="small text-muted mt-1">Referencia para combo, producto empujado o campaña informativa.</div>
+                                        </td>
+                                        <td>
+                                            <span class="badge" th:classappend="${row.statusBadgeClass}" th:text="${row.statusLabel}">Activa</span>
+                                            <div th:if="${row.endingSoon}" class="small text-warning mt-1">
+                                                <i class="bi bi-exclamation-triangle"></i> Por vencer pronto
+                                            </div>
+                                        </td>
+                                        <td class="small" th:text="${row.dateRangeText}">Sin fechas definidas</td>
+                                        <td class="text-end">
+                                            <div class="d-flex flex-wrap justify-content-end gap-1">
+                                                <a th:href="@{/marketing/admin/promotions(id=${row.id})}" class="btn btn-outline-dark btn-sm">Editar</a>
+                                                <button type="button"
+                                                        class="btn btn-outline-primary btn-sm"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#promotionProductsModal"
+                                                        th:attr="data-id=${row.id},data-name=${row.name},data-config=${row.productConfig}">
+                                                    Productos
+                                                </button>
+                                                <form th:if="${row.canActivate}" th:action="@{/marketing/admin/promotions/{id}/activate(id=${row.id})}" method="post">
+                                                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                                    <button type="submit" class="btn btn-outline-success btn-sm">Activar</button>
+                                                </form>
+                                                <form th:if="${row.canPause}" th:action="@{/marketing/admin/promotions/{id}/pause(id=${row.id})}" method="post">
+                                                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                                    <button type="submit" class="btn btn-outline-warning btn-sm">Pausar</button>
+                                                </form>
+                                                <form th:if="${row.canFinish}" th:action="@{/marketing/admin/promotions/{id}/finish(id=${row.id})}" method="post">
+                                                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                                    <button type="submit" class="btn btn-outline-secondary btn-sm">Finalizar</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div class="modal fade" id="promotionProductsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <form id="promotionProductsForm" th:action="@{/marketing/admin/promotions/configure-products}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title">Productos de la promoción</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="promotionId" id="ppPromotionId">
+                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+
+                    <div class="alert alert-warning small">
+                        Los productos configurados aquí son una referencia para marketing. No cambian precios de venta ni generan descuentos automáticos en pedidos.
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th style="width: 36px;"><input type="checkbox" id="ppCheckAll"></th>
+                                <th>Producto</th>
+                                <th class="text-end" style="width: 120px;">Precio S/.</th>
+                                <th class="text-end" style="width: 120px;">Cantidad</th>
+                                <th class="text-end" style="width: 140px;">Monto / precio promo S/.</th>
+                            </tr>
+                            </thead>
+                            <tbody id="ppTableBody">
+                            <tr th:each="prod : ${products}" th:attr="data-product-id=${prod.id}">
+                                <td><input type="checkbox" class="pp-row-check"></td>
+                                <td>
+                                    <span th:text="${prod.name}">Producto</span>
+                                    <small class="text-muted d-block">Producto activo del catálogo.</small>
+                                </td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(prod.price,1,'POINT',2,'POINT')}">0.00</td>
+                                <td>
+                                    <input type="number" min="0" step="1" class="form-control form-control-sm pp-qty" name="quantity">
+                                </td>
+                                <td>
+                                    <input type="number" min="0" step="0.01" class="form-control form-control-sm pp-amount" name="amount">
+                                    <input type="hidden" name="productId">
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success btn-sm">Guardar productos</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="seasonalPromotionsHelpModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-question-circle"></i> Ayuda: promociones por temporada</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <h6 class="fw-semibold">¿Para qué sirve?</h6>
+                    <p class="mb-0">
+                        Sirve para ordenar promociones antes de publicarlas: San Juan, compras por mayor, productos secos, combos, campañas familiares o mensajes para restaurantes.
+                    </p>
+                </div>
+                <div class="mb-3">
+                    <h6 class="fw-semibold">Flujo recomendado</h6>
+                    <ol class="mb-0">
+                        <li>Crea la promoción con nombre, mensaje y fechas.</li>
+                        <li>Déjala activa solo si ya se puede comunicar al público.</li>
+                        <li>Configura productos relacionados para tener claro qué se empuja.</li>
+                        <li>Coordina la publicación desde el plan mensual o el reporte de acciones.</li>
+                    </ol>
+                </div>
+                <div class="alert alert-warning small mb-0">
+                    <strong>Importante:</strong> esta herramienta no aplica descuentos automáticos. Antes de publicar, confirma stock, precio actualizado, presentación y zona de entrega.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const ppModal = document.getElementById('promotionProductsModal');
+        const ppForm = document.getElementById('promotionProductsForm');
+        const ppTableBody = document.getElementById('ppTableBody');
+        const ppCheckAll = document.getElementById('ppCheckAll');
+
+        if (ppModal && ppForm && ppTableBody) {
+            ppModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                if (!button) {
+                    return;
+                }
+
+                const promotionId = button.getAttribute('data-id');
+                const promotionName = button.getAttribute('data-name') || '';
+                const configRaw = button.getAttribute('data-config') || '';
+
+                ppModal.querySelector('.modal-title').textContent = 'Productos de la promoción: ' + promotionName;
+                document.getElementById('ppPromotionId').value = promotionId;
+
+                const configMap = new Map();
+                if (configRaw !== '') {
+                    configRaw.split(';').forEach(function (item) {
+                        const parts = item.split(':');
+                        if (parts.length >= 2) {
+                            configMap.set(parts[0], {
+                                qty: parts[1],
+                                amount: parts.length >= 3 ? parts[2] : ''
+                            });
+                        }
+                    });
+                }
+
+                ppTableBody.querySelectorAll('tr[data-product-id]').forEach(function (row) {
+                    const productId = row.getAttribute('data-product-id');
+                    const checkbox = row.querySelector('.pp-row-check');
+                    const qtyInput = row.querySelector('.pp-qty');
+                    const amountInput = row.querySelector('.pp-amount');
+                    const hiddenProduct = row.querySelector('input[name="productId"]');
+                    const cfg = configMap.get(productId);
+
+                    row.querySelectorAll('input[name="productId"], input[name="quantity"], input[name="amount"]').forEach(function (input) {
+                        input.disabled = false;
+                    });
+
+                    if (cfg) {
+                        checkbox.checked = true;
+                        qtyInput.value = cfg.qty;
+                        amountInput.value = cfg.amount || '';
+                    } else {
+                        checkbox.checked = false;
+                        qtyInput.value = '';
+                        amountInput.value = '';
+                    }
+
+                    hiddenProduct.value = productId;
+                });
+
+                if (ppCheckAll) {
+                    ppCheckAll.checked = false;
+                }
+            });
+
+            if (ppCheckAll) {
+                ppCheckAll.addEventListener('change', function () {
+                    ppTableBody.querySelectorAll('.pp-row-check').forEach(function (checkbox) {
+                        checkbox.checked = ppCheckAll.checked;
+                    });
+                });
+            }
+
+            ppForm.addEventListener('submit', function () {
+                ppTableBody.querySelectorAll('tr[data-product-id]').forEach(function (row) {
+                    const checkbox = row.querySelector('.pp-row-check');
+                    if (!checkbox.checked) {
+                        row.querySelectorAll('input[name="productId"], input[name="quantity"], input[name="amount"]').forEach(function (input) {
+                            input.disabled = true;
+                        });
+                    }
+                });
+            });
+        }
+    });
+</script>
+
+</body>
+</html>

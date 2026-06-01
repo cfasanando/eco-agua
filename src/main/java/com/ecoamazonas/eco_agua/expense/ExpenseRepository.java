@@ -121,6 +121,32 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
         """)
     Expense findDetailedById(@Param("expenseId") Long expenseId);
 
+
+    @Query("""
+        select distinct e
+        from Expense e
+        left join fetch e.category c
+        left join fetch e.supplier s
+        where s.id in :supplierIds
+        order by e.expenseDate desc, e.id desc
+        """)
+    List<Expense> findSupplierExpensesBySupplierIds(@Param("supplierIds") List<Long> supplierIds);
+
+    @Query("""
+        select distinct e
+        from Expense e
+        left join fetch e.category c
+        left join fetch e.supplier s
+        where s.id = :supplierId
+          and e.expenseDate between :start and :end
+        order by e.expenseDate desc, e.id desc
+        """)
+    List<Expense> findSupplierExpensesBySupplierAndPeriod(
+            @Param("supplierId") Long supplierId,
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end
+    );
+
     @Query("""
         select distinct e
         from Expense e

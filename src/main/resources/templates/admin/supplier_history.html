@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="fragments/head_admin :: adminHead('Historial del proveedor - Eco Agua')"></head>
+
+<body>
+
+<div class="app-layout" th:with="activePage='suppliers'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div>
+                    <h1 class="h5 mb-1" th:text="${'Historial de proveedor: ' + supplier.name}">Historial de proveedor</h1>
+                    <p class="text-muted small mb-0">
+                        Revisa compras, egresos vinculados y entradas de stock asociadas al proveedor.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a th:href="@{/admin/suppliers}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-arrow-left"></i> Volver a proveedores
+                    </a>
+                    <a th:href="@{/warehouse/purchase-history(startDate=${startDate},endDate=${endDate},supplierId=${supplier.id})}"
+                       class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-receipt-cutoff"></i> Ver en historial general
+                    </a>
+                    <a th:href="@{/expenses/by-date}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-cart-plus"></i> Registrar compra
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Compras</div>
+                            <div class="h4 mb-0" th:text="${summary.purchaseCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-primary-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Con entrada de stock</div>
+                            <div class="h4 mb-0 text-primary" th:text="${summary.stockLinkedPurchaseCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-info-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Productos</div>
+                            <div class="h4 mb-0 text-info" th:text="${summary.productCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-warning-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Total comprado</div>
+                            <div class="h4 mb-0 text-warning" th:text="${'S/ ' + #numbers.formatDecimal(summary.totalAmount,1,'POINT',2,'POINT')}">S/ 0.00</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-success-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Pagado</div>
+                            <div class="h4 mb-0 text-success" th:text="${'S/ ' + #numbers.formatDecimal(summary.totalPaidAmount,1,'POINT',2,'POINT')}">S/ 0.00</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-danger-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Pendiente</div>
+                            <div class="h4 mb-0 text-danger" th:text="${'S/ ' + #numbers.formatDecimal(summary.pendingAmount,1,'POINT',2,'POINT')}">S/ 0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <strong>Datos del proveedor</strong>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <div class="text-muted small">Documento</div>
+                            <div>
+                                <span th:text="${supplier.docType}">RUC</span>:
+                                <span th:text="${supplier.docNumber}">000</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted small">Teléfono</div>
+                            <div th:text="${supplier.phone} ?: '-'">-</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted small">Contacto</div>
+                            <div th:text="${supplier.contactName} ?: '-'">-</div>
+                            <small class="text-muted" th:text="${supplier.contactPhone} ?: ''"></small>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted small">Categoría</div>
+                            <div th:text="${supplier.category != null ? supplier.category.name : '-'}">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <strong>Filtros</strong>
+                </div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" th:action="@{'/admin/suppliers/' + ${supplier.id} + '/history'}" method="get">
+                        <div class="col-md-4">
+                            <label class="form-label">Desde</label>
+                            <input type="date" class="form-control" name="startDate" th:value="${startDate}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Hasta</label>
+                            <input type="date" class="form-control" name="endDate" th:value="${endDate}">
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100">Aplicar filtro</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                    <strong>Compras del proveedor</strong>
+                    <small class="text-muted">Incluye egresos del proveedor y muestra si generaron entrada de stock.</small>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-light border text-center my-3" th:if="${#lists.isEmpty(rows)}">
+                        No hay compras registradas para este proveedor en el periodo seleccionado.
+                    </div>
+
+                    <div class="table-responsive">
+                        <table id="supplierHistoryTable" class="table table-sm table-striped align-middle" style="width:100%">
+                            <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Fecha</th>
+                                <th>Producto / stock</th>
+                                <th>Categoría del gasto</th>
+                                <th class="text-end">Cantidad stock</th>
+                                <th class="text-end">Monto</th>
+                                <th class="text-end">Pendiente</th>
+                                <th>Estado</th>
+                                <th>Documento</th>
+                                <th>Observación</th>
+                                <th>Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row, stat : ${rows}">
+                                <td th:text="${stat.index + 1}">1</td>
+                                <td th:text="${row.purchaseDate != null ? #temporals.format(row.purchaseDate, 'dd/MM/yyyy') : '-'}">-</td>
+                                <td>
+                                    <div class="fw-semibold" th:text="${row.productSummary}">Producto</div>
+                                    <span class="badge bg-success-subtle text-success" th:if="${row.linkedToStock}">Con entrada de stock</span>
+                                    <span class="badge bg-secondary-subtle text-secondary" th:if="${!row.linkedToStock}">Solo egreso</span>
+                                </td>
+                                <td th:text="${row.categoryName}">Categoría</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.stockQuantity,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(row.amount,1,'POINT',2,'POINT')}">S/ 0.00</td>
+                                <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(row.balance,1,'POINT',2,'POINT')}">S/ 0.00</td>
+                                <td>
+                                    <span class="badge" th:classappend="${row.paymentStatusCssClass}" th:text="${row.paymentStatusLabel}">Estado</span>
+                                </td>
+                                <td>
+                                    <div th:text="${row.documentLabel}">-</div>
+                                    <small class="text-muted" th:text="${row.voucherNumber}">-</small>
+                                </td>
+                                <td class="small" th:text="${row.observation}">-</td>
+                                <td>
+                                    <div class="d-flex flex-column gap-1">
+                                        <a th:if="${row.firstProductId != null}"
+                                           th:href="@{|/warehouse/products-stock/${row.firstProductId}/movements|}"
+                                           class="btn btn-sm btn-outline-secondary">
+                                            Ver Kardex
+                                        </a>
+                                        <a th:if="${row.purchaseDate != null}"
+                                           th:href="@{/expenses/by-date(filter='DAY',date=${row.purchaseDate})}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            Ver gasto
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+        window.ecoAdmin.initStandardDataTable('#supplierHistoryTable', []);
+    });
+</script>
+
+</body>
+</html>

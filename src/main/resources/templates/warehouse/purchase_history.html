@@ -160,7 +160,11 @@
                                     <div class="small text-muted" th:text="${row.movementDate != null ? #temporals.format(row.movementDate, 'HH:mm') : ''}">00:00</div>
                                 </td>
                                 <td>
-                                    <div th:text="${row.supplierName}">Proveedor</div>
+                                    <a th:if="${row.supplierId != null}"
+                                       th:href="@{'/admin/suppliers/' + ${row.supplierId} + '/history'}"
+                                       class="fw-semibold text-decoration-none"
+                                       th:text="${row.supplierName}">Proveedor</a>
+                                    <div th:if="${row.supplierId == null}" th:text="${row.supplierName}">Proveedor</div>
                                     <span class="badge bg-secondary-subtle text-secondary" th:if="${!row.linkedToExpense}">Sin egreso vinculado</span>
                                 </td>
                                 <td>

@@ -37,6 +37,18 @@ public interface InventoryMovementRepository extends JpaRepository<InventoryMove
             @Param("productId") Long productId
     );
 
+
+    @Query("""
+        select m
+        from InventoryMovement m
+        left join fetch m.product p
+        left join fetch p.category c
+        where m.referenceModule = 'PURCHASE'
+          and m.referenceId in :expenseIds
+        order by m.movementDate desc, m.id desc
+        """)
+    List<InventoryMovement> findProductPurchaseMovementsByExpenseIds(@Param("expenseIds") List<Long> expenseIds);
+
     boolean existsByReferenceModuleAndReferenceId(String referenceModule, Long referenceId);
 }
 

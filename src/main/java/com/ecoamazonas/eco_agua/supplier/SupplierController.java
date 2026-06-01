@@ -2,11 +2,13 @@ package com.ecoamazonas.eco_agua.supplier;
 
 import com.ecoamazonas.eco_agua.category.CategoryRepository;
 import com.ecoamazonas.eco_agua.category.CategoryType;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,20 +18,52 @@ public class SupplierController {
 
     private final SupplierService supplierService;
     private final CategoryRepository categoryRepository;
+    private final SupplierPurchaseHistoryService supplierPurchaseHistoryService;
 
     public SupplierController(SupplierService supplierService,
-                              CategoryRepository categoryRepository) {
+                              CategoryRepository categoryRepository,
+                              SupplierPurchaseHistoryService supplierPurchaseHistoryService) {
         this.supplierService = supplierService;
         this.categoryRepository = categoryRepository;
+        this.supplierPurchaseHistoryService = supplierPurchaseHistoryService;
     }
 
     @GetMapping
     public String index(Model model) {
-        model.addAttribute("suppliers", supplierService.findAll());
+        List<Supplier> suppliers = supplierService.findAll();
+
+        model.addAttribute("supplierRows", supplierPurchaseHistoryService.buildSupplierRows(suppliers));
         model.addAttribute("supplierCategories",
                 categoryRepository.findByTypeAndActiveTrueOrderByNameAsc(CategoryType.SUPPLIER));
 
         return "admin/suppliers";
+    }
+
+    @GetMapping("/{id}/history")
+    public String history(
+            @PathVariable Long id,
+            @RequestParam(value = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Model model
+    ) {
+        SupplierPurchaseHistoryService.DateRange range = supplierPurchaseHistoryService.normalizeRange(startDate, endDate);
+        Supplier supplier = supplierPurchaseHistoryService.findSupplier(id);
+        SupplierPurchaseHistorySnapshot snapshot = supplierPurchaseHistoryService.buildSupplierHistory(
+                id,
+                range.start(),
+                range.end()
+        );
+
+        model.addAttribute("activePage", "suppliers");
+        model.addAttribute("supplier", supplier);
+        model.addAttribute("startDate", range.start());
+        model.addAttribute("endDate", range.end());
+        model.addAttribute("summary", snapshot.getSummary());
+        model.addAttribute("rows", snapshot.getRows());
+
+        return "admin/supplier_history";
     }
 
     @PostMapping("/save")

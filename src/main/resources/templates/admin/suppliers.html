@@ -34,6 +34,11 @@
                 </div>
             </div>
 
+            <div class="alert alert-info small shadow-sm" role="alert">
+                <strong>Uso recomendado:</strong>
+                registra tus proveedores aquí y usa el historial para revisar cuánto les compras, cuándo fue la última compra y qué productos abastecen.
+            </div>
+
             <div class="card shadow-sm">
                 <div class="card-body">
                     <table id="suppliersTable"
@@ -49,12 +54,16 @@
                             <th>Celular o teléfono</th>
                             <th>Categoría</th>
                             <th>Contacto</th>
+                            <th>Compras</th>
+                            <th class="text-end">Total comprado</th>
+                            <th>Última compra</th>
                             <th>Activo</th>
                             <th class="text-center">Acciones</th>
                         </tr>
                         </thead>
                         <tbody>
-                        <tr th:each="supplier, stat : ${suppliers}">
+                        <tr th:each="row, stat : ${supplierRows}"
+                            th:with="supplier=${row.supplier}, metric=${row.metrics}">
                             <td>
                                 <input type="checkbox"
                                        class="supplier-row-check"
@@ -62,25 +71,50 @@
                             </td>
                             <td th:text="${stat.index + 1}">1</td>
 
-                            <td th:text="${supplier.name}">Proveedor X</td>
+                            <td>
+                                <div class="fw-semibold" th:text="${supplier.name}">Proveedor X</div>
+                                <div class="small text-muted" th:if="${metric.productCount > 0}" th:text="${metric.productSummary}">Productos</div>
+                                <div class="small text-muted" th:if="${metric.productCount == 0}">Sin compras de stock vinculadas</div>
+                            </td>
 
                             <td>
                                 <span th:text="${supplier.docType}">ruc</span> :
                                 <span th:text="${supplier.docNumber}">0</span>
                             </td>
 
-                            <td th:text="${supplier.address}">Dirección</td>
+                            <td th:text="${supplier.address} ?: '-'">Dirección</td>
 
-                            <td th:text="${supplier.phone}">999</td>
+                            <td>
+                                <div th:text="${supplier.phone} ?: '-'">999</div>
+                                <a th:if="${row.whatsappAvailable}"
+                                   th:href="${row.whatsappUrl}"
+                                   target="_blank"
+                                   rel="noopener"
+                                   class="btn btn-sm btn-outline-success mt-1">
+                                    <i class="bi bi-whatsapp"></i> WhatsApp
+                                </a>
+                            </td>
 
                             <td th:text="${supplier.category != null ? supplier.category.name : '-'}">
                                 Categoría
                             </td>
 
                             <td>
-                                <span th:text="${supplier.contactName}">Contacto</span>
+                                <span th:text="${supplier.contactName} ?: '-'">Contacto</span>
                                 <small class="text-muted d-block"
-                                       th:text="${supplier.contactPhone}">999</small>
+                                       th:text="${supplier.contactPhone} ?: '-'">999</small>
+                            </td>
+
+                            <td>
+                                <span class="badge bg-primary-subtle text-primary" th:text="${metric.purchaseCount + ' compra(s)'}">0 compra(s)</span>
+                                <small class="text-muted d-block" th:text="${metric.stockPurchaseCount + ' con stock'}">0 con stock</small>
+                            </td>
+
+                            <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(metric.totalAmount,1,'POINT',2,'POINT')}">S/ 0.00</td>
+
+                            <td>
+                                <span th:if="${metric.lastPurchaseDate != null}" th:text="${#temporals.format(metric.lastPurchaseDate, 'dd/MM/yyyy')}">01/01/2026</span>
+                                <span th:if="${metric.lastPurchaseDate == null}">-</span>
                             </td>
 
                             <td>
@@ -91,36 +125,44 @@
                             </td>
 
                             <td class="text-center">
-                                <!-- Edit button -->
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-primary me-1"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#supplierModal"
-                                        th:attr="data-id=${supplier.id},
-                                                 data-name=${supplier.name},
-                                                 data-doc-type=${supplier.docType},
-                                                 data-doc-number=${supplier.docNumber},
-                                                 data-address=${supplier.address},
-                                                 data-phone=${supplier.phone},
-                                                 data-contact-name=${supplier.contactName},
-                                                 data-contact-phone=${supplier.contactPhone},
-                                                 data-active=${supplier.active},
-                                                 data-category-id=${supplier.category != null ? supplier.category.id : null}">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
+                                <div class="d-flex justify-content-center gap-1 flex-wrap">
+                                    <a th:href="@{'/admin/suppliers/' + ${supplier.id} + '/history'}"
+                                       class="btn btn-sm btn-outline-secondary"
+                                       title="Ver historial">
+                                        <i class="bi bi-clock-history"></i>
+                                    </a>
 
-                                <!-- Delete button -->
-                                <form th:action="@{'/admin/suppliers/' + ${supplier.id} + '/delete'}"
-                                      method="post"
-                                      class="d-inline supplier-delete-form-single">
-                                    <input type="hidden"
-                                           th:name="${_csrf.parameterName}"
-                                           th:value="${_csrf.token}"/>
-                                    <button type="submit"
-                                            class="btn btn-sm btn-outline-danger">
-                                        <i class="bi bi-trash"></i>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-primary"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#supplierModal"
+                                            th:attr="data-id=${supplier.id},
+                                                     data-name=${supplier.name},
+                                                     data-doc-type=${supplier.docType},
+                                                     data-doc-number=${supplier.docNumber},
+                                                     data-address=${supplier.address},
+                                                     data-phone=${supplier.phone},
+                                                     data-contact-name=${supplier.contactName},
+                                                     data-contact-phone=${supplier.contactPhone},
+                                                     data-active=${supplier.active},
+                                                     data-category-id=${supplier.category != null ? supplier.category.id : null}"
+                                            title="Editar">
+                                        <i class="bi bi-pencil"></i>
                                     </button>
-                                </form>
+
+                                    <form th:action="@{'/admin/suppliers/' + ${supplier.id} + '/delete'}"
+                                          method="post"
+                                          class="d-inline supplier-delete-form-single">
+                                        <input type="hidden"
+                                               th:name="${_csrf.parameterName}"
+                                               th:value="${_csrf.token}"/>
+                                        <button type="submit"
+                                                class="btn btn-sm btn-outline-danger"
+                                                title="Eliminar">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                         </tbody>
@@ -259,7 +301,7 @@
         'use strict';
 
         // DataTable setup (no sort on first and last columns)
-        window.ecoAdmin.initStandardDataTable('#suppliersTable', [0, 9]);
+        window.ecoAdmin.initStandardDataTable('#suppliersTable', [0, 12]);
 
         // Check-all and delete helpers
         window.ecoAdmin.registerCheckAll('#suppliersCheckAll', '.supplier-row-check');

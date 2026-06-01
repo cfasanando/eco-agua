@@ -539,6 +539,7 @@ public class ClientAnalyticsService {
         }
 
         return switch (status) {
+            case QUOTED -> "Cotización";
             case PAID -> "Pagado";
             case CREDIT -> "Fiado";
             case REQUESTED -> "Solicitado";
@@ -552,6 +553,7 @@ public class ClientAnalyticsService {
         }
 
         return switch (status) {
+            case QUOTED -> "text-bg-secondary";
             case PAID -> "text-bg-success";
             case CREDIT -> "text-bg-warning";
             case REQUESTED -> "text-bg-info";

@@ -50,6 +50,50 @@ public class OrderService {
         this.clientContainerService = clientContainerService;
     }
 
+    private boolean shouldAffectStock(OrderStatus status) {
+        return status == OrderStatus.REQUESTED
+                || status == OrderStatus.PAID
+                || status == OrderStatus.CREDIT;
+    }
+
+    private void validateStockForOrder(SaleOrder order) {
+        if (order == null || order.getItems() == null) {
+            return;
+        }
+
+        for (SaleOrderItem item : order.getItems()) {
+            if (item == null || item.getProduct() == null || item.getQuantity() == null) {
+                continue;
+            }
+
+            Product product = item.getProduct();
+            BigDecimal availableStock = product.getStock() != null ? product.getStock() : BigDecimal.ZERO;
+            if (availableStock.compareTo(item.getQuantity()) < 0) {
+                throw new IllegalArgumentException(
+                        "Insufficient stock for product: " + product.getName()
+                                + " (available: " + availableStock + ", required: " + item.getQuantity() + ")"
+                );
+            }
+        }
+    }
+
+    private void registerSaleStockMovements(SaleOrder order, String observation) {
+        if (order == null || order.getItems() == null) {
+            return;
+        }
+
+        order.getItems().forEach(item -> inventoryService.registerProductMovement(
+                item.getProduct().getId(),
+                BigDecimal.ZERO,
+                item.getQuantity(),
+                InventoryMovementType.SALE,
+                "SALE_ORDER",
+                order.getId(),
+                observation,
+                order.getOrderDate()
+        ));
+    }
+
     @Transactional
     public SaleOrder createOrderFromForm(
             LocalDate orderDate,
@@ -122,12 +166,14 @@ public class OrderService {
             Product product = productRepository.findById(productId)
                     .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
 
-            BigDecimal availableStock = product.getStock() != null ? product.getStock() : BigDecimal.ZERO;
-            if (availableStock.compareTo(qty) < 0) {
-                throw new IllegalArgumentException(
-                        "Insufficient stock for product: " + product.getName()
-                                + " (available: " + availableStock + ", required: " + qty + ")"
-                );
+            if (shouldAffectStock(order.getStatus())) {
+                BigDecimal availableStock = product.getStock() != null ? product.getStock() : BigDecimal.ZERO;
+                if (availableStock.compareTo(qty) < 0) {
+                    throw new IllegalArgumentException(
+                            "Insufficient stock for product: " + product.getName()
+                                    + " (available: " + availableStock + ", required: " + qty + ")"
+                    );
+                }
             }
 
             SaleOrderItem item = new SaleOrderItem();
@@ -159,20 +205,12 @@ public class OrderService {
 
         SaleOrder saved = orderRepository.save(order);
 
-        saved.getItems().forEach(item -> inventoryService.registerProductMovement(
-                item.getProduct().getId(),
-                BigDecimal.ZERO,
-                item.getQuantity(),
-                InventoryMovementType.SALE,
-                "SALE_ORDER",
-                saved.getId(),
-                "Order #" + saved.getOrderNumber(),
-                saved.getOrderDate()
-        ));
-
-        orderRepository.flush();
-        clientContainerService.syncOrderContainerMovements(saved);
-        personnelExpenseAutoSyncService.syncSalaryExpensesForDate(saved.getOrderDate());
+        if (shouldAffectStock(saved.getStatus())) {
+            registerSaleStockMovements(saved, "Order #" + saved.getOrderNumber());
+            orderRepository.flush();
+            clientContainerService.syncOrderContainerMovements(saved);
+            personnelExpenseAutoSyncService.syncSalaryExpensesForDate(saved.getOrderDate());
+        }
 
         return saved;
     }
@@ -193,12 +231,22 @@ public class OrderService {
         SaleOrder order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
 
-        if (order.getStatus() == newStatus) {
+        OrderStatus oldStatus = order.getStatus();
+
+        if (oldStatus == newStatus) {
             return order;
         }
 
-        if (newStatus == OrderStatus.CANCELED && order.getStatus() != OrderStatus.CANCELED) {
-            boolean effectiveReturn = Boolean.TRUE.equals(returnToStock);
+        boolean oldStatusAffectsStock = shouldAffectStock(oldStatus);
+        boolean newStatusAffectsStock = shouldAffectStock(newStatus);
+
+        if (!oldStatusAffectsStock && newStatusAffectsStock) {
+            validateStockForOrder(order);
+            registerSaleStockMovements(order, "Order confirmed #" + order.getOrderNumber());
+        }
+
+        if (newStatus == OrderStatus.CANCELED && oldStatus != OrderStatus.CANCELED) {
+            boolean effectiveReturn = Boolean.TRUE.equals(returnToStock) && oldStatusAffectsStock;
             LocalDate movementDate = (cancelDate != null ? cancelDate : LocalDate.now());
 
             if (effectiveReturn) {
@@ -226,8 +274,11 @@ public class OrderService {
         order.setStatus(newStatus);
         orderRepository.save(order);
         orderRepository.flush();
-        clientContainerService.syncOrderContainerMovements(order);
-        personnelExpenseAutoSyncService.syncSalaryExpensesForDate(order.getOrderDate());
+
+        if (oldStatusAffectsStock || newStatusAffectsStock) {
+            clientContainerService.syncOrderContainerMovements(order);
+            personnelExpenseAutoSyncService.syncSalaryExpensesForDate(order.getOrderDate());
+        }
 
         return order;
     }

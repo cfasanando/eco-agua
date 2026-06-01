@@ -10,11 +10,66 @@
 
         <main class="content-wrapper">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                <h1 class="h5 mb-0">Cuentas por cobrar</h1>
+                <div>
+                    <h1 class="h5 mb-1">Cuentas por cobrar</h1>
+                    <p class="text-muted mb-0 small">
+                        Controla fiados pendientes, prioriza cobranza y contacta clientes sin duplicar pedidos ni deudas.
+                    </p>
+                </div>
                 <a th:href="@{/orders/new(orderDate=${newOrderDate},returnTo=${newOrderReturnTo})}"
                    class="btn btn-success">
                     <i class="bi bi-plus-circle"></i> Registrar venta fiada
                 </a>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small" role="alert">
+                <strong>Uso recomendado:</strong>
+                primero revisa los clientes con deuda vencida, luego registra abonos desde “Gestionar” y usa WhatsApp solo cuando el cliente tenga teléfono válido.
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Saldo pendiente</div>
+                            <div class="fs-4 fw-bold text-danger">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.totalPendingAmount,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted" th:text="${summary.openOrderCount + ' pedido(s) abierto(s)'}">0 pedidos</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Clientes con deuda</div>
+                            <div class="fs-4 fw-bold" th:text="${summary.clientCount}">0</div>
+                            <div class="small text-muted">Clientes únicos en el rango</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Deuda vencida</div>
+                            <div class="fs-4 fw-bold" th:classappend="${summary.hasOverdueOrders()} ? ' text-danger' : ' text-success'">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.overduePendingAmount,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted" th:text="${summary.overdueOrderCount + ' pedido(s) vencido(s)'}">0 vencidos</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Vence hoy</div>
+                            <div class="fs-4 fw-bold text-warning">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.dueTodayPendingAmount,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted" th:text="${summary.dueTodayOrderCount + ' pedido(s)'}">0 pedidos</div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="card shadow-sm mb-3">
@@ -40,9 +95,71 @@
                 </div>
             </div>
 
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <strong>Resumen por cliente</strong>
+                    <span class="text-muted small">Ordenado por mayor saldo pendiente</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Cliente</th>
+                                <th class="text-center">Pedidos</th>
+                                <th>Prioridad</th>
+                                <th>Canal</th>
+                                <th>Vence</th>
+                                <th class="text-end">Saldo S/.</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="c : ${clientSummaries}">
+                                <td>
+                                    <div class="fw-semibold" th:text="${c.clientName}">Cliente</div>
+                                    <div class="small text-muted" th:text="${c.phone != null && !#strings.isEmpty(c.phone) ? c.phone : 'Sin teléfono'}">Teléfono</div>
+                                </td>
+                                <td class="text-center" th:text="${c.orderCount}">1</td>
+                                <td>
+                                    <span class="badge" th:classappend="${c.priorityBadgeClass}" th:text="${c.priorityLabel}">Pendiente</span>
+                                    <div class="small text-danger" th:if="${c.overdueOrderCount > 0}" th:text="${c.overdueOrderCount + ' vencido(s)'}">0 vencidos</div>
+                                </td>
+                                <td th:text="${c.mainSalesChannelLabel}">WhatsApp</td>
+                                <td>
+                                    <span th:if="${c.nearestDueDate != null}" th:text="${#temporals.format(c.nearestDueDate,'dd/MM/yyyy')}">-</span>
+                                    <span th:if="${c.nearestDueDate == null}" class="text-muted">Sin fecha</span>
+                                </td>
+                                <td class="text-end fw-semibold text-danger" th:text="${#numbers.formatDecimal(c.pendingAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-center text-nowrap">
+                                    <a th:if="${c.whatsappContactAvailable}"
+                                       th:href="${c.whatsappUrl}"
+                                       target="_blank"
+                                       rel="noopener"
+                                       class="btn btn-sm btn-success me-1">
+                                        WhatsApp
+                                    </a>
+                                    <a th:if="${c.clientId != null}"
+                                       th:href="@{|/admin/clients/${c.clientId}/stats|}"
+                                       class="btn btn-sm btn-outline-secondary">
+                                        Historial
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(clientSummaries)}">
+                                <td colspan="7" class="text-center text-muted">
+                                    No hay clientes con saldo pendiente en las fechas seleccionadas.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <div class="card shadow-sm">
                 <div class="card-header bg-white">
-                    Pedidos pendientes de cobro (estado: CREDIT)
+                    Pedidos pendientes de cobro
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -81,7 +198,7 @@
                                     <span th:if="${o.overdueDays > 0}" class="badge bg-danger" th:text="${o.overdueDays + ' d'}">0 d</span>
                                     <span th:if="${o.overdueDays == 0}" class="badge bg-success">Al día</span>
                                 </td>
-                                <td class="text-center">
+                                <td class="text-center text-nowrap">
                                     <a th:href="@{|/income/credit/${o.id}?back=/income/credit|}" class="btn btn-sm btn-outline-primary me-1">
                                         Gestionar
                                     </a>

@@ -152,6 +152,37 @@ public class SaleOrder {
         this.status = status;
     }
 
+
+    @Transient
+    public String getStatusLabel() {
+        if (status == null) {
+            return "Sin estado";
+        }
+
+        return switch (status) {
+            case QUOTED -> "Cotización";
+            case REQUESTED -> "Pedido";
+            case PAID -> "Pagado";
+            case CREDIT -> "Fiado";
+            case CANCELED -> "Anulado";
+        };
+    }
+
+    @Transient
+    public String getStatusBadgeClass() {
+        if (status == null) {
+            return "text-bg-secondary";
+        }
+
+        return switch (status) {
+            case QUOTED -> "text-bg-secondary";
+            case REQUESTED -> "text-bg-info";
+            case PAID -> "text-bg-success";
+            case CREDIT -> "text-bg-warning";
+            case CANCELED -> "text-bg-danger";
+        };
+    }
+
     public SalesChannel getSalesChannel() {
         return salesChannel;
     }

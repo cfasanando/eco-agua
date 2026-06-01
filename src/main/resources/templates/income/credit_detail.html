@@ -70,6 +70,34 @@
                 </div>
             </div>
 
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <strong>Acción de cobranza sugerida</strong>
+                    <span class="badge" th:classappend="${order.overdueDays > 0} ? ' text-bg-danger' : ' text-bg-primary'"
+                          th:text="${order.overdueDays > 0 ? 'Vencido' : 'Pendiente'}">Pendiente</span>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2 small text-muted">
+                        Usa este mensaje para coordinar el saldo pendiente sin registrar una venta nueva ni duplicar la deuda.
+                    </p>
+                    <div class="border rounded p-3 bg-light small mb-3" th:text="${collectionSuggestedMessage}">
+                        Hola, te escribimos para coordinar el saldo pendiente.
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a th:if="${collectionWhatsappUrl != null}"
+                           th:href="${collectionWhatsappUrl}"
+                           target="_blank"
+                           rel="noopener"
+                           class="btn btn-success">
+                            <i class="bi bi-whatsapp"></i> Contactar por WhatsApp
+                        </a>
+                        <span th:if="${collectionWhatsappUrl == null}" class="text-muted small align-self-center">
+                            Este cliente no tiene un teléfono válido para WhatsApp.
+                        </span>
+                    </div>
+                </div>
+            </div>
+
             <div class="row g-3">
                 <div class="col-lg-5">
                     <div class="card shadow-sm">

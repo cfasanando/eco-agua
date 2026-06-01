@@ -21,8 +21,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -111,7 +114,9 @@ public class OrderController {
         try {
             OrderStatus initialStatus;
 
-            if ("PAID".equalsIgnoreCase(action)) {
+            if ("QUOTED".equalsIgnoreCase(action)) {
+                initialStatus = OrderStatus.QUOTED;
+            } else if ("PAID".equalsIgnoreCase(action)) {
                 initialStatus = OrderStatus.PAID;
             } else if ("CREDIT".equalsIgnoreCase(action)) {
                 initialStatus = OrderStatus.CREDIT;
@@ -137,7 +142,8 @@ public class OrderController {
 
             redirectAttributes.addFlashAttribute(
                     "message",
-                    "Pedido registrado correctamente. Nº " + order.getOrderNumber()
+                    (order.getStatus() == OrderStatus.QUOTED ? "Cotización registrada correctamente. Nº " : "Pedido registrado correctamente. Nº ")
+                            + order.getOrderNumber()
             );
             redirectAttributes.addFlashAttribute("messageType", "success");
 
@@ -171,6 +177,15 @@ public class OrderController {
         return changeStatusAndRedirect(id, OrderStatus.CREDIT, redirect, redirectAttributes);
     }
 
+    @PostMapping("/{id}/request")
+    public String markAsRequested(
+            @PathVariable Long id,
+            @RequestParam(value = "redirect", required = false) String redirect,
+            RedirectAttributes redirectAttributes
+    ) {
+        return changeStatusAndRedirect(id, OrderStatus.REQUESTED, redirect, redirectAttributes);
+    }
+
     @PostMapping("/{id}/cancel")
     public String cancelOrder(
             @PathVariable Long id,
@@ -201,9 +216,11 @@ public class OrderController {
             orderService.changeStatus(id, newStatus);
 
             String message = switch (newStatus) {
+                case REQUESTED -> "Cotización confirmada como pedido.";
                 case PAID -> "Pedido marcado como pagado.";
                 case CREDIT -> "Pedido marcado como fiado.";
-                default -> "Estado del pedido actualizado.";
+                case QUOTED -> "Pedido marcado como cotización.";
+                case CANCELED -> "Pedido anulado.";
             };
 
             redirectAttributes.addFlashAttribute("message", message);
@@ -214,6 +231,24 @@ public class OrderController {
         }
 
         return "redirect:" + resolveRedirectTarget(redirect, "/home");
+    }
+
+    @GetMapping("/quotes")
+    public String listQuotes(Model model) {
+        List<SaleOrder> quotes = orderService.findOrdersByStatus(OrderStatus.QUOTED);
+        Map<Long, String> quoteWhatsappUrls = new HashMap<>();
+
+        for (SaleOrder quote : quotes) {
+            if (quote.getId() != null) {
+                quoteWhatsappUrls.put(quote.getId(), buildQuoteWhatsappUrl(quote));
+            }
+        }
+
+        model.addAttribute("activePage", "orders_quotes");
+        model.addAttribute("quotes", quotes);
+        model.addAttribute("quoteWhatsappUrls", quoteWhatsappUrls);
+
+        return "orders/quote_list";
     }
 
     @GetMapping("/client/{clientId}/promotions")
@@ -239,10 +274,12 @@ public class OrderController {
             daysSinceOrder = Math.max(ChronoUnit.DAYS.between(order.getOrderDate(), LocalDate.now()), 0);
         }
 
-        model.addAttribute("activePage", "home");
+        model.addAttribute("activePage", resolveActivePage(backUrl));
         model.addAttribute("order", order);
         model.addAttribute("backUrl", backUrl);
         model.addAttribute("daysSinceOrder", daysSinceOrder);
+        model.addAttribute("quoteMessage", buildQuoteMessage(order));
+        model.addAttribute("quoteWhatsappUrl", buildQuoteWhatsappUrl(order));
 
         return "orders/order_detail";
     }
@@ -251,6 +288,10 @@ public class OrderController {
     private String resolveOrderSavedRedirect(SaleOrder order, String returnTo) {
         String safeReturnTo = resolveRedirectTarget(returnTo, "/home");
         LocalDate effectiveOrderDate = order.getOrderDate() != null ? order.getOrderDate() : LocalDate.now();
+
+        if (order.getStatus() == OrderStatus.QUOTED) {
+            return "/orders/quotes";
+        }
 
         if (safeReturnTo.startsWith("/income/")) {
             if (order.getStatus() == OrderStatus.PAID) {
@@ -284,6 +325,10 @@ public class OrderController {
     private String resolveActivePage(String returnTo) {
         String safeReturnTo = resolveRedirectTarget(returnTo, "/home");
 
+        if (safeReturnTo.startsWith("/orders/quotes")) {
+            return "orders_quotes";
+        }
+
         if (safeReturnTo.startsWith("/income/sales")) {
             return "income_sales";
         }
@@ -293,6 +338,73 @@ public class OrderController {
         }
 
         return "home";
+    }
+
+    private String buildQuoteWhatsappUrl(SaleOrder order) {
+        if (order == null || order.getClient() == null || order.getClient().getPhone() == null) {
+            return null;
+        }
+
+        String normalizedPhone = normalizePhoneForWhatsapp(order.getClient().getPhone());
+        if (normalizedPhone.isBlank()) {
+            return null;
+        }
+
+        return "https://wa.me/" + normalizedPhone + "?text="
+                + URLEncoder.encode(buildQuoteMessage(order), StandardCharsets.UTF_8);
+    }
+
+    private String buildQuoteMessage(SaleOrder order) {
+        if (order == null) {
+            return "Hola, te compartimos tu cotización.";
+        }
+
+        StringBuilder message = new StringBuilder();
+        message.append("Hola");
+
+        if (order.getClient() != null && order.getClient().getName() != null && !order.getClient().getName().isBlank()) {
+            message.append(" ").append(order.getClient().getName().trim());
+        }
+
+        message.append(", te compartimos tu cotización");
+
+        if (order.getOrderNumber() != null) {
+            message.append(" #").append(order.getOrderNumber());
+        }
+
+        message.append(":\n");
+
+        if (order.getItems() != null && !order.getItems().isEmpty()) {
+            for (SaleOrderItem item : order.getItems()) {
+                message.append("- ")
+                        .append(item.getDescription() != null ? item.getDescription() : "Producto")
+                        .append(" x ")
+                        .append(item.getQuantity() != null ? item.getQuantity().stripTrailingZeros().toPlainString() : "0")
+                        .append(" = S/ ")
+                        .append(item.getTotal() != null ? item.getTotal().setScale(2).toPlainString() : "0.00")
+                        .append("\n");
+            }
+        }
+
+        message.append("Total referencial: S/ ")
+                .append(order.getTotalAmount() != null ? order.getTotalAmount().setScale(2).toPlainString() : "0.00")
+                .append("\n");
+        message.append("Confírmanos por este medio para separar y coordinar disponibilidad.");
+
+        return message.toString();
+    }
+
+    private String normalizePhoneForWhatsapp(String rawPhone) {
+        if (rawPhone == null || rawPhone.isBlank()) {
+            return "";
+        }
+
+        String cleaned = rawPhone.replaceAll("[^0-9]", "");
+        if (cleaned.length() == 9 && cleaned.startsWith("9")) {
+            return "51" + cleaned;
+        }
+
+        return cleaned;
     }
 
     private String resolveRedirectTarget(String redirect, String defaultPath) {

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/head_admin :: adminHead('Nuevo pedido')"></head>
+<head th:replace="fragments/head_admin :: adminHead('Registro rápido de pedido')"></head>
 
 <body>
 
@@ -16,11 +16,21 @@
         <!-- Content -->
         <main class="content-wrapper">
 
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h1 class="h5 mb-0" th:text="${'Nuevo pedido - ' + (businessShortName ?: 'Negocio')}">Nuevo pedido</h1>
-                <div class="small text-muted">
-                    Fecha actual:
-                    <span th:text="${today}">2025-11-23</span>
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                <div>
+                    <h1 class="h5 mb-1" th:text="${'Registro rápido de pedido - ' + (businessShortName ?: 'Negocio')}">Registro rápido de pedido</h1>
+                    <p class="text-muted small mb-0">
+                        Registre una cotización, venta, fiado o pedido pendiente desde la misma pantalla.
+                    </p>
+                </div>
+                <div class="text-end small text-muted">
+                    <div>
+                        Fecha actual:
+                        <span th:text="${today}">2025-11-23</span>
+                    </div>
+                    <a th:href="@{/admin/clients/portfolio}" class="text-decoration-none">
+                        Ver cartera de clientes
+                    </a>
                 </div>
             </div>
 
@@ -44,6 +54,14 @@
                                 <input type="hidden"
                                        th:name="${_csrf.parameterName}"
                                        th:value="${_csrf.token}"/>
+
+                                <div id="orderFormValidation" class="alert alert-warning d-none py-2 mb-3" role="alert"></div>
+
+                                <div class="alert alert-info py-2 small mb-3">
+                                    <strong>Flujo rápido:</strong>
+                                    seleccione un cliente, agregue productos desde la lista derecha y cierre como cotización, pedido, fiado o pagado.
+                                    Para una venta sin datos del comprador, use el botón <strong>Cliente contado</strong>.
+                                </div>
 
                                 <div class="row g-2 mb-3">
                                     <div class="col-md-3">
@@ -95,7 +113,14 @@
                                     </div>
                                     <input type="hidden" name="deliveryPerson" value="" th:if="${!featureDelivery}">
                                     <div th:class="${featureDelivery} ? 'col-md-3' : 'col-md-6'">
-                                        <label for="clientSearch" class="form-label" th:text="${businessCustomerLabel} ?: 'Cliente'">Cliente</label>
+                                        <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                            <label for="clientSearch" class="form-label mb-0" th:text="${businessCustomerLabel} ?: 'Cliente'">Cliente</label>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-primary"
+                                                    id="quickCashClientButton">
+                                                Cliente contado
+                                            </button>
+                                        </div>
 
                                         <div class="position-relative">
                                             <input
@@ -293,33 +318,61 @@
                                     </div>
                                 </div>
 
-                                <!-- Botones -->
-                                <div class="d-flex flex-wrap gap-2">
-                                    <button type="submit"
-                                            class="btn btn-info"
-                                            name="action"
-                                            value="REQUESTED">
-                                        Pedir
-                                    </button>
+                                <!-- Acciones finales -->
+                                <div class="border rounded p-3 bg-light">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                        <div>
+                                            <h6 class="mb-0">Cerrar operación</h6>
+                                            <small class="text-muted">Elija una sola acción según el estado real de la venta.</small>
+                                        </div>
+                                        <a th:href="${cancelUrl}"
+                                           class="btn btn-sm btn-outline-secondary">
+                                            Cancelar
+                                        </a>
+                                    </div>
 
-                                    <button type="submit"
-                                            class="btn btn-warning"
-                                            name="action"
-                                            value="CREDIT">
-                                        Fiado
-                                    </button>
+                                    <div class="alert alert-secondary py-2 small mb-3">
+                                        <strong>Cotización:</strong> guarda el cálculo para enviarlo al cliente. No descuenta stock, no genera cobro y no afecta caja.
+                                    </div>
 
-                                    <button type="submit"
-                                            class="btn btn-primary"
-                                            name="action"
-                                            value="PAID">
-                                        Pagar
-                                    </button>
-
-                                    <a th:href="${cancelUrl}"
-                                       class="btn btn-outline-secondary">
-                                        Cancelar
-                                    </a>
+                                    <div class="row g-2">
+                                        <div class="col-md-6 col-xl-3">
+                                            <button type="submit"
+                                                    class="btn btn-outline-secondary w-100"
+                                                    name="action"
+                                                    value="QUOTED">
+                                                Guardar cotización
+                                            </button>
+                                            <small class="text-muted d-block mt-1">Úselo si el cliente aún no confirmó la compra.</small>
+                                        </div>
+                                        <div class="col-md-6 col-xl-3">
+                                            <button type="submit"
+                                                    class="btn btn-info w-100"
+                                                    name="action"
+                                                    value="REQUESTED">
+                                                Guardar pedido
+                                            </button>
+                                            <small class="text-muted d-block mt-1">Úselo si queda pendiente de entregar o cobrar.</small>
+                                        </div>
+                                        <div class="col-md-6 col-xl-3">
+                                            <button type="submit"
+                                                    class="btn btn-warning w-100"
+                                                    name="action"
+                                                    value="CREDIT">
+                                                Registrar fiado
+                                            </button>
+                                            <small class="text-muted d-block mt-1">Úselo cuando el cliente recibe el pedido y queda por cobrar.</small>
+                                        </div>
+                                        <div class="col-md-6 col-xl-3">
+                                            <button type="submit"
+                                                    class="btn btn-primary w-100"
+                                                    name="action"
+                                                    value="PAID">
+                                                Registrar pagado
+                                            </button>
+                                            <small class="text-muted d-block mt-1">Úselo cuando la venta ya fue cobrada.</small>
+                                        </div>
+                                    </div>
                                 </div>
 
                             </form>
@@ -423,7 +476,11 @@
     document.addEventListener('DOMContentLoaded', function () {
         'use strict';
 
+        const orderForm = document.getElementById('orderForm');
+        const orderFormValidation = document.getElementById('orderFormValidation');
         const clientSearchInput = document.getElementById('clientSearch');
+        const clientSearchHelp = document.getElementById('clientSearchHelp');
+        const quickCashClientButton = document.getElementById('quickCashClientButton');
         const clientDatalist = document.getElementById('clientDatalist');
         const clientSelect = document.getElementById('clientSelect');
         const clDocNumber = document.getElementById('clDocNumber');
@@ -460,8 +517,94 @@
 
         initSingleDeliveryPerson();
         setupClientAutocomplete();
+        setupQuickCashClientButton();
         setupBorrowedBottlesAutoMode();
+        setupOrderFormValidation();
         let currentClientPromotions = [];
+
+        function showOrderValidationMessage(message) {
+            if (orderFormValidation) {
+                orderFormValidation.textContent = message;
+                orderFormValidation.classList.remove('d-none');
+            }
+
+            if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
+                window.ecoAdmin.showFlashMessage(message, 'warning');
+            }
+        }
+
+        function clearOrderValidationMessage() {
+            if (orderFormValidation) {
+                orderFormValidation.textContent = '';
+                orderFormValidation.classList.add('d-none');
+            }
+        }
+
+        function hasOrderItems() {
+            return !!orderItemsBody.querySelector('tr[data-item-product-id]');
+        }
+
+        function setupOrderFormValidation() {
+            if (!orderForm) {
+                return;
+            }
+
+            orderForm.addEventListener('submit', function (event) {
+                clearOrderValidationMessage();
+
+                if (!clientSelect || !clientSelect.value) {
+                    event.preventDefault();
+                    showOrderValidationMessage('Seleccione un cliente antes de guardar el pedido. Para venta rápida, use Cliente contado.');
+                    if (clientSearchInput) {
+                        clientSearchInput.focus();
+                    }
+                    return;
+                }
+
+                if (!hasOrderItems()) {
+                    event.preventDefault();
+                    showOrderValidationMessage('Agregue al menos un producto al pedido antes de guardar.');
+                    if (productSearch) {
+                        productSearch.focus();
+                    }
+                }
+            });
+        }
+
+        function findCashClientOption() {
+            if (!clientSelect) {
+                return null;
+            }
+
+            const options = Array.from(clientSelect.options).filter(function (option) {
+                return option.value;
+            });
+
+            return options.find(function (option) {
+                return normalizeSearchText(option.textContent) === 'cliente contado';
+            }) || options.find(function (option) {
+                return normalizeSearchText(option.getAttribute('data-doc-number')) === 's/n';
+            }) || options.find(function (option) {
+                return normalizeSearchText(option.getAttribute('data-profile')) === 'cliente contado';
+            }) || null;
+        }
+
+        function setupQuickCashClientButton() {
+            if (!quickCashClientButton) {
+                return;
+            }
+
+            quickCashClientButton.addEventListener('click', function () {
+                const option = findCashClientOption();
+                if (!option) {
+                    showOrderValidationMessage('No se encontró un cliente contado activo. Revise la cartera de clientes.');
+                    return;
+                }
+
+                selectClientOption(option);
+                clearOrderValidationMessage();
+            });
+        }
 
         function updateClientInfo() {
             const opt = clientSelect ? clientSelect.options[clientSelect.selectedIndex] : null;
@@ -774,6 +917,13 @@
                 if (stockCell) {
                     stockCell.textContent = remaining.toFixed(0);
                 }
+
+                row.classList.remove('table-warning', 'table-danger');
+                if (remaining <= 0) {
+                    row.classList.add('table-danger');
+                } else if (remaining <= 5) {
+                    row.classList.add('table-warning');
+                }
             });
         }
 
@@ -853,6 +1003,7 @@
                 recalcTotals();
                 refreshProductsStockDisplay();
                 updateBorrowedBottlesSuggestion();
+                clearOrderValidationMessage();
                 return;
             }
 
@@ -984,6 +1135,7 @@
             recalcTotals();
             refreshProductsStockDisplay();
             updateBorrowedBottlesSuggestion();
+            clearOrderValidationMessage();
         }
 
         function applyCategoryFilter() {
@@ -1191,6 +1343,7 @@
             updateClientInfo();
             loadPromotionsForClient(option.value);
             hideClientSuggestions();
+            clearOrderValidationMessage();
 
             if (clientSearchHelp) {
                 clientSearchHelp.textContent = 'Cliente seleccionado correctamente.';

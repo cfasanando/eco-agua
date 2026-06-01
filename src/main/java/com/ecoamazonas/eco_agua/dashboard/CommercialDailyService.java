@@ -130,7 +130,7 @@ public class CommercialDailyService {
                 .toList();
 
         int pendingDeliveriesToday = (int) deliveryOrdersToday.stream()
-                .filter(order -> order.getStatus() != OrderStatus.CANCELED)
+                .filter(order -> order.getStatus() != OrderStatus.CANCELED && order.getStatus() != OrderStatus.QUOTED)
                 .filter(order -> order.getDeliveryStatus() != DeliveryStatus.DELIVERED)
                 .filter(order -> order.getDeliveryStatus() != DeliveryStatus.CANCELED)
                 .count();
@@ -290,7 +290,7 @@ public class CommercialDailyService {
     }
 
     private boolean hasCommercialDeliveryIssue(SaleOrder order) {
-        if (order == null || order.getStatus() == OrderStatus.CANCELED) {
+        if (order == null || order.getStatus() == OrderStatus.CANCELED || order.getStatus() == OrderStatus.QUOTED) {
             return false;
         }
 

@@ -119,6 +119,8 @@ public class IncomeController {
         BigDecimal total = receivableService.calculatePendingTotal(orders);
 
         model.addAttribute("activePage", "income_credit");
+        model.addAttribute("summary", receivableService.buildSummary(orders));
+        model.addAttribute("clientSummaries", receivableService.buildClientSummaries(orders));
         model.addAttribute("startDate", startDate);
         model.addAttribute("endDate", endDate);
         model.addAttribute("orders", orders);
@@ -137,6 +139,8 @@ public class IncomeController {
         SaleOrder order = receivableService.findDetailedOrder(id);
         model.addAttribute("activePage", "income_credit");
         model.addAttribute("order", order);
+        model.addAttribute("collectionWhatsappUrl", receivableService.buildCollectionWhatsappUrl(order));
+        model.addAttribute("collectionSuggestedMessage", receivableService.buildCollectionMessage(order));
         model.addAttribute("backUrl", resolveRedirectTarget(back, "/income/credit"));
         return "income/credit_detail";
     }

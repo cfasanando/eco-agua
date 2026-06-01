@@ -30,7 +30,7 @@ public class DeliveryDailyService {
         List<SaleOrder> orders = saleOrderRepository.findDeliveryOrdersForDate(effectiveDate);
 
         return orders.stream()
-                .filter(order -> order.getStatus() != OrderStatus.CANCELED)
+                .filter(order -> order.getStatus() != OrderStatus.CANCELED && order.getStatus() != OrderStatus.QUOTED)
                 .filter(order -> deliveryPerson == null || deliveryPerson.isBlank() || safeEqualsIgnoreCase(order.getDeliveryPerson(), deliveryPerson))
                 .filter(order -> deliveryStatus == null || order.getDeliveryStatus() == deliveryStatus)
                 .sorted(Comparator.comparing(SaleOrder::getDeliveryOrderIndex, Comparator.nullsLast(Integer::compareTo))

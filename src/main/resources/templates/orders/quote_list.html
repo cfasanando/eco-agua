@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Cotizaciones - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='orders_quotes'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Cotizaciones simples</h1>
+                    <p class="text-muted small mb-0">
+                        Arme una venta antes de confirmarla. Estas cotizaciones no afectan stock, caja ni cuentas por cobrar.
+                    </p>
+                </div>
+                <a th:href="@{/orders/new(returnTo='/orders/quotes')}" class="btn btn-primary">
+                    Nueva cotización
+                </a>
+            </div>
+
+            <div class="alert alert-info small">
+                <strong>Uso recomendado:</strong>
+                guarde una cotización cuando el cliente pregunta precios o cantidades, pero todavía no confirma la compra.
+                Cuando acepte, conviértala en pedido, fiado o pagado desde el detalle.
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <span>Cotizaciones pendientes</span>
+                    <span class="badge text-bg-secondary" th:text="${#lists.size(quotes)}">0</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>N°</th>
+                                <th>Cliente</th>
+                                <th>Canal</th>
+                                <th class="text-end">Total S/.</th>
+                                <th>Comentario</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="quote : ${quotes}">
+                                <td th:text="${quote.orderDate != null ? #temporals.format(quote.orderDate,'dd/MM/yyyy') : '-'}">01/06/2026</td>
+                                <td>
+                                    #<span th:text="${quote.orderNumber}">1</span>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold" th:text="${quote.client != null ? quote.client.name : '-'}">Cliente</div>
+                                    <div class="small text-muted" th:text="${quote.client != null && quote.client.phone != null ? quote.client.phone : 'Sin teléfono'}">Teléfono</div>
+                                </td>
+                                <td>
+                                    <span class="badge text-bg-light" th:text="${quote.salesChannel != null ? quote.salesChannel.label : 'WhatsApp'}">WhatsApp</span>
+                                </td>
+                                <td class="text-end fw-semibold" th:text="${#numbers.formatDecimal(quote.totalAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="small text-muted" th:text="${quote.comment} ?: '-'">-</td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a th:href="@{|/orders/${quote.id}?from=/orders/quotes|}" class="btn btn-outline-primary">
+                                            Detalle
+                                        </a>
+                                        <a th:if="${quoteWhatsappUrls[quote.id] != null}"
+                                           th:href="${quoteWhatsappUrls[quote.id]}"
+                                           target="_blank"
+                                           rel="noopener"
+                                           class="btn btn-success">
+                                            WhatsApp
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(quotes)}">
+                                <td colspan="7" class="text-center text-muted py-4">
+                                    Aún no hay cotizaciones pendientes.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+</body>
+</html>

@@ -20,12 +20,36 @@
                         <span th:text="${#temporals.format(order.orderDate,'dd/MM/yyyy')}">23/11/2025</span>
                         &nbsp;|&nbsp;
                         Estado:
-                        <span th:text="${order.status}">REQUESTED</span>
+                        <span class="badge"
+                              th:classappend="${order.statusBadgeClass}"
+                              th:text="${order.statusLabel}">Pedido</span>
                     </div>
                     <div th:if="${order.status.name() == 'CREDIT' and daysSinceOrder != null}">
                         Días de deuda:
                         <strong th:text="${daysSinceOrder}">0</strong>
                     </div>
+                </div>
+            </div>
+
+            <div class="alert alert-secondary d-flex flex-wrap justify-content-between align-items-start gap-2"
+                 th:if="${order.status.name() == 'QUOTED'}">
+                <div>
+                    <strong>Cotización pendiente de confirmación.</strong>
+                    <div class="small mb-0">
+                        Esta cotización no afecta stock, caja ni cuentas por cobrar. Confírmela como pedido, fiado o pagado cuando el cliente acepte.
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a th:if="${quoteWhatsappUrl != null}"
+                       th:href="${quoteWhatsappUrl}"
+                       target="_blank"
+                       rel="noopener"
+                       class="btn btn-sm btn-success">
+                        Enviar por WhatsApp
+                    </a>
+                    <a th:href="@{/orders/quotes}" class="btn btn-sm btn-outline-secondary">
+                        Ver cotizaciones
+                    </a>
                 </div>
             </div>
 
@@ -98,6 +122,13 @@
             </div>
 
             <div class="d-flex flex-wrap gap-2">
+                <form th:if="${order.status.name() == 'QUOTED'}"
+                      th:action="@{|/orders/${order.id}/request|}" method="post">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <input type="hidden" name="redirect" th:value="${backUrl}"/>
+                    <button type="submit" class="btn btn-info">Confirmar como pedido</button>
+                </form>
+
                 <form th:if="${order.status.name() != 'PAID' and order.status.name() != 'CANCELED'}"
                       th:action="@{|/orders/${order.id}/pay|}" method="post">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -114,7 +145,7 @@
 
                 <form th:if="${order.status.name() != 'CANCELED'}"
                       th:action="@{|/orders/${order.id}/cancel|}" method="post"
-                      onsubmit="return confirm('¿Seguro que deseas anular el pedido?');">
+                      onsubmit="return confirm('¿Seguro que deseas anular esta operación?');">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <input type="hidden" name="redirect" th:value="${backUrl}"/>
                     <input type="hidden" name="returnToStock" value="true"/>

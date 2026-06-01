@@ -338,6 +338,7 @@
             or activePage == 'supplies'
             or activePage == 'categories'
             or activePage == 'warehouse_products_stock'
+            or activePage == 'warehouse_reorder_suggestions'
             or activePage == 'warehouse_supplies_stock'
             or activePage == 'warehouse_containers'
             or activePage == 'production'}"
@@ -397,6 +398,17 @@
               >
                 <span class="icon"><i class="bi bi-archive"></i></span>
                 <span>Stock de productos</span>
+              </a>
+            </th:block>
+
+            <th:block th:if="${moduleWarehouseEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+              <a
+                th:href="@{/warehouse/reorder-suggestions}"
+                class="menu-link submenu"
+                th:classappend="${activePage == 'warehouse_reorder_suggestions' ? ' active' : ''}"
+              >
+                <span class="icon"><i class="bi bi-clipboard-check"></i></span>
+                <span>Reposición sugerida</span>
               </a>
             </th:block>
 

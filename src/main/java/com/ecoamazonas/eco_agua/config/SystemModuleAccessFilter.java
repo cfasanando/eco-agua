@@ -40,6 +40,7 @@ public class SystemModuleAccessFilter extends OncePerRequestFilter {
             ModuleRoute.prefix("/admin/suppliers", "suppliers"),
             ModuleRoute.prefix("/admin/products", "products"),
             ModuleRoute.prefix("/admin/categories", "categories"),
+            ModuleRoute.prefix("/warehouse/reorder-suggestions", "warehouse"),
             ModuleRoute.prefix("/warehouse/products-stock", "warehouse"),
             ModuleRoute.prefix("/warehouse/supplies-stock", "supplies"),
             ModuleRoute.prefix("/admin/supplies", "supplies"),

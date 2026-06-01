@@ -5,6 +5,7 @@ import com.ecoamazonas.eco_agua.supply.Supply;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface InventoryMovementRepository extends JpaRepository<InventoryMovement, Long> {
 
@@ -12,5 +13,10 @@ public interface InventoryMovementRepository extends JpaRepository<InventoryMove
 
     List<InventoryMovement> findByProductOrderByMovementDateAscIdAsc(Product product);
 
+    Optional<InventoryMovement> findTopByProductOrderByMovementDateDescIdDesc(Product product);
+
     List<InventoryMovement> findBySupplyOrderByMovementDateDesc(Supply supply);
+
+    boolean existsByReferenceModuleAndReferenceId(String referenceModule, Long referenceId);
 }
+

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="fragments/head_admin :: adminHead('Reposición sugerida - Eco Agua')"></head>
+
+<body>
+
+<div class="app-layout" th:with="activePage='warehouse_reorder_suggestions'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div>
+                    <h1 class="h5 mb-1">Reposición sugerida</h1>
+                    <p class="text-muted small mb-0">
+                        Revisa qué productos están agotados, bajo mínimo o en el límite para preparar la siguiente compra.
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a th:href="@{/warehouse/products-stock}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-archive"></i> Stock de productos
+                    </a>
+                    <a th:href="@{/expenses/by-date}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-cart-plus"></i> Registrar compra
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Productos activos</div>
+                            <div class="h4 mb-0" th:text="${summary.activeProducts}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-secondary-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Con mínimo configurado</div>
+                            <div class="h4 mb-0" th:text="${summary.configuredMinimumProducts}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-danger-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Agotados</div>
+                            <div class="h4 mb-0 text-danger" th:text="${summary.outOfStockProducts}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-warning-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Bajo mínimo</div>
+                            <div class="h4 mb-0 text-warning" th:text="${summary.belowMinimumProducts}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-info-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">En el límite</div>
+                            <div class="h4 mb-0 text-info" th:text="${summary.atLimitProducts}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-primary-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Con compra sugerida</div>
+                            <div class="h4 mb-0 text-primary" th:text="${summary.suggestedProducts}">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-info small shadow-sm" role="alert">
+                <strong>Cómo leer esta vista:</strong>
+                solo se evalúan productos activos con stock mínimo mayor a cero. La cantidad sugerida busca recuperar el stock hasta el mínimo configurado.
+                Para productos sin mínimo, primero configura la alerta desde <strong>Stock de productos</strong>.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <strong>Filtros</strong>
+                </div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" th:action="@{/warehouse/reorder-suggestions}" method="get">
+                        <div class="col-md-4">
+                            <label class="form-label">Estado</label>
+                            <select class="form-select" name="status">
+                                <option value="NEEDS_REORDER" th:selected="${selectedStatus == 'NEEDS_REORDER'}">Necesitan revisión</option>
+                                <option value="OUT_OF_STOCK" th:selected="${selectedStatus == 'OUT_OF_STOCK'}">Agotados</option>
+                                <option value="LOW_STOCK" th:selected="${selectedStatus == 'LOW_STOCK'}">Bajo mínimo</option>
+                                <option value="AT_LIMIT" th:selected="${selectedStatus == 'AT_LIMIT'}">En el límite</option>
+                                <option value="ALL_CONFIGURED" th:selected="${selectedStatus == 'ALL_CONFIGURED'}">Todos con mínimo configurado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">Aplicar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                    <strong>Lista de compra sugerida</strong>
+                    <small class="text-muted">Basado en stock actual y stock mínimo</small>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-light border text-center my-3" th:if="${#lists.isEmpty(rows)}">
+                        No hay productos para reponer con el filtro seleccionado. Configura stock mínimo en los productos que quieras controlar.
+                    </div>
+
+                    <div class="table-responsive">
+                        <table id="reorderSuggestionsTable" class="table table-sm align-middle table-striped" style="width:100%">
+                            <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Producto</th>
+                                <th>Categoría</th>
+                                <th class="text-end">Stock actual</th>
+                                <th class="text-end">Stock mínimo</th>
+                                <th class="text-end">Cantidad sugerida</th>
+                                <th>Estado</th>
+                                <th>Último movimiento</th>
+                                <th>Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row, stat : ${rows}"
+                                th:classappend="${row.outOfStock} ? 'table-danger' : (${row.belowMinimum} ? 'table-warning' : (${row.atLimit} ? 'table-info' : ''))">
+                                <td th:text="${stat.index + 1}">1</td>
+                                <td>
+                                    <div class="fw-semibold" th:text="${row.productName}">Producto</div>
+                                    <div class="small text-muted" th:text="${row.actionLabel}">Acción</div>
+                                </td>
+                                <td th:text="${row.categoryName}">Categoría</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.currentStock,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.minimumStock,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end fw-semibold"
+                                    th:classappend="${row.needsPurchase()} ? ' text-primary' : ' text-muted'"
+                                    th:text="${#numbers.formatDecimal(row.suggestedQuantity,1,'POINT',2,'POINT')}">0.00</td>
+                                <td>
+                                    <span class="badge"
+                                          th:classappend="${row.statusClass == 'danger'} ? ' bg-danger'
+                                          : (${row.statusClass == 'warning'} ? ' bg-warning text-dark'
+                                          : (${row.statusClass == 'info'} ? ' bg-info text-dark' : ' bg-success'))"
+                                          th:text="${row.statusLabel}">Estado</span>
+                                </td>
+                                <td>
+                                    <div th:text="${row.lastMovementLabel}">Movimiento</div>
+                                    <div class="small text-muted"
+                                         th:text="${row.lastMovementDate != null ? #temporals.format(row.lastMovementDate, 'dd/MM/yyyy HH:mm') : '-'}">-</div>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column gap-1">
+                                        <a th:href="@{/expenses/by-date}" class="btn btn-sm btn-outline-primary">
+                                            Registrar compra
+                                        </a>
+                                        <a th:href="@{|/warehouse/products-stock/${row.productId}/movements|}"
+                                           class="btn btn-sm btn-outline-secondary">
+                                            Ver Kardex
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+        window.ecoAdmin.initStandardDataTable('#reorderSuggestionsTable', []);
+    });
+</script>
+
+</body>
+</html>

@@ -66,35 +66,87 @@ public class ProductStockController {
             @RequestParam("action") String action, // IN or OUT
             @RequestParam("quantity") BigDecimal quantity,
             @RequestParam("movementDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate movementDate,
+            @RequestParam(value = "movementType", required = false, defaultValue = "ADJUSTMENT") String movementTypeValue,
             @RequestParam(value = "observation", required = false) String observation,
             RedirectAttributes redirectAttributes
     ) {
         try {
             if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalArgumentException("Quantity must be greater than zero");
+                throw new IllegalArgumentException("La cantidad debe ser mayor que cero");
             }
 
             boolean isIn = "IN".equalsIgnoreCase(action);
+            boolean isOut = "OUT".equalsIgnoreCase(action);
+            if (!isIn && !isOut) {
+                throw new IllegalArgumentException("El tipo de operación no es válido");
+            }
+
+            InventoryMovementType movementType = parseManualMovementType(movementTypeValue);
+            validateManualMovementType(movementType, isIn);
 
             inventoryService.registerProductMovement(
                     productId,
                     isIn ? quantity : BigDecimal.ZERO,
                     isIn ? BigDecimal.ZERO : quantity,
-                    InventoryMovementType.ADJUSTMENT,
-                    "MANUAL",
+                    movementType,
+                    referenceModuleFor(movementType),
                     null,
-                    observation,
+                    normalizeObservation(observation),
                     movementDate
             );
 
-            redirectAttributes.addFlashAttribute("message", "Stock actualizado correctamente.");
+            redirectAttributes.addFlashAttribute("message", "Movimiento de stock registrado correctamente.");
             redirectAttributes.addFlashAttribute("messageType", "success");
         } catch (Exception ex) {
-            redirectAttributes.addFlashAttribute("message", "Error al actualizar el stock: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("message", "Error al registrar el movimiento de stock: " + ex.getMessage());
             redirectAttributes.addFlashAttribute("messageType", "error");
         }
 
         return "redirect:/warehouse/products-stock";
+    }
+
+
+    private InventoryMovementType parseManualMovementType(String movementTypeValue) {
+        if (movementTypeValue == null || movementTypeValue.isBlank()) {
+            return InventoryMovementType.ADJUSTMENT;
+        }
+
+        try {
+            return InventoryMovementType.valueOf(movementTypeValue.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("El origen del movimiento no es válido");
+        }
+    }
+
+    private void validateManualMovementType(InventoryMovementType movementType, boolean isIn) {
+        boolean valid = isIn
+                ? movementType == InventoryMovementType.INITIAL
+                || movementType == InventoryMovementType.PURCHASE
+                || movementType == InventoryMovementType.RETURN
+                || movementType == InventoryMovementType.ADJUSTMENT
+                : movementType == InventoryMovementType.LOSS
+                || movementType == InventoryMovementType.ADJUSTMENT;
+
+        if (!valid) {
+            throw new IllegalArgumentException("El origen seleccionado no coincide con la entrada o salida de stock");
+        }
+    }
+
+    private String referenceModuleFor(InventoryMovementType movementType) {
+        return switch (movementType) {
+            case INITIAL -> "INITIAL";
+            case PURCHASE -> "PURCHASE";
+            case LOSS -> "LOSS";
+            case RETURN -> "RETURN";
+            default -> "MANUAL";
+        };
+    }
+
+    private String normalizeObservation(String observation) {
+        if (observation == null || observation.isBlank()) {
+            return null;
+        }
+        return observation.trim();
     }
 
     private ProductStockSummary buildSummary(Iterable<Product> products) {

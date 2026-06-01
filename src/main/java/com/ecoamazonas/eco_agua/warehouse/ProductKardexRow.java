@@ -110,6 +110,15 @@ public class ProductKardexRow {
         if ("MANUAL".equalsIgnoreCase(module)) {
             return "Ajuste manual";
         }
+        if ("INITIAL".equalsIgnoreCase(module)) {
+            return "Stock inicial";
+        }
+        if ("LOSS".equalsIgnoreCase(module)) {
+            return "Merma / pérdida";
+        }
+        if ("RETURN".equalsIgnoreCase(module)) {
+            return "Devolución";
+        }
         if ("PRODUCTION".equalsIgnoreCase(module)) {
             return referenceId != null ? "Producción #" + referenceId : "Producción";
         }

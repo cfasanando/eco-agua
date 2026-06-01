@@ -5,6 +5,11 @@ import com.ecoamazonas.eco_agua.category.CategoryRepository;
 import com.ecoamazonas.eco_agua.category.CategoryType;
 import com.ecoamazonas.eco_agua.category.CostBehavior;
 import com.ecoamazonas.eco_agua.category.PersonnelMode;
+import com.ecoamazonas.eco_agua.inventory.InventoryMovementRepository;
+import com.ecoamazonas.eco_agua.inventory.InventoryMovementType;
+import com.ecoamazonas.eco_agua.inventory.InventoryService;
+import com.ecoamazonas.eco_agua.product.Product;
+import com.ecoamazonas.eco_agua.product.ProductRepository;
 import com.ecoamazonas.eco_agua.supplier.Supplier;
 import com.ecoamazonas.eco_agua.supplier.SupplierRepository;
 import com.ecoamazonas.eco_agua.supply.Supply;
@@ -39,6 +44,9 @@ public class ExpenseService {
     private final SupplierRepository supplierRepository;
     private final SupplyRepository supplyRepository;
     private final EmployeeRepository employeeRepository;
+    private final ProductRepository productRepository;
+    private final InventoryMovementRepository movementRepository;
+    private final InventoryService inventoryService;
 
     public ExpenseService(
             ExpenseRepository expenseRepository,
@@ -46,7 +54,10 @@ public class ExpenseService {
             CategoryRepository categoryRepository,
             SupplierRepository supplierRepository,
             SupplyRepository supplyRepository,
-            EmployeeRepository employeeRepository
+            EmployeeRepository employeeRepository,
+            ProductRepository productRepository,
+            InventoryMovementRepository movementRepository,
+            InventoryService inventoryService
     ) {
         this.expenseRepository = expenseRepository;
         this.paymentRepository = paymentRepository;
@@ -54,6 +65,9 @@ public class ExpenseService {
         this.supplierRepository = supplierRepository;
         this.supplyRepository = supplyRepository;
         this.employeeRepository = employeeRepository;
+        this.productRepository = productRepository;
+        this.movementRepository = movementRepository;
+        this.inventoryService = inventoryService;
     }
 
     private void fillTaxInfoWithoutVat(Expense expense) {
@@ -274,6 +288,39 @@ public class ExpenseService {
             String voucherNumber,
             BigDecimal amount
     ) {
+        return registerSimpleExpense(
+                expenseDate,
+                categoryId,
+                supplierId,
+                manualSupplierName,
+                supplyId,
+                employeeId,
+                employeePaymentType,
+                observation,
+                voucherNumber,
+                amount,
+                false,
+                null,
+                null
+        );
+    }
+
+    @Transactional
+    public Expense registerSimpleExpense(
+            LocalDate expenseDate,
+            Long categoryId,
+            Long supplierId,
+            String manualSupplierName,
+            Long supplyId,
+            Long employeeId,
+            String employeePaymentType,
+            String observation,
+            String voucherNumber,
+            BigDecimal amount,
+            boolean updateProductStock,
+            Long stockProductId,
+            BigDecimal stockQuantity
+    ) {
         if (categoryId == null) {
             throw new IllegalArgumentException("Category is required.");
         }
@@ -300,6 +347,17 @@ public class ExpenseService {
         if (employeeId != null) {
             employee = employeeRepository.findById(employeeId)
                     .orElseThrow(() -> new IllegalArgumentException("Employee not found."));
+        }
+
+        Product stockProduct = null;
+        BigDecimal normalizedStockQuantity = normalizeStockQuantity(updateProductStock, stockProductId, stockQuantity);
+        if (updateProductStock) {
+            stockProduct = productRepository.findById(stockProductId)
+                    .orElseThrow(() -> new IllegalArgumentException("Product not found."));
+
+            if (!stockProduct.isActive()) {
+                throw new IllegalArgumentException("Product must be active to update stock.");
+            }
         }
 
         ExpenseInputContext context = resolveExpenseInputContext(category);
@@ -341,7 +399,65 @@ public class ExpenseService {
 
         fillTaxInfoWithoutVat(expense);
 
-        return expenseRepository.save(expense);
+        Expense savedExpense = expenseRepository.save(expense);
+
+        if (updateProductStock) {
+            registerProductStockFromExpense(savedExpense, stockProduct, normalizedStockQuantity);
+        }
+
+        return savedExpense;
+    }
+
+    private BigDecimal normalizeStockQuantity(boolean updateProductStock, Long stockProductId, BigDecimal stockQuantity) {
+        if (!updateProductStock) {
+            return BigDecimal.ZERO;
+        }
+
+        if (stockProductId == null) {
+            throw new IllegalArgumentException("Product is required when stock update is enabled.");
+        }
+
+        if (stockQuantity == null || stockQuantity.signum() <= 0) {
+            throw new IllegalArgumentException("Stock quantity must be greater than zero.");
+        }
+
+        return stockQuantity;
+    }
+
+    private void registerProductStockFromExpense(Expense expense, Product product, BigDecimal stockQuantity) {
+        String observation = buildProductStockObservation(expense, product);
+
+        inventoryService.registerProductMovement(
+                product.getId(),
+                stockQuantity,
+                BigDecimal.ZERO,
+                InventoryMovementType.PURCHASE,
+                "PURCHASE",
+                expense.getId(),
+                observation,
+                expense.getExpenseDate()
+        );
+    }
+
+    private String buildProductStockObservation(Expense expense, Product product) {
+        List<String> parts = new ArrayList<>();
+        parts.add("Compra de mercadería registrada desde egreso #" + expense.getId());
+
+        if (product != null && trimToNull(product.getName()) != null) {
+            parts.add("Producto: " + product.getName());
+        }
+        if (expense.getSupplier() != null && trimToNull(expense.getSupplier().getName()) != null) {
+            parts.add("Proveedor: " + expense.getSupplier().getName());
+        }
+        if (trimToNull(expense.getVoucherNumber()) != null) {
+            parts.add("Comprobante: " + expense.getVoucherNumber());
+        }
+        if (trimToNull(expense.getObservation()) != null) {
+            parts.add(expense.getObservation());
+        }
+
+        String result = String.join(". ", parts);
+        return result.length() > 255 ? result.substring(0, 255) : result;
     }
 
     @Transactional(readOnly = true)
@@ -365,6 +481,10 @@ public class ExpenseService {
 
         if (expense.getPayments() != null && !expense.getPayments().isEmpty()) {
             throw new IllegalArgumentException("Expenses with registered payments cannot be edited or deleted.");
+        }
+
+        if (expense.getId() != null && movementRepository.existsByReferenceModuleAndReferenceId("PURCHASE", expense.getId())) {
+            throw new IllegalArgumentException("Expenses linked to product stock cannot be edited or deleted from this screen.");
         }
     }
 
@@ -550,6 +670,11 @@ public class ExpenseService {
     @Transactional(readOnly = true)
     public List<Supply> findActiveSupplies() {
         return supplyRepository.findByActiveTrueOrderByNameAsc();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Product> findActiveProducts() {
+        return productRepository.findByActiveTrueOrderByNameAsc();
     }
 
     @Transactional(readOnly = true)

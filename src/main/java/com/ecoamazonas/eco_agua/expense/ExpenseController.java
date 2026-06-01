@@ -92,6 +92,7 @@ public class ExpenseController {
         model.addAttribute("categories", expenseService.findExpenseCategories());
         model.addAttribute("suppliers", expenseService.findActiveSuppliers());
         model.addAttribute("supplies", expenseService.findActiveSupplies());
+        model.addAttribute("products", expenseService.findActiveProducts());
         model.addAttribute("employees", expenseService.findActiveEmployees());
 
         return "expenses/expenses_by_date";
@@ -106,6 +107,9 @@ public class ExpenseController {
             @RequestParam(name = "supplyId", required = false) Long supplyId,
             @RequestParam(name = "employeeId", required = false) Long employeeId,
             @RequestParam(name = "employeePaymentType", required = false) String employeePaymentType,
+            @RequestParam(name = "updateProductStock", required = false, defaultValue = "false") boolean updateProductStock,
+            @RequestParam(name = "stockProductId", required = false) Long stockProductId,
+            @RequestParam(name = "stockQuantity", required = false) BigDecimal stockQuantity,
             @RequestParam(name = "observation", required = false) String observation,
             @RequestParam(name = "voucherNumber", required = false) String voucherNumber,
             @RequestParam(name = "expenseDate", required = false)
@@ -126,7 +130,10 @@ public class ExpenseController {
                     employeePaymentType,
                     observation,
                     voucherNumber,
-                    amount
+                    amount,
+                    updateProductStock,
+                    stockProductId,
+                    stockQuantity
             );
 
             redirectAttributes.addFlashAttribute("message", "Expense saved successfully.");

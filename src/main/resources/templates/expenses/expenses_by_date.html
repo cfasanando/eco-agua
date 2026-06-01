@@ -221,6 +221,50 @@
                                placeholder="Ej: cochera, grifo eventual, servicio puntual, etc.">
                     </div>
 
+
+                    <div class="border rounded-3 p-3 mb-3 d-none" id="expenseProductStockGroup">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   value="true"
+                                   name="updateProductStock"
+                                   id="expenseUpdateProductStock">
+                            <label class="form-check-label fw-semibold" for="expenseUpdateProductStock">
+                                Esta compra aumenta stock de producto
+                            </label>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-7">
+                                <label class="form-label">Producto que ingresa al stock</label>
+                                <select class="form-select"
+                                        name="stockProductId"
+                                        id="expenseStockProductId"
+                                        disabled>
+                                    <option value="">- Seleccione producto -</option>
+                                    <option th:each="product : ${products}"
+                                            th:value="${product.id}"
+                                            th:text="${product.name + ' | Stock: ' + #numbers.formatDecimal(product.stock,1,'POINT',2,'POINT')}">
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label">Cantidad que ingresa</label>
+                                <input type="number"
+                                       class="form-control"
+                                       name="stockQuantity"
+                                       id="expenseStockQuantity"
+                                       min="0.0001"
+                                       step="0.0001"
+                                       disabled>
+                            </div>
+                        </div>
+
+                        <small class="text-muted d-block mt-2">
+                            Úsalo solo cuando el gasto corresponde a compra de mercadería para venta. El sistema creará una entrada en Kardex con referencia a esta compra.
+                        </small>
+                    </div>
+
                     <div class="mb-3 d-none" id="expenseEmployeeGroup">
                         <label class="form-label">Personal</label>
                         <select class="form-select" name="employeeId" id="expenseEmployeeId">
@@ -511,6 +555,10 @@
             const employeeHelp = document.getElementById(config.employeeHelpId);
             const employeePaymentTypeGroup = document.getElementById(config.employeePaymentTypeGroupId);
             const employeePaymentTypeSelect = document.getElementById(config.employeePaymentTypeSelectId);
+            const productStockGroup = document.getElementById(config.productStockGroupId);
+            const updateProductStockCheckbox = document.getElementById(config.updateProductStockCheckboxId);
+            const stockProductSelect = document.getElementById(config.stockProductSelectId);
+            const stockQuantityInput = document.getElementById(config.stockQuantityInputId);
             const amountInput = document.getElementById(config.amountInputId);
             const amountHint = document.getElementById(config.amountHintId);
             const expenseDateInput = document.getElementById(config.expenseDateInputId);
@@ -735,6 +783,32 @@
                 }
             }
 
+
+            function updateProductStockFields(showProductStockGroup) {
+                const checked = Boolean(updateProductStockCheckbox && updateProductStockCheckbox.checked);
+                const enabled = showProductStockGroup && checked;
+
+                if (!showProductStockGroup && updateProductStockCheckbox) {
+                    updateProductStockCheckbox.checked = false;
+                }
+
+                if (stockProductSelect) {
+                    stockProductSelect.disabled = !enabled;
+                    stockProductSelect.required = enabled;
+                    if (!enabled) {
+                        stockProductSelect.value = '';
+                    }
+                }
+
+                if (stockQuantityInput) {
+                    stockQuantityInput.disabled = !enabled;
+                    stockQuantityInput.required = enabled;
+                    if (!enabled) {
+                        stockQuantityInput.value = '';
+                    }
+                }
+            }
+
             function updateContextHint(context) {
                 if (!contextHint) {
                     return;
@@ -857,6 +931,7 @@
                 const showSupplier = context === 'SUPPLIER' || context === 'SUPPLY';
                 const showSupply = context === 'SUPPLY';
                 const showPersonnel = context === 'PERSONNEL';
+                const showProductStockGroup = context === 'SUPPLIER';
 
                 updateContextHint(context);
 
@@ -865,6 +940,8 @@
                 toggleGroup(supplyGroup, showSupply);
                 toggleGroup(employeeGroup, showPersonnel);
                 toggleGroup(employeePaymentTypeGroup, showPersonnel);
+                toggleGroup(productStockGroup, showProductStockGroup);
+                updateProductStockFields(showProductStockGroup);
 
                 if (supplierSelect) {
                     supplierSelect.required = false;
@@ -907,6 +984,10 @@
 
             categorySelect.addEventListener('change', updateExpenseFormUi);
 
+            if (updateProductStockCheckbox) {
+                updateProductStockCheckbox.addEventListener('change', updateExpenseFormUi);
+            }
+
             if (employeeSelect) {
                 employeeSelect.addEventListener('change', updateExpenseFormUi);
             }
@@ -939,6 +1020,10 @@
             employeeHelpId: 'expenseEmployeeHelp',
             employeePaymentTypeGroupId: 'expenseEmployeePaymentTypeGroup',
             employeePaymentTypeSelectId: 'expenseEmployeePaymentType',
+            productStockGroupId: 'expenseProductStockGroup',
+            updateProductStockCheckboxId: 'expenseUpdateProductStock',
+            stockProductSelectId: 'expenseStockProductId',
+            stockQuantityInputId: 'expenseStockQuantity',
             amountInputId: 'expenseAmount',
             amountHintId: 'expenseAmountHint',
             expenseDateInputId: 'expenseDate',

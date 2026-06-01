@@ -22,17 +22,20 @@ public class IncomeController {
     private final OtherIncomeService otherIncomeService;
     private final CategoryRepository categoryRepository;
     private final ReceivableService receivableService;
+    private final SalesChannelReportService salesChannelReportService;
 
     public IncomeController(
             OrderService orderService,
             OtherIncomeService otherIncomeService,
             CategoryRepository categoryRepository,
-            ReceivableService receivableService
+            ReceivableService receivableService,
+            SalesChannelReportService salesChannelReportService
     ) {
         this.orderService = orderService;
         this.otherIncomeService = otherIncomeService;
         this.categoryRepository = categoryRepository;
         this.receivableService = receivableService;
+        this.salesChannelReportService = salesChannelReportService;
     }
 
     @GetMapping("/sales")
@@ -94,6 +97,38 @@ public class IncomeController {
         model.addAttribute("newOrderDate", startDate);
         model.addAttribute("newOrderReturnTo", "/income/sales");
         return "income/sales_by_date";
+    }
+
+
+    @GetMapping("/sales/channels")
+    public String salesByChannel(
+            @RequestParam(name = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Model model
+    ) {
+        LocalDate today = LocalDate.now();
+        if (startDate == null) {
+            startDate = today.withDayOfMonth(1);
+        }
+        if (endDate == null) {
+            endDate = today;
+        }
+        if (endDate.isBefore(startDate)) {
+            LocalDate tmp = startDate;
+            startDate = endDate;
+            endDate = tmp;
+        }
+
+        SalesChannelReportSummary summary = salesChannelReportService.buildReport(startDate, endDate);
+
+        model.addAttribute("activePage", "income_sales_channels");
+        model.addAttribute("startDate", startDate);
+        model.addAttribute("endDate", endDate);
+        model.addAttribute("summary", summary);
+        model.addAttribute("rows", summary.getRows());
+        model.addAttribute("newOrderDate", endDate);
+        model.addAttribute("newOrderReturnTo", "/income/sales/channels");
+        return "income/sales_by_channel";
     }
 
     @GetMapping("/credit")

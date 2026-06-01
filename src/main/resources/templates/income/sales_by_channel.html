@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Ventas por canal - Eco Agua')"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='income_sales_channels'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Ventas por canal</h1>
+                    <p class="text-muted mb-0">
+                        Revisa qué canal trae más pedidos, cuánto se vendió, cuánto se cobró y cuánto quedó pendiente.
+                    </p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a th:href="@{/income/sales(mode='PERIOD',startDate=${startDate},endDate=${endDate})}"
+                       class="btn btn-outline-primary">
+                        <i class="bi bi-calendar-range"></i> Ventas por fecha
+                    </a>
+                    <a th:href="@{/orders/new(orderDate=${newOrderDate},returnTo=${newOrderReturnTo})}"
+                       class="btn btn-success">
+                        <i class="bi bi-plus-circle"></i> Registrar venta
+                    </a>
+                </div>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm" role="alert">
+                <strong>Lectura comercial:</strong>
+                este reporte considera pedidos pagados y fiados. Las cotizaciones y pedidos no confirmados no entran hasta convertirse en venta real.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <strong>Filtros</strong>
+                </div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" th:action="@{/income/sales/channels}" method="get">
+                        <div class="col-md-4">
+                            <label class="form-label">Desde</label>
+                            <input type="date" class="form-control" name="startDate" th:value="${startDate}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Hasta</label>
+                            <input type="date" class="form-control" name="endDate" th:value="${endDate}">
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Buscar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Pedidos</div>
+                            <div class="h4 mb-0" th:text="${summary.totalOrderCount}">0</div>
+                            <div class="small text-muted">
+                                Pagados: <span th:text="${summary.paidOrderCount}">0</span> ·
+                                Fiados: <span th:text="${summary.creditOrderCount}">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Total vendido</div>
+                            <div class="h4 mb-0">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.totalSalesAmount,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Ticket promedio: S/. <span th:text="${#numbers.formatDecimal(summary.averageTicketAmount,1,'POINT',2,'POINT')}">0.00</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Cobrado</div>
+                            <div class="h4 mb-0 text-success">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.paidAmount,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Dinero ya recuperado</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Pendiente</div>
+                            <div class="h4 mb-0 text-warning">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.pendingAmount,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Canal principal: <span th:text="${summary.bestChannelLabel}">Sin ventas</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <strong>Resumen por canal</strong>
+                        <div class="small text-muted">
+                            Del <span th:text="${#temporals.format(startDate,'dd/MM/yyyy')}">01/01/2026</span>
+                            al <span th:text="${#temporals.format(endDate,'dd/MM/yyyy')}">31/01/2026</span>
+                        </div>
+                    </div>
+                    <span class="badge text-bg-light" th:text="${summary.hasMovement() ? 'Con movimiento' : 'Sin ventas en el período'}">Estado</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-sm align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Canal</th>
+                                <th class="text-end">Pedidos</th>
+                                <th class="text-end">Pagados</th>
+                                <th class="text-end">Fiados</th>
+                                <th class="text-end">Vendido S/.</th>
+                                <th class="text-end">Cobrado S/.</th>
+                                <th class="text-end">Pendiente S/.</th>
+                                <th class="text-end">Ticket S/.</th>
+                                <th>Lectura</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row : ${rows}">
+                                <td>
+                                    <strong th:text="${row.channelLabel}">WhatsApp</strong>
+                                </td>
+                                <td class="text-end" th:text="${row.orderCount}">0</td>
+                                <td class="text-end" th:text="${row.paidOrderCount}">0</td>
+                                <td class="text-end" th:text="${row.creditOrderCount}">0</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.totalSalesAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.paidAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.pendingAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.averageTicketAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                <td>
+                                    <span class="badge" th:classappend="${row.readingBadgeClass}" th:text="${row.reading}">Lectura</span>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(rows)}">
+                                <td colspan="9" class="text-center text-muted py-4">
+                                    No hay canales para mostrar.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="alert alert-light border mt-3 mb-0">
+                        <strong>Cómo usarlo:</strong>
+                        si un canal tiene muchos pedidos pero poco cobro, revisa la cobranza. Si un canal tiene pocas ventas, úsalo más para visibilidad que para venta directa hasta tener más datos.
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+</body>
+</html>

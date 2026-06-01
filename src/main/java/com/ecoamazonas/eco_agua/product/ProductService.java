@@ -50,6 +50,7 @@ public class ProductService {
             BigDecimal price,
             boolean active,
             boolean featured,
+            BigDecimal minimumStock,
             Long categoryId,
             String imagePath
     ) {
@@ -67,6 +68,11 @@ public class ProductService {
         product.setPrice(price);
         product.setActive(active);
         product.setFeatured(featured);
+        if (minimumStock != null) {
+            product.setMinimumStock(minimumStock);
+        } else if (id == null) {
+            product.setMinimumStock(BigDecimal.ZERO);
+        }
 
         if (categoryId != null) {
             Category category = categoryRepository.findById(categoryId)
@@ -82,6 +88,19 @@ public class ProductService {
             product.setImagePath(null);
         }
 
+        repository.save(product);
+    }
+
+    @Transactional
+    public void updateMinimumStock(Long productId, BigDecimal minimumStock) {
+        Product product = repository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found with id " + productId));
+
+        if (minimumStock == null || minimumStock.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Minimum stock must be zero or greater");
+        }
+
+        product.setMinimumStock(minimumStock);
         repository.save(product);
     }
 

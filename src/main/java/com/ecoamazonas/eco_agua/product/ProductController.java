@@ -84,6 +84,7 @@ public class ProductController {
             @RequestParam BigDecimal price,
             @RequestParam(defaultValue = "false") boolean active,     // <-- was "true"
             @RequestParam(value = "featured", defaultValue = "false") boolean featured, // <-- NEW
+            @RequestParam(value = "minimumStock", required = false) BigDecimal minimumStock,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(value = "imageFile", required = false) MultipartFile imageFile,
             RedirectAttributes redirectAttributes
@@ -102,6 +103,7 @@ public class ProductController {
                     price,
                     active,
                     featured,
+                    minimumStock,
                     categoryId,
                     storedImagePath
             );

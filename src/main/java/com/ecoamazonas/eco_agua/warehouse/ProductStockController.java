@@ -32,8 +32,28 @@ public class ProductStockController {
 
     @GetMapping
     public String index(Model model) {
-        model.addAttribute("products", productService.findAll());
+        var products = productService.findAll();
+        model.addAttribute("products", products);
+        model.addAttribute("summary", buildSummary(products));
         return "warehouse/products_stock";
+    }
+
+    @PostMapping("/minimum-stock")
+    public String updateMinimumStock(
+            @RequestParam("productId") Long productId,
+            @RequestParam("minimumStock") BigDecimal minimumStock,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            productService.updateMinimumStock(productId, minimumStock);
+            redirectAttributes.addFlashAttribute("message", "Stock mínimo actualizado correctamente.");
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (Exception ex) {
+            redirectAttributes.addFlashAttribute("message", "Error al actualizar el stock mínimo: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "error");
+        }
+
+        return "redirect:/warehouse/products-stock";
     }
 
     @PostMapping("/adjust")
@@ -71,6 +91,31 @@ public class ProductStockController {
         }
 
         return "redirect:/warehouse/products-stock";
+    }
+
+    private ProductStockSummary buildSummary(Iterable<Product> products) {
+        int activeProducts = 0;
+        int outOfStockProducts = 0;
+        int lowStockProducts = 0;
+        int enoughStockProducts = 0;
+
+        for (Product product : products) {
+            if (product == null || !product.isActive()) {
+                continue;
+            }
+
+            activeProducts++;
+
+            if (product.isOutOfStock()) {
+                outOfStockProducts++;
+            } else if (product.isBelowMinimumStock()) {
+                lowStockProducts++;
+            } else {
+                enoughStockProducts++;
+            }
+        }
+
+        return new ProductStockSummary(activeProducts, outOfStockProducts, lowStockProducts, enoughStockProducts);
     }
 
     @GetMapping("/{id}/movements")

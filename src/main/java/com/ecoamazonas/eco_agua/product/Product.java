@@ -41,6 +41,9 @@ public class Product {
     @Column(precision = 10, scale = 2, nullable = false)
     private BigDecimal stock = BigDecimal.ZERO;
 
+    @Column(name = "minimum_stock", precision = 10, scale = 2, nullable = false)
+    private BigDecimal minimumStock = BigDecimal.ZERO;
+
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProductSupply> suppliesComposition = new ArrayList<>();
 
@@ -88,6 +91,10 @@ public class Product {
         return stock;
     }
 
+    public BigDecimal getMinimumStock() {
+        return minimumStock;
+    }
+
     public void setId(Long id) {
         this.id = id;
     }
@@ -121,7 +128,49 @@ public class Product {
     }
 
     public void setStock(BigDecimal stock) {
-        this.stock = stock;
+        this.stock = stock != null ? stock : BigDecimal.ZERO;
+    }
+
+    public void setMinimumStock(BigDecimal minimumStock) {
+        this.minimumStock = minimumStock != null ? minimumStock : BigDecimal.ZERO;
+    }
+
+    @Transient
+    public boolean isOutOfStock() {
+        return stock == null || stock.compareTo(BigDecimal.ZERO) <= 0;
+    }
+
+    @Transient
+    public boolean isBelowMinimumStock() {
+        if (isOutOfStock()) {
+            return false;
+        }
+        if (minimumStock == null || minimumStock.compareTo(BigDecimal.ZERO) <= 0) {
+            return false;
+        }
+        return stock.compareTo(minimumStock) <= 0;
+    }
+
+    @Transient
+    public String getStockStatusLabel() {
+        if (isOutOfStock()) {
+            return "Agotado";
+        }
+        if (isBelowMinimumStock()) {
+            return "Bajo mínimo";
+        }
+        return "Suficiente";
+    }
+
+    @Transient
+    public String getStockStatusCode() {
+        if (isOutOfStock()) {
+            return "OUT_OF_STOCK";
+        }
+        if (isBelowMinimumStock()) {
+            return "LOW_STOCK";
+        }
+        return "ENOUGH_STOCK";
     }
 
     @Transient

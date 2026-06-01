@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
 
-<head th:replace="fragments/head_admin :: adminHead('Movimientos de producto - Eco Agua')"></head>
+<head th:replace="fragments/head_admin :: adminHead('Kardex de producto - Eco Agua')"></head>
 
 <body>
 
@@ -13,48 +13,174 @@
 
         <main class="content-wrapper">
 
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h1 class="h5 mb-0">
-                    Detalle entrada/salida (Stock):
-                    <span th:text="${product.name}">Producto</span>
-                </h1>
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-3 flex-wrap">
+                <div>
+                    <h1 class="h5 mb-1">
+                        Kardex de producto:
+                        <span th:text="${product.name}">Producto</span>
+                    </h1>
+                    <p class="text-muted small mb-0">
+                        Revisa entradas, salidas, origen del movimiento y saldo calculado después de cada operación.
+                    </p>
+                </div>
 
                 <a th:href="@{/warehouse/products-stock}"
                    class="btn btn-outline-secondary btn-sm">
-                    Volver
+                    <i class="bi bi-arrow-left"></i> Volver al stock
                 </a>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Stock actual</div>
+                            <div class="h4 mb-0"
+                                 th:text="${#numbers.formatDecimal(summary.currentStock,1,'POINT',2,'POINT')}">0.00</div>
+                            <div class="small text-muted mt-1">
+                                Mínimo:
+                                <span th:text="${#numbers.formatDecimal(product.minimumStock,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-success-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Entradas del periodo</div>
+                            <div class="h4 mb-0 text-success"
+                                 th:text="${#numbers.formatDecimal(summary.totalIn,1,'POINT',2,'POINT')}">0.00</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-danger-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Salidas del periodo</div>
+                            <div class="h4 mb-0 text-danger"
+                                 th:text="${#numbers.formatDecimal(summary.totalOut,1,'POINT',2,'POINT')}">0.00</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-primary-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Saldo calculado</div>
+                            <div class="h4 mb-0 text-primary"
+                                 th:text="${#numbers.formatDecimal(summary.endingBalance,1,'POINT',2,'POINT')}">0.00</div>
+                            <div class="small text-muted mt-1">
+                                Movimientos:
+                                <span th:text="${summary.movementCount}">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-warning small shadow-sm"
+                 th:if="${!summary.balancedWithCurrentStock}">
+                <strong>Revisión recomendada:</strong>
+                el saldo calculado del Kardex no coincide con el stock actual. Esto puede pasar si existía stock antes de registrar movimientos históricos
+                o si hubo carga inicial sin movimiento. Diferencia:
+                <strong th:text="${#numbers.formatDecimal(summary.stockDifference,1,'POINT',2,'POINT')}">0.00</strong>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" method="get">
+                        <div class="col-md-3">
+                            <label class="form-label">Desde</label>
+                            <input type="date"
+                                   class="form-control form-control-sm"
+                                   name="startDate"
+                                   th:value="${startDate != null ? #temporals.format(startDate, 'yyyy-MM-dd') : ''}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Hasta</label>
+                            <input type="date"
+                                   class="form-control form-control-sm"
+                                   name="endDate"
+                                   th:value="${endDate != null ? #temporals.format(endDate, 'yyyy-MM-dd') : ''}">
+                        </div>
+                        <div class="col-md-6 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                <i class="bi bi-search"></i> Filtrar
+                            </button>
+                            <a th:href="@{'/warehouse/products-stock/' + ${product.id} + '/movements'}"
+                               class="btn btn-outline-secondary btn-sm">
+                                Limpiar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="alert alert-info small shadow-sm" role="alert">
+                <strong>Cómo leer el Kardex:</strong>
+                cada fila muestra la entrada o salida registrada y el saldo que quedó después de ese movimiento.
+                Las ventas confirmadas salen como <strong>Venta</strong>; los cambios manuales salen como <strong>Ajuste</strong>.
             </div>
 
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <table class="table table-striped table-sm align-middle">
-                        <thead class="table-light">
-                        <tr>
-                            <th>Observación</th>
-                            <th class="text-end">Entrada</th>
-                            <th class="text-end">Salida</th>
-                            <th>Tipo</th>
-                            <th>Fecha</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="mov : ${movements}">
-                            <td th:text="${mov.observation}">Obs</td>
-                            <td class="text-end"
-                                th:text="${#numbers.formatDecimal(mov.quantityIn,1,'POINT',2,'POINT')}">
-                                0.00
-                            </td>
-                            <td class="text-end"
-                                th:text="${#numbers.formatDecimal(mov.quantityOut,1,'POINT',2,'POINT')}">
-                                0.00
-                            </td>
-                            <td th:text="${mov.movementType}">TYPE</td>
-                            <td th:text="${#temporals.format(mov.movementDate, 'yyyy-MM-dd HH:mm:ss')}">
-                                2025-01-01
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table id="productKardexTable" class="table table-striped table-sm align-middle" style="width:100%">
+                            <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Fecha</th>
+                                <th>Movimiento</th>
+                                <th>Referencia</th>
+                                <th>Observación</th>
+                                <th class="text-end">Entrada</th>
+                                <th class="text-end">Salida</th>
+                                <th class="text-end">Saldo</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:if="${#lists.isEmpty(rows)}">
+                                <td colspan="8" class="text-center text-muted py-4">
+                                    No hay movimientos para este producto en el periodo seleccionado.
+                                </td>
+                            </tr>
+                            <tr th:each="row : ${rows}"
+                                th:classappend="${row.directionCode == 'IN'} ? 'table-success' : (${row.directionCode == 'OUT'} ? 'table-light' : '')">
+                                <td th:text="${row.rowNumber}">1</td>
+                                <td th:text="${#temporals.format(row.movement.movementDate, 'yyyy-MM-dd HH:mm')}">2026-01-01 08:00</td>
+                                <td>
+                                    <span th:if="${row.directionCode == 'IN'}"
+                                          class="badge bg-success-subtle text-success me-1">Entrada</span>
+                                    <span th:if="${row.directionCode == 'OUT'}"
+                                          class="badge bg-danger-subtle text-danger me-1">Salida</span>
+                                    <span th:if="${row.directionCode == 'MIXED'}"
+                                          class="badge bg-warning-subtle text-warning me-1">Mixto</span>
+                                    <span th:if="${row.directionCode == 'NONE'}"
+                                          class="badge bg-secondary-subtle text-secondary me-1">Sin cantidad</span>
+                                    <span th:text="${row.movementTypeLabel}">Ajuste</span>
+                                </td>
+                                <td>
+                                    <a th:if="${row.referenceUrl != null}"
+                                       th:href="${row.referenceUrl}"
+                                       th:text="${row.referenceLabel}">Pedido</a>
+                                    <span th:if="${row.referenceUrl == null}"
+                                          th:text="${row.referenceLabel}">Referencia</span>
+                                </td>
+                                <td>
+                                    <span th:if="${row.movement.observation != null and !row.movement.observation.isBlank()}"
+                                          th:text="${row.movement.observation}">Observación</span>
+                                    <span th:if="${row.movement.observation == null or row.movement.observation.isBlank()}"
+                                          class="text-muted">Sin observación</span>
+                                </td>
+                                <td class="text-end text-success fw-semibold"
+                                    th:text="${#numbers.formatDecimal(row.quantityIn,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end text-danger fw-semibold"
+                                    th:text="${#numbers.formatDecimal(row.quantityOut,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end fw-semibold"
+                                    th:text="${#numbers.formatDecimal(row.balanceAfter,1,'POINT',2,'POINT')}">0.00</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -63,6 +189,16 @@
 </div>
 
 <th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        if (window.ecoAdmin && document.querySelector('#productKardexTable')) {
+            window.ecoAdmin.initStandardDataTable('#productKardexTable', []);
+        }
+    });
+</script>
 
 </body>
 </html>

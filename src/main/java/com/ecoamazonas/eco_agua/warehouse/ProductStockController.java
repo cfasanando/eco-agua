@@ -13,6 +13,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Controller
 @RequestMapping("/warehouse/products-stock")
@@ -119,11 +123,94 @@ public class ProductStockController {
     }
 
     @GetMapping("/{id}/movements")
-    public String viewMovements(@PathVariable Long id, Model model) {
+    public String viewMovements(
+            @PathVariable Long id,
+            @RequestParam(value = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Model model
+    ) {
         Product product = productService.findById(id);
+
+        DateRange range = normalizeDateRange(startDate, endDate);
+        ProductKardexView kardexView = buildProductKardex(
+                product,
+                movementRepository.findByProductOrderByMovementDateAscIdAsc(product),
+                range.startDate(),
+                range.endDate()
+        );
+
         model.addAttribute("product", product);
-        model.addAttribute("movements", movementRepository.findByProductOrderByMovementDateDesc(product));
+        model.addAttribute("rows", kardexView.rows());
+        model.addAttribute("summary", kardexView.summary());
+        model.addAttribute("startDate", range.startDate());
+        model.addAttribute("endDate", range.endDate());
 
         return "warehouse/product_movements";
+    }
+
+    private ProductKardexView buildProductKardex(
+            Product product,
+            List<com.ecoamazonas.eco_agua.inventory.InventoryMovement> movements,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        List<ProductKardexRow> rows = new ArrayList<>();
+        BigDecimal balance = BigDecimal.ZERO;
+        BigDecimal openingBalance = BigDecimal.ZERO;
+        BigDecimal totalIn = BigDecimal.ZERO;
+        BigDecimal totalOut = BigDecimal.ZERO;
+        LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : null;
+        LocalDateTime endDateTime = endDate != null ? endDate.atTime(LocalTime.MAX) : null;
+        int rowNumber = 1;
+
+        for (var movement : movements) {
+            LocalDateTime movementDate = movement.getMovementDate();
+            BigDecimal quantityIn = movement.getQuantityIn() != null ? movement.getQuantityIn() : BigDecimal.ZERO;
+            BigDecimal quantityOut = movement.getQuantityOut() != null ? movement.getQuantityOut() : BigDecimal.ZERO;
+
+            boolean beforeStart = startDateTime != null && movementDate != null && movementDate.isBefore(startDateTime);
+            boolean afterEnd = endDateTime != null && movementDate != null && movementDate.isAfter(endDateTime);
+
+            if (beforeStart) {
+                balance = balance.add(quantityIn).subtract(quantityOut);
+                openingBalance = balance;
+                continue;
+            }
+
+            if (afterEnd) {
+                break;
+            }
+
+            balance = balance.add(quantityIn).subtract(quantityOut);
+            totalIn = totalIn.add(quantityIn);
+            totalOut = totalOut.add(quantityOut);
+            rows.add(new ProductKardexRow(rowNumber++, movement, balance));
+        }
+
+        ProductKardexSummary summary = new ProductKardexSummary(
+                openingBalance,
+                totalIn,
+                totalOut,
+                balance,
+                product != null ? product.getStock() : BigDecimal.ZERO,
+                rows.size()
+        );
+
+        return new ProductKardexView(rows, summary);
+    }
+
+    private DateRange normalizeDateRange(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
+            return new DateRange(endDate, startDate);
+        }
+        return new DateRange(startDate, endDate);
+    }
+
+    private record ProductKardexView(List<ProductKardexRow> rows, ProductKardexSummary summary) {
+    }
+
+    private record DateRange(LocalDate startDate, LocalDate endDate) {
     }
 }

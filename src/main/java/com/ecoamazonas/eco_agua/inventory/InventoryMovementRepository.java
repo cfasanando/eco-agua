@@ -10,5 +10,7 @@ public interface InventoryMovementRepository extends JpaRepository<InventoryMove
 
     List<InventoryMovement> findByProductOrderByMovementDateDesc(Product product);
 
+    List<InventoryMovement> findByProductOrderByMovementDateAscIdAsc(Product product);
+
     List<InventoryMovement> findBySupplyOrderByMovementDateDesc(Supply supply);
 }

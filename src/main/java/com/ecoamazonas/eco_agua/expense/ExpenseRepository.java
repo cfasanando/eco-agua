@@ -120,4 +120,13 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
         where e.id = :expenseId
         """)
     Expense findDetailedById(@Param("expenseId") Long expenseId);
+
+    @Query("""
+        select distinct e
+        from Expense e
+        left join fetch e.category c
+        left join fetch e.supplier s
+        where e.id in :expenseIds
+        """)
+    List<Expense> findAllDetailedByIdIn(@Param("expenseIds") List<Long> expenseIds);
 }

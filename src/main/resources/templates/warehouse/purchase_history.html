@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="fragments/head_admin :: adminHead('Historial de compras - Eco Agua')"></head>
+
+<body>
+
+<div class="app-layout" th:with="activePage='warehouse_purchase_history'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div>
+                    <h1 class="h5 mb-1">Historial de compras</h1>
+                    <p class="text-muted small mb-0">
+                        Revisa las compras de mercadería que generaron entrada de stock y movimiento en Kardex.
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a th:href="@{/warehouse/reorder-suggestions}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-clipboard-check"></i> Reposición sugerida
+                    </a>
+                    <a th:href="@{/expenses/by-date}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-cart-plus"></i> Registrar compra
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Movimientos</div>
+                            <div class="h4 mb-0" th:text="${summary.movementCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-primary-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Con egreso vinculado</div>
+                            <div class="h4 mb-0 text-primary" th:text="${summary.linkedExpenseCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-secondary-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Proveedores</div>
+                            <div class="h4 mb-0" th:text="${summary.supplierCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-info-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Productos</div>
+                            <div class="h4 mb-0 text-info" th:text="${summary.productCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-success-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Cantidad ingresada</div>
+                            <div class="h4 mb-0 text-success" th:text="${#numbers.formatDecimal(summary.totalQuantity,1,'POINT',2,'POINT')}">0.00</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-warning-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Monto comprado</div>
+                            <div class="h4 mb-0 text-warning" th:text="${'S/ ' + #numbers.formatDecimal(summary.totalAmount,1,'POINT',2,'POINT')}">S/ 0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-info small shadow-sm" role="alert">
+                <strong>Cómo leer esta vista:</strong>
+                solo aparecen movimientos de Kardex con origen <strong>compra</strong>. Si la compra fue registrada desde gastos con la opción de aumentar stock, también se muestra proveedor, monto y comprobante.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <strong>Filtros</strong>
+                </div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" th:action="@{/warehouse/purchase-history}" method="get">
+                        <div class="col-md-2">
+                            <label class="form-label">Desde</label>
+                            <input type="date" class="form-control" name="startDate" th:value="${startDate}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Hasta</label>
+                            <input type="date" class="form-control" name="endDate" th:value="${endDate}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Proveedor</label>
+                            <select class="form-select" name="supplierId">
+                                <option value="">Todos</option>
+                                <option th:each="supplier : ${suppliers}"
+                                        th:value="${supplier.id}"
+                                        th:selected="${selectedSupplierId != null and selectedSupplierId.equals(supplier.id)}"
+                                        th:text="${supplier.name}">Proveedor</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Producto</label>
+                            <select class="form-select" name="productId">
+                                <option value="">Todos</option>
+                                <option th:each="product : ${products}"
+                                        th:value="${product.id}"
+                                        th:selected="${selectedProductId != null and selectedProductId.equals(product.id)}"
+                                        th:text="${product.name}">Producto</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">Aplicar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                    <strong>Compras con entrada de stock</strong>
+                    <small class="text-muted">Basado en movimientos de Kardex con origen compra</small>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-light border text-center my-3" th:if="${#lists.isEmpty(rows)}">
+                        No hay compras con entrada de stock para el filtro seleccionado.
+                    </div>
+
+                    <div class="table-responsive">
+                        <table id="purchaseHistoryTable" class="table table-sm align-middle table-striped" style="width:100%">
+                            <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Fecha</th>
+                                <th>Proveedor</th>
+                                <th>Producto</th>
+                                <th>Categoría</th>
+                                <th class="text-end">Cantidad</th>
+                                <th class="text-end">Monto</th>
+                                <th>Comprobante</th>
+                                <th>Observación</th>
+                                <th>Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row, stat : ${rows}">
+                                <td th:text="${stat.index + 1}">1</td>
+                                <td>
+                                    <div th:text="${row.purchaseDate != null ? #temporals.format(row.purchaseDate, 'dd/MM/yyyy') : '-'}">-</div>
+                                    <div class="small text-muted" th:text="${row.movementDate != null ? #temporals.format(row.movementDate, 'HH:mm') : ''}">00:00</div>
+                                </td>
+                                <td>
+                                    <div th:text="${row.supplierName}">Proveedor</div>
+                                    <span class="badge bg-secondary-subtle text-secondary" th:if="${!row.linkedToExpense}">Sin egreso vinculado</span>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold" th:text="${row.productName}">Producto</div>
+                                    <div class="small text-muted" th:text="${row.expenseId != null ? 'Egreso #' + row.expenseId : 'Movimiento #' + row.movementId}">Referencia</div>
+                                </td>
+                                <td th:text="${row.categoryName}">Categoría</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.quantity,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(row.amount,1,'POINT',2,'POINT')}">S/ 0.00</td>
+                                <td th:text="${row.voucherNumber}">-</td>
+                                <td class="small" th:text="${row.observation}">-</td>
+                                <td>
+                                    <div class="d-flex flex-column gap-1">
+                                        <a th:if="${row.productId != null}"
+                                           th:href="@{|/warehouse/products-stock/${row.productId}/movements|}"
+                                           class="btn btn-sm btn-outline-secondary">
+                                            Ver Kardex
+                                        </a>
+                                        <a th:if="${row.purchaseDate != null}"
+                                           th:href="@{/expenses/by-date(filter='DAY',date=${row.purchaseDate})}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            Ver gasto
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+        window.ecoAdmin.initStandardDataTable('#purchaseHistoryTable', []);
+    });
+</script>
+
+</body>
+</html>

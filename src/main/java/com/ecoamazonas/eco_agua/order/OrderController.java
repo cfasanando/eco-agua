@@ -71,6 +71,8 @@ public class OrderController {
         model.addAttribute("activePage", resolveActivePage(safeReturnTo));
         model.addAttribute("today", today);
         model.addAttribute("orderDate", selectedOrderDate);
+        model.addAttribute("salesChannels", SalesChannel.values());
+        model.addAttribute("selectedSalesChannel", SalesChannel.WHATSAPP);
         model.addAttribute("returnTo", safeReturnTo);
         model.addAttribute("cancelUrl", safeReturnTo);
         model.addAttribute("clients", clientRepository.findByActiveTrueOrderByNameAsc());
@@ -92,6 +94,7 @@ public class OrderController {
     public String createOrder(
             @RequestParam("orderDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate orderDate,
             @RequestParam("clientId") Long clientId,
+            @RequestParam(value = "salesChannel", required = false) SalesChannel salesChannel,
             @RequestParam(value = "deliveryPerson", required = false) String deliveryPerson,
             @RequestParam(value = "borrowedBottles", required = false) Integer borrowedBottles,
             @RequestParam(value = "containersDelivered", required = false) Integer containersDelivered,
@@ -119,6 +122,7 @@ public class OrderController {
             SaleOrder order = orderService.createOrderFromForm(
                     orderDate,
                     clientId,
+                    salesChannel,
                     deliveryPerson,
                     borrowedBottles,
                     containersDelivered,

@@ -4,6 +4,7 @@ import com.ecoamazonas.eco_agua.order.OrderStatus;
 import com.ecoamazonas.eco_agua.order.SaleOrder;
 import com.ecoamazonas.eco_agua.order.SaleOrderItem;
 import com.ecoamazonas.eco_agua.order.SaleOrderRepository;
+import com.ecoamazonas.eco_agua.order.SalesChannel;
 import com.ecoamazonas.eco_agua.product.Product;
 import jakarta.persistence.EntityNotFoundException;
 import org.hibernate.ObjectNotFoundException;
@@ -144,6 +145,7 @@ public class ClientPortfolioService {
                     client.getName(),
                     client.getProfile() != null ? client.getProfile().getName() : "-",
                     client.getPhone(),
+                    resolvePreferredSalesChannelLabel(commercialAllOrders),
                     client.getRegistrationDate() != null ? client.getRegistrationDate().toLocalDate() : null,
                     historyAvailable,
                     lastOrderDate,
@@ -180,6 +182,30 @@ public class ClientPortfolioService {
                         .thenComparing(ClientPortfolioRow::getEstimatedProfitInPeriod, Comparator.reverseOrder())
                         .thenComparing(ClientPortfolioRow::getClientName, String.CASE_INSENSITIVE_ORDER)
         );
+
+        List<ClientPortfolioRow> frequentClients = rows.stream()
+                .filter(row -> row.getCommercialOrdersInPeriod() > 0)
+                .sorted(
+                        Comparator.comparingInt(ClientPortfolioRow::getCommercialOrdersInPeriod).reversed()
+                                .thenComparing(ClientPortfolioRow::getTotalRevenueInPeriod, Comparator.reverseOrder())
+                                .thenComparing(ClientPortfolioRow::getEstimatedProfitInPeriod, Comparator.reverseOrder())
+                                .thenComparing(ClientPortfolioRow::getClientName, String.CASE_INSENSITIVE_ORDER)
+                )
+                .limit(8)
+                .toList();
+
+        List<ClientPortfolioRow> followUpClients = rows.stream()
+                .filter(ClientPortfolioRow::isFollowUpRecommended)
+                .sorted(
+                        Comparator.comparingInt(ClientPortfolioRow::getFollowUpPriorityScore).reversed()
+                                .thenComparing(ClientPortfolioRow::getCreditPendingAllTime, Comparator.reverseOrder())
+                                .thenComparingLong(ClientPortfolioRow::getOverdueDays).reversed()
+                                .thenComparingLong(ClientPortfolioRow::getDaysSinceLastOrder).reversed()
+                                .thenComparing(ClientPortfolioRow::getTotalRevenueInPeriod, Comparator.reverseOrder())
+                                .thenComparing(ClientPortfolioRow::getClientName, String.CASE_INSENSITIVE_ORDER)
+                )
+                .limit(20)
+                .toList();
 
         List<ClientPortfolioRow> topRevenueClients = rows.stream()
                 .filter(row -> row.getTotalRevenueInPeriod().compareTo(BigDecimal.ZERO) > 0)
@@ -242,6 +268,8 @@ public class ClientPortfolioService {
                 totalCreditPendingAllTime.setScale(2, RoundingMode.HALF_UP),
                 totalBorrowedBottlesInPeriod,
                 rows,
+                frequentClients,
+                followUpClients,
                 topRevenueClients,
                 topProfitClients,
                 reactivationCandidates,
@@ -412,6 +440,33 @@ public class ClientPortfolioService {
         }
         return total;
     }
+
+    private String resolvePreferredSalesChannelLabel(List<SaleOrder> commercialOrders) {
+        if (commercialOrders == null || commercialOrders.isEmpty()) {
+            return "Sin ventas";
+        }
+
+        Map<SalesChannel, Integer> counts = new LinkedHashMap<>();
+        for (SaleOrder order : commercialOrders) {
+            if (order == null) {
+                continue;
+            }
+            SalesChannel channel = order.getSalesChannel() != null ? order.getSalesChannel() : SalesChannel.WHATSAPP;
+            counts.put(channel, counts.getOrDefault(channel, 0) + 1);
+        }
+
+        SalesChannel preferredChannel = SalesChannel.WHATSAPP;
+        int preferredCount = -1;
+        for (Map.Entry<SalesChannel, Integer> entry : counts.entrySet()) {
+            if (entry.getValue() > preferredCount) {
+                preferredChannel = entry.getKey();
+                preferredCount = entry.getValue();
+            }
+        }
+
+        return preferredChannel.getLabel();
+    }
+
 
     private BigDecimal safeSubtract(BigDecimal amount, BigDecimal cost) {
         BigDecimal left = amount != null ? amount : BigDecimal.ZERO;

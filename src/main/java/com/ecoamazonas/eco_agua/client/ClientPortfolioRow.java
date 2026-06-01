@@ -1,6 +1,8 @@
 package com.ecoamazonas.eco_agua.client;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 
 public class ClientPortfolioRow {
@@ -9,6 +11,7 @@ public class ClientPortfolioRow {
     private final String clientName;
     private final String profileName;
     private final String phone;
+    private final String preferredSalesChannelLabel;
     private final LocalDate registrationDate;
     private final boolean historyAvailable;
     private final LocalDate lastOrderDate;
@@ -36,6 +39,7 @@ public class ClientPortfolioRow {
             String clientName,
             String profileName,
             String phone,
+            String preferredSalesChannelLabel,
             LocalDate registrationDate,
             boolean historyAvailable,
             LocalDate lastOrderDate,
@@ -62,6 +66,7 @@ public class ClientPortfolioRow {
         this.clientName = clientName;
         this.profileName = profileName;
         this.phone = phone;
+        this.preferredSalesChannelLabel = preferredSalesChannelLabel;
         this.registrationDate = registrationDate;
         this.historyAvailable = historyAvailable;
         this.lastOrderDate = lastOrderDate;
@@ -99,6 +104,22 @@ public class ClientPortfolioRow {
 
     public String getPhone() {
         return phone;
+    }
+
+    public String getPreferredSalesChannelLabel() {
+        return preferredSalesChannelLabel;
+    }
+
+    public boolean isWhatsappContactAvailable() {
+        return normalizeWhatsappNumber() != null;
+    }
+
+    public String getWhatsappContactUrl() {
+        return buildWhatsappUrl("Hola, queremos coordinar contigo sobre tu pedido.");
+    }
+
+    public String getFollowUpWhatsappUrl() {
+        return buildWhatsappUrl(getSuggestedWhatsappMessage());
     }
 
     public LocalDate getRegistrationDate() {
@@ -183,5 +204,135 @@ public class ClientPortfolioRow {
 
     public boolean isDormant() {
         return dormant;
+    }
+
+    public boolean isFollowUpRecommended() {
+        return getFollowUpPriorityScore() >= 40;
+    }
+
+    public int getFollowUpPriorityScore() {
+        int score = 0;
+
+        if (creditPendingAllTime != null && creditPendingAllTime.compareTo(BigDecimal.ZERO) > 0) {
+            score += 45;
+        }
+
+        if (dormant) {
+            score += 35;
+        } else if (reactivationCandidate) {
+            score += 28;
+        } else if (overdueDays > 0) {
+            score += 20;
+        }
+
+        if (historyAvailable && daysSinceLastOrder >= 14) {
+            score += 10;
+        }
+
+        if (healthScore >= 60 && commercialOrdersInPeriod > 0) {
+            score += 8;
+        }
+
+        return Math.min(score, 100);
+    }
+
+    public String getFollowUpPriorityLabel() {
+        if (creditPendingAllTime != null && creditPendingAllTime.compareTo(BigDecimal.ZERO) > 0) {
+            return "Cobranza";
+        }
+        if (dormant) {
+            return "Reactivar";
+        }
+        if (reactivationCandidate || overdueDays > 0) {
+            return "Contactar";
+        }
+        if (healthScore >= 60 && commercialOrdersInPeriod > 0) {
+            return "Fidelizar";
+        }
+        if (!historyAvailable) {
+            return "Primer pedido";
+        }
+        return "Observar";
+    }
+
+    public String getFollowUpBadgeClass() {
+        if (creditPendingAllTime != null && creditPendingAllTime.compareTo(BigDecimal.ZERO) > 0) {
+            return "text-bg-danger";
+        }
+        if (dormant) {
+            return "text-bg-warning";
+        }
+        if (reactivationCandidate || overdueDays > 0) {
+            return "text-bg-primary";
+        }
+        if (healthScore >= 60 && commercialOrdersInPeriod > 0) {
+            return "text-bg-success";
+        }
+        return "text-bg-secondary";
+    }
+
+    public String getFollowUpReason() {
+        if (creditPendingAllTime != null && creditPendingAllTime.compareTo(BigDecimal.ZERO) > 0) {
+            return "Tiene fiado pendiente. Primero conviene coordinar cobranza antes de ofrecer más crédito.";
+        }
+        if (dormant) {
+            return "Lleva varios días sin comprar. Conviene reactivarlo con un mensaje directo o una promoción puntual.";
+        }
+        if (reactivationCandidate || overdueDays > 0) {
+            return "Ya salió de su ciclo habitual de compra. Conviene contactarlo para evitar que se enfríe.";
+        }
+        if (healthScore >= 60 && commercialOrdersInPeriod > 0) {
+            return "Cliente con buen movimiento. Conviene fidelizarlo, pedir referidos o recordarle productos disponibles.";
+        }
+        if (!historyAvailable) {
+            return "Cliente activo sin historial de pedidos. Conviene registrar una primera compra para empezar seguimiento.";
+        }
+        return "Mantener en observación y revisar su comportamiento en los siguientes días.";
+    }
+
+    public String getSuggestedWhatsappMessage() {
+        if (creditPendingAllTime != null && creditPendingAllTime.compareTo(BigDecimal.ZERO) > 0) {
+            return "Hola, te escribimos para coordinar tu saldo pendiente y revisar si necesitas algún producto disponible.";
+        }
+        if (dormant || reactivationCandidate || overdueDays > 0) {
+            return "Hola, te escribimos para contarte qué productos tenemos disponibles esta semana. ¿Deseas que te enviemos la lista?";
+        }
+        if (healthScore >= 60 && commercialOrdersInPeriod > 0) {
+            return "Hola, gracias por comprar con nosotros. Tenemos productos disponibles esta semana, ¿te compartimos la lista?";
+        }
+        return "Hola, te escribimos para coordinar contigo y comentarte los productos disponibles esta semana.";
+    }
+
+    private String buildWhatsappUrl(String message) {
+        String normalizedPhone = normalizeWhatsappNumber();
+        if (normalizedPhone == null) {
+            return null;
+        }
+
+        String safeMessage = message != null && !message.isBlank()
+                ? message
+                : "Hola, queremos coordinar contigo sobre tu pedido.";
+        return "https://wa.me/" + normalizedPhone + "?text=" + URLEncoder.encode(safeMessage, StandardCharsets.UTF_8);
+    }
+
+    private String normalizeWhatsappNumber() {
+        if (phone == null || phone.isBlank()) {
+            return null;
+        }
+
+        String digits = phone.replaceAll("\\D", "");
+        if (digits.isBlank()) {
+            return null;
+        }
+
+        if (digits.length() == 9 && digits.startsWith("9")) {
+            return "51" + digits;
+        }
+
+        if (digits.length() >= 10) {
+            return digits;
+        }
+
+        return null;
     }
 }

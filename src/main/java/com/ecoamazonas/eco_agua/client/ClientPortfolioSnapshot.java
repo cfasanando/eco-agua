@@ -17,6 +17,8 @@ public class ClientPortfolioSnapshot {
     private final BigDecimal totalCreditPendingAllTime;
     private final int totalBorrowedBottlesInPeriod;
     private final List<ClientPortfolioRow> rankedClients;
+    private final List<ClientPortfolioRow> frequentClients;
+    private final List<ClientPortfolioRow> followUpClients;
     private final List<ClientPortfolioRow> topRevenueClients;
     private final List<ClientPortfolioRow> topProfitClients;
     private final List<ClientPortfolioRow> reactivationCandidates;
@@ -35,6 +37,8 @@ public class ClientPortfolioSnapshot {
             BigDecimal totalCreditPendingAllTime,
             int totalBorrowedBottlesInPeriod,
             List<ClientPortfolioRow> rankedClients,
+            List<ClientPortfolioRow> frequentClients,
+            List<ClientPortfolioRow> followUpClients,
             List<ClientPortfolioRow> topRevenueClients,
             List<ClientPortfolioRow> topProfitClients,
             List<ClientPortfolioRow> reactivationCandidates,
@@ -52,6 +56,8 @@ public class ClientPortfolioSnapshot {
         this.totalCreditPendingAllTime = totalCreditPendingAllTime;
         this.totalBorrowedBottlesInPeriod = totalBorrowedBottlesInPeriod;
         this.rankedClients = rankedClients;
+        this.frequentClients = frequentClients;
+        this.followUpClients = followUpClients;
         this.topRevenueClients = topRevenueClients;
         this.topProfitClients = topProfitClients;
         this.reactivationCandidates = reactivationCandidates;
@@ -101,6 +107,14 @@ public class ClientPortfolioSnapshot {
 
     public List<ClientPortfolioRow> getRankedClients() {
         return rankedClients;
+    }
+
+    public List<ClientPortfolioRow> getFrequentClients() {
+        return frequentClients;
+    }
+
+    public List<ClientPortfolioRow> getFollowUpClients() {
+        return followUpClients;
     }
 
     public List<ClientPortfolioRow> getTopRevenueClients() {

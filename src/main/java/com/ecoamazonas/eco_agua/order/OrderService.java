@@ -54,6 +54,7 @@ public class OrderService {
     public SaleOrder createOrderFromForm(
             LocalDate orderDate,
             Long clientId,
+            SalesChannel salesChannel,
             String deliveryPerson,
             Integer borrowedBottles,
             Integer containersDelivered,
@@ -88,6 +89,7 @@ public class OrderService {
         order.setClient(client);
         order.setOrderDate(effectiveDate);
         order.setStatus(initialStatus != null ? initialStatus : OrderStatus.REQUESTED);
+        order.setSalesChannel(salesChannel != null ? salesChannel : SalesChannel.WHATSAPP);
         order.setDeliveryPerson(deliveryPerson);
         order.setContainersDelivered(normalizedDelivered);
         order.setContainersReturned(normalizedReturned);

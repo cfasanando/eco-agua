@@ -41,6 +41,10 @@ public class SaleOrder {
     private OrderStatus status = OrderStatus.REQUESTED;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "sales_channel", length = 30, nullable = false)
+    private SalesChannel salesChannel = SalesChannel.WHATSAPP;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "delivery_status", length = 20, nullable = false)
     private DeliveryStatus deliveryStatus = DeliveryStatus.PENDING;
 
@@ -146,6 +150,14 @@ public class SaleOrder {
 
     public void setStatus(OrderStatus status) {
         this.status = status;
+    }
+
+    public SalesChannel getSalesChannel() {
+        return salesChannel;
+    }
+
+    public void setSalesChannel(SalesChannel salesChannel) {
+        this.salesChannel = salesChannel;
     }
 
     public DeliveryStatus getDeliveryStatus() {
@@ -401,6 +413,10 @@ public class SaleOrder {
 
         if (this.taxRate == null) {
             this.taxRate = DEFAULT_TAX_RATE;
+        }
+
+        if (this.salesChannel == null) {
+            this.salesChannel = SalesChannel.WHATSAPP;
         }
 
         if (this.deliveryStatus == null) {

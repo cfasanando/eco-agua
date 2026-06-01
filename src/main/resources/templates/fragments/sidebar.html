@@ -66,6 +66,7 @@
           or activePage == 'client-profiles'
           or activePage == 'clients'
           or activePage == 'clients_portfolio'
+          or activePage == 'clients_follow_up'
           or activePage == 'promotions'
           or activePage == 'delivery_zones'
           or activePage == 'delivery_daily'
@@ -111,10 +112,22 @@
             <a
               th:href="@{/admin/clients/portfolio}"
               class="menu-link submenu"
-              th:classappend="${activePage == 'clients_portfolio' or activePage == 'clients' ? ' active' : ''}"
+              th:classappend="${activePage == 'clients_portfolio' ? ' active' : ''}"
             >
               <span class="icon"><i class="bi bi-bar-chart-line"></i></span>
               <span th:text="${'Cartera de ' + #strings.toLowerCase(businessCustomerPluralLabel ?: 'clientes')}">Cartera de clientes</span>
+            </a>
+          </th:block>
+
+
+          <th:block th:if="${moduleClientsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_SALES','ROLE_FINANCE')">
+            <a
+              th:href="@{/admin/clients/follow-up}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'clients_follow_up' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-telephone-outbound"></i></span>
+              <span>Seguimiento de clientes</span>
             </a>
           </th:block>
 

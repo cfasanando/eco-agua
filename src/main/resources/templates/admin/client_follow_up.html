@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Seguimiento de clientes - Eco Agua')"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='clients_follow_up'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <th:block
+              th:replace="~{fragments/local_breadcrumb :: trail(
+                'Comercial / CRM',
+                null,
+                'Cartera de clientes',
+                @{/admin/clients/portfolio},
+                'Seguimiento de clientes',
+                null,
+                null,
+                'Lista priorizada para saber a qué clientes contactar, cobrar, reactivar o fidelizar según compras reales.'
+              )}"
+            ></th:block>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Acciones comerciales</div>
+                    <h1 class="h4 mb-1">Seguimiento de clientes</h1>
+                    <div class="small text-muted">
+                        Vista práctica para contactar clientes según deuda, frecuencia de compra, canal principal y días sin pedido.
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button"
+                            class="btn btn-outline-info btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#clientFollowUpHelpModal">
+                        <i class="bi bi-question-circle"></i> Ayuda
+                    </button>
+                    <a th:href="@{|/admin/clients/portfolio?from=${snapshot.fromDate}&to=${snapshot.toDate}|}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-bar-chart-line"></i> Ver cartera
+                    </a>
+                    <a th:href="@{/orders/new}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-lg"></i> Nuevo pedido
+                    </a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body d-flex flex-column gap-3 gap-lg-0 flex-lg-row justify-content-between align-items-lg-center">
+                    <div>
+                        <div class="help-label small text-muted mb-1">
+                            <span>Período analizado</span>
+                            <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                    title="Rango usado para revisar ventas recientes, días sin comprar y prioridad de seguimiento.">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </div>
+                        <div class="fw-semibold">
+                            <span th:text="${#temporals.format(snapshot.fromDate, 'dd/MM/yyyy')}">01/03/2026</span>
+                            -
+                            <span th:text="${#temporals.format(snapshot.toDate, 'dd/MM/yyyy')}">30/03/2026</span>
+                            <span class="text-muted" th:text="|'(${currentRangeDays} días)'|">(30 días)</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <a th:href="@{/admin/clients/follow-up(days=30)}"
+                           class="btn btn-sm"
+                           th:classappend="${selectedPresetDays == 30 ? ' btn-primary' : ' btn-outline-primary'}">
+                            30 días
+                        </a>
+                        <a th:href="@{/admin/clients/follow-up(days=60)}"
+                           class="btn btn-sm"
+                           th:classappend="${selectedPresetDays == 60 ? ' btn-primary' : ' btn-outline-primary'}">
+                            60 días
+                        </a>
+                        <a th:href="@{/admin/clients/follow-up(days=90)}"
+                           class="btn btn-sm"
+                           th:classappend="${selectedPresetDays == 90 ? ' btn-primary' : ' btn-outline-primary'}">
+                            90 días
+                        </a>
+                    </div>
+
+                    <form method="get" class="row g-2 align-items-end">
+                        <div class="col-auto">
+                            <label class="form-label small mb-1">Desde</label>
+                            <input type="date" name="from" class="form-control form-control-sm" th:value="${snapshot.fromDate}">
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label small mb-1">Hasta</label>
+                            <input type="date" name="to" class="form-control form-control-sm" th:value="${snapshot.toDate}">
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-sm btn-outline-dark">Aplicar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-primary-subtle">
+                        <div class="card-body">
+                            <div class="small text-muted mb-1">Clientes para seguimiento</div>
+                            <div class="fs-4 fw-semibold" th:text="${snapshot.followUpClients.size()}">0</div>
+                            <div class="small text-muted">Priorizados por deuda, reactivación o fidelización.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-warning-subtle">
+                        <div class="card-body">
+                            <div class="small text-muted mb-1">Por reactivar</div>
+                            <div class="fs-4 fw-semibold" th:text="${snapshot.reactivationCandidates.size()}">0</div>
+                            <div class="small text-muted">Clientes fuera de su ciclo habitual.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-danger-subtle">
+                        <div class="card-body">
+                            <div class="small text-muted mb-1">Con fiado pendiente</div>
+                            <div class="fs-4 fw-semibold" th:text="${snapshot.creditRiskClients.size()}">0</div>
+                            <div class="small text-muted">Conviene revisar cobranza antes de vender más crédito.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-secondary-subtle">
+                        <div class="card-body">
+                            <div class="small text-muted mb-1">Clientes dormidos</div>
+                            <div class="fs-4 fw-semibold" th:text="${snapshot.dormantClients.size()}">0</div>
+                            <div class="small text-muted">Clientes con historial, pero sin compra reciente.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span class="d-inline-flex align-items-center gap-2">
+                        Prioridad de contacto
+                        <button type="button" class="help-icon" data-bs-toggle="tooltip" data-bs-placement="top"
+                                title="Ordena clientes según fiado pendiente, días sin comprar, reactivación y fidelización.">
+                            <i class="bi bi-info-circle"></i>
+                        </button>
+                    </span>
+                    <span class="badge text-bg-light" th:text="|${snapshot.followUpClients.size()} cliente(s)|">0 clientes</span>
+                </div>
+                <div class="card-body p-0">
+                    <div th:if="${#lists.isEmpty(snapshot.followUpClients)}" class="p-3 text-muted small">
+                        No hay clientes urgentes para seguimiento en este período. Puedes ampliar el rango o revisar la cartera completa.
+                    </div>
+
+                    <div class="table-responsive" th:if="${!#lists.isEmpty(snapshot.followUpClients)}">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Prioridad</th>
+                                <th>Última compra</th>
+                                <th class="text-center">Canal</th>
+                                <th class="text-end">Fiado</th>
+                                <th>Acción sugerida</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row : ${snapshot.followUpClients}">
+                                <td>
+                                    <div class="fw-semibold" th:text="${row.clientName}">Cliente</div>
+                                    <div class="small text-muted">
+                                        <span th:text="${row.profileName}">Perfil</span>
+                                        <span th:if="${row.phone != null && !#strings.isEmpty(row.phone)}" th:text="| · ${row.phone}|"> · 999999999</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge" th:classappend="${row.followUpBadgeClass}" th:text="${row.followUpPriorityLabel}">Contactar</span>
+                                    <div class="small text-muted mt-1" th:text="|Prioridad ${row.followUpPriorityScore}/100|">Prioridad 70/100</div>
+                                </td>
+                                <td>
+                                    <div th:if="${row.lastOrderDate != null}">
+                                        <div class="fw-semibold" th:text="${#temporals.format(row.lastOrderDate, 'dd/MM/yyyy')}">08/03/2026</div>
+                                        <div class="small text-muted" th:text="|Hace ${row.daysSinceLastOrder} día(s)|">Hace 4 día(s)</div>
+                                    </div>
+                                    <div th:if="${row.lastOrderDate == null}" class="small text-muted">Sin historial</div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge text-bg-light" th:text="${row.preferredSalesChannelLabel}">WhatsApp</span>
+                                </td>
+                                <td class="text-end">
+                                    <div class="fw-semibold">
+                                        S/. <span th:text="${#numbers.formatDecimal(row.creditPendingAllTime, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                    </div>
+                                    <div class="small text-muted" th:if="${row.overdueDays > 0}" th:text="|${row.overdueDays} día(s) fuera de ciclo|">3 fuera</div>
+                                    <div class="small text-muted" th:if="${row.overdueDays <= 0}">Al día</div>
+                                </td>
+                                <td>
+                                    <div class="small" th:text="${row.followUpReason}">Motivo de seguimiento</div>
+                                    <div class="small text-muted mt-1" th:text="${row.recommendedAction}">Acción recomendada</div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a th:href="@{|/admin/clients/${row.clientId}/stats?from=${snapshot.fromDate}&to=${snapshot.toDate}|}" class="btn btn-outline-secondary" title="Ver historial">
+                                            <i class="bi bi-bar-chart-line"></i>
+                                        </a>
+                                        <a th:if="${row.whatsappContactAvailable}" th:href="${row.followUpWhatsappUrl}" target="_blank" rel="noopener" class="btn btn-outline-success" title="Contactar por WhatsApp">
+                                            <i class="bi bi-whatsapp"></i>
+                                        </a>
+                                        <a th:href="@{/orders/new}" class="btn btn-outline-primary" title="Nuevo pedido">
+                                            <i class="bi bi-bag-plus"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light">Clientes por reactivar</div>
+                        <div class="card-body p-0">
+                            <div th:if="${#lists.isEmpty(snapshot.reactivationCandidates)}" class="p-3 text-muted small">No hay clientes para reactivar.</div>
+                            <ul class="list-group list-group-flush" th:if="${!#lists.isEmpty(snapshot.reactivationCandidates)}">
+                                <li class="list-group-item" th:each="row : ${snapshot.reactivationCandidates}">
+                                    <div class="fw-semibold" th:text="${row.clientName}">Cliente</div>
+                                    <div class="small text-muted" th:text="|${row.daysSinceLastOrder} día(s) sin comprar · ${row.preferredSalesChannelLabel}|">20 días</div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light">Fiado pendiente</div>
+                        <div class="card-body p-0">
+                            <div th:if="${#lists.isEmpty(snapshot.creditRiskClients)}" class="p-3 text-muted small">No hay fiado pendiente en clientes activos.</div>
+                            <ul class="list-group list-group-flush" th:if="${!#lists.isEmpty(snapshot.creditRiskClients)}">
+                                <li class="list-group-item d-flex justify-content-between gap-2" th:each="row : ${snapshot.creditRiskClients}">
+                                    <div>
+                                        <div class="fw-semibold" th:text="${row.clientName}">Cliente</div>
+                                        <div class="small text-muted" th:text="${row.preferredSalesChannelLabel}">WhatsApp</div>
+                                    </div>
+                                    <div class="text-end fw-semibold">
+                                        S/. <span th:text="${#numbers.formatDecimal(row.creditPendingAllTime, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light">Clientes dormidos</div>
+                        <div class="card-body p-0">
+                            <div th:if="${#lists.isEmpty(snapshot.dormantClients)}" class="p-3 text-muted small">No hay clientes dormidos detectados.</div>
+                            <ul class="list-group list-group-flush" th:if="${!#lists.isEmpty(snapshot.dormantClients)}">
+                                <li class="list-group-item" th:each="row : ${snapshot.dormantClients}">
+                                    <div class="fw-semibold" th:text="${row.clientName}">Cliente</div>
+                                    <div class="small text-muted" th:text="|Última compra hace ${row.daysSinceLastOrder} día(s)|">Última compra</div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<button type="button"
+        class="btn btn-info page-help-floating"
+        data-bs-toggle="modal"
+        data-bs-target="#clientFollowUpHelpModal"
+        aria-label="Abrir ayuda de Seguimiento de clientes">
+    <i class="bi bi-question-circle"></i>
+    <span>Ayuda</span>
+</button>
+
+<div class="modal fade" id="clientFollowUpHelpModal" tabindex="-1" aria-labelledby="clientFollowUpHelpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content help-modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="small text-muted">Guía rápida</div>
+                    <h2 class="modal-title h5" id="clientFollowUpHelpModalLabel">Cómo usar Seguimiento de clientes</h2>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-4">
+                    Esta pantalla no crea un CRM separado. Usa pedidos reales para priorizar contactos, cobranza, reactivación y fidelización.
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-cash-coin"></i> 1. Cobra primero</div>
+                            <p>Si el cliente tiene fiado pendiente, prioriza coordinación de pago antes de ofrecer más crédito.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-arrow-repeat"></i> 2. Reactiva a tiempo</div>
+                            <p>Los clientes fuera de ciclo pueden recuperarse con un mensaje directo por WhatsApp o una oferta puntual.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-whatsapp"></i> 3. Usa el canal principal</div>
+                            <p>El canal más usado ayuda a decidir si conviene escribir por WhatsApp, redes o atender de forma presencial.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="help-step h-100">
+                            <div class="help-step-title"><i class="bi bi-heart"></i> 4. Fideliza clientes buenos</div>
+                            <p>Los clientes con buen movimiento no solo se cobran: también se cuidan, se fidelizan y pueden traer referidos.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h3 class="h6">Qué hacer si no aparecen clientes</h3>
+                <ul class="mb-0">
+                    <li>Amplía el rango a 60 o 90 días.</li>
+                    <li>Registra pedidos reales para que el sistema calcule frecuencia.</li>
+                    <li>Completa teléfonos para activar el botón de WhatsApp.</li>
+                    <li>Revisa la cartera completa si quieres ver clientes sin prioridad urgente.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+</body>
+</html>

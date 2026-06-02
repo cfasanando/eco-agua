@@ -1,47 +1,106 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/head_admin :: adminHead('Detalle de reparto - Eco Agua')"></head>
+<head th:replace="fragments/head_admin :: adminHead('Detalle de entrega - Eco Agua')"></head>
 <body>
 <div class="app-layout" th:with="activePage='delivery_daily'">
     <aside th:replace="fragments/sidebar :: sidebar"></aside>
     <div class="main-content">
         <header th:replace="fragments/topbar :: topbar"></header>
         <main class="content-wrapper">
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
                 <div>
-                    <h1 class="h5 mb-1" th:text="'Reparto del pedido #' + ${order.orderNumber}">Reparto</h1>
+                    <h1 class="h5 mb-1" th:text="'Entrega del pedido #' + ${order.orderNumber}">Entrega</h1>
                     <div class="text-muted small" th:text="${order.client != null ? order.client.name : '-'}">Cliente</div>
                 </div>
-                <a class="btn btn-outline-secondary" th:href="@{/delivery}">Volver</a>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-secondary btn-sm" th:href="@{/delivery}">
+                        <i class="bi bi-arrow-left me-1"></i> Volver
+                    </a>
+                    <a class="btn btn-outline-primary btn-sm" th:href="@{|/orders/${order.id}|}">
+                        <i class="bi bi-receipt me-1"></i> Ver pedido
+                    </a>
+                    <a th:if="${whatsappUrl != null}" class="btn btn-outline-success btn-sm" target="_blank" th:href="${whatsappUrl}">
+                        <i class="bi bi-whatsapp me-1"></i> WhatsApp
+                    </a>
+                    <a th:if="${mapsUrl != null}" class="btn btn-outline-info btn-sm" target="_blank" th:href="${mapsUrl}">
+                        <i class="bi bi-map me-1"></i> Mapa
+                    </a>
+                </div>
             </div>
 
             <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}">OK</div>
             <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}">Error</div>
 
+            <div class="alert alert-light border shadow-sm small mb-3">
+                Usa esta ficha para coordinar dirección, asignar zona/repartidor y dejar historial operativo de la entrega.
+            </div>
+
             <div class="row g-3 mb-3">
-                <div class="col-lg-6">
+                <div class="col-lg-5">
                     <div class="card shadow-sm h-100">
-                        <div class="card-header bg-light"><strong>Cliente</strong></div>
+                        <div class="card-header bg-light"><strong>Cliente y ubicación</strong></div>
                         <div class="card-body small">
                             <p class="mb-1"><strong>Nombre:</strong> <span th:text="${order.client != null ? order.client.name : '-'}">-</span></p>
                             <p class="mb-1"><strong>Teléfono:</strong> <span th:text="${order.client != null ? order.client.phone : '-'}">-</span></p>
                             <p class="mb-1"><strong>Dirección:</strong> <span th:text="${order.client != null ? order.client.address : '-'}">-</span></p>
                             <p class="mb-1"><strong>Referencia:</strong> <span th:text="${order.client != null ? order.client.reference : '-'}">-</span></p>
                             <p class="mb-1"><strong>Perfil:</strong> <span th:text="${order.client != null and order.client.profile != null ? order.client.profile.name : '-'}">-</span></p>
+                            <div class="d-flex flex-wrap gap-2 mt-3">
+                                <a th:if="${whatsappUrl != null}" class="btn btn-sm btn-outline-success" target="_blank" th:href="${whatsappUrl}">
+                                    <i class="bi bi-whatsapp me-1"></i> Coordinar por WhatsApp
+                                </a>
+                                <a th:if="${mapsUrl != null}" class="btn btn-sm btn-outline-info" target="_blank" th:href="${mapsUrl}">
+                                    <i class="bi bi-map me-1"></i> Abrir mapa
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-6">
+
+                <div class="col-lg-4">
                     <div class="card shadow-sm h-100">
-                        <div class="card-header bg-light"><strong>Estado actual</strong></div>
+                        <div class="card-header bg-light"><strong>Estado operativo</strong></div>
                         <div class="card-body small">
-                            <p class="mb-1"><strong>Estado comercial:</strong> <span th:text="${order.status}">REQUESTED</span></p>
-                            <p class="mb-1"><strong>Estado de reparto:</strong> <span th:text="${order.deliveryStatus}">PENDING</span></p>
+                            <p class="mb-1">
+                                <strong>Estado comercial:</strong>
+                                <span class="badge" th:classappend="${order.statusBadgeClass}" th:text="${order.statusLabel}">Pedido</span>
+                            </p>
+                            <p class="mb-1">
+                                <strong>Estado de entrega:</strong>
+                                <span class="badge"
+                                      th:classappend="${order.deliveryStatus.name() == 'DELIVERED'} ? ' text-bg-success' : (${order.deliveryStatus.name() == 'PENDING'} ? ' text-bg-warning text-dark' : (${order.deliveryStatus.name() == 'IN_ROUTE'} ? ' text-bg-primary' : (${order.deliveryStatus.name() == 'NOT_DELIVERED'} ? ' text-bg-danger' : (${order.deliveryStatus.name() == 'RESCHEDULED'} ? ' text-bg-info text-dark' : ' text-bg-secondary'))))">
+                                    <span th:switch="${order.deliveryStatus.name()}">
+                                        <span th:case="'PENDING'">Pendiente</span>
+                                        <span th:case="'IN_ROUTE'">En ruta</span>
+                                        <span th:case="'DELIVERED'">Entregado</span>
+                                        <span th:case="'NOT_DELIVERED'">No entregado</span>
+                                        <span th:case="'RESCHEDULED'">Reprogramado</span>
+                                        <span th:case="*">Cancelado</span>
+                                    </span>
+                                </span>
+                            </p>
                             <p class="mb-1"><strong>Repartidor:</strong> <span th:text="${order.deliveryPerson} ?: '-'">-</span></p>
                             <p class="mb-1"><strong>Zona:</strong> <span th:text="${order.deliveryZone != null ? order.deliveryZone.name : '-'}">-</span></p>
                             <p class="mb-1"><strong>Orden de ruta:</strong> <span th:text="${order.deliveryOrderIndex} ?: '-'">-</span></p>
                             <p class="mb-1"><strong>Entregado en:</strong> <span th:text="${order.deliveredAt != null ? #temporals.format(order.deliveredAt, 'dd/MM/yyyy HH:mm') : '-'}">-</span></p>
                             <p class="mb-0"><strong>Observación:</strong> <span th:text="${order.deliveryObservation} ?: '-'">-</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Resumen del pedido</strong></div>
+                        <div class="card-body small">
+                            <p class="mb-1"><strong>Fecha:</strong> <span th:text="${#temporals.format(order.orderDate, 'dd/MM/yyyy')}">-</span></p>
+                            <p class="mb-1"><strong>Canal:</strong> <span th:text="${order.salesChannel != null ? order.salesChannel.label : '-'}">-</span></p>
+                            <p class="mb-1"><strong>Total:</strong> S/ <span th:text="${#numbers.formatDecimal(order.totalAmount, 1, 2)}">0.00</span></p>
+                            <p class="mb-1"><strong>Pagado:</strong> S/ <span th:text="${#numbers.formatDecimal(order.paidAmount, 1, 2)}">0.00</span></p>
+                            <p class="mb-1"><strong>Pendiente:</strong> S/ <span th:text="${#numbers.formatDecimal(order.pendingAmount, 1, 2)}">0.00</span></p>
+                            <p th:if="${featureContainers == true}" class="mb-0">
+                                <strong th:text="${businessContainerPluralLabel ?: 'Envases'}">Envases</strong>:
+                                <span th:text="${order.borrowedBottles} ?: 0">0</span>
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -67,9 +126,11 @@
                                 </div>
                                 <div class="col-md-12">
                                     <label class="form-label">Repartidor</label>
-                                    <input type="text" class="form-control" name="deliveryPerson" th:value="${order.deliveryPerson}">
+                                    <input type="text" class="form-control" name="deliveryPerson" th:value="${order.deliveryPerson}" placeholder="Nombre del repartidor o responsable">
                                 </div>
-                                <div class="col-md-12"><button type="submit" class="btn btn-outline-primary">Guardar ruta</button></div>
+                                <div class="col-md-12">
+                                    <button type="submit" class="btn btn-outline-primary">Guardar ruta</button>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -84,20 +145,54 @@
                                 <div class="col-md-12">
                                     <label class="form-label">Nuevo estado</label>
                                     <select class="form-select" name="deliveryStatus" required>
-                                        <option th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).IN_ROUTE}">IN_ROUTE</option>
-                                        <option th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).DELIVERED}">DELIVERED</option>
-                                        <option th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).NOT_DELIVERED}">NOT_DELIVERED</option>
-                                        <option th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).RESCHEDULED}">RESCHEDULED</option>
-                                        <option th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).CANCELED}">CANCELED</option>
+                                        <option th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).IN_ROUTE}">En ruta</option>
+                                        <option th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).DELIVERED}">Entregado</option>
+                                        <option th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).NOT_DELIVERED}">No entregado</option>
+                                        <option th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).RESCHEDULED}">Reprogramado</option>
+                                        <option th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).CANCELED}">Cancelado</option>
                                     </select>
                                 </div>
                                 <div class="col-md-12">
                                     <label class="form-label">Observación</label>
-                                    <textarea class="form-control" name="observation" rows="3"></textarea>
+                                    <textarea class="form-control" name="observation" rows="3" placeholder="Ejemplo: cliente no respondió, se coordinó para mañana, entregado en portería, etc."></textarea>
                                 </div>
-                                <div class="col-md-12"><button type="submit" class="btn btn-primary">Actualizar estado</button></div>
+                                <div class="col-md-12">
+                                    <button type="submit" class="btn btn-primary">Actualizar estado</button>
+                                </div>
                             </form>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light"><strong>Productos para entregar</strong></div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Producto</th>
+                                <th class="text-end">Cantidad</th>
+                                <th class="text-end">Precio</th>
+                                <th class="text-end">Total</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="item : ${order.items}">
+                                <td>
+                                    <div class="fw-semibold" th:text="${item.description}">Producto</div>
+                                    <div class="small text-muted" th:if="${item.product != null}" th:text="${item.product.name}">Producto</div>
+                                </td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(item.quantity, 1, 2)}">0.00</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(item.unitPrice, 1, 2)}">0.00</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(item.total, 1, 2)}">0.00</td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(order.items)}">
+                                <td colspan="4" class="text-center text-muted">No hay productos registrados en este pedido.</td>
+                            </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -111,7 +206,17 @@
                             <tbody>
                             <tr th:each="event : ${events}">
                                 <td th:text="${#temporals.format(event.eventDate, 'dd/MM/yyyy HH:mm')}">-</td>
-                                <td th:text="${event.eventType}">NOTE</td>
+                                <td>
+                                    <span th:switch="${event.eventType.name()}">
+                                        <span th:case="'PENDING'">Pendiente</span>
+                                        <span th:case="'IN_ROUTE'">En ruta</span>
+                                        <span th:case="'DELIVERED'">Entregado</span>
+                                        <span th:case="'NOT_DELIVERED'">No entregado</span>
+                                        <span th:case="'RESCHEDULED'">Reprogramado</span>
+                                        <span th:case="'CANCELED'">Cancelado</span>
+                                        <span th:case="*">Nota</span>
+                                    </span>
+                                </td>
                                 <td th:text="${event.deliveryPersonSnapshot} ?: '-'">-</td>
                                 <td th:text="${event.observation} ?: '-'">-</td>
                             </tr>

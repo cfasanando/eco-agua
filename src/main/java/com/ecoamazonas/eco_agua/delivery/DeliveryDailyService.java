@@ -1,11 +1,14 @@
 package com.ecoamazonas.eco_agua.delivery;
 
+import com.ecoamazonas.eco_agua.client.Client;
 import com.ecoamazonas.eco_agua.order.OrderStatus;
 import com.ecoamazonas.eco_agua.order.SaleOrder;
 import com.ecoamazonas.eco_agua.order.SaleOrderRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -80,7 +83,7 @@ public class DeliveryDailyService {
         order.setDeliveryOrderIndex(deliveryOrderIndex);
         order.setDeliveryPerson(clean(deliveryPerson));
         saleOrderRepository.save(order);
-        registerEvent(order, DeliveryEventType.NOTE, "Route assignment updated.");
+        registerEvent(order, DeliveryEventType.NOTE, "Asignación de ruta actualizada.");
         return order;
     }
 
@@ -89,6 +92,35 @@ public class DeliveryDailyService {
     @Transactional public SaleOrder markNotDelivered(Long orderId, String observation) { return updateDeliveryStatus(orderId, DeliveryStatus.NOT_DELIVERED, DeliveryEventType.NOT_DELIVERED, observation, false); }
     @Transactional public SaleOrder markRescheduled(Long orderId, String observation) { return updateDeliveryStatus(orderId, DeliveryStatus.RESCHEDULED, DeliveryEventType.RESCHEDULED, observation, false); }
     @Transactional public SaleOrder markCanceled(Long orderId, String observation) { return updateDeliveryStatus(orderId, DeliveryStatus.CANCELED, DeliveryEventType.CANCELED, observation, false); }
+
+    public String buildWhatsappUrl(SaleOrder order) {
+        if (order == null || order.getClient() == null) {
+            return null;
+        }
+
+        String normalizedPhone = normalizePhone(order.getClient().getPhone());
+        if (normalizedPhone == null) {
+            return null;
+        }
+
+        String message = "Hola, te escribimos para coordinar la entrega de tu pedido #"
+                + (order.getOrderNumber() != null ? order.getOrderNumber() : order.getId())
+                + ".";
+        return "https://wa.me/" + normalizedPhone + "?text=" + URLEncoder.encode(message, StandardCharsets.UTF_8);
+    }
+
+    public String buildGoogleMapsUrl(SaleOrder order) {
+        if (order == null || order.getClient() == null) {
+            return null;
+        }
+
+        Client client = order.getClient();
+        if (client.getLatitude() == null || client.getLongitude() == null) {
+            return null;
+        }
+
+        return "https://www.google.com/maps/search/?api=1&query=" + client.getLatitude() + "," + client.getLongitude();
+    }
 
     private SaleOrder updateDeliveryStatus(Long orderId, DeliveryStatus deliveryStatus, DeliveryEventType eventType, String observation, boolean setDeliveredAt) {
         SaleOrder order = saleOrderRepository.findById(orderId).orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
@@ -128,5 +160,22 @@ public class DeliveryDailyService {
         if (left == null && right == null) return true;
         if (left == null || right == null) return false;
         return left.equalsIgnoreCase(right);
+    }
+
+    private String normalizePhone(String rawPhone) {
+        if (rawPhone == null || rawPhone.isBlank()) {
+            return null;
+        }
+
+        String digits = rawPhone.replaceAll("\\D", "");
+        if (digits.isBlank()) {
+            return null;
+        }
+
+        if (digits.length() == 9) {
+            return "51" + digits;
+        }
+
+        return digits;
     }
 }

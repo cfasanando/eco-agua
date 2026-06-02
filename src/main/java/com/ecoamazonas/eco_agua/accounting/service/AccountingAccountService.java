@@ -21,6 +21,10 @@ public class AccountingAccountService {
         return accountingAccountRepository.findAllByOrderByCodeAsc();
     }
 
+    public List<AccountingAccount> findActive() {
+        return accountingAccountRepository.findByActiveTrueOrderByCodeAsc();
+    }
+
     public AccountingAccount findForEdit(Long id) {
         if (id == null) {
             return null;

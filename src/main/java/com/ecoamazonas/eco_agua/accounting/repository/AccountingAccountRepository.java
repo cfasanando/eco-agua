@@ -10,6 +10,8 @@ public interface AccountingAccountRepository extends JpaRepository<AccountingAcc
 
     List<AccountingAccount> findAllByOrderByCodeAsc();
 
+    List<AccountingAccount> findByActiveTrueOrderByCodeAsc();
+
     Optional<AccountingAccount> findByCode(String code);
 
     boolean existsByCode(String code);

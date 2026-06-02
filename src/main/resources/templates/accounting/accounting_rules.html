@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Reglas contables automáticas')}"></head>
+<body>
+<div class="app-layout" th:with="activePage=${activePage}">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Reglas contables automáticas</h1>
+                    <p class="text-muted mb-0">
+                        Define qué cuentas debe usar el sistema cuando más adelante genere asientos desde ventas, cobros, egresos y pagos.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a th:href="@{/accounting/accounts}" class="btn btn-outline-secondary btn-sm">
+                        Plan de cuentas
+                    </a>
+                    <a th:href="@{/accounting/journal-entries}" class="btn btn-outline-primary btn-sm">
+                        Asientos internos
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${message}" class="alert mb-3"
+                 th:classappend="${messageType == 'success'} ? ' alert-success' : ' alert-danger'"
+                 th:text="${message}">Mensaje</div>
+
+            <div class="alert alert-warning border-0 shadow-sm mb-3">
+                <strong>Importante:</strong>
+                esta pantalla todavía no genera asientos automáticos. Solo prepara el mapeo de cuentas.
+                El siguiente paso será usar estas reglas para crear asientos en borrador desde operaciones reales.
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h2 class="h6 mb-3" th:text="${selectedRule != null ? 'Editar regla' : 'Nueva regla'}">Nueva regla</h2>
+
+                            <div th:if="${#lists.isEmpty(accounts)}" class="alert alert-danger">
+                                No hay cuentas activas. Primero crea o activa cuentas en el plan de cuentas.
+                            </div>
+
+                            <form method="post" th:action="@{/accounting/rules/save}" class="row g-3">
+                                <input type="hidden" name="id" th:value="${selectedRule != null ? selectedRule.id : ''}">
+
+                                <div class="col-12">
+                                    <label class="form-label">Evento del sistema</label>
+                                    <select name="eventType" class="form-select" required>
+                                        <option value="">Seleccionar evento</option>
+                                        <option th:each="event : ${eventTypes}"
+                                                th:value="${event.name()}"
+                                                th:selected="${selectedRule != null and selectedRule.eventType == event}"
+                                                th:disabled="${selectedRule == null and configuredEvents.contains(event)}"
+                                                th:text="${event.label + (selectedRule == null and configuredEvents.contains(event) ? ' — ya configurado' : '')}">
+                                            Venta pagada
+                                        </option>
+                                    </select>
+                                    <div class="form-text">
+                                        Cada evento debe tener solo una regla activa de referencia.
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Cuenta al debe</label>
+                                    <select name="debitAccountId" class="form-select" required>
+                                        <option value="">Seleccionar cuenta</option>
+                                        <option th:each="account : ${accounts}"
+                                                th:value="${account.id}"
+                                                th:selected="${selectedRule != null and selectedRule.debitAccount != null and selectedRule.debitAccount.id == account.id}"
+                                                th:text="${account.code + ' - ' + account.name}">
+                                            101 - Caja
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Cuenta al haber</label>
+                                    <select name="creditAccountId" class="form-select" required>
+                                        <option value="">Seleccionar cuenta</option>
+                                        <option th:each="account : ${accounts}"
+                                                th:value="${account.id}"
+                                                th:selected="${selectedRule != null and selectedRule.creditAccount != null and selectedRule.creditAccount.id == account.id}"
+                                                th:text="${account.code + ' - ' + account.name}">
+                                            701 - Ventas
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Descripción interna</label>
+                                    <textarea name="description" class="form-control" rows="3" maxlength="255"
+                                              placeholder="Ej. Regla base para registrar venta pagada en caja."
+                                              th:text="${selectedRule != null ? selectedRule.description : ''}"></textarea>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="form-check mb-2">
+                                        <input type="checkbox" name="generateDraft" value="true" class="form-check-input" id="generateDraftRule"
+                                               th:checked="${selectedRule == null or selectedRule.generateDraft}">
+                                        <label for="generateDraftRule" class="form-check-label">
+                                            Generar asientos automáticos como borrador
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" name="active" value="true" class="form-check-input" id="activeRule"
+                                               th:checked="${selectedRule == null or selectedRule.active}">
+                                        <label for="activeRule" class="form-check-label">Regla activa</label>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 d-flex gap-2 flex-wrap">
+                                    <button type="submit" class="btn btn-primary" th:disabled="${#lists.isEmpty(accounts)}">
+                                        Guardar regla
+                                    </button>
+                                    <a th:if="${selectedRule != null}" th:href="@{/accounting/rules}" class="btn btn-outline-secondary">
+                                        Nueva regla
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mt-3">
+                        <div class="card-body">
+                            <h2 class="h6 mb-3">Guía rápida de cuentas</h2>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Evento</th>
+                                        <th>Debe sugerido</th>
+                                        <th>Haber sugerido</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="event : ${eventTypes}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${event.label}">Venta pagada</div>
+                                            <small class="text-muted" th:text="${event.description}">Descripción</small>
+                                        </td>
+                                        <td th:text="${event.suggestedDebit}">Caja</td>
+                                        <td th:text="${event.suggestedCredit}">Ventas</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h2 class="h6 mb-1">Reglas configuradas</h2>
+                                    <p class="text-muted mb-0 small">
+                                        Estas reglas serán usadas en la siguiente fase para proponer asientos automáticos en borrador.
+                                    </p>
+                                </div>
+                                <span class="badge bg-light text-dark border" th:text="${#lists.size(rules) + ' reglas'}">0 reglas</span>
+                            </div>
+
+                            <div th:if="${#lists.isEmpty(rules)}" class="alert alert-light border mb-0">
+                                Todavía no hay reglas contables. Configura al menos venta pagada, venta fiada, cobro de fiado,
+                                egreso pagado, egreso a crédito, pago a proveedor y otros ingresos.
+                            </div>
+
+                            <div th:if="${not #lists.isEmpty(rules)}" class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Evento</th>
+                                        <th>Debe</th>
+                                        <th>Haber</th>
+                                        <th>Modo</th>
+                                        <th>Estado</th>
+                                        <th class="text-end">Acciones</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="rule : ${rules}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${rule.eventType.label}">Venta pagada</div>
+                                            <small class="text-muted" th:if="${rule.description}" th:text="${rule.description}">Descripción</small>
+                                            <small class="text-muted" th:unless="${rule.description}" th:text="${rule.eventType.description}">Descripción</small>
+                                        </td>
+                                        <td>
+                                            <span class="fw-semibold" th:text="${rule.debitAccount.code}">101</span>
+                                            <span th:text="${' - ' + rule.debitAccount.name}"> - Caja</span>
+                                        </td>
+                                        <td>
+                                            <span class="fw-semibold" th:text="${rule.creditAccount.code}">701</span>
+                                            <span th:text="${' - ' + rule.creditAccount.name}"> - Ventas</span>
+                                        </td>
+                                        <td>
+                                            <span th:if="${rule.generateDraft}" class="badge bg-info-subtle text-info border border-info-subtle">Borrador</span>
+                                            <span th:unless="${rule.generateDraft}" class="badge bg-primary-subtle text-primary border border-primary-subtle">Registrado</span>
+                                        </td>
+                                        <td>
+                                            <span th:if="${rule.active}" class="badge bg-success-subtle text-success border border-success-subtle">Activa</span>
+                                            <span th:unless="${rule.active}" class="badge bg-secondary-subtle text-secondary border">Inactiva</span>
+                                        </td>
+                                        <td class="text-end text-nowrap">
+                                            <a class="btn btn-outline-primary btn-sm"
+                                               th:href="@{/accounting/rules(editId=${rule.id})}">
+                                                Editar
+                                            </a>
+                                            <form method="post" th:action="@{/accounting/rules/{id}/toggle(id=${rule.id})}" class="d-inline">
+                                                <button type="submit" class="btn btn-outline-secondary btn-sm"
+                                                        th:text="${rule.active ? 'Desactivar' : 'Activar'}">
+                                                    Desactivar
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mt-3">
+                        <div class="card-body">
+                            <h2 class="h6 mb-3">Eventos pendientes de configurar</h2>
+                            <div class="d-flex flex-wrap gap-2">
+                                <th:block th:each="event : ${eventTypes}">
+                                    <span th:if="${configuredEvents.contains(event)}"
+                                          class="badge bg-success-subtle text-success border border-success-subtle"
+                                          th:text="${event.label + ' configurado'}">
+                                        Configurado
+                                    </span>
+                                    <span th:unless="${configuredEvents.contains(event)}"
+                                          class="badge bg-warning-subtle text-warning border border-warning-subtle"
+                                          th:text="${event.label + ' pendiente'}">
+                                        Pendiente
+                                    </span>
+                                </th:block>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div th:replace="~{fragments/scripts_admin :: adminScripts}"></div>
+</body>
+</html>

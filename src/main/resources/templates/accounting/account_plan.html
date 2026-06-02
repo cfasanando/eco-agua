@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Plan de cuentas interno')}"></head>
+<body>
+<div class="app-layout" th:with="activePage=${activePage}">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Plan de cuentas interno</h1>
+                    <p class="text-muted mb-0">
+                        Base contable interna para clasificar caja, clientes, proveedores, ventas, compras y gastos.
+                        Todavía no reemplaza una validación contable oficial.
+                    </p>
+                </div>
+                <a th:href="@{/cashflow/monthly-summary}" class="btn btn-outline-secondary btn-sm">
+                    Ver resumen financiero
+                </a>
+            </div>
+
+            <div th:if="${message}" class="alert mb-3"
+                 th:classappend="${messageType == 'success'} ? ' alert-success' : ' alert-danger'"
+                 th:text="${message}">Mensaje</div>
+
+            <div class="alert alert-info border-0 shadow-sm mb-3">
+                <strong>Uso recomendado:</strong>
+                primero mantén este plan simple. Luego se usará para generar libro diario, mayor y balance interno
+                desde ventas, cobros, egresos y pagos reales.
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h2 class="h6 mb-3" th:text="${selectedAccount != null ? 'Editar cuenta' : 'Nueva cuenta'}">Nueva cuenta</h2>
+
+                            <form method="post" th:action="@{/accounting/accounts/save}" class="row g-3">
+                                <input type="hidden" name="id" th:value="${selectedAccount != null ? selectedAccount.id : ''}">
+
+                                <div class="col-12">
+                                    <label class="form-label">Código</label>
+                                    <input type="text" name="code" class="form-control" required maxlength="20"
+                                           placeholder="Ej. 101, 121, 701"
+                                           th:value="${selectedAccount != null ? selectedAccount.code : ''}">
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Nombre</label>
+                                    <input type="text" name="name" class="form-control" required maxlength="180"
+                                           placeholder="Ej. Caja, Clientes, Ventas"
+                                           th:value="${selectedAccount != null ? selectedAccount.name : ''}">
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Tipo</label>
+                                    <select name="type" class="form-select" required>
+                                        <option th:each="type : ${accountTypes}"
+                                                th:value="${type.name()}"
+                                                th:selected="${selectedAccount != null and selectedAccount.type == type}"
+                                                th:text="${type.label}">
+                                            Activo
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Descripción</label>
+                                    <textarea name="description" class="form-control" rows="3" maxlength="255"
+                                              th:text="${selectedAccount != null ? selectedAccount.description : ''}"></textarea>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        <input type="checkbox" name="active" value="true" class="form-check-input" id="activeAccount"
+                                               th:checked="${selectedAccount == null or selectedAccount.active}">
+                                        <label for="activeAccount" class="form-check-label">Cuenta activa</label>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        Guardar cuenta
+                                    </button>
+                                    <a th:if="${selectedAccount != null}" th:href="@{/accounting/accounts}" class="btn btn-outline-secondary">
+                                        Cancelar edición
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h2 class="h6 mb-1">Cuentas registradas</h2>
+                                    <p class="text-muted mb-0 small">Usa códigos simples y estables para no romper los reportes futuros.</p>
+                                </div>
+                                <span class="badge bg-light text-dark border" th:text="${#lists.size(accounts) + ' cuentas'}">0 cuentas</span>
+                            </div>
+
+                            <div th:if="${#lists.isEmpty(accounts)}" class="alert alert-light border mb-0">
+                                No hay cuentas registradas. Ejecuta el SQL inicial o crea las cuentas manualmente.
+                            </div>
+
+                            <div th:if="${!#lists.isEmpty(accounts)}" class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>Cuenta</th>
+                                        <th>Tipo</th>
+                                        <th>Estado</th>
+                                        <th class="text-end">Acciones</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="account : ${accounts}">
+                                        <td class="fw-semibold" th:text="${account.code}">101</td>
+                                        <td>
+                                            <div th:text="${account.name}">Caja</div>
+                                            <small class="text-muted" th:if="${account.description}" th:text="${account.description}">Descripción</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border" th:text="${account.type.label}">Activo</span>
+                                        </td>
+                                        <td>
+                                            <span th:if="${account.active}" class="badge bg-success-subtle text-success border border-success-subtle">Activa</span>
+                                            <span th:unless="${account.active}" class="badge bg-secondary-subtle text-secondary border">Inactiva</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <a class="btn btn-outline-primary btn-sm"
+                                               th:href="@{/accounting/accounts(editId=${account.id})}">
+                                                Editar
+                                            </a>
+                                            <form method="post" th:action="@{/accounting/accounts/{id}/toggle(id=${account.id})}" class="d-inline">
+                                                <button type="submit" class="btn btn-outline-secondary btn-sm"
+                                                        th:text="${account.active ? 'Desactivar' : 'Activar'}">
+                                                    Desactivar
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div th:replace="~{fragments/scripts_admin :: adminScripts}"></div>
+</body>
+</html>

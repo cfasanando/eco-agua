@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Asientos contables internos')}"></head>
+<body>
+<div class="app-layout" th:with="activePage=${activePage}">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Asientos contables internos</h1>
+                    <p class="text-muted mb-0">
+                        Registra asientos manuales balanceados para preparar el libro diario, mayor y balance interno.
+                        Esta sección todavía no genera libros oficiales SUNAT.
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a th:href="@{/accounting/accounts}" class="btn btn-outline-secondary btn-sm">
+                        Plan de cuentas
+                    </a>
+                    <a th:href="@{/cashflow/monthly-summary}" class="btn btn-outline-secondary btn-sm">
+                        Resumen financiero
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${message}" class="alert mb-3"
+                 th:classappend="${messageType == 'success'} ? ' alert-success' : ' alert-danger'"
+                 th:text="${message}">Mensaje</div>
+
+            <div class="alert alert-info border-0 shadow-sm mb-3">
+                <strong>Uso recomendado:</strong>
+                por ahora registra asientos manuales internos. Más adelante se conectarán ventas, compras, cobros y pagos
+                para proponer asientos automáticos sin duplicar la información operativa.
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-5">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h2 class="h6 mb-3" th:text="${selectedEntry != null ? 'Editar asiento' : 'Nuevo asiento'}">Nuevo asiento</h2>
+
+                            <form method="post" th:action="@{/accounting/journal-entries/save}" id="journalEntryForm" class="row g-3">
+                                <input type="hidden" name="id" th:value="${selectedEntry != null ? selectedEntry.id : ''}">
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Fecha</label>
+                                    <input type="date" name="entryDate" class="form-control" required
+                                           th:value="${selectedEntry != null ? selectedEntry.entryDate : today}">
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Estado</label>
+                                    <select name="status" class="form-select" required>
+                                        <option th:each="status : ${entryStatuses}"
+                                                th:value="${status.name()}"
+                                                th:selected="${selectedEntry != null and selectedEntry.status == status}"
+                                                th:text="${status.label}">
+                                            Borrador
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Origen</label>
+                                    <select name="sourceType" class="form-select" required>
+                                        <option th:each="sourceType : ${sourceTypes}"
+                                                th:value="${sourceType.name()}"
+                                                th:selected="${selectedEntry != null and selectedEntry.sourceType == sourceType}"
+                                                th:text="${sourceType.label}">
+                                            Manual
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Validación</label>
+                                    <div id="journalBalanceBadge" class="form-control bg-light border text-muted">
+                                        Debe = Haber
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Glosa / descripción</label>
+                                    <input type="text" name="description" class="form-control" required maxlength="255"
+                                           placeholder="Ej. Registro interno de venta, compra o ajuste"
+                                           th:value="${selectedEntry != null ? selectedEntry.description : ''}">
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="form-label mb-0">Líneas del asiento</label>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" id="addJournalLineBtn">
+                                            Agregar línea
+                                        </button>
+                                    </div>
+
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle mb-2">
+                                            <thead class="table-light">
+                                            <tr>
+                                                <th style="min-width: 180px;">Cuenta</th>
+                                                <th style="min-width: 160px;">Detalle</th>
+                                                <th class="text-end" style="width: 110px;">Debe</th>
+                                                <th class="text-end" style="width: 110px;">Haber</th>
+                                                <th class="text-end" style="width: 60px;">Acción</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody id="journalLinesBody">
+                                            <th:block th:if="${selectedEntry != null and not #lists.isEmpty(selectedEntry.lines)}">
+                                                <tr th:each="line : ${selectedEntry.lines}">
+                                                    <td>
+                                                        <select name="accountId" class="form-select form-select-sm" required>
+                                                            <option value="">Seleccionar</option>
+                                                            <option th:each="account : ${accounts}"
+                                                                    th:value="${account.id}"
+                                                                    th:selected="${line.account != null and line.account.id == account.id}"
+                                                                    th:text="${account.code + ' - ' + account.name}">
+                                                                101 - Caja
+                                                            </option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <input type="text" name="lineDescription" class="form-control form-control-sm" maxlength="255"
+                                                               placeholder="Detalle opcional"
+                                                               th:value="${line.description}">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" name="debitAmount" class="form-control form-control-sm text-end journal-debit"
+                                                               step="0.01" min="0" inputmode="decimal"
+                                                               th:value="${#numbers.formatDecimal(line.debitAmount, 1, 'POINT', 2, 'POINT')}">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" name="creditAmount" class="form-control form-control-sm text-end journal-credit"
+                                                               step="0.01" min="0" inputmode="decimal"
+                                                               th:value="${#numbers.formatDecimal(line.creditAmount, 1, 'POINT', 2, 'POINT')}">
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <button type="button" class="btn btn-outline-danger btn-sm remove-journal-line">Quitar</button>
+                                                    </td>
+                                                </tr>
+                                            </th:block>
+
+                                            <th:block th:if="${selectedEntry == null or #lists.isEmpty(selectedEntry.lines)}">
+                                                <tr>
+                                                    <td>
+                                                        <select name="accountId" class="form-select form-select-sm" required>
+                                                            <option value="">Seleccionar</option>
+                                                            <option th:each="account : ${accounts}"
+                                                                    th:value="${account.id}"
+                                                                    th:text="${account.code + ' - ' + account.name}">
+                                                                101 - Caja
+                                                            </option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <input type="text" name="lineDescription" class="form-control form-control-sm" maxlength="255" placeholder="Detalle opcional">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" name="debitAmount" class="form-control form-control-sm text-end journal-debit" step="0.01" min="0" inputmode="decimal" value="0.00">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" name="creditAmount" class="form-control form-control-sm text-end journal-credit" step="0.01" min="0" inputmode="decimal" value="0.00">
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <button type="button" class="btn btn-outline-danger btn-sm remove-journal-line">Quitar</button>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <select name="accountId" class="form-select form-select-sm" required>
+                                                            <option value="">Seleccionar</option>
+                                                            <option th:each="account : ${accounts}"
+                                                                    th:value="${account.id}"
+                                                                    th:text="${account.code + ' - ' + account.name}">
+                                                                701 - Ventas
+                                                            </option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <input type="text" name="lineDescription" class="form-control form-control-sm" maxlength="255" placeholder="Detalle opcional">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" name="debitAmount" class="form-control form-control-sm text-end journal-debit" step="0.01" min="0" inputmode="decimal" value="0.00">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" name="creditAmount" class="form-control form-control-sm text-end journal-credit" step="0.01" min="0" inputmode="decimal" value="0.00">
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <button type="button" class="btn btn-outline-danger btn-sm remove-journal-line">Quitar</button>
+                                                    </td>
+                                                </tr>
+                                            </th:block>
+                                            </tbody>
+                                            <tfoot class="table-light">
+                                            <tr>
+                                                <th colspan="2" class="text-end">Totales</th>
+                                                <th class="text-end">S/. <span id="totalDebitText">0.00</span></th>
+                                                <th class="text-end">S/. <span id="totalCreditText">0.00</span></th>
+                                                <th></th>
+                                            </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+
+                                    <small class="text-muted">
+                                        Cada línea debe tener una cuenta y solo un importe: debe o haber. El asiento se guarda solo si ambos totales cuadran.
+                                    </small>
+                                </div>
+
+                                <div class="col-12 d-flex gap-2 flex-wrap">
+                                    <button type="submit" class="btn btn-primary">
+                                        Guardar asiento
+                                    </button>
+                                    <a th:if="${selectedEntry != null}" th:href="@{/accounting/journal-entries}" class="btn btn-outline-secondary">
+                                        Nuevo asiento
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h2 class="h6 mb-1">Asientos registrados</h2>
+                                    <p class="text-muted mb-0 small">Estos asientos son internos y servirán como base para el libro diario.</p>
+                                </div>
+                                <span class="badge bg-light text-dark border" th:text="${#lists.size(entries) + ' asientos'}">0 asientos</span>
+                            </div>
+
+                            <div th:if="${#lists.isEmpty(entries)}" class="alert alert-light border mb-0">
+                                No hay asientos registrados. Crea un asiento manual para validar el flujo contable interno.
+                            </div>
+
+                            <div th:if="${not #lists.isEmpty(entries)}" class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Glosa</th>
+                                        <th>Origen</th>
+                                        <th>Estado</th>
+                                        <th class="text-end">Debe</th>
+                                        <th class="text-end">Haber</th>
+                                        <th class="text-end">Acciones</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="entry : ${entries}">
+                                        <td th:text="${entry.entryDate}">2026-06-02</td>
+                                        <td>
+                                            <div class="fw-semibold" th:text="${entry.description}">Glosa</div>
+                                            <small class="text-muted" th:text="${#lists.size(entry.lines) + ' líneas'}">2 líneas</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border" th:text="${entry.sourceType.label}">Manual</span>
+                                        </td>
+                                        <td>
+                                            <span th:if="${entry.status.name() == 'POSTED'}" class="badge bg-success-subtle text-success border border-success-subtle">Registrado</span>
+                                            <span th:if="${entry.status.name() == 'DRAFT'}" class="badge bg-warning-subtle text-warning border border-warning-subtle">Borrador</span>
+                                            <span th:if="${entry.status.name() == 'CANCELLED'}" class="badge bg-secondary-subtle text-secondary border">Anulado</span>
+                                        </td>
+                                        <td class="text-end">
+                                            S/. <span th:text="${#numbers.formatDecimal(entry.totalDebit, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                        </td>
+                                        <td class="text-end">
+                                            S/. <span th:text="${#numbers.formatDecimal(entry.totalCredit, 1, 'POINT', 2, 'POINT')}">0.00</span>
+                                        </td>
+                                        <td class="text-end text-nowrap">
+                                            <a class="btn btn-outline-primary btn-sm"
+                                               th:href="@{/accounting/journal-entries(editId=${entry.id})}">
+                                                Editar
+                                            </a>
+                                            <form method="post" th:if="${entry.status.name() != 'CANCELLED'}"
+                                                  th:action="@{/accounting/journal-entries/{id}/cancel(id=${entry.id})}"
+                                                  class="d-inline">
+                                                <button type="submit" class="btn btn-outline-secondary btn-sm"
+                                                        onclick="return confirm('¿Anular este asiento contable?');">
+                                                    Anular
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<template id="journalLineTemplate">
+    <tr>
+        <td>
+            <select name="accountId" class="form-select form-select-sm" required>
+                <option value="">Seleccionar</option>
+                <option th:each="account : ${accounts}"
+                        th:value="${account.id}"
+                        th:text="${account.code + ' - ' + account.name}">
+                    101 - Caja
+                </option>
+            </select>
+        </td>
+        <td>
+            <input type="text" name="lineDescription" class="form-control form-control-sm" maxlength="255" placeholder="Detalle opcional">
+        </td>
+        <td>
+            <input type="number" name="debitAmount" class="form-control form-control-sm text-end journal-debit" step="0.01" min="0" inputmode="decimal" value="0.00">
+        </td>
+        <td>
+            <input type="number" name="creditAmount" class="form-control form-control-sm text-end journal-credit" step="0.01" min="0" inputmode="decimal" value="0.00">
+        </td>
+        <td class="text-end">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-journal-line">Quitar</button>
+        </td>
+    </tr>
+</template>
+
+<div th:replace="~{fragments/scripts_admin :: adminScripts}"></div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const body = document.getElementById('journalLinesBody');
+        const template = document.getElementById('journalLineTemplate');
+        const addButton = document.getElementById('addJournalLineBtn');
+        const totalDebitText = document.getElementById('totalDebitText');
+        const totalCreditText = document.getElementById('totalCreditText');
+        const balanceBadge = document.getElementById('journalBalanceBadge');
+
+        function parseAmount(value) {
+            if (!value) {
+                return 0;
+            }
+            const normalized = String(value).replace(',', '.');
+            const amount = Number.parseFloat(normalized);
+            return Number.isFinite(amount) ? amount : 0;
+        }
+
+        function formatAmount(value) {
+            return value.toFixed(2);
+        }
+
+        function updateTotals() {
+            let debit = 0;
+            let credit = 0;
+
+            body.querySelectorAll('.journal-debit').forEach(function (input) {
+                debit += parseAmount(input.value);
+            });
+            body.querySelectorAll('.journal-credit').forEach(function (input) {
+                credit += parseAmount(input.value);
+            });
+
+            totalDebitText.textContent = formatAmount(debit);
+            totalCreditText.textContent = formatAmount(credit);
+
+            balanceBadge.classList.remove('text-success', 'text-danger', 'text-muted');
+            if (debit > 0 && Math.abs(debit - credit) < 0.01) {
+                balanceBadge.textContent = 'Cuadrado: Debe = Haber';
+                balanceBadge.classList.add('text-success');
+            } else {
+                balanceBadge.textContent = 'Diferencia: S/. ' + formatAmount(Math.abs(debit - credit));
+                balanceBadge.classList.add('text-danger');
+            }
+        }
+
+        addButton.addEventListener('click', function () {
+            body.appendChild(template.content.cloneNode(true));
+            updateTotals();
+        });
+
+        body.addEventListener('click', function (event) {
+            if (!event.target.classList.contains('remove-journal-line')) {
+                return;
+            }
+
+            const rows = body.querySelectorAll('tr');
+            if (rows.length <= 2) {
+                const row = event.target.closest('tr');
+                row.querySelectorAll('input').forEach(function (input) {
+                    input.value = input.type === 'number' ? '0.00' : '';
+                });
+                row.querySelectorAll('select').forEach(function (select) {
+                    select.value = '';
+                });
+            } else {
+                event.target.closest('tr').remove();
+            }
+
+            updateTotals();
+        });
+
+        body.addEventListener('input', updateTotals);
+        updateTotals();
+    });
+</script>
+</body>
+</html>

@@ -40,6 +40,23 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     );
 
     @Query("""
+        select distinct e
+        from Expense e
+        left join fetch e.category c
+        left join fetch e.supplier s
+        left join fetch e.payments p
+        where e.debt = true
+          and e.status in :statuses
+          and e.expenseDate between :start and :end
+        order by e.dueDate asc, e.expenseDate asc, e.id asc
+        """)
+    List<Expense> findOpenDebtsDetailedByPeriod(
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end,
+            @Param("statuses") List<ExpenseStatus> statuses
+    );
+
+    @Query("""
         select coalesce(sum(e.amount), 0)
         from Expense e
         where e.expenseDate between :start and :end

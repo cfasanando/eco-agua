@@ -20,9 +20,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.EnumSet;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -653,8 +655,254 @@ public class ExpenseService {
 
     @Transactional(readOnly = true)
     public List<Expense> findOpenDebts(LocalDate start, LocalDate end) {
-        Set<ExpenseStatus> statuses = EnumSet.of(ExpenseStatus.OPEN, ExpenseStatus.PARTIAL);
-        return expenseRepository.findByDebtTrueAndExpenseDateBetweenOrderByExpenseDateAsc(start, end);
+        List<ExpenseStatus> statuses = List.of(ExpenseStatus.OPEN, ExpenseStatus.PARTIAL);
+        return expenseRepository.findOpenDebtsDetailedByPeriod(start, end, statuses);
+    }
+
+    public AccountsPayableSummary buildAccountsPayableSummary(List<Expense> debts, LocalDate today) {
+        AccountsPayableSummary summary = new AccountsPayableSummary();
+        Set<Long> supplierIds = new java.util.HashSet<>();
+        boolean hasUnknownSupplier = false;
+
+        for (Expense debt : debts) {
+            BigDecimal pendingAmount = normalizeBalance(debt);
+            BigDecimal paidAmount = normalizeAmount(debt.getPaidAmount());
+
+            summary.setTotalPendingAmount(summary.getTotalPendingAmount().add(pendingAmount));
+            summary.setPartialPaidAmount(summary.getPartialPaidAmount().add(paidAmount));
+            summary.setOpenDebtCount(summary.getOpenDebtCount() + 1);
+
+            if (debt.getSupplier() != null && debt.getSupplier().getId() != null) {
+                supplierIds.add(debt.getSupplier().getId());
+            } else {
+                hasUnknownSupplier = true;
+            }
+
+            if (isOverdue(debt.getDueDate(), today)) {
+                summary.setOverdueDebtCount(summary.getOverdueDebtCount() + 1);
+                summary.setOverduePendingAmount(summary.getOverduePendingAmount().add(pendingAmount));
+            }
+
+            if (isDueToday(debt.getDueDate(), today)) {
+                summary.setDueTodayDebtCount(summary.getDueTodayDebtCount() + 1);
+                summary.setDueTodayPendingAmount(summary.getDueTodayPendingAmount().add(pendingAmount));
+            }
+
+            if (debt.getStatus() == ExpenseStatus.PARTIAL || paidAmount.signum() > 0) {
+                summary.setPartialDebtCount(summary.getPartialDebtCount() + 1);
+            }
+        }
+
+        summary.setSupplierCount(supplierIds.size() + (hasUnknownSupplier ? 1 : 0));
+        return summary;
+    }
+
+    public List<AccountsPayableSupplierSummary> buildSupplierDebtSummary(List<Expense> debts, LocalDate today) {
+        Map<String, AccountsPayableSupplierSummary> grouped = new LinkedHashMap<>();
+
+        for (Expense debt : debts) {
+            String key = debt.getSupplier() != null && debt.getSupplier().getId() != null
+                    ? "SUPPLIER-" + debt.getSupplier().getId()
+                    : "NO-SUPPLIER";
+
+            AccountsPayableSupplierSummary summary = grouped.computeIfAbsent(key, ignored -> buildInitialSupplierSummary(debt));
+            BigDecimal pendingAmount = normalizeBalance(debt);
+            BigDecimal paidAmount = normalizeAmount(debt.getPaidAmount());
+
+            summary.setDebtCount(summary.getDebtCount() + 1);
+            summary.setPendingAmount(summary.getPendingAmount().add(pendingAmount));
+            summary.setPaidAmount(summary.getPaidAmount().add(paidAmount));
+
+            LocalDate dueDate = debt.getDueDate();
+            if (dueDate != null && (summary.getNearestDueDate() == null || dueDate.isBefore(summary.getNearestDueDate()))) {
+                summary.setNearestDueDate(dueDate);
+            }
+
+            if (isOverdue(dueDate, today)) {
+                summary.setOverdueDebtCount(summary.getOverdueDebtCount() + 1);
+            }
+        }
+
+        List<AccountsPayableSupplierSummary> summaries = new ArrayList<>(grouped.values());
+        for (AccountsPayableSupplierSummary summary : summaries) {
+            summary.setPriorityLabel(resolvePriorityLabel(summary.getNearestDueDate(), today, summary.getOverdueDebtCount() > 0));
+            summary.setPriorityBadgeClass(resolvePriorityBadgeClass(summary.getNearestDueDate(), today, summary.getOverdueDebtCount() > 0));
+            summary.setWhatsappUrl(buildSupplierWhatsappUrl(summary.getPhone(), summary.getSupplierName(), summary.getPendingAmount()));
+        }
+
+        summaries.sort(Comparator
+                .comparing(AccountsPayableSupplierSummary::getOverdueDebtCount).reversed()
+                .thenComparing(AccountsPayableSupplierSummary::getPendingAmount, Comparator.reverseOrder())
+                .thenComparing(AccountsPayableSupplierSummary::getSupplierName, Comparator.nullsLast(String::compareToIgnoreCase)));
+
+        return summaries;
+    }
+
+    public List<AccountsPayableRow> buildAccountsPayableRows(List<Expense> debts, LocalDate today) {
+        return debts.stream()
+                .map(debt -> buildAccountsPayableRow(debt, today))
+                .sorted(Comparator
+                        .comparing(AccountsPayableRow::getDueDate, Comparator.nullsLast(LocalDate::compareTo))
+                        .thenComparing(AccountsPayableRow::getExpenseDate, Comparator.nullsLast(LocalDate::compareTo))
+                        .thenComparing(AccountsPayableRow::getExpenseId, Comparator.nullsLast(Long::compareTo)))
+                .collect(Collectors.toList());
+    }
+
+    private AccountsPayableSupplierSummary buildInitialSupplierSummary(Expense debt) {
+        AccountsPayableSupplierSummary summary = new AccountsPayableSupplierSummary();
+        Supplier supplier = debt.getSupplier();
+
+        if (supplier != null) {
+            summary.setSupplierId(supplier.getId());
+            summary.setSupplierName(trimToNull(supplier.getName()) != null ? supplier.getName() : "Proveedor sin nombre");
+            summary.setPhone(resolveSupplierPhone(supplier));
+        } else {
+            summary.setSupplierName("Sin proveedor asignado");
+        }
+
+        return summary;
+    }
+
+    private AccountsPayableRow buildAccountsPayableRow(Expense debt, LocalDate today) {
+        AccountsPayableRow row = new AccountsPayableRow();
+        Supplier supplier = debt.getSupplier();
+
+        row.setExpenseId(debt.getId());
+        row.setSupplierId(supplier != null ? supplier.getId() : null);
+        row.setSupplierName(supplier != null && trimToNull(supplier.getName()) != null ? supplier.getName() : "Sin proveedor asignado");
+        row.setPhone(supplier != null ? resolveSupplierPhone(supplier) : null);
+        row.setCategoryName(debt.getCategory() != null ? debt.getCategory().getName() : "-");
+        row.setDescription(trimToNull(debt.getObservation()) != null ? debt.getObservation() : "Sin observación");
+        row.setVoucherNumber(trimToNull(debt.getVoucherNumber()) != null ? debt.getVoucherNumber() : "-");
+        row.setExpenseDate(debt.getExpenseDate());
+        row.setDueDate(debt.getDueDate());
+        row.setStatusLabel(resolveStatusLabel(debt.getStatus()));
+        row.setPriorityLabel(resolvePriorityLabel(debt.getDueDate(), today, false));
+        row.setPriorityBadgeClass(resolvePriorityBadgeClass(debt.getDueDate(), today, false));
+        row.setTotalAmount(normalizeAmount(debt.getAmount()));
+        row.setPaidAmount(normalizeAmount(debt.getPaidAmount()));
+        row.setPendingAmount(normalizeBalance(debt));
+        row.setWhatsappUrl(buildSupplierWhatsappUrl(row.getPhone(), row.getSupplierName(), row.getPendingAmount()));
+
+        return row;
+    }
+
+    private BigDecimal normalizeBalance(Expense expense) {
+        if (expense == null) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal balance = expense.getBalance();
+        if (balance == null || balance.signum() < 0) {
+            return BigDecimal.ZERO;
+        }
+
+        return balance;
+    }
+
+    private boolean isOverdue(LocalDate dueDate, LocalDate today) {
+        return dueDate != null && today != null && dueDate.isBefore(today);
+    }
+
+    private boolean isDueToday(LocalDate dueDate, LocalDate today) {
+        return dueDate != null && today != null && dueDate.isEqual(today);
+    }
+
+    private String resolvePriorityLabel(LocalDate dueDate, LocalDate today, boolean hasOverdueDebts) {
+        if (hasOverdueDebts || isOverdue(dueDate, today)) {
+            return "Vencido";
+        }
+        if (isDueToday(dueDate, today)) {
+            return "Vence hoy";
+        }
+        if (dueDate == null) {
+            return "Sin fecha";
+        }
+        if (today != null && !dueDate.isAfter(today.plusDays(3))) {
+            return "Próximo";
+        }
+        return "Pendiente";
+    }
+
+    private String resolvePriorityBadgeClass(LocalDate dueDate, LocalDate today, boolean hasOverdueDebts) {
+        if (hasOverdueDebts || isOverdue(dueDate, today)) {
+            return "bg-danger";
+        }
+        if (isDueToday(dueDate, today)) {
+            return "bg-warning text-dark";
+        }
+        if (dueDate == null) {
+            return "bg-secondary";
+        }
+        if (today != null && !dueDate.isAfter(today.plusDays(3))) {
+            return "bg-info text-dark";
+        }
+        return "bg-success";
+    }
+
+    private String resolveStatusLabel(ExpenseStatus status) {
+        if (status == null) {
+            return "Pendiente";
+        }
+
+        return switch (status) {
+            case OPEN -> "Pendiente";
+            case PARTIAL -> "Pago parcial";
+            case PAID -> "Pagado";
+            case CANCELED -> "Cancelado";
+        };
+    }
+
+    private String resolveSupplierPhone(Supplier supplier) {
+        if (supplier == null) {
+            return null;
+        }
+
+        String contactPhone = trimToNull(supplier.getContactPhone());
+        if (contactPhone != null) {
+            return contactPhone;
+        }
+
+        return trimToNull(supplier.getPhone());
+    }
+
+    private String buildSupplierWhatsappUrl(String phone, String supplierName, BigDecimal pendingAmount) {
+        String normalizedPhone = normalizePhoneForWhatsapp(phone);
+        if (normalizedPhone == null) {
+            return null;
+        }
+
+        String cleanSupplierName = trimToNull(supplierName) != null ? supplierName : "proveedor";
+        String amountText = normalizeAmount(pendingAmount).toPlainString();
+        String message = "Hola, queremos coordinar el pago pendiente de S/ "
+                + amountText
+                + " registrado para "
+                + cleanSupplierName
+                + ".";
+
+        return "https://wa.me/" + normalizedPhone + "?text=" + URLEncoder.encode(message, StandardCharsets.UTF_8);
+    }
+
+    private String normalizePhoneForWhatsapp(String phone) {
+        String value = trimToNull(phone);
+        if (value == null) {
+            return null;
+        }
+
+        String digits = value.replaceAll("\\D", "");
+        if (digits.isBlank()) {
+            return null;
+        }
+
+        if (digits.length() == 9) {
+            return "51" + digits;
+        }
+
+        if (digits.length() >= 10) {
+            return digits;
+        }
+
+        return null;
     }
 
     @Transactional(readOnly = true)

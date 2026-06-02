@@ -4,89 +4,276 @@
 
 <body>
 <div class="app-layout" th:with="activePage='expenses_debts'">
-    <!-- Sidebar -->
     <aside th:replace="fragments/sidebar :: sidebar"></aside>
 
-    <!-- Main -->
     <div class="main-content">
-        <!-- Topbar -->
         <header th:replace="fragments/topbar :: topbar"></header>
 
-        <!-- Content -->
         <main class="content-wrapper">
-
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                 <div>
-                    <h1 class="h5 mb-0">Cuentas x pagar (Deudas)</h1>
-                    <div class="small text-muted">Deudas por pagar</div>
+                    <h1 class="h5 mb-1">Cuentas por pagar</h1>
+                    <p class="text-muted mb-0 small">
+                        Controla deudas con proveedores, prioriza vencimientos y registra pagos sin duplicar egresos.
+                    </p>
                 </div>
-
-                <!-- Botón futuro para registrar nueva deuda -->
-                <button type="button"
-                        class="btn btn-outline-primary"
-                        disabled
-                        title="Próximamente">
-                    <i class="bi bi-plus-circle me-1"></i>
-                    Agregar deuda
-                </button>
+                <a th:href="@{/expenses/by-date}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Registrar egreso
+                </a>
             </div>
 
-            <div class="card shadow-sm mb-3">
-                <div class="card-header bg-light">
-                    <strong>Filtros :</strong>
+            <div class="alert alert-info border-0 shadow-sm small" role="alert">
+                <strong>Uso recomendado:</strong>
+                registra las compras o gastos a crédito desde egresos, revisa aquí lo vencido y registra pagos reales en la fecha que salió dinero de caja.
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Saldo pendiente</div>
+                            <div class="fs-4 fw-bold text-danger">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.totalPendingAmount,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted" th:text="${summary.openDebtCount + ' deuda(s) abierta(s)'}">0 deudas</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <!-- Placeholder de filtros; listo para que luego agregues fecha, proveedor, estado, etc. -->
-                    <div class="alert alert-secondary mb-0 small">
-                        Filtros de búsqueda para deudas pendientes (fecha, proveedor, estado) se
-                        implementarán más adelante.
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Proveedores con deuda</div>
+                            <div class="fs-4 fw-bold" th:text="${summary.supplierCount}">0</div>
+                            <div class="small text-muted">Proveedores únicos en el rango</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Deuda vencida</div>
+                            <div class="fs-4 fw-bold" th:classappend="${summary.hasOverdueDebts()} ? ' text-danger' : ' text-success'">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.overduePendingAmount,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted" th:text="${summary.overdueDebtCount + ' deuda(s) vencida(s)'}">0 vencidas</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Vence hoy</div>
+                            <div class="fs-4 fw-bold text-warning">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.dueTodayPendingAmount,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted" th:text="${summary.dueTodayDebtCount + ' deuda(s)'}">0 deudas</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="card shadow-sm">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <strong>Filtros</strong>
+                </div>
                 <div class="card-body">
-                   
-                    <div class="table-responsive mt-3">
+                    <form class="row g-2 align-items-end" th:action="@{/expenses/debts}" method="get">
+                        <div class="col-md-4">
+                            <label class="form-label">Desde</label>
+                            <input type="date" class="form-control" name="from" th:value="${fromDate}">
+                            <div class="form-text">Fecha de registro del egreso.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Hasta</label>
+                            <input type="date" class="form-control" name="to" th:value="${toDate}">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Buscar
+                            </button>
+                        </div>
+                        <div class="col-md-2">
+                            <a th:href="@{/expenses/debts}" class="btn btn-outline-secondary w-100">Hoy</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <strong>Resumen por proveedor</strong>
+                    <span class="text-muted small">Ordenado por prioridad y saldo pendiente</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
                         <table class="table table-sm align-middle">
                             <thead class="table-light">
                             <tr>
                                 <th>Proveedor</th>
-                                <th>Categoría</th>
-                                <th>Descripción</th>
-                                <th class="text-end">Monto total S/.</th>
+                                <th class="text-center">Deudas</th>
+                                <th>Prioridad</th>
+                                <th>Vence</th>
+                                <th class="text-end">Abonado S/.</th>
                                 <th class="text-end">Saldo S/.</th>
-                                <th>Vencimiento</th>
-                                <th>Estado</th>
                                 <th class="text-center">Acciones</th>
                             </tr>
                             </thead>
                             <tbody>
-                            <tr th:each="d : ${debts}">
-                                <td th:text="${d.supplier.name}">Proveedor</td>
-                                <td th:text="${d.category != null ? d.category.name : '-'}">Categoría</td>
-                                <td th:text="${d.description}">Descripción</td>
-                                <td class="text-end"
-                                    th:text="${#numbers.formatDecimal(d.totalAmount,1,'POINT',2,'POINT')}">0.00</td>
-                                <td class="text-end"
-                                    th:text="${#numbers.formatDecimal(d.remainingAmount,1,'POINT',2,'POINT')}">0.00</td>
-                                <td th:text="${#temporals.format(d.dueDate,'dd/MM/yyyy')}">23/11/2025</td>
-                                <td th:text="${d.status}">Pendiente</td>
+                            <tr th:each="s : ${supplierSummaries}">
+                                <td>
+                                    <div class="fw-semibold" th:text="${s.supplierName}">Proveedor</div>
+                                    <div class="small text-muted" th:text="${s.phone != null && !#strings.isEmpty(s.phone) ? s.phone : 'Sin teléfono'}">Teléfono</div>
+                                </td>
                                 <td class="text-center">
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-success">
-                                        Registrar pago
-                                    </button>
+                                    <span th:text="${s.debtCount}">0</span>
+                                    <div class="small text-danger" th:if="${s.overdueDebtCount > 0}" th:text="${s.overdueDebtCount + ' vencida(s)'}">0 vencidas</div>
+                                </td>
+                                <td>
+                                    <span class="badge" th:classappend="${s.priorityBadgeClass}" th:text="${s.priorityLabel}">Pendiente</span>
+                                </td>
+                                <td>
+                                    <span th:if="${s.nearestDueDate != null}" th:text="${#temporals.format(s.nearestDueDate,'dd/MM/yyyy')}">-</span>
+                                    <span th:if="${s.nearestDueDate == null}" class="text-muted">Sin fecha</span>
+                                </td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(s.paidAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end fw-semibold text-danger" th:text="${#numbers.formatDecimal(s.pendingAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-center text-nowrap">
+                                    <a th:if="${s.whatsappUrl != null}"
+                                       th:href="${s.whatsappUrl}"
+                                       target="_blank"
+                                       rel="noopener"
+                                       class="btn btn-sm btn-success">
+                                        WhatsApp
+                                    </a>
+                                    <span th:if="${s.whatsappUrl == null}" class="text-muted small">Sin contacto</span>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(supplierSummaries)}">
+                                <td colspan="7" class="text-center text-muted py-3">
+                                    No hay proveedores con deuda pendiente en el rango seleccionado.
                                 </td>
                             </tr>
                             </tbody>
                         </table>
                     </div>
-                    
                 </div>
             </div>
 
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <strong>Deudas pendientes</strong>
+                    <span class="text-muted small">Registra pagos cuando realmente salga dinero de caja</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-sm align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Registro</th>
+                                <th>Proveedor</th>
+                                <th>Categoría</th>
+                                <th>Descripción</th>
+                                <th>Vencimiento</th>
+                                <th>Prioridad</th>
+                                <th class="text-end">Total S/.</th>
+                                <th class="text-end">Abonado S/.</th>
+                                <th class="text-end">Saldo S/.</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row, iterStat : ${rows}">
+                                <td th:text="${iterStat.count}">1</td>
+                                <td>
+                                    <div th:text="${row.expenseDate != null ? #temporals.format(row.expenseDate,'dd/MM/yyyy') : '-'}">01/01/2026</div>
+                                    <div class="small text-muted" th:text="${row.voucherNumber != null ? row.voucherNumber : '-'}">Comprobante</div>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold" th:text="${row.supplierName}">Proveedor</div>
+                                    <div class="small text-muted" th:text="${row.phone != null && !#strings.isEmpty(row.phone) ? row.phone : 'Sin teléfono'}">Teléfono</div>
+                                </td>
+                                <td th:text="${row.categoryName}">Categoría</td>
+                                <td style="min-width: 220px;">
+                                    <span th:text="${row.description}">Descripción</span>
+                                    <div class="small text-muted" th:text="${row.statusLabel}">Pendiente</div>
+                                </td>
+                                <td>
+                                    <span th:if="${row.dueDate != null}" th:text="${#temporals.format(row.dueDate,'dd/MM/yyyy')}">-</span>
+                                    <span th:if="${row.dueDate == null}" class="text-muted">Sin fecha</span>
+                                </td>
+                                <td>
+                                    <span class="badge" th:classappend="${row.priorityBadgeClass}" th:text="${row.priorityLabel}">Pendiente</span>
+                                </td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.totalAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.paidAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end fw-semibold text-danger" th:text="${#numbers.formatDecimal(row.pendingAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-center text-nowrap">
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-success me-1 js-open-payment-modal"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#paymentModal"
+                                            th:attr="data-expense-id=${row.expenseId},data-supplier=${row.supplierName},data-pending=${row.pendingAmount}">
+                                        Registrar pago
+                                    </button>
+                                    <a th:if="${row.whatsappUrl != null}"
+                                       th:href="${row.whatsappUrl}"
+                                       target="_blank"
+                                       rel="noopener"
+                                       class="btn btn-sm btn-success">
+                                        WhatsApp
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(rows)}">
+                                <td colspan="11" class="text-center text-muted py-3">
+                                    No hay cuentas por pagar pendientes en las fechas seleccionadas.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </main>
+    </div>
+</div>
+
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form id="paymentForm" method="post" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registrar pago</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-light border small">
+                    <strong>Proveedor:</strong> <span id="paymentSupplierName">-</span><br>
+                    <strong>Saldo actual:</strong> S/. <span id="paymentPendingAmount">0.00</span>
+                </div>
+
+                <input type="hidden" name="from" th:value="${fromDate}">
+                <input type="hidden" name="to" th:value="${toDate}">
+
+                <div class="mb-3">
+                    <label class="form-label">Fecha de pago</label>
+                    <input type="date" name="paymentDate" class="form-control" th:value="${paymentDate}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Monto pagado S/.</label>
+                    <input type="number" name="amount" id="paymentAmount" class="form-control" step="0.01" min="0.01" required>
+                    <div class="form-text">No debe superar el saldo pendiente.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Observación</label>
+                    <textarea name="observation" class="form-control" rows="2" placeholder="Ejemplo: pago por Yape, efectivo, transferencia, adelanto..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-success">Guardar pago</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -105,6 +292,25 @@
                 alert(flashMessage);
             }
         }
+
+        const paymentForm = document.getElementById('paymentForm');
+        const supplierName = document.getElementById('paymentSupplierName');
+        const pendingAmount = document.getElementById('paymentPendingAmount');
+        const paymentAmount = document.getElementById('paymentAmount');
+
+        document.querySelectorAll('.js-open-payment-modal').forEach(function (button) {
+            button.addEventListener('click', function () {
+                const expenseId = button.getAttribute('data-expense-id');
+                const supplier = button.getAttribute('data-supplier') || '-';
+                const pending = button.getAttribute('data-pending') || '0.00';
+
+                paymentForm.setAttribute('action', '/expenses/' + expenseId + '/payments');
+                supplierName.textContent = supplier;
+                pendingAmount.textContent = Number(pending).toFixed(2);
+                paymentAmount.value = Number(pending).toFixed(2);
+                paymentAmount.setAttribute('max', Number(pending).toFixed(2));
+            });
+        });
     });
 </script>
 </body>

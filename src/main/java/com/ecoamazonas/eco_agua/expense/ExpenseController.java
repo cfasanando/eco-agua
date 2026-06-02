@@ -283,6 +283,10 @@ public class ExpenseController {
         model.addAttribute("fromDate", start);
         model.addAttribute("toDate", end);
         model.addAttribute("debts", debts);
+        model.addAttribute("rows", expenseService.buildAccountsPayableRows(debts, today));
+        model.addAttribute("summary", expenseService.buildAccountsPayableSummary(debts, today));
+        model.addAttribute("supplierSummaries", expenseService.buildSupplierDebtSummary(debts, today));
+        model.addAttribute("paymentDate", today);
 
         return "expenses/expenses_debts";
     }
@@ -294,6 +298,10 @@ public class ExpenseController {
             @RequestParam(name = "paymentDate", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate paymentDate,
             @RequestParam(name = "observation", required = false) String observation,
+            @RequestParam(name = "from", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(name = "to", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             RedirectAttributes redirectAttributes
     ) {
         try {
@@ -305,7 +313,22 @@ public class ExpenseController {
             redirectAttributes.addFlashAttribute("messageType", "error");
         }
 
-        return "redirect:/expenses/debts";
+        String redirectUrl = "/expenses/debts";
+        if (from != null || to != null) {
+            StringBuilder builder = new StringBuilder(redirectUrl).append("?");
+            if (from != null) {
+                builder.append("from=").append(from);
+            }
+            if (to != null) {
+                if (from != null) {
+                    builder.append("&");
+                }
+                builder.append("to=").append(to);
+            }
+            redirectUrl = builder.toString();
+        }
+
+        return "redirect:" + redirectUrl;
     }
 
     @GetMapping("/fixed-costs")

@@ -11,15 +11,86 @@
 
         <main class="content-wrapper">
 
-            <h1 class="h5 mb-1">Otros ingresos</h1>
-            <p class="text-muted small mb-3">
-                Otros ingresos, préstamos, actividades, entre otros.
-            </p>
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Otros ingresos</h1>
+                    <p class="text-muted small mb-0">
+                        Registra entradas de dinero que no nacen de un pedido: aportes, préstamos, devoluciones, ajustes positivos u otros ingresos extraordinarios.
+                    </p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a th:href="${cashflowUrl}" class="btn btn-outline-primary">
+                        <i class="bi bi-cash-stack"></i> Ver en flujo de caja
+                    </a>
+                    <button type="button"
+                            class="btn btn-success"
+                            data-bs-toggle="modal"
+                            data-bs-target="#otherIncomeModal">
+                        <i class="bi bi-plus-circle"></i> Registrar ingreso
+                    </button>
+                </div>
+            </div>
 
-            <!-- Filtros -->
+            <div th:if="${message}"
+                 class="alert mb-3"
+                 th:classappend="${messageType == 'success' ? ' alert-success' : (messageType == 'warning' ? ' alert-warning' : ' alert-danger')}"
+                 th:text="${message}">
+                Mensaje
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm mb-3">
+                <div class="d-flex gap-2">
+                    <i class="bi bi-info-circle fs-5"></i>
+                    <div>
+                        <strong>Uso recomendado:</strong>
+                        usa esta pantalla solo para dinero que entra a caja y no corresponde a una venta registrada en pedidos.
+                        Las ventas normales deben registrarse desde <strong>Registrar pedido</strong> para no duplicar ingresos.
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Total otros ingresos</div>
+                            <div class="h4 mb-0">
+                                S/ <span th:text="${#numbers.formatDecimal(summary.totalAmount,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Registros</div>
+                            <div class="h4 mb-0" th:text="${summary.recordCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Días con ingreso</div>
+                            <div class="h4 mb-0" th:text="${summary.daysWithIncome}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Promedio por registro</div>
+                            <div class="h4 mb-0">
+                                S/ <span th:text="${#numbers.formatDecimal(summary.averageAmount,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-light">
-                    <strong>Por período :</strong>
+                    <strong>Filtros</strong>
                 </div>
                 <div class="card-body">
                     <form class="row g-2 align-items-end"
@@ -43,37 +114,80 @@
                         </div>
 
                         <div class="col-md-2">
-                            <button type="submit"
-                                    class="btn btn-primary w-100">
+                            <button type="submit" class="btn btn-primary w-100">
                                 <i class="bi bi-search"></i> Buscar
                             </button>
+                        </div>
+
+                        <div class="col-md-2">
+                            <a th:href="@{/income/others}" class="btn btn-outline-secondary w-100">
+                                Hoy
+                            </a>
                         </div>
                     </form>
                 </div>
             </div>
 
-            <!-- Tabla -->
-            <div class="card shadow-sm">
-                <div class="card-body">
-
-                    <div class="d-flex justify-content-between mb-2">
-                        <div>
-                            <button type="button"
-                                    class="btn btn-danger btn-sm"
-                                    onclick="document.getElementById('deleteIncomeForm').submit();">
-                                <i class="bi bi-trash"></i> Borrar
-                            </button>
+            <div class="row g-3 mb-3" th:if="${not #lists.isEmpty(summary.categorySummaries)}">
+                <div class="col-lg-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <strong>Resumen por categoría</strong>
                         </div>
-                        <div>
-                            <button type="button"
-                                    class="btn btn-primary btn-sm"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#otherIncomeModal">
-                                <i class="bi bi-plus-circle"></i> Agregar
-                            </button>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Categoría</th>
+                                        <th class="text-end">Registros</th>
+                                        <th class="text-end">Total S/.</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="cat : ${summary.categorySummaries}">
+                                        <td th:text="${cat.categoryName}">Categoría</td>
+                                        <td class="text-end" th:text="${cat.recordCount}">0</td>
+                                        <td class="text-end" th:text="${#numbers.formatDecimal(cat.totalAmount,1,'POINT',2,'POINT')}">0.00</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
+                </div>
+                <div class="col-lg-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <strong>Lectura rápida</strong>
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-2">
+                                Estos montos entran al <strong>flujo de caja real</strong> como otros ingresos en la fecha registrada.
+                            </p>
+                            <ul class="mb-0 text-muted small">
+                                <li>No uses esta pantalla para duplicar ventas que ya están en pedidos.</li>
+                                <li>Para aportes o préstamos, usa una categoría clara y una observación descriptiva.</li>
+                                <li>Si el ingreso tiene comprobante, completa los datos opcionales del documento.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>Detalle de otros ingresos</strong>
+                        <span class="text-muted small" th:text="|Del ${startDate} al ${endDate}|">Periodo</span>
+                    </div>
+                    <button type="button"
+                            class="btn btn-outline-danger btn-sm"
+                            onclick="document.getElementById('deleteIncomeForm').submit();">
+                        <i class="bi bi-trash"></i> Borrar seleccionados
+                    </button>
+                </div>
+                <div class="card-body">
                     <form id="deleteIncomeForm"
                           th:action="@{/income/others/delete}"
                           method="post">
@@ -93,34 +207,33 @@
                                                id="chkAll"
                                                onclick="toggleAllIncomes(this)">
                                     </th>
-                                    <th>Categoría</th>
-                                    <th>Observación</th>
-                                    <th class="text-end">Monto S/.</th>
                                     <th>Fecha</th>
+                                    <th>Categoría</th>
+                                    <th>Documento</th>
+                                    <th>Observación</th>
+                                    <th class="text-end">Base S/.</th>
+                                    <th class="text-end">IGV S/.</th>
+                                    <th class="text-end">Total S/.</th>
                                 </tr>
                                 </thead>
                                 <tbody>
                                 <tr th:each="inc : ${incomes}">
                                     <td>
-                                        <input type="checkbox"
-                                               name="ids"
-                                               th:value="${inc.id}">
+                                        <input type="checkbox" name="ids" th:value="${inc.id}">
                                     </td>
-                                    <td th:text="${inc.category != null ? inc.category.name : '-'}">
-                                        Categoria
+                                    <td th:text="${#temporals.format(inc.incomeDate, 'dd/MM/yyyy')}">01/06/2026</td>
+                                    <td th:text="${inc.category != null ? inc.category.name : '-'}">Categoría</td>
+                                    <td>
+                                        <span th:text="${inc.documentLabel}">Documento</span>
                                     </td>
-                                    <td th:text="${inc.observation}">Obs</td>
-                                    <td class="text-end"
-                                        th:text="${#numbers.formatDecimal(inc.amount,1,'POINT',2,'POINT')}">
-                                        0.00
-                                    </td>
-                                    <td th:text="${#temporals.format(inc.incomeDate, 'dd/MM/yyyy')}">
-                                        23/11/2025
-                                    </td>
+                                    <td th:text="${inc.observation != null and !#strings.isEmpty(inc.observation) ? inc.observation : '-'}">Observación</td>
+                                    <td class="text-end" th:text="${#numbers.formatDecimal(inc.taxBase != null ? inc.taxBase : 0,1,'POINT',2,'POINT')}">0.00</td>
+                                    <td class="text-end" th:text="${#numbers.formatDecimal(inc.taxIgv != null ? inc.taxIgv : 0,1,'POINT',2,'POINT')}">0.00</td>
+                                    <td class="text-end fw-semibold" th:text="${#numbers.formatDecimal(inc.amount,1,'POINT',2,'POINT')}">0.00</td>
                                 </tr>
                                 <tr th:if="${#lists.isEmpty(incomes)}">
-                                    <td colspan="5" class="text-center text-muted">
-                                        No hay datos en el período seleccionado.
+                                    <td colspan="8" class="text-center text-muted py-4">
+                                        No hay otros ingresos en el período seleccionado.
                                     </td>
                                 </tr>
                                 </tbody>
@@ -130,10 +243,8 @@
 
                     <div class="d-flex justify-content-end mt-2">
                         <div class="fw-bold">
-                            Total:&nbsp;
-                            <span th:text="${#numbers.formatDecimal(totalAmount,1,'POINT',2,'POINT')}">
-                                0.00
-                            </span> S/.
+                            Total del período:&nbsp;
+                            <span th:text="${#numbers.formatDecimal(summary.totalAmount,1,'POINT',2,'POINT')}">0.00</span> S/.
                         </div>
                     </div>
 
@@ -153,30 +264,15 @@
             cb.checked = source.checked;
         });
     }
-
-    document.addEventListener('DOMContentLoaded', function () {
-        const flashMessage = /*[[${message}]]*/ null;
-        const flashType = /*[[${messageType}]]*/ null;
-
-        if (flashMessage && flashMessage !== 'null' && flashMessage !== '') {
-            if (window.ecoAdmin && typeof window.ecoAdmin.showFlashMessage === 'function') {
-                window.ecoAdmin.showFlashMessage(flashMessage, flashType);
-            } else {
-                alert(flashMessage);
-            }
-        }
-    });
 </script>
 
-<!-- Modal para agregar ingreso -->
 <div class="modal fade" id="otherIncomeModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form th:action="@{/income/others}" method="post">
                 <div class="modal-header">
-                    <h5 class="modal-title">Agrega ingreso</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"
-                            aria-label="Close"></button>
+                    <h5 class="modal-title">Registrar otro ingreso</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
 
@@ -184,53 +280,75 @@
                            th:name="${_csrf.parameterName}"
                            th:value="${_csrf.token}"/>
 
-                    <div class="mb-3">
-                        <label class="form-label">Categoría</label>
-                        <select class="form-select" name="categoryId" required>
-                            <option value="">- Seleccione -</option>
-                            <option th:each="cat : ${incomeCategories}"
-                                    th:value="${cat.id}"
-                                    th:text="${cat.name}">
-                                Categoria
-                            </option>
-                        </select>
-                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Categoría</label>
+                            <select class="form-select" name="categoryId" required>
+                                <option value="">Seleccione una categoría</option>
+                                <option th:each="cat : ${incomeCategories}"
+                                        th:value="${cat.id}"
+                                        th:text="${cat.name}">
+                                    Categoría
+                                </option>
+                            </select>
+                            <div class="form-text">Usa una categoría distinta a ventas si no viene de un pedido.</div>
+                        </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Costo S/.</label>
-                        <input type="number"
-                               class="form-control"
-                               name="amount"
-                               min="0"
-                               step="0.01"
-                               required>
-                    </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Monto total S/.</label>
+                            <input type="number" class="form-control" name="amount" min="0.01" step="0.01" required>
+                        </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Fecha</label>
-                        <input type="date"
-                               class="form-control"
-                               name="incomeDate"
-                               th:value="${endDate}">
-                    </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Fecha</label>
+                            <input type="date" class="form-control" name="incomeDate" th:value="${endDate}" required>
+                        </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Observación</label>
-                        <textarea class="form-control"
-                                  name="observation"
-                                  rows="2"></textarea>
+                        <div class="col-md-3">
+                            <label class="form-label">Tipo doc.</label>
+                            <select class="form-select" name="docType">
+                                <option value="">Sin documento</option>
+                                <option value="03">Boleta</option>
+                                <option value="01">Factura</option>
+                                <option value="07">Nota de crédito</option>
+                                <option value="08">Nota de débito</option>
+                                <option value="99">Interno</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Serie</label>
+                            <input type="text" class="form-control" name="docSeries" maxlength="10" placeholder="Ej: B001">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Número</label>
+                            <input type="text" class="form-control" name="docNumber" maxlength="20" placeholder="Ej: 000123">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">IGV %</label>
+                            <select class="form-select" name="taxRatePercent">
+                                <option value="0">0%</option>
+                                <option value="18">18%</option>
+                            </select>
+                            <div class="form-text">Para aportes, préstamos o ajustes normalmente usa 0%.</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Observación</label>
+                            <textarea class="form-control"
+                                      name="observation"
+                                      rows="3"
+                                      placeholder="Ej: Aporte del dueño para caja chica, devolución de proveedor, préstamo recibido, ajuste positivo de caja."></textarea>
+                        </div>
                     </div>
 
                 </div>
                 <div class="modal-footer">
-                    <button type="button"
-                            class="btn btn-secondary"
-                            data-bs-dismiss="modal">
-                        Cancelar
-                    </button>
-                    <button type="submit"
-                            class="btn btn-success">
-                        Añadir
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Guardar ingreso
                     </button>
                 </div>
             </form>

@@ -257,16 +257,14 @@ public class IncomeController {
         }
 
         List<OtherIncome> incomes = otherIncomeService.findByDateRange(startDate, endDate);
-        BigDecimal total = incomes.stream()
-                .map(OtherIncome::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         model.addAttribute("activePage", "income_others");
         model.addAttribute("startDate", startDate);
         model.addAttribute("endDate", endDate);
         model.addAttribute("incomes", incomes);
-        model.addAttribute("totalAmount", total);
+        model.addAttribute("summary", otherIncomeService.buildSummary(incomes));
         model.addAttribute("incomeCategories", categoryRepository.findByTypeAndActiveTrueOrderByNameAsc(CategoryType.INCOME));
+        model.addAttribute("cashflowUrl", "/cashflow?startDate=" + startDate + "&endDate=" + endDate);
         return "income/other_income_placeholder";
     }
 
@@ -276,10 +274,23 @@ public class IncomeController {
             @RequestParam("amount") BigDecimal amount,
             @RequestParam("incomeDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate incomeDate,
             @RequestParam(name = "observation", required = false) String observation,
+            @RequestParam(name = "docType", required = false) String docType,
+            @RequestParam(name = "docSeries", required = false) String docSeries,
+            @RequestParam(name = "docNumber", required = false) String docNumber,
+            @RequestParam(name = "taxRatePercent", required = false) BigDecimal taxRatePercent,
             RedirectAttributes redirectAttributes
     ) {
         try {
-            otherIncomeService.saveFromForm(categoryId, amount, incomeDate, observation);
+            otherIncomeService.saveFromForm(
+                    categoryId,
+                    amount,
+                    incomeDate,
+                    observation,
+                    docType,
+                    docSeries,
+                    docNumber,
+                    taxRatePercent
+            );
             redirectAttributes.addFlashAttribute("message", "Ingreso registrado correctamente.");
             redirectAttributes.addFlashAttribute("messageType", "success");
         } catch (IllegalArgumentException ex) {

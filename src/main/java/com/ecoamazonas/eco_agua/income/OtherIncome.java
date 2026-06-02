@@ -52,8 +52,8 @@ public class OtherIncome {
     @Column(name = "tax_rate", precision = 5, scale = 2)
     private BigDecimal taxRate;
 
-    // === Default IGV (VAT) rate ===
-    private static final BigDecimal DEFAULT_TAX_RATE = new BigDecimal("0.18");
+    // Default tax rate for non-taxable auxiliary income records.
+    private static final BigDecimal DEFAULT_TAX_RATE = BigDecimal.ZERO;
 
     @PrePersist
     public void prePersist() {
@@ -75,36 +75,60 @@ public class OtherIncome {
     // ---------- Automatic tax calculation ----------
 
     private void calculateTaxesIfNeeded() {
-        System.out.println(">>> OtherIncome.calculateTaxesIfNeeded() BEFORE: amount=" + amount
-                + ", taxBase=" + taxBase + ", taxIgv=" + taxIgv + ", rate=" + taxRate);
-
-        // Ensure amount is not null
         if (this.amount == null) {
             this.amount = BigDecimal.ZERO;
         }
 
-        // Use default tax rate if none is provided
         if (this.taxRate == null) {
             this.taxRate = DEFAULT_TAX_RATE;
         }
 
-        // Calculate tax base and tax amount only if missing
         if (this.taxBase == null || this.taxIgv == null) {
-            // Assumes amount already includes tax (gross amount)
-            BigDecimal divisor = BigDecimal.ONE.add(this.taxRate); // e.g. 1.18
-            BigDecimal base = this.amount
-                    .divide(divisor, 2, RoundingMode.HALF_UP);
-            BigDecimal igv = this.amount.subtract(base);
+            if (this.taxRate.compareTo(BigDecimal.ZERO) <= 0) {
+                this.taxBase = this.amount.setScale(2, RoundingMode.HALF_UP);
+                this.taxIgv = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                return;
+            }
+
+            BigDecimal divisor = BigDecimal.ONE.add(this.taxRate);
+            BigDecimal base = this.amount.divide(divisor, 2, RoundingMode.HALF_UP);
+            BigDecimal igv = this.amount.subtract(base).setScale(2, RoundingMode.HALF_UP);
 
             this.taxBase = base;
             this.taxIgv = igv;
         }
-
-        System.out.println(">>> OtherIncome.calculateTaxesIfNeeded() AFTER: amount=" + amount
-                + ", taxBase=" + taxBase + ", taxIgv=" + taxIgv + ", rate=" + taxRate);
     }
 
     // ---------- Getters and setters ----------
+
+
+    public String getDocumentLabel() {
+        boolean hasDocType = docType != null && !docType.isBlank();
+        boolean hasSeries = docSeries != null && !docSeries.isBlank();
+        boolean hasNumber = docNumber != null && !docNumber.isBlank();
+
+        if (!hasDocType && !hasSeries && !hasNumber) {
+            return "Sin documento";
+        }
+
+        StringBuilder label = new StringBuilder();
+        if (hasDocType) {
+            label.append(docType.trim());
+        }
+        if (hasSeries) {
+            if (!label.isEmpty()) {
+                label.append(" ");
+            }
+            label.append(docSeries.trim());
+        }
+        if (hasNumber) {
+            if (!label.isEmpty()) {
+                label.append("-");
+            }
+            label.append(docNumber.trim());
+        }
+        return label.toString();
+    }
 
     public Long getId() {
         return id;

@@ -1,8 +1,10 @@
 package com.ecoamazonas.eco_agua.cashflow;
 
 import com.ecoamazonas.eco_agua.expense.Expense;
+import com.ecoamazonas.eco_agua.expense.ExpensePayment;
 import com.ecoamazonas.eco_agua.income.OtherIncome;
 import com.ecoamazonas.eco_agua.order.SaleOrder;
+import com.ecoamazonas.eco_agua.order.SaleOrderPayment;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -12,13 +14,19 @@ import java.util.List;
 public class CashflowDayDetail {
 
     private LocalDate date;
-    private List<SaleOrder> sales = new ArrayList<>();
+    private List<SaleOrder> directSales = new ArrayList<>();
+    private List<SaleOrderPayment> creditCollections = new ArrayList<>();
     private List<OtherIncome> otherIncomes = new ArrayList<>();
-    private List<Expense> expenses = new ArrayList<>();
+    private List<Expense> cashExpenses = new ArrayList<>();
+    private List<ExpensePayment> debtPayments = new ArrayList<>();
 
+    private BigDecimal directSalesTotal = BigDecimal.ZERO;
+    private BigDecimal creditCollectionTotal = BigDecimal.ZERO;
     private BigDecimal salesTotal = BigDecimal.ZERO;
     private BigDecimal otherIncomeTotal = BigDecimal.ZERO;
     private BigDecimal totalIncome = BigDecimal.ZERO;
+    private BigDecimal cashExpenseTotal = BigDecimal.ZERO;
+    private BigDecimal debtPaymentTotal = BigDecimal.ZERO;
     private BigDecimal expenseTotal = BigDecimal.ZERO;
     private BigDecimal netResult = BigDecimal.ZERO;
 
@@ -30,12 +38,28 @@ public class CashflowDayDetail {
         this.date = date;
     }
 
+    public List<SaleOrder> getDirectSales() {
+        return directSales;
+    }
+
+    public void setDirectSales(List<SaleOrder> directSales) {
+        this.directSales = directSales != null ? directSales : new ArrayList<>();
+    }
+
     public List<SaleOrder> getSales() {
-        return sales;
+        return directSales;
     }
 
     public void setSales(List<SaleOrder> sales) {
-        this.sales = (sales != null ? sales : new ArrayList<>());
+        setDirectSales(sales);
+    }
+
+    public List<SaleOrderPayment> getCreditCollections() {
+        return creditCollections;
+    }
+
+    public void setCreditCollections(List<SaleOrderPayment> creditCollections) {
+        this.creditCollections = creditCollections != null ? creditCollections : new ArrayList<>();
     }
 
     public List<OtherIncome> getOtherIncomes() {
@@ -43,15 +67,47 @@ public class CashflowDayDetail {
     }
 
     public void setOtherIncomes(List<OtherIncome> otherIncomes) {
-        this.otherIncomes = (otherIncomes != null ? otherIncomes : new ArrayList<>());
+        this.otherIncomes = otherIncomes != null ? otherIncomes : new ArrayList<>();
+    }
+
+    public List<Expense> getCashExpenses() {
+        return cashExpenses;
+    }
+
+    public void setCashExpenses(List<Expense> cashExpenses) {
+        this.cashExpenses = cashExpenses != null ? cashExpenses : new ArrayList<>();
     }
 
     public List<Expense> getExpenses() {
-        return expenses;
+        return cashExpenses;
     }
 
     public void setExpenses(List<Expense> expenses) {
-        this.expenses = (expenses != null ? expenses : new ArrayList<>());
+        setCashExpenses(expenses);
+    }
+
+    public List<ExpensePayment> getDebtPayments() {
+        return debtPayments;
+    }
+
+    public void setDebtPayments(List<ExpensePayment> debtPayments) {
+        this.debtPayments = debtPayments != null ? debtPayments : new ArrayList<>();
+    }
+
+    public BigDecimal getDirectSalesTotal() {
+        return directSalesTotal;
+    }
+
+    public void setDirectSalesTotal(BigDecimal directSalesTotal) {
+        this.directSalesTotal = safe(directSalesTotal);
+    }
+
+    public BigDecimal getCreditCollectionTotal() {
+        return creditCollectionTotal;
+    }
+
+    public void setCreditCollectionTotal(BigDecimal creditCollectionTotal) {
+        this.creditCollectionTotal = safe(creditCollectionTotal);
     }
 
     public BigDecimal getSalesTotal() {
@@ -59,7 +115,7 @@ public class CashflowDayDetail {
     }
 
     public void setSalesTotal(BigDecimal salesTotal) {
-        this.salesTotal = (salesTotal != null ? salesTotal : BigDecimal.ZERO);
+        this.salesTotal = safe(salesTotal);
     }
 
     public BigDecimal getOtherIncomeTotal() {
@@ -67,7 +123,7 @@ public class CashflowDayDetail {
     }
 
     public void setOtherIncomeTotal(BigDecimal otherIncomeTotal) {
-        this.otherIncomeTotal = (otherIncomeTotal != null ? otherIncomeTotal : BigDecimal.ZERO);
+        this.otherIncomeTotal = safe(otherIncomeTotal);
     }
 
     public BigDecimal getTotalIncome() {
@@ -75,7 +131,23 @@ public class CashflowDayDetail {
     }
 
     public void setTotalIncome(BigDecimal totalIncome) {
-        this.totalIncome = (totalIncome != null ? totalIncome : BigDecimal.ZERO);
+        this.totalIncome = safe(totalIncome);
+    }
+
+    public BigDecimal getCashExpenseTotal() {
+        return cashExpenseTotal;
+    }
+
+    public void setCashExpenseTotal(BigDecimal cashExpenseTotal) {
+        this.cashExpenseTotal = safe(cashExpenseTotal);
+    }
+
+    public BigDecimal getDebtPaymentTotal() {
+        return debtPaymentTotal;
+    }
+
+    public void setDebtPaymentTotal(BigDecimal debtPaymentTotal) {
+        this.debtPaymentTotal = safe(debtPaymentTotal);
     }
 
     public BigDecimal getExpenseTotal() {
@@ -83,7 +155,7 @@ public class CashflowDayDetail {
     }
 
     public void setExpenseTotal(BigDecimal expenseTotal) {
-        this.expenseTotal = (expenseTotal != null ? expenseTotal : BigDecimal.ZERO);
+        this.expenseTotal = safe(expenseTotal);
     }
 
     public BigDecimal getNetResult() {
@@ -91,6 +163,10 @@ public class CashflowDayDetail {
     }
 
     public void setNetResult(BigDecimal netResult) {
-        this.netResult = (netResult != null ? netResult : BigDecimal.ZERO);
+        this.netResult = safe(netResult);
+    }
+
+    private BigDecimal safe(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 }

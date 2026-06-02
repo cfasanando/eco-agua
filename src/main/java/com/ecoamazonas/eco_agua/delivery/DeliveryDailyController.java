@@ -38,7 +38,7 @@ public class DeliveryDailyController {
         model.addAttribute("activePage", "delivery_daily");
         model.addAttribute("today", effectiveDate);
         model.addAttribute("rows", rows);
-        model.addAttribute("deliveryEmployees", employeeRepository.findActiveByJobPositionName("Repartidor"));
+        model.addAttribute("deliveryEmployees", employeeRepository.findByActiveTrueOrderByFirstNameAscLastNameAsc());
         model.addAttribute("deliveryStatuses", DeliveryStatus.values());
         model.addAttribute("selectedDeliveryPerson", deliveryPerson);
         model.addAttribute("selectedDeliveryStatus", deliveryStatus);

@@ -15,6 +15,21 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     List<Expense> findByExpenseDateBetweenOrderByExpenseDateAsc(LocalDate start, LocalDate end);
 
+
+    @Query("""
+        select distinct e
+        from Expense e
+        left join fetch e.category c
+        left join fetch e.supplier s
+        where e.expenseDate between :start and :end
+          and e.debt = false
+        order by e.expenseDate asc, e.id asc
+        """)
+    List<Expense> findCashflowPaidExpensesBetween(
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end
+    );
+
     List<Expense> findByExpenseDateAndDebtFalseOrderByExpenseDateAsc(LocalDate date);
 
     List<Expense> findByDebtTrueAndStatusInOrderByDueDateAsc(List<ExpenseStatus> statuses);

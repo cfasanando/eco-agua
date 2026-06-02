@@ -33,8 +33,6 @@ public class CashflowController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             Model model
     ) {
-        System.out.println(">>> [CashflowController] Handling /cashflow");
-
         LocalDate today = LocalDate.now();
         LocalDate base = (date != null ? date : today);
 
@@ -69,21 +67,23 @@ public class CashflowController {
         }
 
         List<CashflowItem> items;
+        CashflowSummary summary;
         BigDecimal totalIncomes;
         BigDecimal totalExpenses;
         BigDecimal netResult;
 
         try {
             items = cashflowService.buildCashflow(start, end);
-            totalIncomes = cashflowService.calculateTotalIncomes(items);
-            totalExpenses = cashflowService.calculateTotalExpenses(items);
-            netResult = cashflowService.calculateNetResult(items);
+            summary = cashflowService.buildSummary(items);
+            totalIncomes = summary.getCollectedIncome();
+            totalExpenses = summary.getPaidExpenses();
+            netResult = summary.getNetCashResult();
             model.addAttribute("errorMessage", null);
         } catch (Exception ex) {
-            System.out.println("[CashflowController] Error building cashflow: " + ex.getMessage());
             ex.printStackTrace();
 
             items = List.of();
+            summary = new CashflowSummary();
             totalIncomes = BigDecimal.ZERO;
             totalExpenses = BigDecimal.ZERO;
             netResult = BigDecimal.ZERO;
@@ -98,6 +98,7 @@ public class CashflowController {
         model.addAttribute("toDate", end);
         model.addAttribute("periodLabel", periodLabel);
         model.addAttribute("cashflowItems", items);
+        model.addAttribute("summary", summary);
         model.addAttribute("totalIncomes", totalIncomes);
         model.addAttribute("totalExpenses", totalExpenses);
         model.addAttribute("netResult", netResult);

@@ -1,80 +1,71 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/head_admin :: adminHead('Flujo de caja - Eco Agua')"></head>
+<head th:replace="fragments/head_admin :: adminHead('Flujo de caja real - Eco Agua')"></head>
 
 <body>
 
 <div class="app-layout" th:with="activePage='cashflow'">
-
-    <!-- Sidebar -->
     <aside th:replace="fragments/sidebar :: sidebar"></aside>
 
-    <!-- Main -->
     <div class="main-content">
-
-        <!-- Topbar -->
         <header th:replace="fragments/topbar :: topbar"></header>
 
-        <!-- Content -->
         <main class="content-wrapper">
-
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
                 <div>
-                    <h1 class="h5 mb-0">Flujo de caja</h1>
+                    <div class="small text-muted mb-1">Finanzas</div>
+                    <h1 class="h4 mb-1">Flujo de caja real</h1>
                     <div class="small text-muted">
-                        Resumen de ingresos y gastos
-                        <span th:text="${periodLabel}">del 01/01/2025 al 01/01/2025</span>
+                        Ingresos cobrados y egresos pagados
+                        <span th:text="${periodLabel}">del 01/01/2025 al 01/01/2025</span>.
                     </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a th:href="@{/income/sales}" class="btn btn-outline-success btn-sm">
+                        <i class="bi bi-cash-coin"></i> Ventas
+                    </a>
+                    <a th:href="@{/income/credit}" class="btn btn-outline-warning btn-sm">
+                        <i class="bi bi-wallet2"></i> Por cobrar
+                    </a>
+                    <a th:href="@{/expenses/by-date}" class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-receipt"></i> Egresos
+                    </a>
                 </div>
             </div>
 
-            <!-- Filtros -->
+            <div class="alert alert-info border-0 shadow-sm small mb-3">
+                <strong>Lectura correcta:</strong>
+                este reporte separa caja real de registros comerciales. Una venta fiada no entra como efectivo hasta que se cobre.
+                Un gasto a crédito no sale de caja hasta que se pague.
+            </div>
+
             <div class="card mb-3 shadow-sm">
                 <div class="card-header bg-light">
                     <strong>Filtros</strong>
                 </div>
                 <div class="card-body">
-                    <form class="row g-2 align-items-end"
-                          method="get"
-                          th:action="@{/cashflow}">
-
+                    <form class="row g-2 align-items-end" method="get" th:action="@{/cashflow}">
                         <div class="col-md-3">
                             <label for="mode" class="form-label">Modo</label>
-                            <select id="mode"
-                                    name="mode"
-                                    class="form-select">
-                                <option value="BY_DAY"
-                                        th:selected="${mode}=='BY_DAY'">Por día</option>
-                                <option value="BY_PERIOD"
-                                        th:selected="${mode}=='BY_PERIOD'">Por período</option>
+                            <select id="mode" name="mode" class="form-select">
+                                <option value="BY_DAY" th:selected="${mode}=='BY_DAY'">Por día</option>
+                                <option value="BY_PERIOD" th:selected="${mode}=='BY_PERIOD'">Por período</option>
                             </select>
                         </div>
 
                         <div class="col-md-3" id="singleDateWrapper">
                             <label for="filterDate" class="form-label">Fecha</label>
-                            <input type="date"
-                                   id="filterDate"
-                                   name="date"
-                                   class="form-control"
-                                   th:value="${date}">
+                            <input type="date" id="filterDate" name="date" class="form-control" th:value="${date}">
                         </div>
 
                         <div class="col-md-3 d-none" id="fromDateWrapper">
                             <label for="fromDate" class="form-label">Desde</label>
-                            <input type="date"
-                                   id="fromDate"
-                                   name="fromDate"
-                                   class="form-control"
-                                   th:value="${fromDate}">
+                            <input type="date" id="fromDate" name="fromDate" class="form-control" th:value="${fromDate}">
                         </div>
 
                         <div class="col-md-3 d-none" id="toDateWrapper">
                             <label for="toDate" class="form-label">Hasta</label>
-                            <input type="date"
-                                   id="toDate"
-                                   name="toDate"
-                                   class="form-control"
-                                   th:value="${toDate}">
+                            <input type="date" id="toDate" name="toDate" class="form-control" th:value="${toDate}">
                         </div>
 
                         <div class="col-md-3">
@@ -86,150 +77,180 @@
                 </div>
             </div>
 
-            <!-- Errores -->
-            <div th:if="${errorMessage != null}"
-                 class="alert alert-danger">
+            <div th:if="${errorMessage != null}" class="alert alert-danger">
                 <strong>Error:</strong>
                 <span th:text="${errorMessage}">Mensaje de error</span>
             </div>
 
-            <!-- Resumen -->
             <div class="row g-3 mb-3">
-                <div class="col-md-4">
-                    <div class="card shadow-sm border-success">
+                <div class="col-md-3">
+                    <div class="card shadow-sm border-success h-100">
                         <div class="card-body">
-                            <div class="text-muted small">Ingresos totales</div>
+                            <div class="text-muted small">Ingresos cobrados</div>
                             <div class="fs-5 text-success fw-bold">
-                                S/.
-                                <span th:text="${#numbers.formatDecimal(totalIncomes,1,'POINT',2,'POINT')}">
-                                    0.00
-                                </span>
+                                S/. <span th:text="${#numbers.formatDecimal(summary.collectedIncome,1,'POINT',2,'POINT')}">0.00</span>
                             </div>
+                            <div class="small text-muted">Ventas cobradas + otros ingresos.</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-md-4">
-                    <div class="card shadow-sm border-danger">
+                <div class="col-md-3">
+                    <div class="card shadow-sm border-danger h-100">
                         <div class="card-body">
-                            <div class="text-muted small">Gastos totales</div>
+                            <div class="text-muted small">Egresos pagados</div>
                             <div class="fs-5 text-danger fw-bold">
-                                S/.
-                                <span th:text="${#numbers.formatDecimal(totalExpenses,1,'POINT',2,'POINT')}">
-                                    0.00
-                                </span>
+                                S/. <span th:text="${#numbers.formatDecimal(summary.paidExpenses,1,'POINT',2,'POINT')}">0.00</span>
                             </div>
+                            <div class="small text-muted">Gastos pagados + pagos de deuda.</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-md-4">
-                    <div class="card shadow-sm border-primary">
+                <div class="col-md-3">
+                    <div class="card shadow-sm border-primary h-100">
                         <div class="card-body">
-                            <div class="text-muted small">Resultado neto</div>
-                            <div class="fs-5 fw-bold"
-                                 th:classappend="${netResult != null and netResult < 0} ? ' text-danger' : ' text-success'">
-                                S/.
-                                <span th:text="${#numbers.formatDecimal(netResult,1,'POINT',2,'POINT')}">
-                                    0.00
-                                </span>
+                            <div class="text-muted small">Resultado de caja</div>
+                            <div class="fs-5 fw-bold" th:classappend="${summary.netCashResult != null and summary.netCashResult < 0} ? ' text-danger' : ' text-success'">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.netCashResult,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Caja real del período.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="card shadow-sm border-secondary h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Resultado registrado</div>
+                            <div class="fs-5 fw-bold" th:classappend="${summary.registeredResult != null and summary.registeredResult < 0} ? ' text-danger' : ' text-success'">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.registeredResult,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Ventas registradas - gastos registrados.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Ventas cobradas al contado</div>
+                            <div class="fw-semibold text-success">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.directSalesIncome,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Cobros de fiados</div>
+                            <div class="fw-semibold text-success">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.creditCollections,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Pendiente por cobrar</div>
+                            <div class="fw-semibold text-warning">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.pendingReceivables,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Pendiente por pagar</div>
+                            <div class="fw-semibold text-danger">
+                                S/. <span th:text="${#numbers.formatDecimal(summary.pendingPayables,1,'POINT',2,'POINT')}">0.00</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Detalle por día -->
             <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <strong>Detalle diario</strong>
+                    <span class="small text-muted">Haz clic en una fecha o monto para ver el detalle.</span>
+                </div>
                 <div class="card-body">
-
                     <div th:if="${cashflowItems != null and !#lists.isEmpty(cashflowItems)}">
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
                                 <thead class="table-light">
                                 <tr>
                                     <th>Fecha</th>
-                                    <th class="text-end">Ventas S/.</th>
+                                    <th class="text-end">Ventas contado S/.</th>
+                                    <th class="text-end">Cobros fiado S/.</th>
                                     <th class="text-end">Otros ingresos S/.</th>
-                                    <th class="text-end">Total ingresos S/.</th>
-                                    <th class="text-end">Gastos S/.</th>
-                                    <th class="text-end">Resultado neto S/.</th>
+                                    <th class="text-end">Ingresos cobrados S/.</th>
+                                    <th class="text-end">Gastos pagados S/.</th>
+                                    <th class="text-end">Pagos deuda S/.</th>
+                                    <th class="text-end">Egresos pagados S/.</th>
+                                    <th class="text-end">Caja real S/.</th>
                                 </tr>
                                 </thead>
                                 <tbody>
                                 <tr th:each="item : ${cashflowItems}">
                                     <td>
-                                        <button type="button"
-                                                class="btn btn-link btn-sm p-0 text-decoration-none js-cashflow-day-detail"
-                                                th:attr="data-date=${item.date}"
-                                                th:text="${#temporals.format(item.date, 'dd/MM/yyyy')}">
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none js-cashflow-day-detail" th:attr="data-date=${item.date}" th:text="${#temporals.format(item.date, 'dd/MM/yyyy')}">
                                             01/01/2025
                                         </button>
                                     </td>
-
                                     <td class="text-end">
-                                        <button type="button"
-                                                class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail"
-                                                th:attr="data-date=${item.date}">
-                                            <span th:text="${#numbers.formatDecimal(item.salesIncome,1,'POINT',2,'POINT')}">
-                                                0.00
-                                            </span>
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail" th:attr="data-date=${item.date}">
+                                            <span th:text="${#numbers.formatDecimal(item.directSalesIncome,1,'POINT',2,'POINT')}">0.00</span>
                                         </button>
                                     </td>
-
                                     <td class="text-end">
-                                        <button type="button"
-                                                class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail"
-                                                th:attr="data-date=${item.date}">
-                                            <span th:text="${#numbers.formatDecimal(item.otherIncome,1,'POINT',2,'POINT')}">
-                                                0.00
-                                            </span>
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail" th:attr="data-date=${item.date}">
+                                            <span th:text="${#numbers.formatDecimal(item.creditCollectionIncome,1,'POINT',2,'POINT')}">0.00</span>
                                         </button>
                                     </td>
-
                                     <td class="text-end">
-                                        <button type="button"
-                                                class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail"
-                                                th:attr="data-date=${item.date}">
-                                            <span th:text="${#numbers.formatDecimal(item.totalIncome,1,'POINT',2,'POINT')}">
-                                                0.00
-                                            </span>
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail" th:attr="data-date=${item.date}">
+                                            <span th:text="${#numbers.formatDecimal(item.otherIncome,1,'POINT',2,'POINT')}">0.00</span>
                                         </button>
                                     </td>
-
-                                    <td class="text-end">
-                                        <button type="button"
-                                                class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail"
-                                                th:attr="data-date=${item.date}">
-                                            <span th:text="${#numbers.formatDecimal(item.totalExpense,1,'POINT',2,'POINT')}">
-                                                0.00
-                                            </span>
+                                    <td class="text-end fw-semibold">
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail" th:attr="data-date=${item.date}">
+                                            <span th:text="${#numbers.formatDecimal(item.totalIncome,1,'POINT',2,'POINT')}">0.00</span>
                                         </button>
                                     </td>
-
-                                    <td class="text-end"
-                                        th:classappend="${item.netResult != null and item.netResult < 0} ? ' text-danger' : ' text-success'">
-                                        <button type="button"
-                                                class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail"
-                                                th:attr="data-date=${item.date}"
-                                                th:classappend="${item.netResult != null and item.netResult < 0} ? ' link-danger' : ' link-success'">
-                                            <span th:text="${#numbers.formatDecimal(item.netResult,1,'POINT',2,'POINT')}">
-                                                0.00
-                                            </span>
+                                    <td class="text-end">
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail" th:attr="data-date=${item.date}">
+                                            <span th:text="${#numbers.formatDecimal(item.cashExpense,1,'POINT',2,'POINT')}">0.00</span>
+                                        </button>
+                                    </td>
+                                    <td class="text-end">
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail" th:attr="data-date=${item.date}">
+                                            <span th:text="${#numbers.formatDecimal(item.debtPaymentExpense,1,'POINT',2,'POINT')}">0.00</span>
+                                        </button>
+                                    </td>
+                                    <td class="text-end fw-semibold">
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail" th:attr="data-date=${item.date}">
+                                            <span th:text="${#numbers.formatDecimal(item.totalExpense,1,'POINT',2,'POINT')}">0.00</span>
+                                        </button>
+                                    </td>
+                                    <td class="text-end" th:classappend="${item.netResult != null and item.netResult < 0} ? ' text-danger' : ' text-success'">
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none w-100 text-end js-cashflow-day-detail" th:attr="data-date=${item.date}" th:classappend="${item.netResult != null and item.netResult < 0} ? ' link-danger' : ' link-success'">
+                                            <span th:text="${#numbers.formatDecimal(item.netResult,1,'POINT',2,'POINT')}">0.00</span>
                                         </button>
                                     </td>
                                 </tr>
                                 </tbody>
                             </table>
                         </div>
-
-                        <div class="small text-muted mt-3">
-                            Haz clic en la fecha o en cualquier monto del día para ver el detalle de ventas, otros ingresos y gastos.
-                        </div>
                     </div>
 
-                    <div th:if="${cashflowItems == null or #lists.isEmpty(cashflowItems)}"
-                         class="text-center text-muted py-4">
+                    <div th:if="${cashflowItems == null or #lists.isEmpty(cashflowItems)}" class="text-center text-muted py-4">
                         No hay datos de flujo de caja para el período seleccionado.
                     </div>
                 </div>
@@ -238,7 +259,6 @@
     </div>
 </div>
 
-<!-- Day detail modal -->
 <div class="modal fade" id="cashflowDayDetailModal" tabindex="-1" aria-labelledby="cashflowDayDetailModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">

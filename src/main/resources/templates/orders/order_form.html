@@ -94,21 +94,20 @@
                                         </small>
                                     </div>
                                     <div class="col-md-3" th:if="${featureDelivery}">
-                                        <label class="form-label" th:text="${businessDeliveryPersonLabel} ?: 'Repartidor'">Repartidor</label>
-                                        <!-- Delivery person select (only registered employees with job 'Repartidor') -->
+                                        <label class="form-label">Atendido por</label>
+                                        <!-- Optional attendant/responsible selector. Delivery can be assigned later from the delivery board. -->
                                         <select class="form-select"
                                                 id="deliveryPerson"
-                                                name="deliveryPerson"
-                                                required>
-                                            <option value="" th:text="${'Seleccione ' + #strings.toLowerCase(businessDeliveryPersonLabel ?: 'un repartidor')}">Seleccione un repartidor</option>
+                                                name="deliveryPerson">
+                                            <option value="">Sin responsable por ahora</option>
                                             <option th:each="emp : ${deliveryEmployees}"
                                                     th:value="${emp.firstName + ' ' + emp.lastName}"
                                                     th:text="${emp.firstName + ' ' + emp.lastName}">
-                                                Repartidor
+                                                Responsable
                                             </option>
                                         </select>
-                                        <small class="text-muted small" th:text="${'Solo se muestran colaboradores activos configurados como ' + #strings.toLowerCase(businessDeliveryPersonLabel ?: 'repartidor') + '.'}">
-                                            Solo se muestran colaboradores activos con cargo de repartidor.
+                                        <small class="text-muted small">
+                                            Opcional. Puede seleccionar quién atendió el pedido o dejarlo vacío y asignar la entrega desde Delivery.
                                         </small>
                                     </div>
                                     <input type="hidden" name="deliveryPerson" value="" th:if="${!featureDelivery}">
@@ -515,7 +514,6 @@
         let lastSuggestedDelivered = 0;
         let lastSuggestedReturned = 0;
 
-        initSingleDeliveryPerson();
         setupClientAutocomplete();
         setupQuickCashClientButton();
         setupBorrowedBottlesAutoMode();

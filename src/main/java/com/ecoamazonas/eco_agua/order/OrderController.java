@@ -86,7 +86,7 @@ public class OrderController {
         );
         model.addAttribute(
                 "deliveryEmployees",
-                employeeRepository.findActiveByJobPositionName("Repartidor")
+                employeeRepository.findByActiveTrueOrderByFirstNameAscLastNameAsc()
         );
         model.addAttribute("clientContainerBalances", clientContainerBalances);
 

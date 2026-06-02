@@ -1,34 +1,53 @@
 <div th:fragment="dayDetailModalContent">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-            <h5 class="mb-0">Detalle del flujo de caja</h5>
-            <div class="small text-muted"
-                 th:text="${#temporals.format(dayDetail.date, 'dd/MM/yyyy')}">
+            <h5 class="mb-0">Detalle del flujo de caja real</h5>
+            <div class="small text-muted" th:text="${#temporals.format(dayDetail.date, 'dd/MM/yyyy')}">
                 01/01/2025
             </div>
         </div>
     </div>
 
     <div class="row g-3 mb-3">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card border-success shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Ingresos por ventas</div>
-                    <div class="fs-5 fw-bold text-success">
-                        S/.
-                        <span th:text="${#numbers.formatDecimal(dayDetail.salesTotal,1,'POINT',2,'POINT')}">0.00</span>
+                    <div class="text-muted small">Ventas al contado</div>
+                    <div class="fs-6 fw-bold text-success">
+                        S/. <span th:text="${#numbers.formatDecimal(dayDetail.directSalesTotal,1,'POINT',2,'POINT')}">0.00</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-3">
+            <div class="card border-success shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Cobros de fiados</div>
+                    <div class="fs-6 fw-bold text-success">
+                        S/. <span th:text="${#numbers.formatDecimal(dayDetail.creditCollectionTotal,1,'POINT',2,'POINT')}">0.00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
             <div class="card border-info shadow-sm h-100">
                 <div class="card-body">
                     <div class="text-muted small">Otros ingresos</div>
-                    <div class="fs-5 fw-bold text-info">
-                        S/.
-                        <span th:text="${#numbers.formatDecimal(dayDetail.otherIncomeTotal,1,'POINT',2,'POINT')}">0.00</span>
+                    <div class="fs-6 fw-bold text-info">
+                        S/. <span th:text="${#numbers.formatDecimal(dayDetail.otherIncomeTotal,1,'POINT',2,'POINT')}">0.00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-primary shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Total cobrado</div>
+                    <div class="fs-6 fw-bold text-primary">
+                        S/. <span th:text="${#numbers.formatDecimal(dayDetail.totalIncome,1,'POINT',2,'POINT')}">0.00</span>
                     </div>
                 </div>
             </div>
@@ -37,73 +56,62 @@
         <div class="col-md-4">
             <div class="card border-danger shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Gastos</div>
-                    <div class="fs-5 fw-bold text-danger">
-                        S/.
-                        <span th:text="${#numbers.formatDecimal(dayDetail.expenseTotal,1,'POINT',2,'POINT')}">0.00</span>
+                    <div class="text-muted small">Gastos pagados</div>
+                    <div class="fs-6 fw-bold text-danger">
+                        S/. <span th:text="${#numbers.formatDecimal(dayDetail.cashExpenseTotal,1,'POINT',2,'POINT')}">0.00</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-6">
-            <div class="card border-primary shadow-sm h-100">
+        <div class="col-md-4">
+            <div class="card border-danger shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Total ingresos</div>
-                    <div class="fs-5 fw-bold text-primary">
-                        S/.
-                        <span th:text="${#numbers.formatDecimal(dayDetail.totalIncome,1,'POINT',2,'POINT')}">0.00</span>
+                    <div class="text-muted small">Pagos de deudas</div>
+                    <div class="fs-6 fw-bold text-danger">
+                        S/. <span th:text="${#numbers.formatDecimal(dayDetail.debtPaymentTotal,1,'POINT',2,'POINT')}">0.00</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-4">
             <div class="card shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Resultado neto</div>
-                    <div class="fs-5 fw-bold"
-                         th:classappend="${dayDetail.netResult != null and dayDetail.netResult < 0} ? ' text-danger' : ' text-success'">
-                        S/.
-                        <span th:text="${#numbers.formatDecimal(dayDetail.netResult,1,'POINT',2,'POINT')}">0.00</span>
+                    <div class="text-muted small">Resultado de caja</div>
+                    <div class="fs-6 fw-bold" th:classappend="${dayDetail.netResult != null and dayDetail.netResult < 0} ? ' text-danger' : ' text-success'">
+                        S/. <span th:text="${#numbers.formatDecimal(dayDetail.netResult,1,'POINT',2,'POINT')}">0.00</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Sales -->
     <div class="card shadow-sm mb-3">
         <div class="card-header bg-light d-flex justify-content-between align-items-center">
-            <strong>Ventas del día</strong>
-            <span class="badge text-bg-success" th:text="${#lists.size(dayDetail.sales)}">0</span>
+            <strong>Ventas cobradas al contado</strong>
+            <span class="badge text-bg-success" th:text="${#lists.size(dayDetail.directSales)}">0</span>
         </div>
         <div class="card-body">
-            <div th:if="${dayDetail.sales != null and !#lists.isEmpty(dayDetail.sales)}" class="table-responsive">
+            <div th:if="${dayDetail.directSales != null and !#lists.isEmpty(dayDetail.directSales)}" class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead class="table-light">
                     <tr>
                         <th>Pedido</th>
                         <th>Cliente</th>
-                        <th>Repartidor</th>
-                        <th>Comentario</th>
+                        <th>Canal</th>
                         <th class="text-end">Total S/.</th>
                         <th class="text-end">Acción</th>
                     </tr>
                     </thead>
                     <tbody>
-                    <tr th:each="order : ${dayDetail.sales}">
+                    <tr th:each="order : ${dayDetail.directSales}">
                         <td th:text="${order.orderNumber}">1</td>
                         <td th:text="${order.client != null ? order.client.name : '-'}">Cliente</td>
-                        <td th:text="${order.deliveryPerson != null and !#strings.isEmpty(order.deliveryPerson) ? order.deliveryPerson : '-'}">-</td>
-                        <td th:text="${order.comment != null and !#strings.isEmpty(order.comment) ? order.comment : '-'}">-</td>
-                        <td class="text-end"
-                            th:text="${#numbers.formatDecimal(order.totalAmount,1,'POINT',2,'POINT')}">
-                            0.00
-                        </td>
+                        <td th:text="${order.salesChannel != null ? order.salesChannel.label : '-'}">Canal</td>
+                        <td class="text-end" th:text="${#numbers.formatDecimal(order.totalAmount,1,'POINT',2,'POINT')}">0.00</td>
                         <td class="text-end">
-                            <a class="btn btn-sm btn-outline-primary"
-                               th:href="@{/orders/{id}(id=${order.id})}">
+                            <a class="btn btn-sm btn-outline-primary" th:href="@{/orders/{id}(id=${order.id})}">
                                 Ver pedido
                             </a>
                         </td>
@@ -112,14 +120,53 @@
                 </table>
             </div>
 
-            <div th:if="${dayDetail.sales == null or #lists.isEmpty(dayDetail.sales)}"
-                 class="text-muted small">
-                No hay ventas pagadas registradas para este día.
+            <div th:if="${dayDetail.directSales == null or #lists.isEmpty(dayDetail.directSales)}" class="text-muted small">
+                No hay ventas al contado cobradas para este día.
             </div>
         </div>
     </div>
 
-    <!-- Other incomes -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <strong>Cobros de fiados</strong>
+            <span class="badge text-bg-success" th:text="${#lists.size(dayDetail.creditCollections)}">0</span>
+        </div>
+        <div class="card-body">
+            <div th:if="${dayDetail.creditCollections != null and !#lists.isEmpty(dayDetail.creditCollections)}" class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Pedido</th>
+                        <th>Cliente</th>
+                        <th>Método</th>
+                        <th>Referencia</th>
+                        <th class="text-end">Monto S/.</th>
+                        <th class="text-end">Acción</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="payment : ${dayDetail.creditCollections}">
+                        <td th:text="${payment.saleOrder != null ? payment.saleOrder.orderNumber : '-'}">1</td>
+                        <td th:text="${payment.saleOrder != null and payment.saleOrder.client != null ? payment.saleOrder.client.name : '-'}">Cliente</td>
+                        <td th:text="${payment.paymentMethod != null and !#strings.isEmpty(payment.paymentMethod) ? payment.paymentMethod : '-'}">Método</td>
+                        <td th:text="${payment.reference != null and !#strings.isEmpty(payment.reference) ? payment.reference : '-'}">Referencia</td>
+                        <td class="text-end" th:text="${#numbers.formatDecimal(payment.amount,1,'POINT',2,'POINT')}">0.00</td>
+                        <td class="text-end">
+                            <a th:if="${payment.saleOrder != null}" class="btn btn-sm btn-outline-primary" th:href="@{/income/credit/{id}(id=${payment.saleOrder.id})}">
+                                Ver cobro
+                            </a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div th:if="${dayDetail.creditCollections == null or #lists.isEmpty(dayDetail.creditCollections)}" class="text-muted small">
+                No hay cobros de fiados para este día.
+            </div>
+        </div>
+    </div>
+
     <div class="card shadow-sm mb-3">
         <div class="card-header bg-light d-flex justify-content-between align-items-center">
             <strong>Otros ingresos</strong>
@@ -141,56 +188,84 @@
                         <td th:text="${income.category != null ? income.category.name : '-'}">Categoría</td>
                         <td th:text="${income.observation != null and !#strings.isEmpty(income.observation) ? income.observation : '-'}">Observación</td>
                         <td th:text="${income.docSeries != null and income.docNumber != null ? income.docSeries + '-' + income.docNumber : '-'}">-</td>
-                        <td class="text-end"
-                            th:text="${#numbers.formatDecimal(income.amount,1,'POINT',2,'POINT')}">
-                            0.00
-                        </td>
+                        <td class="text-end" th:text="${#numbers.formatDecimal(income.amount,1,'POINT',2,'POINT')}">0.00</td>
                     </tr>
                     </tbody>
                 </table>
             </div>
 
-            <div th:if="${dayDetail.otherIncomes == null or #lists.isEmpty(dayDetail.otherIncomes)}"
-                 class="text-muted small">
+            <div th:if="${dayDetail.otherIncomes == null or #lists.isEmpty(dayDetail.otherIncomes)}" class="text-muted small">
                 No hay otros ingresos registrados para este día.
             </div>
         </div>
     </div>
 
-    <!-- Expenses -->
-    <div class="card shadow-sm">
+    <div class="card shadow-sm mb-3">
         <div class="card-header bg-light d-flex justify-content-between align-items-center">
-            <strong>Gastos del día</strong>
-            <span class="badge text-bg-danger" th:text="${#lists.size(dayDetail.expenses)}">0</span>
+            <strong>Gastos pagados al contado</strong>
+            <span class="badge text-bg-danger" th:text="${#lists.size(dayDetail.cashExpenses)}">0</span>
         </div>
         <div class="card-body">
-            <div th:if="${dayDetail.expenses != null and !#lists.isEmpty(dayDetail.expenses)}" class="table-responsive">
+            <div th:if="${dayDetail.cashExpenses != null and !#lists.isEmpty(dayDetail.cashExpenses)}" class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead class="table-light">
                     <tr>
                         <th>Categoría</th>
+                        <th>Proveedor</th>
                         <th>Observación</th>
                         <th>Comprobante</th>
                         <th class="text-end">Monto S/.</th>
                     </tr>
                     </thead>
                     <tbody>
-                    <tr th:each="expense : ${dayDetail.expenses}">
+                    <tr th:each="expense : ${dayDetail.cashExpenses}">
                         <td th:text="${expense.category != null ? expense.category.name : '-'}">Categoría</td>
+                        <td th:text="${expense.supplier != null ? expense.supplier.name : '-'}">Proveedor</td>
                         <td th:text="${expense.observation != null and !#strings.isEmpty(expense.observation) ? expense.observation : '-'}">Observación</td>
                         <td th:text="${expense.voucherNumber != null and !#strings.isEmpty(expense.voucherNumber) ? expense.voucherNumber : '-'}">-</td>
-                        <td class="text-end"
-                            th:text="${#numbers.formatDecimal(expense.amount,1,'POINT',2,'POINT')}">
-                            0.00
-                        </td>
+                        <td class="text-end" th:text="${#numbers.formatDecimal(expense.paidAmount != null ? expense.paidAmount : expense.amount,1,'POINT',2,'POINT')}">0.00</td>
                     </tr>
                     </tbody>
                 </table>
             </div>
 
-            <div th:if="${dayDetail.expenses == null or #lists.isEmpty(dayDetail.expenses)}"
-                 class="text-muted small">
-                No hay gastos registrados para este día.
+            <div th:if="${dayDetail.cashExpenses == null or #lists.isEmpty(dayDetail.cashExpenses)}" class="text-muted small">
+                No hay gastos pagados al contado para este día.
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <strong>Pagos de deudas a proveedores/gastos</strong>
+            <span class="badge text-bg-danger" th:text="${#lists.size(dayDetail.debtPayments)}">0</span>
+        </div>
+        <div class="card-body">
+            <div th:if="${dayDetail.debtPayments != null and !#lists.isEmpty(dayDetail.debtPayments)}" class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Egreso</th>
+                        <th>Categoría</th>
+                        <th>Proveedor</th>
+                        <th>Observación</th>
+                        <th class="text-end">Monto S/.</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="payment : ${dayDetail.debtPayments}">
+                        <td th:text="${payment.expense != null ? '#' + payment.expense.id : '-'}">#1</td>
+                        <td th:text="${payment.expense != null and payment.expense.category != null ? payment.expense.category.name : '-'}">Categoría</td>
+                        <td th:text="${payment.expense != null and payment.expense.supplier != null ? payment.expense.supplier.name : '-'}">Proveedor</td>
+                        <td th:text="${payment.observation != null and !#strings.isEmpty(payment.observation) ? payment.observation : '-'}">Observación</td>
+                        <td class="text-end" th:text="${#numbers.formatDecimal(payment.amount,1,'POINT',2,'POINT')}">0.00</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div th:if="${dayDetail.debtPayments == null or #lists.isEmpty(dayDetail.debtPayments)}" class="text-muted small">
+                No hay pagos de deudas para este día.
             </div>
         </div>
     </div>

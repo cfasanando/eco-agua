@@ -15,11 +15,16 @@ import java.util.List;
 public class CashflowController {
 
     private final CashflowService cashflowService;
+    private final MonthlyFinancialSummaryService monthlyFinancialSummaryService;
 
     private static final DateTimeFormatter LABEL_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-    public CashflowController(CashflowService cashflowService) {
+    public CashflowController(
+            CashflowService cashflowService,
+            MonthlyFinancialSummaryService monthlyFinancialSummaryService
+    ) {
         this.cashflowService = cashflowService;
+        this.monthlyFinancialSummaryService = monthlyFinancialSummaryService;
     }
 
     @GetMapping("/cashflow")
@@ -104,6 +109,31 @@ public class CashflowController {
         model.addAttribute("netResult", netResult);
 
         return "cashflow/cashflow";
+    }
+
+    @GetMapping("/cashflow/monthly-summary")
+    public String monthlyFinancialSummary(
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            Model model
+    ) {
+        MonthlyFinancialSummary monthlySummary;
+
+        try {
+            monthlySummary = monthlyFinancialSummaryService.build(year, month);
+            model.addAttribute("errorMessage", null);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            monthlySummary = monthlyFinancialSummaryService.build(LocalDate.now().getYear(), LocalDate.now().getMonthValue());
+            model.addAttribute("errorMessage", "Error al calcular el resumen financiero mensual: " + ex.getMessage());
+        }
+
+        model.addAttribute("activePage", "cashflow_monthly_summary");
+        model.addAttribute("monthlySummary", monthlySummary);
+        model.addAttribute("selectedYear", monthlySummary.getYear());
+        model.addAttribute("selectedMonth", monthlySummary.getMonth());
+
+        return "cashflow/monthly_summary";
     }
 
     @GetMapping("/cashflow/day-detail")

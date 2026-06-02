@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Resumen financiero mensual - Eco Agua')"></head>
+<body>
+
+<div class="app-layout" th:with="activePage='cashflow_monthly_summary'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Finanzas</div>
+                    <h1 class="h4 mb-1">Resumen financiero mensual</h1>
+                    <div class="small text-muted">
+                        Lectura gerencial de ventas, caja, egresos y pendientes de
+                        <strong th:text="${monthlySummary.monthLabel}">Mes 2026</strong>.
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a th:href="@{/cashflow}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-cash-stack"></i> Flujo de caja
+                    </a>
+                    <a th:href="@{/income/sales}" class="btn btn-outline-success btn-sm">
+                        <i class="bi bi-cash-coin"></i> Ventas
+                    </a>
+                    <a th:href="@{/expenses/debts}" class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-exclamation-octagon"></i> Por pagar
+                    </a>
+                </div>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small mb-3">
+                <strong>Lectura recomendada:</strong>
+                este resumen no es un libro contable oficial. Sirve para revisar caja real, resultado comercial y pendientes del mes antes de pasar a reportes contables más formales.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <strong>Período</strong>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-outline-secondary btn-sm"
+                           th:href="@{/cashflow/monthly-summary(year=${monthlySummary.previousYear}, month=${monthlySummary.previousMonth})}">
+                            <i class="bi bi-chevron-left"></i> Mes anterior
+                        </a>
+                        <a class="btn btn-outline-secondary btn-sm"
+                           th:href="@{/cashflow/monthly-summary(year=${monthlySummary.nextYear}, month=${monthlySummary.nextMonth})}">
+                            Mes siguiente <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" method="get" th:action="@{/cashflow/monthly-summary}">
+                        <div class="col-md-3">
+                            <label for="month" class="form-label">Mes</label>
+                            <select id="month" name="month" class="form-select">
+                                <option value="1" th:selected="${selectedMonth == 1}">Enero</option>
+                                <option value="2" th:selected="${selectedMonth == 2}">Febrero</option>
+                                <option value="3" th:selected="${selectedMonth == 3}">Marzo</option>
+                                <option value="4" th:selected="${selectedMonth == 4}">Abril</option>
+                                <option value="5" th:selected="${selectedMonth == 5}">Mayo</option>
+                                <option value="6" th:selected="${selectedMonth == 6}">Junio</option>
+                                <option value="7" th:selected="${selectedMonth == 7}">Julio</option>
+                                <option value="8" th:selected="${selectedMonth == 8}">Agosto</option>
+                                <option value="9" th:selected="${selectedMonth == 9}">Septiembre</option>
+                                <option value="10" th:selected="${selectedMonth == 10}">Octubre</option>
+                                <option value="11" th:selected="${selectedMonth == 11}">Noviembre</option>
+                                <option value="12" th:selected="${selectedMonth == 12}">Diciembre</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="year" class="form-label">Año</label>
+                            <input type="number" id="year" name="year" class="form-control" min="2020" max="2100" th:value="${selectedYear}">
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search me-1"></i> Ver resumen
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div th:if="${errorMessage != null}" class="alert alert-danger">
+                <strong>Error:</strong>
+                <span th:text="${errorMessage}">Mensaje de error</span>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card shadow-sm border-success h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Ingresos cobrados</div>
+                            <div class="fs-5 text-success fw-bold">
+                                S/. <span th:text="${#numbers.formatDecimal(monthlySummary.collectedIncome,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Ventas cobradas + otros ingresos.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm border-danger h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Egresos pagados</div>
+                            <div class="fs-5 text-danger fw-bold">
+                                S/. <span th:text="${#numbers.formatDecimal(monthlySummary.paidExpenses,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Gastos pagados + pagos de deuda.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm border-primary h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Resultado de caja</div>
+                            <div class="fs-5 fw-bold" th:classappend="${monthlySummary.cashPositive} ? ' text-success' : ' text-danger'">
+                                S/. <span th:text="${#numbers.formatDecimal(monthlySummary.netCashResult,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Ingresos cobrados - egresos pagados.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm border-secondary h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Resultado comercial</div>
+                            <div class="fs-5 fw-bold" th:classappend="${monthlySummary.commercialPositive} ? ' text-success' : ' text-danger'">
+                                S/. <span th:text="${#numbers.formatDecimal(monthlySummary.commercialResult,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Ventas + otros ingresos - egresos registrados.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Caja real del mes</strong></div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Ventas al contado</span>
+                                <strong class="text-success">S/. <span th:text="${#numbers.formatDecimal(monthlySummary.cashflowSummary.directSalesIncome,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Cobros de fiados</span>
+                                <strong class="text-success">S/. <span th:text="${#numbers.formatDecimal(monthlySummary.cashflowSummary.creditCollections,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Otros ingresos</span>
+                                <strong class="text-success">S/. <span th:text="${#numbers.formatDecimal(monthlySummary.cashflowSummary.otherIncome,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Gastos pagados</span>
+                                <strong class="text-danger">S/. <span th:text="${#numbers.formatDecimal(monthlySummary.cashflowSummary.cashExpenses,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between py-2">
+                                <span>Pagos de deudas</span>
+                                <strong class="text-danger">S/. <span th:text="${#numbers.formatDecimal(monthlySummary.cashflowSummary.debtPayments,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Registro comercial</strong></div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Ventas registradas</span>
+                                <strong>S/. <span th:text="${#numbers.formatDecimal(monthlySummary.cashflowSummary.registeredSales,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Otros ingresos registrados</span>
+                                <strong>S/. <span th:text="${#numbers.formatDecimal(monthlySummary.cashflowSummary.otherIncome,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Ingresos registrados</span>
+                                <strong>S/. <span th:text="${#numbers.formatDecimal(monthlySummary.registeredIncome,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Egresos registrados</span>
+                                <strong>S/. <span th:text="${#numbers.formatDecimal(monthlySummary.registeredExpenses,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between py-2">
+                                <span>Resultado comercial</span>
+                                <strong th:classappend="${monthlySummary.commercialPositive} ? ' text-success' : ' text-danger'">
+                                    S/. <span th:text="${#numbers.formatDecimal(monthlySummary.commercialResult,1,'POINT',2,'POINT')}">0.00</span>
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Pendientes actuales</strong></div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Por cobrar</span>
+                                <strong class="text-warning">S/. <span th:text="${#numbers.formatDecimal(monthlySummary.pendingReceivables,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Por pagar</span>
+                                <strong class="text-danger">S/. <span th:text="${#numbers.formatDecimal(monthlySummary.pendingPayables,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Diferencia de pendientes</span>
+                                <strong th:classappend="${monthlySummary.cashGap != null and monthlySummary.cashGap < 0} ? ' text-danger' : ' text-success'">
+                                    S/. <span th:text="${#numbers.formatDecimal(monthlySummary.cashGap,1,'POINT',2,'POINT')}">0.00</span>
+                                </strong>
+                            </div>
+                            <div class="small text-muted mt-3">
+                                Los pendientes son saldos abiertos al momento de consultar, no necesariamente solo del mes seleccionado.
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 mt-3">
+                                <a th:href="@{/income/credit}" class="btn btn-outline-warning btn-sm">Ver por cobrar</a>
+                                <a th:href="@{/expenses/debts}" class="btn btn-outline-danger btn-sm">Ver por pagar</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <strong>Detalle diario del mes</strong>
+                    <span class="small text-muted">Sirve para ubicar días con caja negativa o movimientos importantes.</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Fecha</th>
+                                <th class="text-end">Ventas contado S/.</th>
+                                <th class="text-end">Cobros fiado S/.</th>
+                                <th class="text-end">Otros ingresos S/.</th>
+                                <th class="text-end">Ingresos cobrados S/.</th>
+                                <th class="text-end">Egresos pagados S/.</th>
+                                <th class="text-end">Caja real S/.</th>
+                                <th class="text-end">Resultado registrado S/.</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="item : ${monthlySummary.dailyItems}">
+                                <td>
+                                    <a th:href="@{/cashflow(mode='BY_DAY', date=${item.date})}" th:text="${#temporals.format(item.date, 'dd/MM/yyyy')}">01/01/2026</a>
+                                </td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(item.directSalesIncome,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(item.creditCollectionIncome,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(item.otherIncome,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end fw-semibold" th:text="${#numbers.formatDecimal(item.totalIncome,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end fw-semibold" th:text="${#numbers.formatDecimal(item.totalExpense,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end fw-semibold" th:classappend="${item.netResult != null and item.netResult < 0} ? ' text-danger' : ' text-success'" th:text="${#numbers.formatDecimal(item.netResult,1,'POINT',2,'POINT')}">0.00</td>
+                                <td class="text-end" th:classappend="${item.registeredResult != null and item.registeredResult < 0} ? ' text-danger' : ' text-success'" th:text="${#numbers.formatDecimal(item.registeredResult,1,'POINT',2,'POINT')}">0.00</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+</body>
+</html>

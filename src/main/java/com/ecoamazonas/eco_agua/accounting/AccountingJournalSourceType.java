@@ -4,6 +4,7 @@ public enum AccountingJournalSourceType {
     MANUAL("Manual"),
     SALE("Venta"),
     PURCHASE("Compra"),
+    INCOME("Ingreso"),
     PAYMENT("Pago / cobro"),
     ADJUSTMENT("Ajuste");
 

@@ -1,5 +1,6 @@
 package com.ecoamazonas.eco_agua.order;
 
+import com.ecoamazonas.eco_agua.accounting.service.AccountingAutoJournalEntryService;
 import com.ecoamazonas.eco_agua.client.Client;
 import com.ecoamazonas.eco_agua.client.ClientRepository;
 import com.ecoamazonas.eco_agua.container.ClientContainerService;
@@ -33,6 +34,7 @@ public class OrderService {
     private final InventoryService inventoryService;
     private final PersonnelExpenseAutoSyncService personnelExpenseAutoSyncService;
     private final ClientContainerService clientContainerService;
+    private final AccountingAutoJournalEntryService accountingAutoJournalEntryService;
 
     public OrderService(
             SaleOrderRepository orderRepository,
@@ -40,7 +42,8 @@ public class OrderService {
             ClientRepository clientRepository,
             InventoryService inventoryService,
             PersonnelExpenseAutoSyncService personnelExpenseAutoSyncService,
-            ClientContainerService clientContainerService
+            ClientContainerService clientContainerService,
+            AccountingAutoJournalEntryService accountingAutoJournalEntryService
     ) {
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
@@ -48,6 +51,7 @@ public class OrderService {
         this.inventoryService = inventoryService;
         this.personnelExpenseAutoSyncService = personnelExpenseAutoSyncService;
         this.clientContainerService = clientContainerService;
+        this.accountingAutoJournalEntryService = accountingAutoJournalEntryService;
     }
 
     private boolean shouldAffectStock(OrderStatus status) {
@@ -212,6 +216,8 @@ public class OrderService {
             personnelExpenseAutoSyncService.syncSalaryExpensesForDate(saved.getOrderDate());
         }
 
+        accountingAutoJournalEntryService.generateForSaleOrder(saved);
+
         return saved;
     }
 
@@ -274,6 +280,12 @@ public class OrderService {
         order.setStatus(newStatus);
         orderRepository.save(order);
         orderRepository.flush();
+
+        if (newStatus == OrderStatus.CANCELED) {
+            accountingAutoJournalEntryService.cancelForSaleOrder(order);
+        } else {
+            accountingAutoJournalEntryService.generateForSaleOrder(order);
+        }
 
         if (oldStatusAffectsStock || newStatusAffectsStock) {
             clientContainerService.syncOrderContainerMovements(order);

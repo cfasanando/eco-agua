@@ -1,5 +1,6 @@
 package com.ecoamazonas.eco_agua.order;
 
+import com.ecoamazonas.eco_agua.accounting.service.AccountingAutoJournalEntryService;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -23,13 +24,16 @@ public class ReceivableService {
 
     private final SaleOrderRepository saleOrderRepository;
     private final SaleOrderPaymentRepository saleOrderPaymentRepository;
+    private final AccountingAutoJournalEntryService accountingAutoJournalEntryService;
 
     public ReceivableService(
             SaleOrderRepository saleOrderRepository,
-            SaleOrderPaymentRepository saleOrderPaymentRepository
+            SaleOrderPaymentRepository saleOrderPaymentRepository,
+            AccountingAutoJournalEntryService accountingAutoJournalEntryService
     ) {
         this.saleOrderRepository = saleOrderRepository;
         this.saleOrderPaymentRepository = saleOrderPaymentRepository;
+        this.accountingAutoJournalEntryService = accountingAutoJournalEntryService;
     }
 
     @Transactional
@@ -109,7 +113,7 @@ public class ReceivableService {
         payment.setReference(reference != null ? reference.trim() : null);
         payment.setObservation(observation != null ? observation.trim() : null);
 
-        saleOrderPaymentRepository.save(payment);
+        SaleOrderPayment savedPayment = saleOrderPaymentRepository.save(payment);
 
         List<SaleOrderPayment> refreshedPayments =
                 saleOrderPaymentRepository.findBySaleOrderIdOrderByPaymentDateAscIdAsc(orderId);
@@ -125,7 +129,8 @@ public class ReceivableService {
         }
 
         saleOrderRepository.save(order);
-        return payment;
+        accountingAutoJournalEntryService.generateForCreditCollection(savedPayment);
+        return savedPayment;
     }
 
     @Transactional

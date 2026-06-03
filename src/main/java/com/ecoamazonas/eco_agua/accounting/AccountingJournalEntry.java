@@ -27,6 +27,16 @@ public class AccountingJournalEntry {
     private AccountingJournalSourceType sourceType = AccountingJournalSourceType.MANUAL;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "source_event", length = 40)
+    private AccountingAutomationEvent sourceEvent;
+
+    @Column(name = "source_reference_id")
+    private Long sourceReferenceId;
+
+    @Column(name = "source_reference_code", length = 80)
+    private String sourceReferenceCode;
+
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private AccountingJournalEntryStatus status = AccountingJournalEntryStatus.DRAFT;
 
@@ -82,6 +92,39 @@ public class AccountingJournalEntry {
 
     public void setSourceType(AccountingJournalSourceType sourceType) {
         this.sourceType = sourceType;
+    }
+
+    public AccountingAutomationEvent getSourceEvent() {
+        return sourceEvent;
+    }
+
+    public void setSourceEvent(AccountingAutomationEvent sourceEvent) {
+        this.sourceEvent = sourceEvent;
+    }
+
+    public Long getSourceReferenceId() {
+        return sourceReferenceId;
+    }
+
+    public void setSourceReferenceId(Long sourceReferenceId) {
+        this.sourceReferenceId = sourceReferenceId;
+    }
+
+    public String getSourceReferenceCode() {
+        return sourceReferenceCode;
+    }
+
+    public void setSourceReferenceCode(String sourceReferenceCode) {
+        this.sourceReferenceCode = sourceReferenceCode;
+    }
+
+    @Transient
+    public String getSourceDetailLabel() {
+        String eventLabel = sourceEvent != null ? sourceEvent.getLabel() : sourceType.getLabel();
+        if (sourceReferenceCode == null || sourceReferenceCode.isBlank()) {
+            return eventLabel;
+        }
+        return eventLabel + " · " + sourceReferenceCode;
     }
 
     public AccountingJournalEntryStatus getStatus() {

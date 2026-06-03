@@ -1,5 +1,7 @@
 package com.ecoamazonas.eco_agua.income;
 
+import com.ecoamazonas.eco_agua.accounting.AccountingAutomationEvent;
+import com.ecoamazonas.eco_agua.accounting.service.AccountingAutoJournalEntryService;
 import com.ecoamazonas.eco_agua.category.Category;
 import com.ecoamazonas.eco_agua.category.CategoryRepository;
 import org.springframework.stereotype.Service;
@@ -21,13 +23,16 @@ public class OtherIncomeService {
 
     private final OtherIncomeRepository repository;
     private final CategoryRepository categoryRepository;
+    private final AccountingAutoJournalEntryService accountingAutoJournalEntryService;
 
     public OtherIncomeService(
             OtherIncomeRepository repository,
-            CategoryRepository categoryRepository
+            CategoryRepository categoryRepository,
+            AccountingAutoJournalEntryService accountingAutoJournalEntryService
     ) {
         this.repository = repository;
         this.categoryRepository = categoryRepository;
+        this.accountingAutoJournalEntryService = accountingAutoJournalEntryService;
     }
 
     @Transactional(readOnly = true)
@@ -155,7 +160,9 @@ public class OtherIncomeService {
         income.setTaxBase(taxBase);
         income.setTaxIgv(taxIgv);
 
-        return repository.save(income);
+        OtherIncome savedIncome = repository.save(income);
+        accountingAutoJournalEntryService.generateForOtherIncome(savedIncome);
+        return savedIncome;
     }
 
     @Transactional
@@ -163,7 +170,10 @@ public class OtherIncomeService {
         if (ids == null || ids.isEmpty()) {
             return;
         }
-        ids.forEach(repository::deleteById);
+        ids.forEach(id -> {
+            accountingAutoJournalEntryService.cancelDraftEntries(AccountingAutomationEvent.OTHER_INCOME, id);
+            repository.deleteById(id);
+        });
     }
 
     private BigDecimal normalizeTaxRate(BigDecimal taxRatePercent) {

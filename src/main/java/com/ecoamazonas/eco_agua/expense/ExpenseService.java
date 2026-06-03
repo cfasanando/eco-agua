@@ -1,5 +1,7 @@
 package com.ecoamazonas.eco_agua.expense;
 
+import com.ecoamazonas.eco_agua.accounting.AccountingAutomationEvent;
+import com.ecoamazonas.eco_agua.accounting.service.AccountingAutoJournalEntryService;
 import com.ecoamazonas.eco_agua.category.Category;
 import com.ecoamazonas.eco_agua.category.CategoryRepository;
 import com.ecoamazonas.eco_agua.category.CategoryType;
@@ -49,6 +51,7 @@ public class ExpenseService {
     private final ProductRepository productRepository;
     private final InventoryMovementRepository movementRepository;
     private final InventoryService inventoryService;
+    private final AccountingAutoJournalEntryService accountingAutoJournalEntryService;
 
     public ExpenseService(
             ExpenseRepository expenseRepository,
@@ -59,7 +62,8 @@ public class ExpenseService {
             EmployeeRepository employeeRepository,
             ProductRepository productRepository,
             InventoryMovementRepository movementRepository,
-            InventoryService inventoryService
+            InventoryService inventoryService,
+            AccountingAutoJournalEntryService accountingAutoJournalEntryService
     ) {
         this.expenseRepository = expenseRepository;
         this.paymentRepository = paymentRepository;
@@ -70,6 +74,7 @@ public class ExpenseService {
         this.productRepository = productRepository;
         this.movementRepository = movementRepository;
         this.inventoryService = inventoryService;
+        this.accountingAutoJournalEntryService = accountingAutoJournalEntryService;
     }
 
     private void fillTaxInfoWithoutVat(Expense expense) {
@@ -407,6 +412,8 @@ public class ExpenseService {
             registerProductStockFromExpense(savedExpense, stockProduct, normalizedStockQuantity);
         }
 
+        accountingAutoJournalEntryService.generateForExpense(savedExpense, updateProductStock);
+
         return savedExpense;
     }
 
@@ -525,7 +532,9 @@ public class ExpenseService {
 
         fillTaxInfoWithoutVat(expense);
 
-        return expenseRepository.save(expense);
+        Expense savedExpense = expenseRepository.save(expense);
+        accountingAutoJournalEntryService.regenerateForExpense(savedExpense, false);
+        return savedExpense;
     }
 
     @Transactional
@@ -536,6 +545,7 @@ public class ExpenseService {
 
         Expense expense = findById(expenseId);
         ensureExpenseCanBeModified(expense);
+        accountingAutoJournalEntryService.cancelDraftEntries(AccountingAutomationEvent.EXPENSE_PAID, expense.getId());
         expenseRepository.delete(expense);
     }
 
@@ -597,7 +607,9 @@ public class ExpenseService {
 
         fillTaxInfoWithoutVat(expense);
 
-        return expenseRepository.save(expense);
+        Expense savedExpense = expenseRepository.save(expense);
+        accountingAutoJournalEntryService.regenerateForExpense(savedExpense, false);
+        return savedExpense;
     }
 
     @Transactional
@@ -640,7 +652,9 @@ public class ExpenseService {
         }
 
         expenseRepository.save(expense);
-        return paymentRepository.save(payment);
+        ExpensePayment savedPayment = paymentRepository.save(payment);
+        accountingAutoJournalEntryService.generateForSupplierPayment(savedPayment);
+        return savedPayment;
     }
 
     @Transactional(readOnly = true)

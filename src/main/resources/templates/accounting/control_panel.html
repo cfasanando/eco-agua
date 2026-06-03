@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Panel de alertas contables')}"></head>
+<body>
+<style>
+    @media print {
+        .app-layout > aside,
+        .main-content > header,
+        .d-print-none,
+        .btn,
+        form {
+            display: none !important;
+        }
+        .main-content {
+            margin: 0 !important;
+            width: 100% !important;
+        }
+        .content-wrapper {
+            padding: 0 !important;
+        }
+        .card {
+            box-shadow: none !important;
+            border: 1px solid #dee2e6 !important;
+        }
+    }
+</style>
+<div class="app-layout" th:with="activePage=${activePage}">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Contabilidad interna</div>
+                    <h1 class="h4 mb-1">Panel de alertas contables</h1>
+                    <p class="text-muted mb-0">
+                        Revisión rápida de borradores, descuadres, períodos y reglas antes del cierre contable.
+                    </p>
+                    <div class="small text-muted mt-1" th:if="${snapshot.generatedAt != null}">
+                        Actualizado: <span th:text="${#temporals.format(snapshot.generatedAt, 'dd/MM/yyyy HH:mm')}">03/06/2026 10:30</span>
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 d-print-none">
+                    <button type="button" class="btn btn-outline-dark btn-sm" onclick="window.print()">
+                        <i class="bi bi-printer"></i> Imprimir
+                    </button>
+                    <a th:href="@{/accounting/draft-review}" class="btn btn-outline-warning btn-sm">
+                        <i class="bi bi-check2-square"></i> Borradores
+                    </a>
+                    <a th:href="@{/accounting/period-close}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-calendar-check"></i> Cierre mensual
+                    </a>
+                </div>
+            </div>
+
+            <div class="alert shadow-sm border-0 mb-3" th:classappend="${snapshot.summary.healthy ? ' alert-success' : ' alert-warning'}">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div>
+                        <strong th:text="${snapshot.summary.healthy ? 'Contabilidad sin observaciones críticas' : 'Contabilidad con puntos por revisar'}">Contabilidad con puntos por revisar</strong>
+                        <div class="small mb-0">
+                            Este panel no reemplaza la revisión contable; sirve como control interno antes del cierre mensual.
+                        </div>
+                    </div>
+                    <span class="badge" th:classappend="${snapshot.summary.healthy ? ' text-bg-success' : ' text-bg-warning'}">
+                        <span th:text="${snapshot.summary.criticalIssueCount}">0</span> observación(es) críticas
+                    </span>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.summary.draftEntries == 0 ? ' border-success' : ' border-warning'}">
+                        <div class="card-body">
+                            <div class="text-muted small">Asientos en borrador</div>
+                            <div class="fs-4 fw-bold" th:classappend="${snapshot.summary.draftEntries == 0 ? ' text-success' : ' text-warning'}" th:text="${snapshot.summary.draftEntries}">0</div>
+                            <div class="small text-muted">
+                                <span th:text="${snapshot.summary.automaticDraftEntries}">0</span> automáticos pendientes
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.summary.unbalancedEntries == 0 ? ' border-success' : ' border-danger'}">
+                        <div class="card-body">
+                            <div class="text-muted small">Asientos descuadrados</div>
+                            <div class="fs-4 fw-bold" th:classappend="${snapshot.summary.unbalancedEntries == 0 ? ' text-success' : ' text-danger'}" th:text="${snapshot.summary.unbalancedEntries}">0</div>
+                            <div class="small text-muted">No considera anulados.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.summary.missingTemplateEvents == 0 and snapshot.summary.invalidTemplates == 0 ? ' border-success' : ' border-warning'}">
+                        <div class="card-body">
+                            <div class="text-muted small">Plantillas por revisar</div>
+                            <div class="fs-4 fw-bold" th:classappend="${snapshot.summary.missingTemplateEvents == 0 and snapshot.summary.invalidTemplates == 0 ? ' text-success' : ' text-warning'}">
+                                <span th:text="${snapshot.summary.missingTemplateEvents + snapshot.summary.invalidTemplates}">0</span>
+                            </div>
+                            <div class="small text-muted">
+                                <span th:text="${snapshot.summary.inactiveTemplates}">0</span> inactiva(s)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.summary.balanced ? ' border-success' : ' border-danger'}">
+                        <div class="card-body">
+                            <div class="text-muted small">Diferencia debe / haber</div>
+                            <div class="fs-4 fw-bold" th:classappend="${snapshot.summary.balanced ? ' text-success' : ' text-danger'}">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.absoluteDifference,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted" th:text="${snapshot.summary.balanced ? 'Cuadre general correcto.' : 'Revisar balance de comprobación.'}">Cuadre general correcto.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <strong>Alertas principales</strong>
+                            <a th:href="@{/accounting/trial-balance(status='ALL')}" class="btn btn-outline-secondary btn-sm d-print-none">
+                                Ver balance de comprobación
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            <div class="vstack gap-2">
+                                <div th:each="alert : ${snapshot.alerts}" class="alert mb-0" th:classappend="${alert.alertClass}">
+                                    <div class="d-flex flex-wrap justify-content-between gap-2">
+                                        <div>
+                                            <span class="badge me-1" th:classappend="${alert.badgeClass}" th:text="${alert.severityLabel}">Revisar</span>
+                                            <strong th:text="${alert.title}">Alerta</strong>
+                                            <div class="small mt-1" th:text="${alert.detail}">Detalle de alerta.</div>
+                                        </div>
+                                        <div class="d-print-none" th:if="${alert.hasAction()}">
+                                            <a th:href="${alert.actionUrl}" class="btn btn-sm btn-outline-dark" th:text="${alert.actionLabel}">Revisar</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light">
+                            <strong>Resumen general</strong>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <div class="small text-muted">Asientos totales</div>
+                                    <div class="fw-bold" th:text="${snapshot.summary.totalEntries}">0</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="small text-muted">Registrados</div>
+                                    <div class="fw-bold text-success" th:text="${snapshot.summary.postedEntries}">0</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="small text-muted">Anulados</div>
+                                    <div class="fw-bold text-muted" th:text="${snapshot.summary.cancelledEntries}">0</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="small text-muted">Períodos cerrados</div>
+                                    <div class="fw-bold text-primary" th:text="${snapshot.summary.closedPeriods}">0</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="small text-muted">Total debe activo</div>
+                                    <div class="fw-bold">S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalDebit,1,'POINT',2,'POINT')}">0.00</span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="small text-muted">Total haber activo</div>
+                                    <div class="fw-bold">S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalCredit,1,'POINT',2,'POINT')}">0.00</span></div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="d-grid gap-2 d-print-none">
+                                <a th:href="@{/accounting/journal-book(status='ALL')}" class="btn btn-outline-secondary btn-sm">Libro diario</a>
+                                <a th:href="@{/accounting/ledger(status='ALL')}" class="btn btn-outline-secondary btn-sm">Libro mayor</a>
+                                <a th:href="@{/accounting/period-close}" class="btn btn-outline-primary btn-sm">Cierre mensual</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <strong>Últimos períodos con movimientos</strong>
+                            <a th:href="@{/accounting/period-close}" class="btn btn-outline-primary btn-sm d-print-none">Cerrar período</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Período</th>
+                                        <th>Estado</th>
+                                        <th class="text-end">Asientos</th>
+                                        <th class="text-end">Borradores</th>
+                                        <th class="text-end">Descuadres</th>
+                                        <th class="text-end d-print-none">Acción</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:if="${#lists.isEmpty(snapshot.periods)}">
+                                        <td colspan="6" class="text-center text-muted py-4">Todavía no hay movimientos contables.</td>
+                                    </tr>
+                                    <tr th:each="period : ${snapshot.periods}">
+                                        <td class="fw-semibold" th:text="${period.label}">junio 2026</td>
+                                        <td>
+                                            <span class="badge" th:classappend="${period.statusBadgeClass}" th:text="${period.statusLabel}">Abierto</span>
+                                        </td>
+                                        <td class="text-end" th:text="${period.totalEntries}">0</td>
+                                        <td class="text-end" th:text="${period.draftEntries}">0</td>
+                                        <td class="text-end" th:text="${period.unbalancedEntries}">0</td>
+                                        <td class="text-end d-print-none">
+                                            <a th:href="@{/accounting/period-close(year=${period.year},month=${period.month})}" class="btn btn-outline-primary btn-sm">Revisar</a>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <strong>Últimos asientos automáticos</strong>
+                            <a th:href="@{/accounting/draft-review}" class="btn btn-outline-warning btn-sm d-print-none">Revisar borradores</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Origen</th>
+                                        <th>Estado</th>
+                                        <th class="text-end">Debe</th>
+                                        <th class="text-end">Haber</th>
+                                        <th class="text-end d-print-none">Acción</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:if="${#lists.isEmpty(snapshot.recentAutomaticEntries)}">
+                                        <td colspan="6" class="text-center text-muted py-4">Todavía no hay asientos automáticos.</td>
+                                    </tr>
+                                    <tr th:each="entry : ${snapshot.recentAutomaticEntries}">
+                                        <td th:text="${#temporals.format(entry.entryDate, 'dd/MM/yyyy')}">03/06/2026</td>
+                                        <td>
+                                            <div class="fw-semibold" th:text="${entry.sourceLabel}">Venta pagada</div>
+                                            <div class="small text-muted text-truncate" style="max-width: 220px" th:text="${entry.description}">Glosa</div>
+                                        </td>
+                                        <td>
+                                            <span class="badge" th:classappend="${entry.statusBadgeClass}" th:text="${entry.statusLabel}">Borrador</span>
+                                            <span th:if="${!entry.balanced}" class="badge text-bg-danger ms-1">Descuadrado</span>
+                                        </td>
+                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(entry.totalDebit,1,'POINT',2,'POINT')}">0.00</span></td>
+                                        <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(entry.totalCredit,1,'POINT',2,'POINT')}">0.00</span></td>
+                                        <td class="text-end d-print-none">
+                                            <a th:href="@{/accounting/journal-entries/{id}/edit(id=${entry.id})}" class="btn btn-outline-secondary btn-sm">Ver</a>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <strong>Estado de reglas y plantillas contables</strong>
+                    <a th:href="@{/accounting/rule-templates}" class="btn btn-outline-primary btn-sm d-print-none">Configurar plantillas</a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Evento</th>
+                                <th>Plantilla multilínea</th>
+                                <th class="text-end">Líneas</th>
+                                <th>Regla simple</th>
+                                <th class="text-end d-print-none">Acción</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row : ${snapshot.configurationRows}">
+                                <td>
+                                    <div class="fw-semibold" th:text="${row.eventLabel}">Venta pagada</div>
+                                    <div class="small text-muted" th:text="${row.event.description}">Descripción del evento</div>
+                                </td>
+                                <td>
+                                    <span class="badge" th:classappend="${row.templateBadgeClass}" th:text="${row.templateStatusLabel}">Lista</span>
+                                </td>
+                                <td class="text-end" th:text="${row.templateLineCount}">3</td>
+                                <td>
+                                    <span class="badge" th:classappend="${row.simpleRuleBadgeClass}" th:text="${row.simpleRuleStatusLabel}">Activa</span>
+                                </td>
+                                <td class="text-end d-print-none">
+                                    <a th:href="@{/accounting/rule-templates}" class="btn btn-outline-primary btn-sm">Revisar</a>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div th:replace="~{fragments/scripts_admin :: adminScripts}"></div>
+</body>
+</html>

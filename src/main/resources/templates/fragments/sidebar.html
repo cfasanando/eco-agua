@@ -473,6 +473,7 @@
             or activePage == 'accounting_income_statement'
             or activePage == 'accounting_balance_sheet'
             or activePage == 'accounting_period_close'
+            or activePage == 'accounting_control_panel'
             or activePage == 'accounting_draft_review'
             or activePage == 'accounting_rules'
             or activePage == 'accounting_rule_templates'
@@ -736,7 +737,8 @@
             <div
               th:if="${moduleAccountingEnabled}"
               class="menu-group finance-subgroup"
-              th:with="isAccountingCloseActive=${activePage == 'accounting_period_close'}"
+              th:with="isAccountingCloseActive=${activePage == 'accounting_period_close'
+                or activePage == 'accounting_control_panel'}"
             >
               <input
                 type="checkbox"
@@ -752,6 +754,15 @@
               </label>
 
               <div class="submenu-container">
+                <a
+                  th:href="@{/accounting/control-panel}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_control_panel' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-speedometer2"></i></span>
+                  <span>Panel de alertas</span>
+                </a>
+
                 <a
                   th:href="@{/accounting/period-close}"
                   class="menu-link submenu"

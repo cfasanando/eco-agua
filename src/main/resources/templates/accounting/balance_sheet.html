@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Balance general interno')}"></head>
+<body>
+<div class="app-layout" th:with="activePage=${activePage}">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Contabilidad interna</div>
+                    <h1 class="h4 mb-1">Balance general interno</h1>
+                    <p class="text-muted mb-0">
+                        Lectura de activo, pasivo y patrimonio para el período
+                        <strong th:text="${periodLabel}">01/01/2026 al 30/06/2026</strong>.
+                    </p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a th:href="@{/accounting/income-statement}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-graph-up-arrow"></i> Estado de resultados
+                    </a>
+                    <a th:href="@{/accounting/trial-balance}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-clipboard-data"></i> Balance de comprobación
+                    </a>
+                    <a th:href="@{/accounting/ledger}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-journal-richtext"></i> Libro mayor
+                    </a>
+                </div>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small mb-3">
+                <strong>Lectura recomendada:</strong>
+                usa el filtro <strong>Registrado</strong> para una lectura más cercana a un reporte formal.
+                El filtro <strong>Todos</strong> sirve para simular el balance incluyendo asientos todavía en borrador.
+                Este reporte es interno y no reemplaza una validación contable/SUNAT.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <strong>Filtros</strong>
+                </div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" method="get" th:action="@{/accounting/balance-sheet}">
+                        <div class="col-md-3">
+                            <label for="fromDate" class="form-label">Desde</label>
+                            <input type="date" id="fromDate" name="fromDate" class="form-control" th:value="${fromDate}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="toDate" class="form-label">Hasta</label>
+                            <input type="date" id="toDate" name="toDate" class="form-control" th:value="${toDate}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="status" class="form-label">Estado</label>
+                            <select id="status" name="status" class="form-select">
+                                <option value="ALL" th:selected="${selectedStatus == 'ALL'}">Todos</option>
+                                <option th:each="statusItem : ${entryStatuses}"
+                                        th:value="${statusItem.name()}"
+                                        th:selected="${selectedStatus == statusItem.name()}"
+                                        th:text="${statusItem.label}">
+                                    Registrado
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Aplicar filtros
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-primary">
+                        <div class="card-body">
+                            <div class="text-muted small">Total activo</div>
+                            <div class="fs-5 fw-bold text-primary">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalAssets,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Recursos controlados por el negocio.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-danger">
+                        <div class="card-body">
+                            <div class="text-muted small">Total pasivo</div>
+                            <div class="fs-5 fw-bold text-danger">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalLiabilities,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Obligaciones con terceros.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-success">
+                        <div class="card-body">
+                            <div class="text-muted small">Total patrimonio</div>
+                            <div class="fs-5 fw-bold text-success">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalEquity,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Capital más resultado del período.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.summary.balanced ? ' border-success' : ' border-warning'}">
+                        <div class="card-body">
+                            <div class="text-muted small">Cuadre contable</div>
+                            <div class="fs-5 fw-bold" th:classappend="${snapshot.summary.balanced ? ' text-success' : ' text-warning'}">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.absoluteDifference,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted" th:text="${snapshot.summary.balanced ? 'Activo = Pasivo + Patrimonio' : 'Revisar diferencia'}">Activo = Pasivo + Patrimonio</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <strong>Activo</strong>
+                            <span class="fw-bold text-primary">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalAssets,1,'POINT',2,'POINT')}">0.00</span>
+                            </span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Cuenta</th>
+                                    <th class="text-end">Debe</th>
+                                    <th class="text-end">Haber</th>
+                                    <th class="text-end">Saldo</th>
+                                    <th class="text-end">Acción</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:if="${#lists.isEmpty(snapshot.assetRows)}">
+                                    <td colspan="5" class="text-center text-muted py-3">No hay cuentas de activo con movimiento en el período.</td>
+                                </tr>
+                                <tr th:each="row : ${snapshot.assetRows}">
+                                    <td>
+                                        <div class="fw-semibold" th:text="${row.accountCode + ' - ' + row.accountName}">1011 - Caja</div>
+                                        <div class="small text-muted" th:text="${row.movementCount + ' movimientos'}">0 movimientos</div>
+                                    </td>
+                                    <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(row.totalDebit,1,'POINT',2,'POINT')}">0.00</span></td>
+                                    <td class="text-end">S/. <span th:text="${#numbers.formatDecimal(row.totalCredit,1,'POINT',2,'POINT')}">0.00</span></td>
+                                    <td class="text-end fw-semibold" th:classappend="${row.negativeAmount ? ' text-danger' : ' text-primary'}">
+                                        S/. <span th:text="${#numbers.formatDecimal(row.amount,1,'POINT',2,'POINT')}">0.00</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <a th:href="@{/accounting/ledger(fromDate=${fromDate},toDate=${toDate},status=${selectedStatus},accountId=${row.accountId})}"
+                                           class="btn btn-outline-primary btn-sm">Ver mayor</a>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <strong>Pasivo</strong>
+                            <span class="fw-bold text-danger">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalLiabilities,1,'POINT',2,'POINT')}">0.00</span>
+                            </span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Cuenta</th>
+                                    <th class="text-end">Saldo</th>
+                                    <th class="text-end">Acción</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:if="${#lists.isEmpty(snapshot.liabilityRows)}">
+                                    <td colspan="3" class="text-center text-muted py-3">No hay cuentas de pasivo con movimiento en el período.</td>
+                                </tr>
+                                <tr th:each="row : ${snapshot.liabilityRows}">
+                                    <td>
+                                        <div class="fw-semibold" th:text="${row.accountCode + ' - ' + row.accountName}">4212 - Proveedores</div>
+                                        <div class="small text-muted" th:text="${row.movementCount + ' movimientos'}">0 movimientos</div>
+                                    </td>
+                                    <td class="text-end fw-semibold" th:classappend="${row.negativeAmount ? ' text-danger' : ' text-dark'}">
+                                        S/. <span th:text="${#numbers.formatDecimal(row.amount,1,'POINT',2,'POINT')}">0.00</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <a th:href="@{/accounting/ledger(fromDate=${fromDate},toDate=${toDate},status=${selectedStatus},accountId=${row.accountId})}"
+                                           class="btn btn-outline-primary btn-sm">Mayor</a>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <strong>Patrimonio</strong>
+                            <span class="fw-bold text-success">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalEquity,1,'POINT',2,'POINT')}">0.00</span>
+                            </span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Cuenta</th>
+                                    <th class="text-end">Saldo</th>
+                                    <th class="text-end">Acción</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:if="${#lists.isEmpty(snapshot.equityRows)}">
+                                    <td colspan="3" class="text-center text-muted py-3">No hay patrimonio o resultado con movimiento en el período.</td>
+                                </tr>
+                                <tr th:each="row : ${snapshot.equityRows}">
+                                    <td>
+                                        <div class="fw-semibold" th:text="${row.accountCode + ' - ' + row.accountName}">5011 - Capital</div>
+                                        <div class="small text-muted" th:text="${row.generated ? 'Calculado desde ingresos y gastos' : row.movementCount + ' movimientos'}">0 movimientos</div>
+                                    </td>
+                                    <td class="text-end fw-semibold" th:classappend="${row.negativeAmount ? ' text-danger' : ' text-success'}">
+                                        S/. <span th:text="${#numbers.formatDecimal(row.amount,1,'POINT',2,'POINT')}">0.00</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <a th:if="${!row.generated}"
+                                           th:href="@{/accounting/ledger(fromDate=${fromDate},toDate=${toDate},status=${selectedStatus},accountId=${row.accountId})}"
+                                           class="btn btn-outline-primary btn-sm">Mayor</a>
+                                        <a th:if="${row.generated}"
+                                           th:href="@{/accounting/income-statement(fromDate=${fromDate},toDate=${toDate},status=${selectedStatus})}"
+                                           class="btn btn-outline-success btn-sm">Resultado</a>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <strong>Resumen de ecuación contable</strong>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-3 text-center">
+                            <div class="text-muted small">Activo</div>
+                            <div class="fs-5 fw-bold text-primary">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalAssets,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                        <div class="col-md-1 text-center fs-4 text-muted">=</div>
+                        <div class="col-md-3 text-center">
+                            <div class="text-muted small">Pasivo</div>
+                            <div class="fs-5 fw-bold text-danger">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalLiabilities,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                        <div class="col-md-1 text-center fs-4 text-muted">+</div>
+                        <div class="col-md-3 text-center">
+                            <div class="text-muted small">Patrimonio</div>
+                            <div class="fs-5 fw-bold text-success">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalEquity,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                        <div class="col-md-1 text-center">
+                            <span class="badge" th:classappend="${snapshot.summary.balanced ? ' text-bg-success' : ' text-bg-warning'}"
+                                  th:text="${snapshot.summary.balanced ? 'Cuadra' : 'Revisar'}">Cuadra</span>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="small text-muted">
+                        Pasivo + patrimonio:
+                        <strong>S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalLiabilitiesAndEquity,1,'POINT',2,'POINT')}">0.00</span></strong>
+                        · Diferencia:
+                        <strong>S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.absoluteDifference,1,'POINT',2,'POINT')}">0.00</span></strong>
+                        · <span th:text="${snapshot.summary.currentPeriodResultLabel}">Utilidad del período</span>:
+                        <strong>S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.absoluteCurrentPeriodResult,1,'POINT',2,'POINT')}">0.00</span></strong>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div th:replace="~{fragments/scripts_admin :: adminScripts}"></div>
+</body>
+</html>

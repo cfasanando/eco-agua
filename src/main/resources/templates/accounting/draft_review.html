@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Revisión de asientos automáticos')}"></head>
+<body>
+<div class="app-layout" th:with="activePage=${activePage}">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Contabilidad interna</div>
+                    <h1 class="h4 mb-1">Revisión de asientos automáticos</h1>
+                    <p class="text-muted mb-0">
+                        Revisa los asientos generados en borrador desde ventas, cobros, egresos, pagos y otros ingresos antes de registrarlos.
+                    </p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a th:href="@{/accounting/journal-entries}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-journal-plus"></i> Asientos internos
+                    </a>
+                    <a th:href="@{/accounting/journal-book}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-journal-text"></i> Libro diario
+                    </a>
+                    <a th:href="@{/accounting/trial-balance}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-clipboard-data"></i> Balance
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${message}" class="alert mb-3"
+                 th:classappend="${messageType == 'success'} ? ' alert-success' : ' alert-danger'"
+                 th:text="${message}">Mensaje</div>
+
+            <div class="alert alert-info border-0 shadow-sm small mb-3">
+                <strong>Uso recomendado:</strong>
+                los asientos automáticos se generan como <strong>borrador</strong>. Revisa que el asiento cuadre, que las cuentas sean correctas y recién después márcalo como registrado.
+                Si algo no corresponde, anúlalo o edítalo desde Asientos internos.
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Borradores automáticos</div>
+                            <div class="fs-5 fw-bold" th:text="${snapshot.summary.totalDrafts}">0</div>
+                            <div class="small text-muted">Pendientes de revisión.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-success">
+                        <div class="card-body">
+                            <div class="text-muted small">Cuadrados</div>
+                            <div class="fs-5 fw-bold text-success" th:text="${snapshot.summary.balancedDrafts}">0</div>
+                            <div class="small text-muted">Listos para registrar si las cuentas son correctas.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.summary.unbalancedDrafts > 0} ? ' border-warning' : ''">
+                        <div class="card-body">
+                            <div class="text-muted small">Con diferencia</div>
+                            <div class="fs-5 fw-bold" th:classappend="${snapshot.summary.unbalancedDrafts > 0} ? ' text-warning' : ' text-muted'" th:text="${snapshot.summary.unbalancedDrafts}">0</div>
+                            <div class="small text-muted">Deben revisarse antes de registrar.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.summary.balanced} ? ' border-success' : ' border-warning'">
+                        <div class="card-body">
+                            <div class="text-muted small">Diferencia general</div>
+                            <div class="fs-5 fw-bold" th:classappend="${snapshot.summary.balanced} ? ' text-success' : ' text-warning'">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.difference,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Debe total menos haber total.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${#lists.isEmpty(snapshot.rows)}" class="card shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-check2-circle fs-1 text-success"></i>
+                    <h2 class="h6 mt-3">No hay asientos automáticos pendientes</h2>
+                    <p class="text-muted mb-3">
+                        Cuando registres ventas, cobros, egresos, pagos u otros ingresos, los asientos automáticos aparecerán aquí como borrador.
+                    </p>
+                    <a th:href="@{/accounting/journal-entries}" class="btn btn-primary btn-sm">
+                        Ver asientos internos
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${not #lists.isEmpty(snapshot.rows)}" class="card shadow-sm">
+                <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <strong>Asientos automáticos pendientes</strong>
+                    <span class="badge bg-light text-dark border" th:text="${snapshot.summary.totalDrafts + ' pendientes'}">0 pendientes</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Origen</th>
+                            <th>Referencia</th>
+                            <th>Glosa</th>
+                            <th class="text-end">Líneas</th>
+                            <th class="text-end">Debe</th>
+                            <th class="text-end">Haber</th>
+                            <th class="text-end">Diferencia</th>
+                            <th>Estado</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="row : ${snapshot.rows}">
+                            <td th:text="${#temporals.format(row.entryDate, 'dd/MM/yyyy')}">01/06/2026</td>
+                            <td>
+                                <span class="fw-semibold" th:text="${row.sourceLabel}">Venta pagada</span>
+                            </td>
+                            <td class="small text-muted" th:text="${row.referenceLabel}">Pedido #1</td>
+                            <td>
+                                <div class="fw-semibold" th:text="${row.description}">Glosa</div>
+                                <div class="small text-muted">Asiento automático en borrador</div>
+                            </td>
+                            <td class="text-end" th:text="${row.lineCount}">2</td>
+                            <td class="text-end">
+                                S/. <span th:text="${#numbers.formatDecimal(row.totalDebit,1,'POINT',2,'POINT')}">0.00</span>
+                            </td>
+                            <td class="text-end">
+                                S/. <span th:text="${#numbers.formatDecimal(row.totalCredit,1,'POINT',2,'POINT')}">0.00</span>
+                            </td>
+                            <td class="text-end" th:classappend="${row.balanced} ? ' text-success' : ' text-warning'">
+                                S/. <span th:text="${#numbers.formatDecimal(row.difference,1,'POINT',2,'POINT')}">0.00</span>
+                            </td>
+                            <td>
+                                <span th:if="${row.balanced}" class="badge bg-success-subtle text-success border border-success-subtle">Cuadrado</span>
+                                <span th:unless="${row.balanced}" class="badge bg-warning-subtle text-warning border border-warning-subtle">Revisar</span>
+                            </td>
+                            <td class="text-end">
+                                <div class="d-flex flex-wrap justify-content-end gap-1">
+                                    <a th:href="@{/accounting/journal-entries(editId=${row.id})}" class="btn btn-outline-secondary btn-sm">
+                                        Ver / editar
+                                    </a>
+                                    <form method="post" th:action="@{/accounting/draft-review/{id}/post(id=${row.id})}" class="d-inline">
+                                        <button type="submit" class="btn btn-success btn-sm"
+                                                th:disabled="${!row.balanced}"
+                                                onclick="return confirm('¿Registrar este asiento contable?');">
+                                            Registrar
+                                        </button>
+                                    </form>
+                                    <form method="post" th:action="@{/accounting/draft-review/{id}/cancel(id=${row.id})}" class="d-inline">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                onclick="return confirm('¿Anular este asiento automático?');">
+                                            Anular
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

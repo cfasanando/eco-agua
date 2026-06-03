@@ -31,6 +31,12 @@ public interface AccountingJournalEntryRepository extends JpaRepository<Accounti
             AccountingJournalEntryStatus status
     );
 
+
+    @EntityGraph(attributePaths = {"lines", "lines.account"})
+    List<AccountingJournalEntry> findByStatusAndSourceEventIsNotNullOrderByEntryDateDescIdDesc(
+            AccountingJournalEntryStatus status
+    );
+
     @Override
     @EntityGraph(attributePaths = {"lines", "lines.account"})
     Optional<AccountingJournalEntry> findById(Long id);

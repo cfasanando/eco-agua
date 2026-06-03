@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Plantillas contables multilínea')}"></head>
+<body>
+<div class="app-layout" th:with="activePage=${activePage}">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Plantillas contables multilínea</h1>
+                    <p class="text-muted mb-0">
+                        Configura asientos automáticos con varias líneas para ventas, compras, IGV, cobros, pagos y otros movimientos.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a th:href="@{/accounting/accounts}" class="btn btn-outline-secondary btn-sm">Plan de cuentas</a>
+                    <a th:href="@{/accounting/rules}" class="btn btn-outline-secondary btn-sm">Reglas simples</a>
+                    <a th:href="@{/accounting/journal-entries}" class="btn btn-outline-primary btn-sm">Asientos internos</a>
+                </div>
+            </div>
+
+            <div th:if="${message}" class="alert mb-3"
+                 th:classappend="${messageType == 'success'} ? ' alert-success' : ' alert-danger'"
+                 th:text="${message}">Mensaje</div>
+
+            <div class="alert alert-info border-0 shadow-sm mb-3">
+                <strong>Uso recomendado:</strong>
+                estas plantillas todavía no generan asientos por sí solas. Sirven para definir la estructura contable que luego usará el generador automático.
+                Para operaciones con IGV, usa líneas separadas para base imponible e IGV.
+            </div>
+
+            <div class="row g-3">
+                <div class="col-xl-5">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h2 class="h6 mb-3" th:text="${selectedTemplate != null ? 'Editar plantilla' : 'Nueva plantilla'}">Nueva plantilla</h2>
+
+                            <div th:if="${#lists.isEmpty(accounts)}" class="alert alert-danger">
+                                No hay cuentas activas. Primero crea o activa cuentas en el plan de cuentas.
+                            </div>
+
+                            <form method="post" th:action="@{/accounting/rule-templates/save}" id="ruleTemplateForm" class="row g-3">
+                                <input type="hidden" name="id" th:value="${selectedTemplate != null ? selectedTemplate.id : ''}">
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Evento del sistema</label>
+                                    <select name="eventType" class="form-select" required>
+                                        <option value="">Seleccionar evento</option>
+                                        <option th:each="event : ${eventTypes}"
+                                                th:value="${event.name()}"
+                                                th:selected="${selectedTemplate != null and selectedTemplate.eventType == event}"
+                                                th:disabled="${selectedTemplate == null and configuredEvents.contains(event)}"
+                                                th:text="${event.label + (selectedTemplate == null and configuredEvents.contains(event) ? ' — ya configurado' : '')}">
+                                            Venta pagada
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Nombre de plantilla</label>
+                                    <input type="text" name="name" class="form-control" maxlength="180" required
+                                           placeholder="Ej. Venta pagada con IGV"
+                                           th:value="${selectedTemplate != null ? selectedTemplate.name : ''}">
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Descripción interna</label>
+                                    <textarea name="description" class="form-control" rows="2" maxlength="255"
+                                              placeholder="Ej. Asiento base para venta pagada separando base imponible e IGV."
+                                              th:text="${selectedTemplate != null ? selectedTemplate.description : ''}"></textarea>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="form-check form-check-inline">
+                                        <input type="checkbox" name="generateDraft" value="true" class="form-check-input" id="generateDraftTemplate"
+                                               th:checked="${selectedTemplate == null or selectedTemplate.generateDraft}">
+                                        <label for="generateDraftTemplate" class="form-check-label">Generar asiento como borrador</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input type="checkbox" name="active" value="true" class="form-check-input" id="activeTemplate"
+                                               th:checked="${selectedTemplate == null or selectedTemplate.active}">
+                                        <label for="activeTemplate" class="form-check-label">Plantilla activa</label>
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div>
+                                            <h3 class="h6 mb-0">Líneas del asiento</h3>
+                                            <small class="text-muted">Debe existir al menos una línea al debe y una al haber.</small>
+                                        </div>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" id="addTemplateLine">Agregar línea</button>
+                                    </div>
+
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle" id="templateLinesTable">
+                                            <thead class="table-light">
+                                            <tr>
+                                                <th style="min-width: 180px;">Cuenta</th>
+                                                <th style="width: 110px;">Lado</th>
+                                                <th style="min-width: 160px;">Base de cálculo</th>
+                                                <th style="width: 120px;">Importe fijo</th>
+                                                <th style="min-width: 160px;">Detalle</th>
+                                                <th class="text-end" style="width: 90px;">Acción</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody id="templateLinesBody">
+                                            <th:block th:if="${selectedTemplate != null and not #lists.isEmpty(selectedTemplate.lines)}">
+                                                <tr th:each="line : ${selectedTemplate.lines}">
+                                                    <td>
+                                                        <select name="accountId" class="form-select form-select-sm" required>
+                                                            <option value="">Seleccionar</option>
+                                                            <option th:each="account : ${accounts}"
+                                                                    th:value="${account.id}"
+                                                                    th:selected="${line.account != null and line.account.id == account.id}"
+                                                                    th:text="${account.code + ' - ' + account.name}">
+                                                                1011 - Caja
+                                                            </option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <select name="lineSide" class="form-select form-select-sm" required>
+                                                            <option value="">Lado</option>
+                                                            <option th:each="side : ${lineSides}"
+                                                                    th:value="${side.name()}"
+                                                                    th:selected="${line.lineSide == side}"
+                                                                    th:text="${side.label}">Debe</option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <select name="amountBase" class="form-select form-select-sm" required>
+                                                            <option value="">Base</option>
+                                                            <option th:each="base : ${amountBases}"
+                                                                    th:value="${base.name()}"
+                                                                    th:selected="${line.amountBase == base}"
+                                                                    th:text="${base.label}">Total</option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" name="fixedAmount" class="form-control form-control-sm text-end" step="0.01" min="0"
+                                                               th:value="${line.fixedAmount}">
+                                                    </td>
+                                                    <td>
+                                                        <input type="text" name="lineDescription" class="form-control form-control-sm" maxlength="255"
+                                                               th:value="${line.description}" placeholder="Detalle opcional">
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <button type="button" class="btn btn-outline-danger btn-sm remove-template-line">Quitar</button>
+                                                    </td>
+                                                </tr>
+                                            </th:block>
+
+                                            <th:block th:if="${selectedTemplate == null or #lists.isEmpty(selectedTemplate.lines)}">
+                                                <tr>
+                                                    <td>
+                                                        <select name="accountId" class="form-select form-select-sm" required>
+                                                            <option value="">Seleccionar</option>
+                                                            <option th:each="account : ${accounts}" th:value="${account.id}" th:text="${account.code + ' - ' + account.name}">1011 - Caja</option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <select name="lineSide" class="form-select form-select-sm" required>
+                                                            <option value="">Lado</option>
+                                                            <option th:each="side : ${lineSides}" th:value="${side.name()}" th:text="${side.label}">Debe</option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <select name="amountBase" class="form-select form-select-sm" required>
+                                                            <option value="">Base</option>
+                                                            <option th:each="base : ${amountBases}" th:value="${base.name()}" th:text="${base.label}">Total</option>
+                                                        </select>
+                                                    </td>
+                                                    <td><input type="number" name="fixedAmount" class="form-control form-control-sm text-end" step="0.01" min="0" value="0.00"></td>
+                                                    <td><input type="text" name="lineDescription" class="form-control form-control-sm" maxlength="255" placeholder="Detalle opcional"></td>
+                                                    <td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm remove-template-line">Quitar</button></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>
+                                                        <select name="accountId" class="form-select form-select-sm" required>
+                                                            <option value="">Seleccionar</option>
+                                                            <option th:each="account : ${accounts}" th:value="${account.id}" th:text="${account.code + ' - ' + account.name}">7011 - Ventas</option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <select name="lineSide" class="form-select form-select-sm" required>
+                                                            <option value="">Lado</option>
+                                                            <option th:each="side : ${lineSides}" th:value="${side.name()}" th:text="${side.label}">Haber</option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <select name="amountBase" class="form-select form-select-sm" required>
+                                                            <option value="">Base</option>
+                                                            <option th:each="base : ${amountBases}" th:value="${base.name()}" th:text="${base.label}">Total</option>
+                                                        </select>
+                                                    </td>
+                                                    <td><input type="number" name="fixedAmount" class="form-control form-control-sm text-end" step="0.01" min="0" value="0.00"></td>
+                                                    <td><input type="text" name="lineDescription" class="form-control form-control-sm" maxlength="255" placeholder="Detalle opcional"></td>
+                                                    <td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm remove-template-line">Quitar</button></td>
+                                                </tr>
+                                            </th:block>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div class="alert alert-light border small mb-0">
+                                        <strong>Ejemplo:</strong> venta con IGV: Caja al debe por el total; Ventas al haber por la base; IGV por pagar al haber por el IGV.
+                                    </div>
+                                </div>
+
+                                <div class="col-12 d-flex gap-2 flex-wrap">
+                                    <button type="submit" class="btn btn-primary" th:disabled="${#lists.isEmpty(accounts)}">Guardar plantilla</button>
+                                    <a th:if="${selectedTemplate != null}" th:href="@{/accounting/rule-templates}" class="btn btn-outline-secondary">Nueva plantilla</a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-7">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h2 class="h6 mb-1">Plantillas configuradas</h2>
+                                    <p class="text-muted small mb-0">Estas plantillas serán usadas por la siguiente fase para generar asientos automáticos en borrador.</p>
+                                </div>
+                                <span class="badge bg-light text-dark border" th:text="${#lists.size(templates) + ' plantillas'}">0 plantillas</span>
+                            </div>
+
+                            <div th:if="${#lists.isEmpty(templates)}" class="alert alert-light border mb-0">
+                                Todavía no hay plantillas multilínea. Crea una plantilla para preparar la automatización contable.
+                            </div>
+
+                            <div th:if="${not #lists.isEmpty(templates)}" class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Evento</th>
+                                        <th>Plantilla</th>
+                                        <th>Líneas</th>
+                                        <th>Estado</th>
+                                        <th class="text-end">Acciones</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="template : ${templates}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${template.eventType.label}">Venta pagada</div>
+                                            <small class="text-muted" th:text="${template.eventType.description}">Descripción</small>
+                                        </td>
+                                        <td>
+                                            <div th:text="${template.name}">Venta pagada con IGV</div>
+                                            <small class="text-muted" th:text="${template.description ?: 'Sin descripción'}">Descripción</small>
+                                        </td>
+                                        <td>
+                                            <div class="small" th:text="${template.debitLineCount + ' debe / ' + template.creditLineCount + ' haber'}">1 debe / 2 haber</div>
+                                            <div class="mt-1 d-flex gap-1 flex-wrap">
+                                                <span th:each="line : ${template.lines}" class="badge bg-light text-dark border"
+                                                      th:text="${line.lineSide.label + ': ' + line.account.code + ' ' + line.amountBase.label}">Debe 1011 Total</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge" th:classappend="${template.active ? ' bg-success' : ' bg-secondary'}" th:text="${template.active ? 'Activa' : 'Inactiva'}">Activa</span>
+                                            <span class="badge bg-info text-dark" th:if="${template.generateDraft}">Borrador</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="d-flex gap-1 justify-content-end flex-wrap">
+                                                <a th:href="@{/accounting/rule-templates(editId=${template.id})}" class="btn btn-outline-primary btn-sm">Editar</a>
+                                                <form method="post" th:action="@{/accounting/rule-templates/{id}/toggle(id=${template.id})}">
+                                                    <button type="submit" class="btn btn-outline-secondary btn-sm" th:text="${template.active ? 'Desactivar' : 'Activar'}">Cambiar</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h2 class="h6 mb-3">Bases de cálculo disponibles</h2>
+                            <div class="row g-2">
+                                <div class="col-md-6" th:each="base : ${amountBases}">
+                                    <div class="border rounded-3 p-2 h-100">
+                                        <div class="fw-semibold" th:text="${base.label}">Total</div>
+                                        <small class="text-muted" th:text="${base.description}">Descripción</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<template id="templateLinePrototype">
+    <tr>
+        <td>
+            <select name="accountId" class="form-select form-select-sm" required>
+                <option value="">Seleccionar</option>
+                <option th:each="account : ${accounts}" th:value="${account.id}" th:text="${account.code + ' - ' + account.name}">1011 - Caja</option>
+            </select>
+        </td>
+        <td>
+            <select name="lineSide" class="form-select form-select-sm" required>
+                <option value="">Lado</option>
+                <option th:each="side : ${lineSides}" th:value="${side.name()}" th:text="${side.label}">Debe</option>
+            </select>
+        </td>
+        <td>
+            <select name="amountBase" class="form-select form-select-sm" required>
+                <option value="">Base</option>
+                <option th:each="base : ${amountBases}" th:value="${base.name()}" th:text="${base.label}">Total</option>
+            </select>
+        </td>
+        <td><input type="number" name="fixedAmount" class="form-control form-control-sm text-end" step="0.01" min="0" value="0.00"></td>
+        <td><input type="text" name="lineDescription" class="form-control form-control-sm" maxlength="255" placeholder="Detalle opcional"></td>
+        <td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm remove-template-line">Quitar</button></td>
+    </tr>
+</template>
+
+<div th:replace="~{fragments/scripts_admin :: adminScripts}"></div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const addButton = document.getElementById('addTemplateLine');
+        const tbody = document.getElementById('templateLinesBody');
+        const prototype = document.getElementById('templateLinePrototype');
+
+        if (addButton && tbody && prototype) {
+            addButton.addEventListener('click', function () {
+                const clone = prototype.content.cloneNode(true);
+                tbody.appendChild(clone);
+            });
+        }
+
+        document.addEventListener('click', function (event) {
+            if (!event.target.classList.contains('remove-template-line')) {
+                return;
+            }
+            const rows = tbody ? tbody.querySelectorAll('tr') : [];
+            if (rows.length <= 2) {
+                alert('La plantilla debe conservar al menos dos líneas.');
+                return;
+            }
+            event.target.closest('tr').remove();
+        });
+    });
+</script>
+</body>
+</html>

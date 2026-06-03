@@ -87,4 +87,14 @@ public class AccountingJournalLine {
     public void setCreditAmount(BigDecimal creditAmount) {
         this.creditAmount = creditAmount == null ? BigDecimal.ZERO : creditAmount;
     }
+
+    @Transient
+    public boolean isDebitLine() {
+        return getDebitAmount().compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    @Transient
+    public boolean isCreditLine() {
+        return getCreditAmount().compareTo(BigDecimal.ZERO) > 0;
+    }
 }

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Libro diario interno')}"></head>
+<body>
+<div class="app-layout" th:with="activePage=${activePage}">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Contabilidad interna</div>
+                    <h1 class="h4 mb-1">Libro diario interno</h1>
+                    <p class="text-muted mb-0">
+                        Consulta cronológica de asientos contables internos del período
+                        <strong th:text="${periodLabel}">01/06/2026 al 30/06/2026</strong>.
+                    </p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a th:href="@{/accounting/journal-entries}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-journal-plus"></i> Asientos internos
+                    </a>
+                    <a th:href="@{/accounting/rule-templates}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-diagram-2"></i> Plantillas contables
+                    </a>
+                    <a th:href="@{/accounting/accounts}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-list-columns-reverse"></i> Plan de cuentas
+                    </a>
+                </div>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small mb-3">
+                <strong>Lectura recomendada:</strong>
+                este libro diario es interno. Incluye asientos en borrador, registrados y anulados según el filtro seleccionado.
+                Para reportes finales, usa principalmente asientos en estado <strong>Registrado</strong>.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <strong>Filtros</strong>
+                </div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" method="get" th:action="@{/accounting/journal-book}">
+                        <div class="col-md-3">
+                            <label for="fromDate" class="form-label">Desde</label>
+                            <input type="date" id="fromDate" name="fromDate" class="form-control" th:value="${fromDate}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="toDate" class="form-label">Hasta</label>
+                            <input type="date" id="toDate" name="toDate" class="form-control" th:value="${toDate}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="status" class="form-label">Estado</label>
+                            <select id="status" name="status" class="form-select">
+                                <option value="ALL" th:selected="${selectedStatus == 'ALL'}">Todos</option>
+                                <option th:each="statusItem : ${entryStatuses}"
+                                        th:value="${statusItem.name()}"
+                                        th:selected="${selectedStatus == statusItem.name()}"
+                                        th:text="${statusItem.label}">
+                                    Borrador
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search me-1"></i> Consultar libro
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Asientos</div>
+                            <div class="fs-5 fw-bold" th:text="${snapshot.summary.totalEntries}">0</div>
+                            <div class="small text-muted" th:text="${snapshot.summary.totalLines + ' líneas contables'}">0 líneas</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-primary">
+                        <div class="card-body">
+                            <div class="text-muted small">Total debe</div>
+                            <div class="fs-5 fw-bold text-primary">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalDebit,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Suma del debe del período.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-primary">
+                        <div class="card-body">
+                            <div class="text-muted small">Total haber</div>
+                            <div class="fs-5 fw-bold text-primary">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalCredit,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Suma del haber del período.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.summary.balanced} ? ' border-success' : ' border-danger'">
+                        <div class="card-body">
+                            <div class="text-muted small">Diferencia</div>
+                            <div class="fs-5 fw-bold" th:classappend="${snapshot.summary.balanced} ? ' text-success' : ' text-danger'">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.difference,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted" th:text="${snapshot.summary.balanced ? 'Debe y haber cuadran.' : 'Revisar descuadre.'}">Debe y haber cuadran.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-muted small">Borradores</div>
+                                <div class="fs-5 fw-bold text-warning" th:text="${snapshot.summary.draftEntries}">0</div>
+                            </div>
+                            <i class="bi bi-pencil-square fs-3 text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-muted small">Registrados</div>
+                                <div class="fs-5 fw-bold text-success" th:text="${snapshot.summary.postedEntries}">0</div>
+                            </div>
+                            <i class="bi bi-check-circle fs-3 text-success"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-muted small">Anulados</div>
+                                <div class="fs-5 fw-bold text-secondary" th:text="${snapshot.summary.cancelledEntries}">0</div>
+                            </div>
+                            <i class="bi bi-slash-circle fs-3 text-secondary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${#lists.isEmpty(snapshot.entries)}" class="card shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-journal-text fs-1 text-muted"></i>
+                    <h2 class="h6 mt-3">No hay asientos para el período seleccionado</h2>
+                    <p class="text-muted mb-3">
+                        Crea asientos manuales o registra ventas, cobros, egresos e ingresos para generar borradores automáticos.
+                    </p>
+                    <a th:href="@{/accounting/journal-entries}" class="btn btn-primary btn-sm">
+                        Ir a asientos internos
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${not #lists.isEmpty(snapshot.entries)}" class="card shadow-sm">
+                <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <strong>Detalle del libro diario</strong>
+                    <span class="badge bg-light text-dark border" th:text="${snapshot.summary.totalEntries + ' asientos'}">0 asientos</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th style="width: 110px;">Fecha</th>
+                                <th>Asiento</th>
+                                <th>Cuenta</th>
+                                <th>Detalle</th>
+                                <th class="text-end" style="width: 130px;">Debe</th>
+                                <th class="text-end" style="width: 130px;">Haber</th>
+                                <th style="width: 110px;">Estado</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <th:block th:each="entry : ${snapshot.entries}">
+                                <tr class="table-secondary">
+                                    <td th:text="${entry.entryDate}">2026-06-02</td>
+                                    <td colspan="4">
+                                        <div class="fw-semibold">
+                                            <a th:href="@{/accounting/journal-entries(editId=${entry.id})}"
+                                               class="text-decoration-none"
+                                               th:text="${'Asiento #' + entry.id + ' · ' + entry.description}">
+                                                Asiento #1 · Glosa
+                                            </a>
+                                        </div>
+                                        <div class="small text-muted">
+                                            <span th:text="${entry.sourceType.label}">Manual</span>
+                                            <span th:if="${entry.sourceEvent != null}"> · </span>
+                                            <span th:if="${entry.sourceEvent != null}" th:text="${entry.sourceDetailLabel}">Venta pagada</span>
+                                            <span th:if="${!entry.balanced}" class="badge bg-danger-subtle text-danger border border-danger-subtle ms-2">Descuadrado</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-end fw-semibold">
+                                        S/. <span th:text="${#numbers.formatDecimal(entry.totalDebit,1,'POINT',2,'POINT')}">0.00</span>
+                                    </td>
+                                    <td>
+                                        <span th:if="${entry.status.name() == 'POSTED'}" class="badge bg-success-subtle text-success border border-success-subtle">Registrado</span>
+                                        <span th:if="${entry.status.name() == 'DRAFT'}" class="badge bg-warning-subtle text-warning border border-warning-subtle">Borrador</span>
+                                        <span th:if="${entry.status.name() == 'CANCELLED'}" class="badge bg-secondary-subtle text-secondary border">Anulado</span>
+                                    </td>
+                                </tr>
+                                <tr th:each="line : ${entry.lines}">
+                                    <td></td>
+                                    <td></td>
+                                    <td>
+                                        <div class="fw-semibold" th:text="${line.account.code + ' - ' + line.account.name}">101 - Caja</div>
+                                    </td>
+                                    <td class="text-muted" th:text="${line.description ?: entry.description}">Detalle</td>
+                                    <td class="text-end">
+                                        <span th:if="${line.debitLine}">
+                                            S/. <span th:text="${#numbers.formatDecimal(line.debitAmount,1,'POINT',2,'POINT')}">0.00</span>
+                                        </span>
+                                        <span th:unless="${line.debitLine}" class="text-muted">—</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <span th:if="${line.creditLine}">
+                                            S/. <span th:text="${#numbers.formatDecimal(line.creditAmount,1,'POINT',2,'POINT')}">0.00</span>
+                                        </span>
+                                        <span th:unless="${line.creditLine}" class="text-muted">—</span>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </th:block>
+                            </tbody>
+                            <tfoot class="table-light">
+                            <tr>
+                                <th colspan="4" class="text-end">Totales del período</th>
+                                <th class="text-end">
+                                    S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalDebit,1,'POINT',2,'POINT')}">0.00</span>
+                                </th>
+                                <th class="text-end">
+                                    S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalCredit,1,'POINT',2,'POINT')}">0.00</span>
+                                </th>
+                                <th></th>
+                            </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div th:replace="~{fragments/scripts_admin :: adminScripts}"></div>
+</body>
+</html>

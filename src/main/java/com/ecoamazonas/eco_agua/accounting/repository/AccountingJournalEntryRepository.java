@@ -6,6 +6,7 @@ import com.ecoamazonas.eco_agua.accounting.AccountingJournalEntryStatus;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,6 +14,9 @@ public interface AccountingJournalEntryRepository extends JpaRepository<Accounti
 
     @EntityGraph(attributePaths = {"lines", "lines.account"})
     List<AccountingJournalEntry> findAllByOrderByEntryDateDescIdDesc();
+
+    @EntityGraph(attributePaths = {"lines", "lines.account"})
+    List<AccountingJournalEntry> findByEntryDateBetweenOrderByEntryDateAscIdAsc(LocalDate startDate, LocalDate endDate);
 
     boolean existsBySourceEventAndSourceReferenceIdAndStatusNot(
             AccountingAutomationEvent sourceEvent,

@@ -2,6 +2,28 @@
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/head_admin :: adminHead('Balance de comprobación interno')}"></head>
 <body>
+<style>
+    @media print {
+        .app-layout > aside,
+        .main-content > header,
+        .d-print-none,
+        form,
+        .btn {
+            display: none !important;
+        }
+        .main-content {
+            margin: 0 !important;
+            width: 100% !important;
+        }
+        .content-wrapper {
+            padding: 0 !important;
+        }
+        .card {
+            box-shadow: none !important;
+            border: 1px solid #dee2e6 !important;
+        }
+    }
+</style>
 <div class="app-layout" th:with="activePage=${activePage}">
     <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
 
@@ -18,7 +40,13 @@
                         <strong th:text="${periodLabel}">01/06/2026 al 30/06/2026</strong>.
                     </p>
                 </div>
-                <div class="d-flex flex-wrap gap-2">
+                <div class="d-flex flex-wrap gap-2 d-print-none">
+                    <button type="button" class="btn btn-outline-dark btn-sm" onclick="window.print()">
+                        <i class="bi bi-printer"></i> Imprimir
+                    </button>
+                    <a th:href="@{/accounting/trial-balance/export.csv(fromDate=${fromDate},toDate=${toDate},status=${selectedStatus})}" class="btn btn-outline-success btn-sm">
+                        <i class="bi bi-filetype-csv"></i> Exportar CSV
+                    </a>
                     <a th:href="@{/accounting/ledger}" class="btn btn-outline-primary btn-sm">
                         <i class="bi bi-journal-richtext"></i> Libro mayor
                     </a>
@@ -105,10 +133,10 @@
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card shadow-sm h-100" th:classappend="${snapshot.summary.balanced} ? ' border-success' : ' border-warning'">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.summary.balanced ? ' border-success' : ' border-warning'}">
                         <div class="card-body">
                             <div class="text-muted small">Diferencia</div>
-                            <div class="fs-5 fw-bold" th:classappend="${snapshot.summary.balanced} ? ' text-success' : ' text-warning'">
+                            <div class="fs-5 fw-bold" th:classappend="${snapshot.summary.balanced ? ' text-success' : ' text-warning'}">
                                 S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.movementDifference,1,'POINT',2,'POINT')}">0.00</span>
                             </div>
                             <div class="small text-muted" th:text="${snapshot.summary.balanced ? 'Debe y haber cuadran.' : 'Revisar asientos descuadrados.'}">Debe y haber cuadran.</div>
@@ -133,7 +161,7 @@
             <div th:if="${not #lists.isEmpty(snapshot.rows)}" class="card shadow-sm">
                 <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <strong>Balance de comprobación</strong>
-                    <span class="badge" th:classappend="${snapshot.summary.balanced} ? ' bg-success' : ' bg-warning text-dark'"
+                    <span class="badge" th:classappend="${snapshot.summary.balanced ? ' bg-success' : ' bg-warning text-dark'}"
                           th:text="${snapshot.summary.balanced ? 'Cuadrado' : 'Con diferencia'}">Cuadrado</span>
                 </div>
                 <div class="card-body p-0">

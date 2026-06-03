@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Estado de resultados interno')}"></head>
+<body>
+<div class="app-layout" th:with="activePage=${activePage}">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Contabilidad interna</div>
+                    <h1 class="h4 mb-1">Estado de resultados interno</h1>
+                    <p class="text-muted mb-0">
+                        Lectura de ingresos, costos, gastos y resultado para el período
+                        <strong th:text="${periodLabel}">01/06/2026 al 30/06/2026</strong>.
+                    </p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a th:href="@{/accounting/trial-balance}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-clipboard-data"></i> Balance de comprobación
+                    </a>
+                    <a th:href="@{/accounting/ledger}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-journal-richtext"></i> Libro mayor
+                    </a>
+                    <a th:href="@{/accounting/draft-review}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-check2-square"></i> Revisar borradores
+                    </a>
+                </div>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small mb-3">
+                <strong>Lectura recomendada:</strong>
+                para una lectura más cercana a un reporte formal, usa el filtro <strong>Registrado</strong>.
+                El filtro <strong>Todos</strong> sirve para simular el resultado incluyendo asientos todavía en borrador.
+                Este reporte es interno y no reemplaza una validación contable/SUNAT.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <strong>Filtros</strong>
+                </div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" method="get" th:action="@{/accounting/income-statement}">
+                        <div class="col-md-3">
+                            <label for="fromDate" class="form-label">Desde</label>
+                            <input type="date" id="fromDate" name="fromDate" class="form-control" th:value="${fromDate}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="toDate" class="form-label">Hasta</label>
+                            <input type="date" id="toDate" name="toDate" class="form-control" th:value="${toDate}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="status" class="form-label">Estado</label>
+                            <select id="status" name="status" class="form-select">
+                                <option value="ALL" th:selected="${selectedStatus == 'ALL'}">Todos</option>
+                                <option th:each="statusItem : ${entryStatuses}"
+                                        th:value="${statusItem.name()}"
+                                        th:selected="${selectedStatus == statusItem.name()}"
+                                        th:text="${statusItem.label}">
+                                    Registrado
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Aplicar filtros
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-success">
+                        <div class="card-body">
+                            <div class="text-muted small">Ingresos netos</div>
+                            <div class="fs-5 fw-bold text-success">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalIncome,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Ventas netas + otros ingresos.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-warning">
+                        <div class="card-body">
+                            <div class="text-muted small">Costos y gastos</div>
+                            <div class="fs-5 fw-bold text-warning">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalCostsAndExpenses,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Compras/costos + gastos operativos.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-primary">
+                        <div class="card-body">
+                            <div class="text-muted small">Utilidad bruta</div>
+                            <div class="fs-5 fw-bold text-primary">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.grossProfit,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">Ventas netas menos costo de ventas.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.summary.profit} ? ' border-success' : ' border-danger'">
+                        <div class="card-body">
+                            <div class="text-muted small" th:text="${snapshot.summary.resultLabel + ' del período'}">Resultado del período</div>
+                            <div class="fs-5 fw-bold" th:classappend="${snapshot.summary.profit} ? ' text-success' : ' text-danger'">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.absoluteNetResult,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted" th:text="${snapshot.summary.totalAccounts + ' cuentas · ' + snapshot.summary.totalMovements + ' movimientos'}">0 cuentas · 0 movimientos</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${not snapshot.hasRows()}" class="card shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-graph-up fs-1 text-muted"></i>
+                    <h2 class="h6 mt-3">No hay cuentas de ingresos o gastos con movimiento</h2>
+                    <p class="text-muted mb-3">
+                        Genera o registra asientos contables para ver el estado de resultados interno.
+                    </p>
+                    <a th:href="@{/accounting/journal-entries}" class="btn btn-primary btn-sm">
+                        Ir a asientos internos
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${snapshot.hasRows()}" class="row g-3">
+                <div class="col-lg-7">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <strong>Ingresos</strong>
+                            <span class="badge bg-success">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalIncome,1,'POINT',2,'POINT')}">0.00</span>
+                            </span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Cuenta</th>
+                                        <th>Sección</th>
+                                        <th class="text-end">Mov.</th>
+                                        <th class="text-end">Importe</th>
+                                        <th class="text-end">Acción</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:if="${#lists.isEmpty(snapshot.salesIncomeRows) and #lists.isEmpty(snapshot.otherIncomeRows)}">
+                                        <td colspan="5" class="text-center text-muted py-3">No hay ingresos contables en el período.</td>
+                                    </tr>
+                                    <tr th:each="row : ${snapshot.salesIncomeRows}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.accountCode + ' - ' + row.accountName}">7011 - Ventas</div>
+                                            <div class="small text-muted">Haber - Debe</div>
+                                        </td>
+                                        <td><span class="badge bg-success-subtle text-success" th:text="${row.sectionLabel}">Ingresos por ventas</span></td>
+                                        <td class="text-end" th:text="${row.movementCount}">0</td>
+                                        <td class="text-end fw-semibold text-success">
+                                            S/. <span th:text="${#numbers.formatDecimal(row.amount,1,'POINT',2,'POINT')}">0.00</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <a class="btn btn-outline-secondary btn-sm"
+                                               th:href="@{/accounting/ledger(accountId=${row.accountId},fromDate=${fromDate},toDate=${toDate},status=${selectedStatus})}">
+                                                Ver mayor
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <tr th:each="row : ${snapshot.otherIncomeRows}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.accountCode + ' - ' + row.accountName}">7591 - Otros ingresos</div>
+                                            <div class="small text-muted">Haber - Debe</div>
+                                        </td>
+                                        <td><span class="badge bg-info-subtle text-info" th:text="${row.sectionLabel}">Otros ingresos</span></td>
+                                        <td class="text-end" th:text="${row.movementCount}">0</td>
+                                        <td class="text-end fw-semibold text-success">
+                                            S/. <span th:text="${#numbers.formatDecimal(row.amount,1,'POINT',2,'POINT')}">0.00</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <a class="btn btn-outline-secondary btn-sm"
+                                               th:href="@{/accounting/ledger(accountId=${row.accountId},fromDate=${fromDate},toDate=${toDate},status=${selectedStatus})}">
+                                                Ver mayor
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                    <tfoot class="table-light">
+                                    <tr>
+                                        <th colspan="3">Total ingresos</th>
+                                        <th class="text-end text-success">
+                                            S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalIncome,1,'POINT',2,'POINT')}">0.00</span>
+                                        </th>
+                                        <th></th>
+                                    </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <strong>Costos, compras y gastos</strong>
+                            <span class="badge bg-warning text-dark">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalCostsAndExpenses,1,'POINT',2,'POINT')}">0.00</span>
+                            </span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Cuenta</th>
+                                        <th>Sección</th>
+                                        <th class="text-end">Mov.</th>
+                                        <th class="text-end">Importe</th>
+                                        <th class="text-end">Acción</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:if="${#lists.isEmpty(snapshot.salesDeductionRows) and #lists.isEmpty(snapshot.costRows) and #lists.isEmpty(snapshot.expenseRows)}">
+                                        <td colspan="5" class="text-center text-muted py-3">No hay costos o gastos contables en el período.</td>
+                                    </tr>
+                                    <tr th:each="row : ${snapshot.salesDeductionRows}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.accountCode + ' - ' + row.accountName}">7091 - Descuentos</div>
+                                            <div class="small text-muted">Debe - Haber</div>
+                                        </td>
+                                        <td><span class="badge bg-danger-subtle text-danger" th:text="${row.sectionLabel}">Deducciones de ventas</span></td>
+                                        <td class="text-end" th:text="${row.movementCount}">0</td>
+                                        <td class="text-end fw-semibold">
+                                            S/. <span th:text="${#numbers.formatDecimal(row.amount,1,'POINT',2,'POINT')}">0.00</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <a class="btn btn-outline-secondary btn-sm"
+                                               th:href="@{/accounting/ledger(accountId=${row.accountId},fromDate=${fromDate},toDate=${toDate},status=${selectedStatus})}">
+                                                Ver mayor
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <tr th:each="row : ${snapshot.costRows}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.accountCode + ' - ' + row.accountName}">6011 - Compras</div>
+                                            <div class="small text-muted">Debe - Haber</div>
+                                        </td>
+                                        <td><span class="badge bg-warning-subtle text-warning" th:text="${row.sectionLabel}">Compras y costo de ventas</span></td>
+                                        <td class="text-end" th:text="${row.movementCount}">0</td>
+                                        <td class="text-end fw-semibold">
+                                            S/. <span th:text="${#numbers.formatDecimal(row.amount,1,'POINT',2,'POINT')}">0.00</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <a class="btn btn-outline-secondary btn-sm"
+                                               th:href="@{/accounting/ledger(accountId=${row.accountId},fromDate=${fromDate},toDate=${toDate},status=${selectedStatus})}">
+                                                Ver mayor
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <tr th:each="row : ${snapshot.expenseRows}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.accountCode + ' - ' + row.accountName}">6591 - Otros gastos</div>
+                                            <div class="small text-muted">Debe - Haber</div>
+                                        </td>
+                                        <td><span class="badge bg-secondary" th:text="${row.sectionLabel}">Gastos operativos</span></td>
+                                        <td class="text-end" th:text="${row.movementCount}">0</td>
+                                        <td class="text-end fw-semibold">
+                                            S/. <span th:text="${#numbers.formatDecimal(row.amount,1,'POINT',2,'POINT')}">0.00</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <a class="btn btn-outline-secondary btn-sm"
+                                               th:href="@{/accounting/ledger(accountId=${row.accountId},fromDate=${fromDate},toDate=${toDate},status=${selectedStatus})}">
+                                                Ver mayor
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                    <tfoot class="table-light">
+                                    <tr>
+                                        <th colspan="3">Total costos y gastos</th>
+                                        <th class="text-end text-warning">
+                                            S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalCostsAndExpenses,1,'POINT',2,'POINT')}">0.00</span>
+                                        </th>
+                                        <th></th>
+                                    </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-light">
+                            <strong>Resumen del resultado</strong>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Ingresos por ventas</span>
+                                <strong>S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.salesIncome,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Deducciones de ventas</span>
+                                <strong class="text-danger">- S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.salesDeductions,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Ventas netas</span>
+                                <strong>S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.netSales,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Costo de ventas / compras</span>
+                                <strong class="text-danger">- S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.costOfSales,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Utilidad bruta</span>
+                                <strong>S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.grossProfit,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Otros ingresos</span>
+                                <strong class="text-success">+ S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.otherIncome,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-bottom py-2">
+                                <span>Gastos operativos</span>
+                                <strong class="text-danger">- S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.operatingExpenses,1,'POINT',2,'POINT')}">0.00</span></strong>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center pt-3">
+                                <span class="fw-bold" th:text="${snapshot.summary.resultLabel + ' neta'}">Utilidad neta</span>
+                                <strong class="fs-5" th:classappend="${snapshot.summary.profit} ? ' text-success' : ' text-danger'">
+                                    S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.absoluteNetResult,1,'POINT',2,'POINT')}">0.00</span>
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light">
+                            <strong>Validación rápida</strong>
+                        </div>
+                        <div class="card-body small text-muted">
+                            <p class="mb-2">
+                                Este reporte usa cuentas contables de tipo <strong>Ingreso</strong> y <strong>Gasto / costo</strong>.
+                            </p>
+                            <p class="mb-2">
+                                Si una venta, gasto o cobro no aparece, revisa que tenga asiento contable y que el asiento esté en el estado filtrado.
+                            </p>
+                            <div class="d-grid gap-2 mt-3">
+                                <a th:href="@{/accounting/draft-review}" class="btn btn-outline-primary btn-sm">
+                                    Revisar borradores automáticos
+                                </a>
+                                <a th:href="@{/accounting/trial-balance(fromDate=${fromDate},toDate=${toDate},status=${selectedStatus})}" class="btn btn-outline-secondary btn-sm">
+                                    Comparar con balance de comprobación
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<div th:replace="~{fragments/scripts_admin :: adminScripts}"></div>
+</body>
+</html>

@@ -472,6 +472,7 @@
             or activePage == 'accounting_trial_balance'
             or activePage == 'accounting_income_statement'
             or activePage == 'accounting_balance_sheet'
+            or activePage == 'accounting_period_close'
             or activePage == 'accounting_draft_review'
             or activePage == 'accounting_rules'
             or activePage == 'accounting_rule_templates'
@@ -492,151 +493,275 @@
           </label>
 
           <div class="submenu-container">
-            <a
-              th:if="${moduleAccountingEnabled}"
-              th:href="@{/accounting/sales-registry}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'accounting_sales_registry' ? ' active' : ''}"
-            >
-              <span class="icon"><i class="bi bi-journal-text"></i></span>
-              <span>Reg. ventas e ingresos</span>
-            </a>
-
-            <a
-              th:if="${moduleAccountingEnabled}"
-              th:href="@{/accounting/purchase-registry}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'accounting_purchase_registry' ? ' active' : ''}"
-            >
-              <span class="icon"><i class="bi bi-journal-check"></i></span>
-              <span>Reg. compras y gastos</span>
-            </a>
-
-
-
-            <a
-              th:if="${moduleAccountingEnabled}"
-              th:href="@{/accounting/accounts}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'accounting_accounts' ? ' active' : ''}"
-            >
-              <span class="icon"><i class="bi bi-list-columns-reverse"></i></span>
-              <span>Plan de cuentas</span>
-            </a>
-
-
-
-            <a
-              th:if="${moduleAccountingEnabled}"
-              th:href="@{/accounting/journal-entries}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'accounting_journal_entries' ? ' active' : ''}"
-            >
-              <span class="icon"><i class="bi bi-journal-plus"></i></span>
-              <span>Asientos internos</span>
-            </a>
-
-            <a
-              th:if="${moduleAccountingEnabled}"
-              th:href="@{/accounting/journal-book}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'accounting_journal_book' ? ' active' : ''}"
-            >
-              <span class="icon"><i class="bi bi-journal-text"></i></span>
-              <span>Libro diario interno</span>
-            </a>
-
-            <a
-              th:if="${moduleAccountingEnabled}"
-              th:href="@{/accounting/ledger}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'accounting_ledger' ? ' active' : ''}"
-            >
-              <span class="icon"><i class="bi bi-journal-richtext"></i></span>
-              <span>Libro mayor interno</span>
-            </a>
-
-            <a
-              th:if="${moduleAccountingEnabled}"
-              th:href="@{/accounting/trial-balance}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'accounting_trial_balance' ? ' active' : ''}"
-            >
-              <span class="icon"><i class="bi bi-clipboard-data"></i></span>
-              <span>Balance de comprobación</span>
-            </a>
-
-
-            <a
-              th:if="${moduleAccountingEnabled}"
-              th:href="@{/accounting/income-statement}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'accounting_income_statement' ? ' active' : ''}"
-            >
-              <span class="icon"><i class="bi bi-graph-up-arrow"></i></span>
-              <span>Estado de resultados</span>
-            </a>
-
-            <a
-              th:if="${moduleAccountingEnabled}"
-              th:href="@{/accounting/balance-sheet}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'accounting_balance_sheet' ? ' active' : ''}"
-            >
-              <span class="icon"><i class="bi bi-bank"></i></span>
-              <span>Balance general</span>
-            </a>
-
-
-            <a
-              th:if="${moduleAccountingEnabled}"
-              th:href="@{/accounting/draft-review}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'accounting_draft_review' ? ' active' : ''}"
-            >
-              <span class="icon"><i class="bi bi-check2-square"></i></span>
-              <span>Revisión de borradores</span>
-            </a>
-
-            <a
-              th:if="${moduleAccountingEnabled}"
-              th:href="@{/accounting/rule-templates}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'accounting_rule_templates' ? ' active' : ''}"
-            >
-              <span class="icon"><i class="bi bi-diagram-2"></i></span>
-              <span>Plantillas contables</span>
-            </a>
-
-            <a
-              th:if="${moduleAccountingEnabled}"
-              th:href="@{/accounting/rules}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'accounting_rules' ? ' active' : ''}"
-            >
-              <span class="icon"><i class="bi bi-diagram-3"></i></span>
-              <span>Reglas contables</span>
-            </a>
-
-            <a
+            <div
               th:if="${moduleCashflowEnabled}"
-              th:href="@{/cashflow}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'cashflow' ? ' active' : ''}"
+              class="menu-group finance-subgroup"
+              th:with="isFinanceOperationActive=${activePage == 'cashflow'
+                or activePage == 'cashflow_monthly_summary'}"
             >
-              <span class="icon"><i class="bi bi-cash-stack"></i></span>
-              <span>Flujo de caja</span>
-            </a>
+              <input
+                type="checkbox"
+                id="menu-finance-operation-toggle"
+                class="menu-toggle"
+                th:checked="${isFinanceOperationActive}"
+              >
 
-            <a
-              th:if="${moduleCashflowEnabled}"
-              th:href="@{/cashflow/monthly-summary}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'cashflow_monthly_summary' ? ' active' : ''}"
+              <label class="menu-link submenu has-children" for="menu-finance-operation-toggle">
+                <span class="icon"><i class="bi bi-cash-stack"></i></span>
+                <span>Operación financiera</span>
+                <span class="caret"><i class="bi bi-chevron-right"></i></span>
+              </label>
+
+              <div class="submenu-container">
+                <a
+                  th:href="@{/cashflow}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'cashflow' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-cash-stack"></i></span>
+                  <span>Flujo de caja</span>
+                </a>
+
+                <a
+                  th:href="@{/cashflow/monthly-summary}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'cashflow_monthly_summary' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-calendar3"></i></span>
+                  <span>Resumen financiero mensual</span>
+                </a>
+              </div>
+            </div>
+
+            <div
+              th:if="${moduleAccountingEnabled}"
+              class="menu-group finance-subgroup"
+              th:with="isAccountingRegistryActive=${activePage == 'accounting_sales_registry'
+                or activePage == 'accounting_purchase_registry'}"
             >
-              <span class="icon"><i class="bi bi-calendar3"></i></span>
-              <span>Resumen financiero mensual</span>
-            </a>
+              <input
+                type="checkbox"
+                id="menu-accounting-registry-toggle"
+                class="menu-toggle"
+                th:checked="${isAccountingRegistryActive}"
+              >
+
+              <label class="menu-link submenu has-children" for="menu-accounting-registry-toggle">
+                <span class="icon"><i class="bi bi-journals"></i></span>
+                <span>Registros contables</span>
+                <span class="caret"><i class="bi bi-chevron-right"></i></span>
+              </label>
+
+              <div class="submenu-container">
+                <a
+                  th:href="@{/accounting/sales-registry}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_sales_registry' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-journal-text"></i></span>
+                  <span>Reg. ventas e ingresos</span>
+                </a>
+
+                <a
+                  th:href="@{/accounting/purchase-registry}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_purchase_registry' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-journal-check"></i></span>
+                  <span>Reg. compras y gastos</span>
+                </a>
+              </div>
+            </div>
+
+            <div
+              th:if="${moduleAccountingEnabled}"
+              class="menu-group finance-subgroup"
+              th:with="isInternalAccountingActive=${activePage == 'accounting_accounts'
+                or activePage == 'accounting_journal_entries'
+                or activePage == 'accounting_draft_review'}"
+            >
+              <input
+                type="checkbox"
+                id="menu-internal-accounting-toggle"
+                class="menu-toggle"
+                th:checked="${isInternalAccountingActive}"
+              >
+
+              <label class="menu-link submenu has-children" for="menu-internal-accounting-toggle">
+                <span class="icon"><i class="bi bi-calculator"></i></span>
+                <span>Contabilidad interna</span>
+                <span class="caret"><i class="bi bi-chevron-right"></i></span>
+              </label>
+
+              <div class="submenu-container">
+                <a
+                  th:href="@{/accounting/accounts}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_accounts' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-list-columns-reverse"></i></span>
+                  <span>Plan de cuentas</span>
+                </a>
+
+                <a
+                  th:href="@{/accounting/journal-entries}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_journal_entries' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-journal-plus"></i></span>
+                  <span>Asientos internos</span>
+                </a>
+
+                <a
+                  th:href="@{/accounting/draft-review}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_draft_review' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-check2-square"></i></span>
+                  <span>Revisión de borradores</span>
+                </a>
+              </div>
+            </div>
+
+            <div
+              th:if="${moduleAccountingEnabled}"
+              class="menu-group finance-subgroup"
+              th:with="isAccountingReportsActive=${activePage == 'accounting_journal_book'
+                or activePage == 'accounting_ledger'
+                or activePage == 'accounting_trial_balance'
+                or activePage == 'accounting_income_statement'
+                or activePage == 'accounting_balance_sheet'}"
+            >
+              <input
+                type="checkbox"
+                id="menu-accounting-reports-toggle"
+                class="menu-toggle"
+                th:checked="${isAccountingReportsActive}"
+              >
+
+              <label class="menu-link submenu has-children" for="menu-accounting-reports-toggle">
+                <span class="icon"><i class="bi bi-bar-chart-line"></i></span>
+                <span>Libros y estados</span>
+                <span class="caret"><i class="bi bi-chevron-right"></i></span>
+              </label>
+
+              <div class="submenu-container">
+                <a
+                  th:href="@{/accounting/journal-book}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_journal_book' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-journal-text"></i></span>
+                  <span>Libro diario interno</span>
+                </a>
+
+                <a
+                  th:href="@{/accounting/ledger}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_ledger' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-journal-richtext"></i></span>
+                  <span>Libro mayor interno</span>
+                </a>
+
+                <a
+                  th:href="@{/accounting/trial-balance}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_trial_balance' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-clipboard-data"></i></span>
+                  <span>Balance de comprobación</span>
+                </a>
+
+                <a
+                  th:href="@{/accounting/income-statement}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_income_statement' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-graph-up-arrow"></i></span>
+                  <span>Estado de resultados</span>
+                </a>
+
+                <a
+                  th:href="@{/accounting/balance-sheet}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_balance_sheet' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-bank"></i></span>
+                  <span>Balance general</span>
+                </a>
+              </div>
+            </div>
+
+            <div
+              th:if="${moduleAccountingEnabled}"
+              class="menu-group finance-subgroup"
+              th:with="isAccountingConfigActive=${activePage == 'accounting_rule_templates'
+                or activePage == 'accounting_rules'}"
+            >
+              <input
+                type="checkbox"
+                id="menu-accounting-config-toggle"
+                class="menu-toggle"
+                th:checked="${isAccountingConfigActive}"
+              >
+
+              <label class="menu-link submenu has-children" for="menu-accounting-config-toggle">
+                <span class="icon"><i class="bi bi-sliders"></i></span>
+                <span>Configuración contable</span>
+                <span class="caret"><i class="bi bi-chevron-right"></i></span>
+              </label>
+
+              <div class="submenu-container">
+                <a
+                  th:href="@{/accounting/rule-templates}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_rule_templates' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-diagram-2"></i></span>
+                  <span>Plantillas contables</span>
+                </a>
+
+                <a
+                  th:href="@{/accounting/rules}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_rules' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-diagram-3"></i></span>
+                  <span>Reglas contables</span>
+                </a>
+              </div>
+            </div>
+
+            <div
+              th:if="${moduleAccountingEnabled}"
+              class="menu-group finance-subgroup"
+              th:with="isAccountingCloseActive=${activePage == 'accounting_period_close'}"
+            >
+              <input
+                type="checkbox"
+                id="menu-accounting-close-toggle"
+                class="menu-toggle"
+                th:checked="${isAccountingCloseActive}"
+              >
+
+              <label class="menu-link submenu has-children" for="menu-accounting-close-toggle">
+                <span class="icon"><i class="bi bi-calendar-check"></i></span>
+                <span>Cierre y control</span>
+                <span class="caret"><i class="bi bi-chevron-right"></i></span>
+              </label>
+
+              <div class="submenu-container">
+                <a
+                  th:href="@{/accounting/period-close}"
+                  class="menu-link submenu"
+                  th:classappend="${activePage == 'accounting_period_close' ? ' active' : ''}"
+                >
+                  <span class="icon"><i class="bi bi-calendar-check"></i></span>
+                  <span>Cierre mensual</span>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </th:block>

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Cierre mensual contable')}"></head>
+<body>
+<style>
+    @media print {
+        .app-layout > aside,
+        .main-content > header,
+        .d-print-none,
+        form,
+        .btn {
+            display: none !important;
+        }
+        .main-content {
+            margin: 0 !important;
+            width: 100% !important;
+        }
+        .content-wrapper {
+            padding: 0 !important;
+        }
+        .card {
+            box-shadow: none !important;
+            border: 1px solid #dee2e6 !important;
+        }
+    }
+</style>
+<div class="app-layout" th:with="activePage=${activePage}">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Contabilidad interna</div>
+                    <h1 class="h4 mb-1">Cierre mensual contable</h1>
+                    <p class="text-muted mb-0">
+                        Revisión del período <strong th:text="${periodLabel}">01/06/2026 al 30/06/2026</strong> antes de marcarlo como cerrado.
+                    </p>
+                </div>
+                <div class="d-flex flex-wrap gap-2 d-print-none">
+                    <button type="button" class="btn btn-outline-dark btn-sm" onclick="window.print()">
+                        <i class="bi bi-printer"></i> Imprimir revisión
+                    </button>
+                    <a th:href="@{/accounting/journal-book(fromDate=${snapshot.startDate},toDate=${snapshot.endDate},status='ALL')}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-journal-text"></i> Libro diario
+                    </a>
+                    <a th:href="@{/accounting/trial-balance(fromDate=${snapshot.startDate},toDate=${snapshot.endDate},status='ALL')}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-clipboard-data"></i> Balance de comprobación
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${message}" class="alert shadow-sm" th:classappend="${messageType == 'success' ? ' alert-success' : (messageType == 'warning' ? ' alert-warning' : ' alert-danger')}" th:text="${message}">
+                Mensaje del sistema.
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small mb-3">
+                <strong>Cierre suave:</strong>
+                esta pantalla marca el mes como cerrado para control interno. Por ahora no bloquea ventas, egresos ni asientos;
+                deja una advertencia operativa para revisar antes de modificar información de un período cerrado.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <strong>Período a revisar</strong>
+                </div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" method="get" th:action="@{/accounting/period-close}">
+                        <div class="col-md-3">
+                            <label for="year" class="form-label">Año</label>
+                            <select id="year" name="year" class="form-select">
+                                <option th:each="yearOption : ${yearOptions}"
+                                        th:value="${yearOption}"
+                                        th:selected="${selectedYear == yearOption}"
+                                        th:text="${yearOption}">2026</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="month" class="form-label">Mes</label>
+                            <select id="month" name="month" class="form-select">
+                                <option th:each="monthOption : ${monthOptions}"
+                                        th:value="${monthOption['value']}"
+                                        th:selected="${selectedMonth == monthOption['value']}"
+                                        th:text="${monthOption['label']}">Junio</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Revisar período
+                            </button>
+                        </div>
+                        <div class="col-md-2">
+                            <a th:href="@{/accounting/draft-review}" class="btn btn-outline-secondary w-100">
+                                Borradores
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.closed ? ' border-success' : ' border-warning'}">
+                        <div class="card-body">
+                            <div class="text-muted small">Estado del período</div>
+                            <div class="fs-5 fw-bold" th:classappend="${snapshot.closed ? ' text-success' : ' text-warning'}" th:text="${snapshot.statusLabel}">Abierto</div>
+                            <div class="small text-muted" th:if="${snapshot.closedAt != null}">
+                                Cerrado: <span th:text="${#temporals.format(snapshot.closedAt, 'dd/MM/yyyy HH:mm')}">03/06/2026 08:30</span>
+                            </div>
+                            <div class="small text-muted" th:if="${snapshot.reopenedAt != null}">
+                                Reabierto: <span th:text="${#temporals.format(snapshot.reopenedAt, 'dd/MM/yyyy HH:mm')}">03/06/2026 09:00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100 border-primary">
+                        <div class="card-body">
+                            <div class="text-muted small">Asientos del mes</div>
+                            <div class="fs-5 fw-bold text-primary" th:text="${snapshot.summary.totalEntries}">0</div>
+                            <div class="small text-muted">
+                                <span th:text="${snapshot.summary.postedEntries}">0</span> registrados ·
+                                <span th:text="${snapshot.summary.draftEntries}">0</span> borradores
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.summary.unbalancedEntries == 0 ? ' border-success' : ' border-danger'}">
+                        <div class="card-body">
+                            <div class="text-muted small">Asientos descuadrados</div>
+                            <div class="fs-5 fw-bold" th:classappend="${snapshot.summary.unbalancedEntries == 0 ? ' text-success' : ' text-danger'}" th:text="${snapshot.summary.unbalancedEntries}">0</div>
+                            <div class="small text-muted">No considera asientos anulados.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.summary.readyToClose ? ' border-success' : ' border-warning'}">
+                        <div class="card-body">
+                            <div class="text-muted small">Diferencia debe / haber</div>
+                            <div class="fs-5 fw-bold" th:classappend="${snapshot.summary.readyToClose ? ' text-success' : ' text-warning'}">
+                                S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.absoluteDifference,1,'POINT',2,'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted" th:text="${snapshot.summary.readyToClose ? 'Listo para cierre.' : 'Revisar antes de cerrar.'}">Listo para cierre.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <strong>Controles de cierre</strong>
+                    <span class="badge" th:classappend="${snapshot.summary.readyToClose ? ' text-bg-success' : ' text-bg-warning'}"
+                          th:text="${snapshot.summary.readyToClose ? 'Sin observaciones críticas' : 'Con observaciones'}">Sin observaciones críticas</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Control</th>
+                                <th>Detalle</th>
+                                <th>Estado</th>
+                                <th class="text-end d-print-none">Acción</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="check : ${snapshot.checks}">
+                                <td class="fw-semibold" th:text="${check.title}">Asientos en borrador</td>
+                                <td class="text-muted" th:text="${check.detail}">No hay pendientes.</td>
+                                <td>
+                                    <span class="badge" th:classappend="${check.ok ? ' text-bg-success' : ' text-bg-warning'}"
+                                          th:text="${check.ok ? 'Correcto' : 'Revisar'}">Correcto</span>
+                                </td>
+                                <td class="text-end d-print-none">
+                                    <a th:if="${check.hasAction()}" th:href="${check.actionUrl}" class="btn btn-outline-primary btn-sm" th:text="${check.actionLabel}">Revisar</a>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light">
+                            <strong>Resumen contable del período</strong>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="small text-muted">Total debe</div>
+                                        <div class="fs-5 fw-bold text-primary">
+                                            S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalDebit,1,'POINT',2,'POINT')}">0.00</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="small text-muted">Total haber</div>
+                                        <div class="fs-5 fw-bold text-primary">
+                                            S/. <span th:text="${#numbers.formatDecimal(snapshot.summary.totalCredit,1,'POINT',2,'POINT')}">0.00</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="small text-muted">Registrados</div>
+                                    <div class="fw-bold" th:text="${snapshot.summary.postedEntries}">0</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="small text-muted">Borradores</div>
+                                    <div class="fw-bold" th:text="${snapshot.summary.draftEntries}">0</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="small text-muted">Anulados</div>
+                                    <div class="fw-bold" th:text="${snapshot.summary.cancelledEntries}">0</div>
+                                </div>
+                            </div>
+
+                            <hr>
+
+                            <div th:if="${snapshot.notes != null and !#strings.isEmpty(snapshot.notes)}" class="small text-muted">
+                                <strong>Nota del período:</strong>
+                                <span th:text="${snapshot.notes}">Nota interna del cierre.</span>
+                            </div>
+                            <div th:unless="${snapshot.notes != null and !#strings.isEmpty(snapshot.notes)}" class="small text-muted">
+                                No hay notas internas registradas para este período.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-5 d-print-none">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light">
+                            <strong>Acción de cierre</strong>
+                        </div>
+                        <div class="card-body">
+                            <form th:if="${!snapshot.closed}" method="post" th:action="@{/accounting/period-close/close}" class="vstack gap-3">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <input type="hidden" name="year" th:value="${snapshot.year}"/>
+                                <input type="hidden" name="month" th:value="${snapshot.month}"/>
+                                <div>
+                                    <label for="closeNotes" class="form-label">Nota de cierre</label>
+                                    <textarea id="closeNotes" name="notes" class="form-control" rows="3" placeholder="Ejemplo: cierre revisado por gerencia."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-success" th:disabled="${!snapshot.readyToClose}">
+                                    <i class="bi bi-lock"></i> Cerrar período
+                                </button>
+                                <div class="small text-muted" th:if="${!snapshot.readyToClose}">
+                                    Para cerrar, primero registra los borradores y corrige cualquier descuadre.
+                                </div>
+                            </form>
+
+                            <form th:if="${snapshot.closed}" method="post" th:action="@{/accounting/period-close/reopen}" class="vstack gap-3">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <input type="hidden" name="year" th:value="${snapshot.year}"/>
+                                <input type="hidden" name="month" th:value="${snapshot.month}"/>
+                                <div class="alert alert-success small mb-0">
+                                    Este período está cerrado para control interno.
+                                </div>
+                                <div>
+                                    <label for="reopenNotes" class="form-label">Motivo de reapertura</label>
+                                    <textarea id="reopenNotes" name="notes" class="form-control" rows="3" placeholder="Ejemplo: corrección de asiento aprobado."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-outline-warning">
+                                    <i class="bi bi-unlock"></i> Reabrir período
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div th:replace="~{fragments/scripts_admin :: adminScripts}"></div>
+</body>
+</html>

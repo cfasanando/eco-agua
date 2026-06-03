@@ -35,9 +35,12 @@ public class AccountingJournalEntryController {
             Model model
     ) {
         AccountingJournalEntry selectedEntry = journalEntryService.findForEdit(editId);
+        List<AccountingJournalEntry> entries = journalEntryService.findAll();
 
-        model.addAttribute("entries", journalEntryService.findAll());
+        model.addAttribute("entries", entries);
+        model.addAttribute("closedEntryIds", journalEntryService.findClosedEntryIds(entries));
         model.addAttribute("selectedEntry", selectedEntry);
+        model.addAttribute("selectedEntryPeriodClosed", journalEntryService.isEntryPeriodClosed(selectedEntry));
         model.addAttribute("accounts", accountingAccountService.findAll());
         model.addAttribute("sourceTypes", AccountingJournalSourceType.values());
         model.addAttribute("entryStatuses", List.of(AccountingJournalEntryStatus.DRAFT, AccountingJournalEntryStatus.POSTED));
@@ -74,7 +77,7 @@ public class AccountingJournalEntryController {
             );
             redirectAttributes.addFlashAttribute("message", "Asiento contable guardado correctamente.");
             redirectAttributes.addFlashAttribute("messageType", "success");
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException | IllegalStateException ex) {
             redirectAttributes.addFlashAttribute("message", ex.getMessage());
             redirectAttributes.addFlashAttribute("messageType", "error");
         } catch (Exception ex) {
@@ -94,6 +97,9 @@ public class AccountingJournalEntryController {
             journalEntryService.cancel(id);
             redirectAttributes.addFlashAttribute("message", "Asiento contable anulado correctamente.");
             redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (IllegalStateException ex) {
+            redirectAttributes.addFlashAttribute("message", ex.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "error");
         } catch (Exception ex) {
             redirectAttributes.addFlashAttribute("message", "No se pudo anular el asiento contable.");
             redirectAttributes.addFlashAttribute("messageType", "error");

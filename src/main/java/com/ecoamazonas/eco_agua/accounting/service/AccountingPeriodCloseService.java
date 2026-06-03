@@ -91,6 +91,24 @@ public class AccountingPeriodCloseService {
         periodCloseRepository.save(periodClose);
     }
 
+    @Transactional(readOnly = true)
+    public boolean isClosed(LocalDate date) {
+        if (date == null) {
+            return false;
+        }
+        return periodCloseRepository
+                .findByPeriodYearAndPeriodMonth(date.getYear(), date.getMonthValue())
+                .map(AccountingPeriodClose::isClosed)
+                .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public void assertPeriodOpen(LocalDate date) {
+        if (isClosed(date)) {
+            throw new IllegalStateException("El período contable " + formatPeriod(date) + " está cerrado. Reábrelo desde Cierre mensual antes de modificar asientos.");
+        }
+    }
+
     private AccountingPeriodCloseSummary buildSummary(List<AccountingJournalEntry> entries) {
         int draftEntries = 0;
         int postedEntries = 0;
@@ -181,6 +199,13 @@ public class AccountingPeriodCloseService {
         ));
 
         return checks;
+    }
+
+    private String formatPeriod(LocalDate date) {
+        if (date == null) {
+            return "seleccionado";
+        }
+        return String.format("%02d/%d", date.getMonthValue(), date.getYear());
     }
 
     private YearMonth resolvePeriod(Integer year, Integer month) {

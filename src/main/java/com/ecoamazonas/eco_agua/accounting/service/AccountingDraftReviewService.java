@@ -11,9 +11,14 @@ import java.util.List;
 public class AccountingDraftReviewService {
 
     private final AccountingJournalEntryRepository journalEntryRepository;
+    private final AccountingPeriodCloseService periodCloseService;
 
-    public AccountingDraftReviewService(AccountingJournalEntryRepository journalEntryRepository) {
+    public AccountingDraftReviewService(
+            AccountingJournalEntryRepository journalEntryRepository,
+            AccountingPeriodCloseService periodCloseService
+    ) {
         this.journalEntryRepository = journalEntryRepository;
+        this.periodCloseService = periodCloseService;
     }
 
     public AccountingDraftReviewSnapshot buildSnapshot() {
@@ -28,6 +33,7 @@ public class AccountingDraftReviewService {
     @Transactional
     public void postDraft(Long id) {
         AccountingJournalEntry entry = findAutomaticDraft(id);
+        periodCloseService.assertPeriodOpen(entry.getEntryDate());
         if (!entry.isBalanced()) {
             throw new IllegalArgumentException("El asiento no cuadra. Revisa debe y haber antes de registrarlo.");
         }
@@ -38,6 +44,7 @@ public class AccountingDraftReviewService {
     @Transactional
     public void cancelDraft(Long id) {
         AccountingJournalEntry entry = findAutomaticDraft(id);
+        periodCloseService.assertPeriodOpen(entry.getEntryDate());
         entry.setStatus(AccountingJournalEntryStatus.CANCELLED);
         journalEntryRepository.save(entry);
     }

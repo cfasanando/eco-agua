@@ -10,20 +10,25 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class AccountingJournalEntryService {
 
     private final AccountingJournalEntryRepository journalEntryRepository;
     private final AccountingAccountRepository accountRepository;
+    private final AccountingPeriodCloseService periodCloseService;
 
     public AccountingJournalEntryService(
             AccountingJournalEntryRepository journalEntryRepository,
-            AccountingAccountRepository accountRepository
+            AccountingAccountRepository accountRepository,
+            AccountingPeriodCloseService periodCloseService
     ) {
         this.journalEntryRepository = journalEntryRepository;
         this.accountRepository = accountRepository;
+        this.periodCloseService = periodCloseService;
     }
 
     public List<AccountingJournalEntry> findAll() {
@@ -35,6 +40,23 @@ public class AccountingJournalEntryService {
             return null;
         }
         return journalEntryRepository.findById(id).orElse(null);
+    }
+
+    public boolean isEntryPeriodClosed(AccountingJournalEntry entry) {
+        return entry != null && periodCloseService.isClosed(entry.getEntryDate());
+    }
+
+    public Set<Long> findClosedEntryIds(List<AccountingJournalEntry> entries) {
+        Set<Long> closedIds = new HashSet<>();
+        if (entries == null || entries.isEmpty()) {
+            return closedIds;
+        }
+        for (AccountingJournalEntry entry : entries) {
+            if (entry != null && entry.getId() != null && isEntryPeriodClosed(entry)) {
+                closedIds.add(entry.getId());
+            }
+        }
+        return closedIds;
     }
 
     @Transactional
@@ -63,6 +85,11 @@ public class AccountingJournalEntryService {
                 : journalEntryRepository.findById(id)
                     .orElseThrow(() -> new IllegalArgumentException("Journal entry was not found."));
 
+        if (entry.getId() != null) {
+            periodCloseService.assertPeriodOpen(entry.getEntryDate());
+        }
+        periodCloseService.assertPeriodOpen(entryDate);
+
         entry.setEntryDate(entryDate);
         entry.setDescription(normalizedDescription);
         entry.setSourceType(sourceType == null ? AccountingJournalSourceType.MANUAL : sourceType);
@@ -78,6 +105,7 @@ public class AccountingJournalEntryService {
     public void cancel(Long id) {
         AccountingJournalEntry entry = journalEntryRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Journal entry was not found."));
+        periodCloseService.assertPeriodOpen(entry.getEntryDate());
         entry.setStatus(AccountingJournalEntryStatus.CANCELLED);
         journalEntryRepository.save(entry);
     }

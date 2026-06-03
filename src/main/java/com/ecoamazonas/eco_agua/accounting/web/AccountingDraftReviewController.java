@@ -32,7 +32,7 @@ public class AccountingDraftReviewController {
             draftReviewService.postDraft(id);
             redirectAttributes.addFlashAttribute("message", "Asiento registrado correctamente.");
             redirectAttributes.addFlashAttribute("messageType", "success");
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException | IllegalStateException ex) {
             redirectAttributes.addFlashAttribute("message", ex.getMessage());
             redirectAttributes.addFlashAttribute("messageType", "error");
         } catch (Exception ex) {
@@ -51,7 +51,7 @@ public class AccountingDraftReviewController {
             draftReviewService.cancelDraft(id);
             redirectAttributes.addFlashAttribute("message", "Asiento anulado correctamente.");
             redirectAttributes.addFlashAttribute("messageType", "success");
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException | IllegalStateException ex) {
             redirectAttributes.addFlashAttribute("message", ex.getMessage());
             redirectAttributes.addFlashAttribute("messageType", "error");
         } catch (Exception ex) {

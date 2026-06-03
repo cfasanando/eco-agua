@@ -36,6 +36,11 @@
                 revisa los asientos automáticos en borrador antes de registrarlos. La generación automática usa las plantillas contables multilínea configuradas.
             </div>
 
+            <div th:if="${selectedEntryPeriodClosed}" class="alert alert-warning border-0 shadow-sm mb-3">
+                <strong>Período cerrado:</strong>
+                este asiento pertenece a un período contable cerrado. Puedes revisarlo, pero no guardarlo ni anularlo hasta reabrir el período desde Cierre mensual.
+            </div>
+
             <div class="row g-3">
                 <div class="col-lg-5">
                     <div class="card shadow-sm">
@@ -211,7 +216,7 @@
                                 </div>
 
                                 <div class="col-12 d-flex gap-2 flex-wrap">
-                                    <button type="submit" class="btn btn-primary">
+                                    <button type="submit" class="btn btn-primary" th:disabled="${selectedEntryPeriodClosed}">
                                         Guardar asiento
                                     </button>
                                     <a th:if="${selectedEntry != null}" th:href="@{/accounting/journal-entries}" class="btn btn-outline-secondary">
@@ -266,6 +271,7 @@
                                             <span th:if="${entry.status.name() == 'POSTED'}" class="badge bg-success-subtle text-success border border-success-subtle">Registrado</span>
                                             <span th:if="${entry.status.name() == 'DRAFT'}" class="badge bg-warning-subtle text-warning border border-warning-subtle">Borrador</span>
                                             <span th:if="${entry.status.name() == 'CANCELLED'}" class="badge bg-secondary-subtle text-secondary border">Anulado</span>
+                                            <span th:if="${closedEntryIds.contains(entry.id)}" class="badge bg-dark-subtle text-dark border mt-1 d-inline-block">Período cerrado</span>
                                         </td>
                                         <td class="text-end">
                                             S/. <span th:text="${#numbers.formatDecimal(entry.totalDebit, 1, 'POINT', 2, 'POINT')}">0.00</span>
@@ -276,12 +282,13 @@
                                         <td class="text-end text-nowrap">
                                             <a class="btn btn-outline-primary btn-sm"
                                                th:href="@{/accounting/journal-entries(editId=${entry.id})}">
-                                                Editar
+                                                Ver / editar
                                             </a>
                                             <form method="post" th:if="${entry.status.name() != 'CANCELLED'}"
                                                   th:action="@{/accounting/journal-entries/{id}/cancel(id=${entry.id})}"
                                                   class="d-inline">
                                                 <button type="submit" class="btn btn-outline-secondary btn-sm"
+                                                        th:disabled="${closedEntryIds.contains(entry.id)}"
                                                         onclick="return confirm('¿Anular este asiento contable?');">
                                                     Anular
                                                 </button>

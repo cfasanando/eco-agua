@@ -20,6 +20,28 @@ public class ProductionController {
         this.productionService = productionService;
     }
 
+
+    @GetMapping("/overview")
+    public String overview(
+            @RequestParam(value = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Model model
+    ) {
+        LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
+        LocalDate effectiveStart = startDate != null ? startDate : effectiveEnd.minusDays(30);
+
+        ProductionOverviewSnapshot snapshot = productionService.buildOverview(effectiveStart, effectiveEnd);
+
+        model.addAttribute("activePage", "production");
+        model.addAttribute("snapshot", snapshot);
+        model.addAttribute("startDate", snapshot.getSummary().getStartDate());
+        model.addAttribute("endDate", snapshot.getSummary().getEndDate());
+
+        return "production/overview";
+    }
+
     @GetMapping
     public String index(
             @RequestParam(value = "startDate", required = false)

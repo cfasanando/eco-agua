@@ -14,7 +14,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ProductionService {
@@ -48,6 +50,79 @@ public class ProductionService {
         }
 
         return productionOrderRepository.findByDateRangeAndStatus(effectiveStart, effectiveEnd, status);
+    }
+
+
+    @Transactional(readOnly = true)
+    public ProductionOverviewSnapshot buildOverview(LocalDate startDate, LocalDate endDate) {
+        LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
+        LocalDate effectiveStart = startDate != null ? startDate : effectiveEnd.minusDays(30);
+
+        if (effectiveEnd.isBefore(effectiveStart)) {
+            LocalDate tmp = effectiveStart;
+            effectiveStart = effectiveEnd;
+            effectiveEnd = tmp;
+        }
+
+        List<ProductionOrder> orders = productionOrderRepository.findByDateRangeAndStatus(effectiveStart, effectiveEnd, null);
+
+        long confirmedOrders = 0;
+        long draftOrders = 0;
+        long canceledOrders = 0;
+        BigDecimal confirmedQuantityProduced = BigDecimal.ZERO;
+        BigDecimal confirmedInputCost = BigDecimal.ZERO;
+        Map<Long, ProductionOverviewProductRow> products = new LinkedHashMap<>();
+        List<ProductionOrder> pendingDrafts = new ArrayList<>();
+
+        for (ProductionOrder order : orders) {
+            if (order.getStatus() == ProductionStatus.CONFIRMED) {
+                confirmedOrders++;
+                confirmedQuantityProduced = confirmedQuantityProduced.add(valueOrZero(order.getQuantityProduced()));
+                confirmedInputCost = confirmedInputCost.add(valueOrZero(order.getTotalInputCost()));
+
+                Long productId = order.getProductId();
+                ProductionOverviewProductRow row = products.computeIfAbsent(
+                        productId,
+                        id -> new ProductionOverviewProductRow(id, resolveProductName(order))
+                );
+                row.addOrder(order);
+            } else if (order.getStatus() == ProductionStatus.DRAFT) {
+                draftOrders++;
+                if (pendingDrafts.size() < 8) {
+                    pendingDrafts.add(order);
+                }
+            } else if (order.getStatus() == ProductionStatus.CANCELED) {
+                canceledOrders++;
+            }
+        }
+
+        BigDecimal averageUnitCost = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+        if (confirmedQuantityProduced.compareTo(BigDecimal.ZERO) > 0) {
+            averageUnitCost = confirmedInputCost.divide(confirmedQuantityProduced, 4, RoundingMode.HALF_UP);
+        }
+
+        ProductionOverviewSummary summary = new ProductionOverviewSummary(
+                effectiveStart,
+                effectiveEnd,
+                orders.size(),
+                confirmedOrders,
+                draftOrders,
+                canceledOrders,
+                confirmedQuantityProduced.setScale(2, RoundingMode.HALF_UP),
+                confirmedInputCost.setScale(2, RoundingMode.HALF_UP),
+                averageUnitCost
+        );
+
+        List<ProductionOrder> latestOrders = orders.stream()
+                .limit(8)
+                .toList();
+
+        return new ProductionOverviewSnapshot(
+                summary,
+                new ArrayList<>(products.values()),
+                latestOrders,
+                pendingDrafts
+        );
     }
 
     @Transactional(readOnly = true)
@@ -349,6 +424,27 @@ public class ProductionService {
         }
 
         return quantityProduced.setScale(2, RoundingMode.HALF_UP);
+    }
+
+
+    private String resolveProductName(ProductionOrder order) {
+        if (order == null) {
+            return "Producto";
+        }
+
+        if (order.getProduct() != null && order.getProduct().getName() != null && !order.getProduct().getName().isBlank()) {
+            return order.getProduct().getName();
+        }
+
+        if (order.getProductId() != null) {
+            return "Producto #" + order.getProductId();
+        }
+
+        return "Producto";
+    }
+
+    private BigDecimal valueOrZero(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 
     private String clean(String value) {

@@ -1,0 +1,71 @@
+package com.ecoamazonas.eco_agua.production;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+
+public class ProductionOverviewProductRow {
+
+    private final Long productId;
+    private final String productName;
+    private long orderCount;
+    private BigDecimal quantityProduced = BigDecimal.ZERO;
+    private BigDecimal inputCost = BigDecimal.ZERO;
+    private LocalDate latestProductionDate;
+
+    public ProductionOverviewProductRow(Long productId, String productName) {
+        this.productId = productId;
+        this.productName = productName;
+    }
+
+    public void addOrder(ProductionOrder order) {
+        if (order == null) {
+            return;
+        }
+
+        orderCount++;
+        quantityProduced = quantityProduced.add(valueOrZero(order.getQuantityProduced()));
+        inputCost = inputCost.add(valueOrZero(order.getTotalInputCost()));
+
+        if (order.getProductionDate() != null
+                && (latestProductionDate == null || order.getProductionDate().isAfter(latestProductionDate))) {
+            latestProductionDate = order.getProductionDate();
+        }
+    }
+
+    public Long getProductId() {
+        return productId;
+    }
+
+    public String getProductName() {
+        return productName;
+    }
+
+    public long getOrderCount() {
+        return orderCount;
+    }
+
+    public BigDecimal getQuantityProduced() {
+        return quantityProduced;
+    }
+
+    public BigDecimal getInputCost() {
+        return inputCost;
+    }
+
+    public BigDecimal getAverageUnitCost() {
+        if (quantityProduced == null || quantityProduced.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+        }
+
+        return inputCost.divide(quantityProduced, 4, RoundingMode.HALF_UP);
+    }
+
+    public LocalDate getLatestProductionDate() {
+        return latestProductionDate;
+    }
+
+    private BigDecimal valueOrZero(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+}

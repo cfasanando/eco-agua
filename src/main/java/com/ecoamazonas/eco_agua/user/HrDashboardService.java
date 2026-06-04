@@ -173,6 +173,151 @@ public class HrDashboardService {
         return profile;
     }
 
+    @Transactional(readOnly = true)
+    public HrEmployeeObligationOverviewSnapshot buildEmployeeObligationsOverview(String status) {
+        String selectedStatus = resolveObligationStatusFilter(status);
+        List<Employee> employees = employeePaymentService.findActiveEmployees();
+        List<HrEmployeeObligationOverviewRow> rows = new ArrayList<>();
+
+        for (Employee employee : employees) {
+            List<EmployeeObligation> obligations = employeePaymentService.findObligations(employee.getId());
+            obligations.stream()
+                    .filter(obligation -> shouldIncludeObligation(obligation, selectedStatus))
+                    .map(obligation -> buildEmployeeObligationOverviewRow(employee, obligation))
+                    .forEach(rows::add);
+        }
+
+        rows.sort(Comparator
+                .comparing(HrEmployeeObligationOverviewRow::hasPendingAmount).reversed()
+                .thenComparing(HrEmployeeObligationOverviewRow::getEmployeeName, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(HrEmployeeObligationOverviewRow::getIssueDate, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(HrEmployeeObligationOverviewRow::getObligationId, Comparator.nullsLast(Comparator.reverseOrder())));
+
+        HrEmployeeObligationOverviewSnapshot snapshot = new HrEmployeeObligationOverviewSnapshot();
+        snapshot.setSelectedStatus(selectedStatus);
+        snapshot.setSelectedStatusLabel(buildObligationStatusFilterLabel(selectedStatus));
+        snapshot.setRows(rows);
+        snapshot.setSummary(buildEmployeeObligationOverviewSummary(rows));
+
+        return snapshot;
+    }
+
+    private HrEmployeeObligationOverviewSummary buildEmployeeObligationOverviewSummary(
+            List<HrEmployeeObligationOverviewRow> rows
+    ) {
+        HrEmployeeObligationOverviewSummary summary = new HrEmployeeObligationOverviewSummary();
+        summary.setEmployeeCount((int) rows.stream()
+                .map(HrEmployeeObligationOverviewRow::getEmployeeId)
+                .distinct()
+                .count());
+        summary.setObligationCount(rows.size());
+        summary.setActiveObligationCount((int) rows.stream()
+                .filter(HrEmployeeObligationOverviewRow::hasPendingAmount)
+                .count());
+        summary.setClosedObligationCount((int) rows.stream()
+                .filter(row -> !row.hasPendingAmount())
+                .count());
+        summary.setTotalOriginalAmount(rows.stream()
+                .map(HrEmployeeObligationOverviewRow::getOriginalAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        summary.setTotalAppliedAmount(rows.stream()
+                .map(HrEmployeeObligationOverviewRow::getAppliedAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        summary.setTotalPendingAmount(rows.stream()
+                .map(HrEmployeeObligationOverviewRow::getPendingAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+
+        return summary;
+    }
+
+    private HrEmployeeObligationOverviewRow buildEmployeeObligationOverviewRow(
+            Employee employee,
+            EmployeeObligation obligation
+    ) {
+        HrEmployeeObligationOverviewRow row = new HrEmployeeObligationOverviewRow();
+        row.setObligationId(obligation.getId());
+        row.setEmployeeId(employee.getId());
+        row.setEmployeeName(buildEmployeeName(employee));
+
+        JobPosition jobPosition = employee.getJobPosition();
+        row.setJobPositionName(jobPosition != null ? cleanText(jobPosition.getName()) : "Sin cargo asignado");
+
+        row.setTypeLabel(obligation.getType() != null ? obligation.getType().getLabel() : "Obligación");
+        row.setIssueDate(obligation.getIssueDate());
+        row.setOriginalAmount(obligation.getOriginalAmount());
+        row.setAppliedAmount(employeePaymentService.getAppliedAmount(obligation.getId()));
+        row.setPendingAmount(obligation.getPendingAmount());
+        row.setDiscountModeLabel(obligation.getDiscountMode() != null ? obligation.getDiscountMode().getLabel() : "Manual");
+        row.setFixedDiscountAmount(obligation.getFixedDiscountAmount());
+        row.setDiscountPercentage(obligation.getDiscountPercentage());
+        row.setDescription(cleanText(obligation.getDescription()));
+        row.setActive(obligation.isActive());
+        row.setStatusLabel(buildObligationStatusLabel(obligation));
+        row.setStatusBadgeClass(buildObligationStatusBadgeClass(obligation));
+
+        return row;
+    }
+
+    private boolean shouldIncludeObligation(EmployeeObligation obligation, String selectedStatus) {
+        if (obligation == null) {
+            return false;
+        }
+
+        boolean pending = isPendingObligation(obligation);
+
+        return switch (selectedStatus) {
+            case "closed" -> !pending;
+            case "all" -> true;
+            default -> pending;
+        };
+    }
+
+    private boolean isPendingObligation(EmployeeObligation obligation) {
+        return obligation != null
+                && obligation.isActive()
+                && normalizeMoney(obligation.getPendingAmount()).compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    private String resolveObligationStatusFilter(String status) {
+        String cleanStatus = cleanText(status).toLowerCase(Locale.ROOT);
+        return switch (cleanStatus) {
+            case "all", "closed" -> cleanStatus;
+            default -> "active";
+        };
+    }
+
+    private String buildObligationStatusFilterLabel(String selectedStatus) {
+        return switch (selectedStatus) {
+            case "all" -> "Todas";
+            case "closed" -> "Cerradas o canceladas";
+            default -> "Pendientes";
+        };
+    }
+
+    private String buildObligationStatusLabel(EmployeeObligation obligation) {
+        if (isPendingObligation(obligation)) {
+            return "Pendiente";
+        }
+
+        if (normalizeMoney(obligation.getPendingAmount()).compareTo(BigDecimal.ZERO) <= 0) {
+            return "Cancelada";
+        }
+
+        return "Cerrada";
+    }
+
+    private String buildObligationStatusBadgeClass(EmployeeObligation obligation) {
+        if (isPendingObligation(obligation)) {
+            return "bg-warning text-dark";
+        }
+
+        if (normalizeMoney(obligation.getPendingAmount()).compareTo(BigDecimal.ZERO) <= 0) {
+            return "bg-success";
+        }
+
+        return "bg-secondary";
+    }
+
     private HrMonthlyPayrollRow buildMonthlyPayrollRow(
             Employee employee,
             List<EmployeePayment> payments,
@@ -437,6 +582,14 @@ public class HrDashboardService {
     private boolean isLegacyPayment(EmployeePayment payment) {
         String observation = cleanText(payment.getObservation());
         return observation.toLowerCase(Locale.ROOT).startsWith("legacy expense");
+    }
+
+    private BigDecimal normalizeMoney(BigDecimal value) {
+        if (value == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        return value.setScale(2, RoundingMode.HALF_UP);
     }
 
     private String cleanText(String value) {

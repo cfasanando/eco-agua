@@ -46,6 +46,19 @@ public class HrDashboardController {
         return "admin/personnel_monthly_payroll";
     }
 
+    @GetMapping("/obligations")
+    public String showEmployeeObligations(
+            @RequestParam(name = "status", required = false) String status,
+            Model model
+    ) {
+        HrEmployeeObligationOverviewSnapshot snapshot = hrDashboardService.buildEmployeeObligationsOverview(status);
+
+        model.addAttribute("activePage", "personnel_obligations");
+        model.addAttribute("snapshot", snapshot);
+
+        return "admin/personnel_obligations";
+    }
+
     @GetMapping("/employees/{employeeId}")
     public String showEmployeeProfile(
             @PathVariable("employeeId") Long employeeId,

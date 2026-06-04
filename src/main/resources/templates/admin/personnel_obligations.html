@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+
+<head th:replace="fragments/head_admin :: adminHead('Adelantos y deudas del personal')"></head>
+
+<body>
+
+<div class="app-layout" th:with="activePage='personnel_obligations'">
+
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-3 d-print-none">
+                <div>
+                    <div class="text-muted small text-uppercase">Configuración y RRHH</div>
+                    <h1 class="h4 mb-1">Adelantos y deudas del personal</h1>
+                    <p class="text-muted mb-0">
+                        Control de adelantos, préstamos, descuentos, abonos y saldos pendientes por trabajador.
+                    </p>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-secondary" th:href="@{/admin/personnel}">
+                        <i class="bi bi-person-workspace me-1"></i> Resumen
+                    </a>
+                    <a class="btn btn-outline-secondary" th:href="@{/admin/personnel/monthly-payroll}">
+                        <i class="bi bi-table me-1"></i> Planilla mensual
+                    </a>
+                    <a class="btn btn-primary" th:href="@{/admin/personnel/payments}">
+                        <i class="bi bi-plus-circle me-1"></i> Registrar adelanto o abono
+                    </a>
+                </div>
+            </div>
+
+            <div class="alert alert-info shadow-sm small d-print-none">
+                <strong>Cómo usar esta pantalla:</strong>
+                aquí solo se resume lo que ya existe. Para crear un adelanto, préstamo o descuento, entra a
+                <strong>Registrar adelanto o abono</strong>, selecciona el trabajador y usa la sección de obligaciones.
+                Si hay un pago con descuento, el saldo se actualiza automáticamente.
+            </div>
+
+            <form class="card shadow-sm mb-3 d-print-none" method="get" th:action="@{/admin/personnel/obligations}">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label" for="status">Estado</label>
+                            <select id="status" name="status" class="form-select">
+                                <option value="active" th:selected="${snapshot.selectedStatus == 'active'}">Pendientes</option>
+                                <option value="closed" th:selected="${snapshot.selectedStatus == 'closed'}">Cerradas o canceladas</option>
+                                <option value="all" th:selected="${snapshot.selectedStatus == 'all'}">Todas</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search me-1"></i> Ver obligaciones
+                            </button>
+                        </div>
+
+                        <div class="col-md-4 text-md-end">
+                            <div class="text-muted small">Filtro actual</div>
+                            <div class="fw-bold" th:text="${snapshot.selectedStatusLabel}">Pendientes</div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                        <div>
+                            <div class="text-muted small text-uppercase">Control interno de RRHH</div>
+                            <h2 class="h5 mb-1">Reporte de obligaciones del personal</h2>
+                            <div class="text-muted small" th:text="${'Generado el ' + #temporals.format(snapshot.generatedAt, 'dd/MM/yyyy')}">Generado el 04/06/2026</div>
+                        </div>
+                        <div class="text-md-end">
+                            <div class="fw-semibold">Sistema integral Eco del Amazonas</div>
+                            <div class="text-muted small" th:text="${'Filtro: ' + snapshot.selectedStatusLabel}">Filtro: Pendientes</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-3 col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted text-uppercase small">Trabajadores con registro</div>
+                            <div class="fs-3 fw-bold" th:text="${snapshot.summary.employeeCount}">0</div>
+                            <div class="text-muted small">Según el filtro seleccionado.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted text-uppercase small">Obligaciones</div>
+                            <div class="fs-3 fw-bold" th:text="${snapshot.summary.obligationCount}">0</div>
+                            <div class="text-muted small" th:text="${snapshot.summary.activeObligationCount + ' pendiente(s)'}">0 pendiente(s)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted text-uppercase small">Aplicado / abonado</div>
+                            <div class="fs-3 fw-bold" th:text="${'S/. ' + #numbers.formatDecimal(snapshot.summary.totalAppliedAmount, 1, 2)}">S/. 0.00</div>
+                            <div class="text-muted small">Descuentos en pagos y abonos directos.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted text-uppercase small">Saldo pendiente</div>
+                            <div class="fs-3 fw-bold" th:text="${'S/. ' + #numbers.formatDecimal(snapshot.summary.totalPendingAmount, 1, 2)}">S/. 0.00</div>
+                            <div class="text-muted small" th:text="${'Original: S/. ' + #numbers.formatDecimal(snapshot.summary.totalOriginalAmount, 1, 2)}">Original: S/. 0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                    <div>
+                        <h2 class="h5 mb-0">Detalle de adelantos, descuentos y deudas</h2>
+                        <div class="text-muted small">Muestra el saldo actual por obligación registrada.</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm d-print-none" onclick="window.print()">
+                        <i class="bi bi-printer me-1"></i> Imprimir
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Trabajador</th>
+                                <th>Tipo</th>
+                                <th>Fecha</th>
+                                <th>Regla</th>
+                                <th class="text-end">Monto original</th>
+                                <th class="text-end">Aplicado</th>
+                                <th class="text-end">Saldo</th>
+                                <th class="text-center">Estado</th>
+                                <th class="text-center d-print-none">Acción</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:if="${#lists.isEmpty(snapshot.rows)}">
+                                <td colspan="9" class="text-center text-muted py-4">
+                                    No hay adelantos, descuentos o deudas para el filtro seleccionado.
+                                </td>
+                            </tr>
+                            <tr th:each="row : ${snapshot.rows}">
+                                <td>
+                                    <div class="fw-semibold" th:text="${row.employeeName}">Raul Maylle</div>
+                                    <div class="text-muted small" th:text="${row.jobPositionName}">Repartidor</div>
+                                    <div class="text-muted small" th:if="${!#strings.isEmpty(row.description)}" th:text="${row.description}">Descripción</div>
+                                </td>
+                                <td th:text="${row.typeLabel}">Adelanto</td>
+                                <td th:text="${row.issueDate != null ? #temporals.format(row.issueDate, 'dd/MM/yyyy') : '-'}">04/06/2026</td>
+                                <td>
+                                    <div th:text="${row.discountModeLabel}">Manual</div>
+                                    <div class="text-muted small" th:if="${row.hasFixedDiscountAmount()}" th:text="${'Fijo: S/. ' + #numbers.formatDecimal(row.fixedDiscountAmount, 1, 2)}">Fijo: S/. 0.00</div>
+                                    <div class="text-muted small" th:if="${row.hasDiscountPercentage()}" th:text="${'Porcentaje: ' + #numbers.formatDecimal(row.discountPercentage, 1, 2) + '%'}">Porcentaje: 0.00%</div>
+                                </td>
+                                <td class="text-end" th:text="${'S/. ' + #numbers.formatDecimal(row.originalAmount, 1, 2)}">S/. 0.00</td>
+                                <td class="text-end" th:text="${'S/. ' + #numbers.formatDecimal(row.appliedAmount, 1, 2)}">S/. 0.00</td>
+                                <td class="text-end fw-semibold" th:text="${'S/. ' + #numbers.formatDecimal(row.pendingAmount, 1, 2)}">S/. 0.00</td>
+                                <td class="text-center">
+                                    <span th:class="${'badge ' + row.statusBadgeClass}" th:text="${row.statusLabel}">Pendiente</span>
+                                </td>
+                                <td class="text-center d-print-none">
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a class="btn btn-outline-secondary" th:href="@{/admin/personnel/employees/{id}(id=${row.employeeId})}">
+                                            Ficha
+                                        </a>
+                                        <a class="btn btn-outline-primary" th:href="@{/admin/personnel/payments(employeeId=${row.employeeId}, editObligationId=${row.obligationId})}">
+                                            Editar
+                                        </a>
+                                        <a class="btn btn-outline-success" th:if="${row.hasPendingAmount()}" th:href="@{/admin/personnel/payments(employeeId=${row.employeeId}, settleObligationId=${row.obligationId})}">
+                                            Abonar
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-warning shadow-sm small d-print-none">
+                <strong>Nota:</strong>
+                esta pantalla es un control interno. No reemplaza boletas, planilla electrónica ni cálculos laborales legales.
+                Para obligaciones laborales peruanas se debe validar después con un contador o especialista laboral.
+            </div>
+
+        </main>
+
+    </div>
+
+</div>
+
+</body>
+</html>

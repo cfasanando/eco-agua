@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+
+<head th:replace="fragments/head_admin :: adminHead('Resumen de RRHH')"></head>
+
+<body>
+
+<div class="app-layout" th:with="activePage='personnel_overview'">
+
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-3">
+                <div>
+                    <div class="text-muted small text-uppercase">Configuración y RRHH</div>
+                    <h1 class="h4 mb-1">Resumen de RRHH</h1>
+                    <p class="text-muted mb-0">
+                        Vista rápida de trabajadores activos, pagos del mes y adelantos o deudas pendientes.
+                    </p>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-secondary" th:href="@{/admin/users}">
+                        <i class="bi bi-people me-1"></i> Personal y usuarios
+                    </a>
+                    <a class="btn btn-outline-secondary" th:href="@{/admin/job-positions}">
+                        <i class="bi bi-briefcase me-1"></i> Cargos
+                    </a>
+                    <a class="btn btn-primary" th:href="@{/admin/personnel/payments}">
+                        <i class="bi bi-cash-stack me-1"></i> Registrar pagos
+                    </a>
+                </div>
+            </div>
+
+            <div class="alert alert-info shadow-sm small">
+                <strong>Cómo usar esta pantalla:</strong>
+                primero registra o actualiza el trabajador en <strong>Personal y usuarios</strong>, luego define su cargo y regla de pago en
+                <strong>Cargos</strong>. Cuando haya pago real, entra a <strong>Registrar pagos</strong>. Esta vista solo resume lo que ya existe.
+            </div>
+
+            <form class="card shadow-sm mb-3" method="get" th:action="@{/admin/personnel}">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label" for="month">Mes</label>
+                            <select id="month" name="month" class="form-select">
+                                <option th:value="1" th:selected="${snapshot.selectedMonth == 1}">Enero</option>
+                                <option th:value="2" th:selected="${snapshot.selectedMonth == 2}">Febrero</option>
+                                <option th:value="3" th:selected="${snapshot.selectedMonth == 3}">Marzo</option>
+                                <option th:value="4" th:selected="${snapshot.selectedMonth == 4}">Abril</option>
+                                <option th:value="5" th:selected="${snapshot.selectedMonth == 5}">Mayo</option>
+                                <option th:value="6" th:selected="${snapshot.selectedMonth == 6}">Junio</option>
+                                <option th:value="7" th:selected="${snapshot.selectedMonth == 7}">Julio</option>
+                                <option th:value="8" th:selected="${snapshot.selectedMonth == 8}">Agosto</option>
+                                <option th:value="9" th:selected="${snapshot.selectedMonth == 9}">Setiembre</option>
+                                <option th:value="10" th:selected="${snapshot.selectedMonth == 10}">Octubre</option>
+                                <option th:value="11" th:selected="${snapshot.selectedMonth == 11}">Noviembre</option>
+                                <option th:value="12" th:selected="${snapshot.selectedMonth == 12}">Diciembre</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label" for="year">Año</label>
+                            <input id="year" name="year" type="number" min="2000" max="2100" class="form-control" th:value="${snapshot.selectedYear}">
+                        </div>
+
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search me-1"></i> Ver resumen
+                            </button>
+                        </div>
+
+                        <div class="col-md-3 text-md-end">
+                            <div class="text-muted small">Periodo seleccionado</div>
+                            <div class="fw-bold" th:text="${snapshot.selectedMonthName}">Junio 2026</div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-3 col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted text-uppercase small">Trabajadores activos</div>
+                            <div class="fs-3 fw-bold" th:text="${snapshot.summary.activeEmployeeCount}">0</div>
+                            <div class="text-muted small">Personal visible para operaciones.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted text-uppercase small">Neto pagado</div>
+                            <div class="fs-3 fw-bold" th:text="${'S/. ' + #numbers.formatDecimal(snapshot.summary.totalNet, 1, 2)}">S/. 0.00</div>
+                            <div class="text-muted small" th:text="${snapshot.summary.paymentCount + ' pago(s) registrados'}">0 pago(s)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted text-uppercase small">Descuentos del mes</div>
+                            <div class="fs-3 fw-bold" th:text="${'S/. ' + #numbers.formatDecimal(snapshot.summary.totalDiscount, 1, 2)}">S/. 0.00</div>
+                            <div class="text-muted small">Descuentos manuales y de obligaciones.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted text-uppercase small">Saldo pendiente</div>
+                            <div class="fs-3 fw-bold" th:text="${'S/. ' + #numbers.formatDecimal(snapshot.summary.totalPendingObligations, 1, 2)}">S/. 0.00</div>
+                            <div class="text-muted small" th:text="${snapshot.summary.activeObligationCount + ' obligación(es) activa(s)'}">0 obligación(es)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-8">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <h2 class="h5 mb-0">Trabajadores del mes</h2>
+                                <div class="text-muted small">Control rápido por trabajador.</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Trabajador</th>
+                                        <th>Cargo</th>
+                                        <th class="text-end">Bruto</th>
+                                        <th class="text-end">Descuento</th>
+                                        <th class="text-end">Neto</th>
+                                        <th class="text-end">Pendiente</th>
+                                        <th class="text-center">Acción</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:if="${#lists.isEmpty(snapshot.employeeRows)}">
+                                        <td colspan="7" class="text-center text-muted py-4">
+                                            Aún no hay trabajadores activos registrados.
+                                        </td>
+                                    </tr>
+                                    <tr th:each="row : ${snapshot.employeeRows}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.employeeName}">Raul Maylle</div>
+                                            <div class="text-muted small" th:if="${row.phone != ''}" th:text="${row.phone}">999999999</div>
+                                        </td>
+                                        <td>
+                                            <div th:text="${row.jobPositionName}">Repartidor</div>
+                                            <div class="text-muted small" th:text="${row.paymentModeLabel}">Sueldo fijo</div>
+                                        </td>
+                                        <td class="text-end" th:text="${'S/. ' + #numbers.formatDecimal(row.monthlyGross, 1, 2)}">S/. 0.00</td>
+                                        <td class="text-end" th:text="${'S/. ' + #numbers.formatDecimal(row.monthlyDiscount, 1, 2)}">S/. 0.00</td>
+                                        <td class="text-end fw-semibold" th:text="${'S/. ' + #numbers.formatDecimal(row.monthlyNet, 1, 2)}">S/. 0.00</td>
+                                        <td class="text-end">
+                                            <span th:classappend="${row.hasPendingObligations()} ? 'text-danger fw-semibold' : 'text-muted'"
+                                                  th:text="${'S/. ' + #numbers.formatDecimal(row.pendingObligations, 1, 2)}">
+                                                S/. 0.00
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <a class="btn btn-sm btn-outline-primary"
+                                               th:href="@{/admin/personnel/payments(employeeId=${row.employeeId}, year=${snapshot.selectedYear}, month=${snapshot.selectedMonth})}">
+                                                Ver pagos
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <h2 class="h5 mb-0">Acciones recomendadas</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a class="btn btn-outline-secondary text-start" th:href="@{/admin/users}">
+                                    <i class="bi bi-person-plus me-1"></i> Registrar trabajador o usuario
+                                </a>
+                                <a class="btn btn-outline-secondary text-start" th:href="@{/admin/job-positions}">
+                                    <i class="bi bi-briefcase me-1"></i> Revisar cargos y reglas de pago
+                                </a>
+                                <a class="btn btn-outline-secondary text-start" th:href="@{/admin/personnel/payments}">
+                                    <i class="bi bi-cash-stack me-1"></i> Registrar pago, adelanto o descuento
+                                </a>
+                            </div>
+
+                            <hr>
+
+                            <div class="small text-muted">
+                                Para Agua Eco puedes usar esta vista para repartidores, producción y administración.
+                                Para Productos de la Selva Belén puedes usarla de forma simple para responsables, apoyo de ventas y pagos puntuales.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <h2 class="h5 mb-0">Últimos pagos del periodo</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Trabajador</th>
+                                        <th class="text-end">Neto</th>
+                                        <th>Tipo</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:if="${#lists.isEmpty(snapshot.recentPayments)}">
+                                        <td colspan="4" class="text-center text-muted py-4">
+                                            Aún no hay pagos registrados en este periodo.
+                                        </td>
+                                    </tr>
+                                    <tr th:each="payment : ${snapshot.recentPayments}">
+                                        <td th:text="${payment.paymentDate != null ? #temporals.format(payment.paymentDate, 'dd/MM/yyyy') : '-'}">01/06/2026</td>
+                                        <td th:text="${payment.employeeName}">Raul Maylle</td>
+                                        <td class="text-end fw-semibold" th:text="${'S/. ' + #numbers.formatDecimal(payment.netAmount, 1, 2)}">S/. 0.00</td>
+                                        <td>
+                                            <span class="badge bg-secondary" th:if="${payment.legacy}">Histórico</span>
+                                            <span class="badge bg-success" th:unless="${payment.legacy}">RRHH</span>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <h2 class="h5 mb-0">Adelantos o deudas pendientes</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Trabajador</th>
+                                        <th>Concepto</th>
+                                        <th class="text-end">Saldo</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:if="${#lists.isEmpty(snapshot.pendingObligations)}">
+                                        <td colspan="4" class="text-center text-muted py-4">
+                                            No hay adelantos o deudas pendientes.
+                                        </td>
+                                    </tr>
+                                    <tr th:each="obligation : ${snapshot.pendingObligations}">
+                                        <td th:text="${obligation.employeeName}">Raul Maylle</td>
+                                        <td>
+                                            <div th:text="${obligation.description != '' ? obligation.description : obligation.typeLabel}">Adelanto</div>
+                                            <div class="text-muted small" th:text="${obligation.discountModeLabel}">Manual</div>
+                                        </td>
+                                        <td class="text-end text-danger fw-semibold" th:text="${'S/. ' + #numbers.formatDecimal(obligation.pendingAmount, 1, 2)}">S/. 0.00</td>
+                                        <td>
+                                            <a class="btn btn-sm btn-outline-primary"
+                                               th:href="@{/admin/personnel/payments(employeeId=${obligation.employeeId}, settleObligationId=${obligation.obligationId})}">
+                                                Abonar
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+
+</body>
+</html>

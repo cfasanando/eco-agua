@@ -919,6 +919,7 @@
         class="menu-group"
         th:with="isSystemActive=${activePage == 'platform_settings'
           or activePage == 'admin_users'
+          or activePage == 'personnel_overview'
           or activePage == 'job_positions'
           or activePage == 'personnel_payments'
           or activePage == 'admin_roles_permissions'
@@ -983,6 +984,17 @@
             >
               <span class="icon"><i class="bi bi-people"></i></span>
               <span>Usuarios</span>
+            </a>
+          </th:block>
+
+          <th:block th:if="${moduleHrEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_HR','ROLE_FINANCE')">
+            <a
+              th:href="@{/admin/personnel}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'personnel_overview' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-person-workspace"></i></span>
+              <span>Resumen de RRHH</span>
             </a>
           </th:block>
 

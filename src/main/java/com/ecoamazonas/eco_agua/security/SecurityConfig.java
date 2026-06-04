@@ -340,8 +340,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/admin/promotions/**", "/marketing/admin/**", "/admin/blog/**").hasAnyAuthority(MARKETING_WRITE)
                 .requestMatchers("/admin/promotions/**", "/marketing/admin/**", "/admin/blog/**").hasAnyAuthority(MARKETING_VIEW)
 
-                .requestMatchers(HttpMethod.POST, "/admin/personnel/**", "/admin/job-positions/**").hasAnyAuthority(HR_WRITE)
-                .requestMatchers("/admin/personnel/**", "/admin/job-positions/**").hasAnyAuthority(HR_VIEW)
+                .requestMatchers(HttpMethod.POST, "/admin/personnel", "/admin/personnel/**", "/admin/job-positions/**").hasAnyAuthority(HR_WRITE)
+                .requestMatchers("/admin/personnel", "/admin/personnel/**", "/admin/job-positions/**").hasAnyAuthority(HR_VIEW)
                 .requestMatchers("/admin/users/**").hasAnyAuthority(USERS_ADMIN)
                 .requestMatchers("/admin/roles-permissions/**").hasAnyAuthority(ROLES_ADMIN)
                 .requestMatchers("/admin/system-modules/**", "/admin/dashboard-widgets/**").hasAnyAuthority(PLATFORM_ADMIN)

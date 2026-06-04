@@ -564,11 +564,12 @@
                                     <th>Base cálculo</th>
                                     <th>Esquema</th>
                                     <th>Observación</th>
+                                    <th class="text-end">Acciones</th>
                                 </tr>
                                 </thead>
                                 <tbody>
                                 <tr th:if="${#lists.isEmpty(payments)}">
-                                    <td colspan="7" class="text-muted">
+                                    <td colspan="8" class="text-muted">
                                         No hay pagos registrados para este empleado y período.
                                     </td>
                                 </tr>
@@ -596,6 +597,17 @@
                                         </span>
                                         <span th:text="${item.observation != null ? item.observation : '-'}">-</span>
                                     </td>
+                                    <td class="text-end">
+                                        <a th:if="${item.id != null and (item.observation == null or !#strings.startsWith(item.observation, 'Legacy expense |'))}"
+                                           class="btn btn-sm btn-outline-primary"
+                                           th:href="@{/admin/personnel/payments/{id}/receipt(id=${item.id})}">
+                                            <i class="bi bi-printer me-1"></i> Recibo
+                                        </a>
+                                        <span th:if="${item.observation != null and #strings.startsWith(item.observation, 'Legacy expense |')}"
+                                              class="text-muted small">
+                                            Histórico
+                                        </span>
+                                    </td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -618,6 +630,7 @@
                                     <th>Deuda aplicada</th>
                                     <th>Monto abonado</th>
                                     <th>Observación</th>
+                                    <th class="text-end">Acciones</th>
                                 </tr>
                                 </thead>
                                 <tbody>

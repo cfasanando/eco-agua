@@ -213,11 +213,12 @@
                                         <th class="text-end">Bruto</th>
                                         <th class="text-end">Descuento</th>
                                         <th class="text-end">Neto</th>
+                                        <th class="text-end">Acciones</th>
                                     </tr>
                                     </thead>
                                     <tbody>
                                     <tr th:if="${#lists.isEmpty(profile.payments)}">
-                                        <td colspan="5" class="text-center text-muted py-4">
+                                        <td colspan="6" class="text-center text-muted py-4">
                                             No hay pagos registrados para este periodo.
                                         </td>
                                     </tr>
@@ -230,6 +231,14 @@
                                         <td class="text-end" th:text="${'S/. ' + #numbers.formatDecimal(payment.grossAmount, 1, 2)}">S/. 0.00</td>
                                         <td class="text-end" th:text="${'S/. ' + #numbers.formatDecimal(payment.discountAmount, 1, 2)}">S/. 0.00</td>
                                         <td class="text-end fw-semibold" th:text="${'S/. ' + #numbers.formatDecimal(payment.netAmount, 1, 2)}">S/. 0.00</td>
+                                        <td class="text-end">
+                                            <a th:if="${payment.paymentId != null and !payment.legacy}"
+                                               class="btn btn-sm btn-outline-primary"
+                                               th:href="@{/admin/personnel/payments/{id}/receipt(id=${payment.paymentId})}">
+                                                Recibo
+                                            </a>
+                                            <span th:if="${payment.legacy}" class="text-muted small">Histórico</span>
+                                        </td>
                                     </tr>
                                     </tbody>
                                 </table>

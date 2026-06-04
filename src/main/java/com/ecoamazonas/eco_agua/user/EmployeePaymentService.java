@@ -301,6 +301,46 @@ public class EmployeePaymentService {
         return normalizeMoney(fromPayments.add(fromSettlements));
     }
 
+    @Transactional(readOnly = true)
+    public HrPaymentReceipt buildPaymentReceipt(Long paymentId) {
+        if (paymentId == null || paymentId <= 0) {
+            throw new IllegalArgumentException("Payment not found.");
+        }
+
+        EmployeePayment payment = employeePaymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("Payment not found: " + paymentId));
+        Employee employee = payment.getEmployee();
+        if (employee == null) {
+            throw new IllegalArgumentException("Payment has no employee assigned: " + paymentId);
+        }
+
+        JobPosition jobPosition = employee.getJobPosition();
+        HrPaymentReceipt receipt = new HrPaymentReceipt();
+        receipt.setPaymentId(payment.getId());
+        receipt.setReceiptNumber(String.format("RRHH-%06d", payment.getId()));
+        receipt.setPaymentDate(payment.getPaymentDate());
+        receipt.setPeriodYear(payment.getPeriodYear());
+        receipt.setPeriodMonth(payment.getPeriodMonth());
+        receipt.setPeriodLabel(buildReceiptPeriodLabel(payment.getPeriodYear(), payment.getPeriodMonth()));
+        receipt.setEmployeeId(employee.getId());
+        receipt.setEmployeeName(buildEmployeeDisplayName(employee));
+        receipt.setEmployeeDni(cleanText(employee.getDni()));
+        receipt.setEmployeePhone(cleanText(employee.getPhone()));
+        receipt.setEmployeeEmail(cleanText(employee.getEmail()));
+        receipt.setJobPositionName(jobPosition != null ? cleanText(jobPosition.getName()) : "Sin cargo asignado");
+        receipt.setPaymentModeLabel(buildReceiptPaymentModeLabel(payment.getPaymentModeSnapshot()));
+        receipt.setSalaryPeriodLabel(buildReceiptSalaryPeriodLabel(payment.getSalaryPeriodSnapshot()));
+        receipt.setGrossAmount(normalizeMoney(payment.getGrossAmount()));
+        receipt.setDiscountAmount(normalizeMoney(payment.getDiscountAmount()));
+        receipt.setNetAmount(normalizeMoney(payment.getNetAmount()));
+        receipt.setCalculationBaseAmount(normalizeMoney(payment.getCalculationBaseAmount()));
+        receipt.setCommissionRate(normalizeMoney(payment.getCommissionRateSnapshot()));
+        receipt.setObservation(cleanText(payment.getObservation()));
+        receipt.setIssueDate(LocalDate.now());
+
+        return receipt;
+    }
+
     @Transactional
     public EmployeePayment registerPayment(EmployeePaymentForm form) {
         if (form == null || form.getEmployeeId() == null) {
@@ -762,6 +802,68 @@ public class EmployeePaymentService {
         }
 
         return normalizeMoney(appliedAmount);
+    }
+
+    private String buildReceiptPeriodLabel(Integer year, Integer month) {
+        if (year == null || month == null || month < 1 || month > 12) {
+            return "Periodo no definido";
+        }
+
+        return buildMonthName(month) + " " + year;
+    }
+
+    private String buildMonthName(int month) {
+        return switch (month) {
+            case 1 -> "Enero";
+            case 2 -> "Febrero";
+            case 3 -> "Marzo";
+            case 4 -> "Abril";
+            case 5 -> "Mayo";
+            case 6 -> "Junio";
+            case 7 -> "Julio";
+            case 8 -> "Agosto";
+            case 9 -> "Setiembre";
+            case 10 -> "Octubre";
+            case 11 -> "Noviembre";
+            case 12 -> "Diciembre";
+            default -> "Mes no definido";
+        };
+    }
+
+    private String buildReceiptPaymentModeLabel(String paymentModeSnapshot) {
+        String value = cleanText(paymentModeSnapshot);
+        if (value == null) {
+            return "Sin esquema";
+        }
+
+        try {
+            return switch (PaymentMode.valueOf(value)) {
+                case FIXED -> "Sueldo fijo";
+                case COMMISSION -> "Solo porcentaje de ventas";
+                case MIXED -> "Mixto (fijo + % ventas)";
+            };
+        } catch (IllegalArgumentException ex) {
+            return value;
+        }
+    }
+
+    private String buildReceiptSalaryPeriodLabel(String salaryPeriodSnapshot) {
+        String value = cleanText(salaryPeriodSnapshot);
+        if (value == null) {
+            return "Sin periodo definido";
+        }
+
+        try {
+            return switch (SalaryPeriod.valueOf(value)) {
+                case DAILY -> "Diario";
+                case WEEKLY -> "Semanal";
+                case BIWEEKLY -> "Quincenal";
+                case MONTHLY -> "Mensual";
+                case HOURLY -> "Por hora";
+            };
+        } catch (IllegalArgumentException ex) {
+            return value;
+        }
     }
 
     private BigDecimal sumPaymentsGross(List<EmployeePayment> payments) {

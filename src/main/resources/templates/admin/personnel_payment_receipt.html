@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+
+<head th:replace="fragments/head_admin :: adminHead('Recibo de pago')"></head>
+
+<body>
+
+<div class="app-layout" th:with="activePage='personnel_payment_receipt'">
+
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <style>
+                .receipt-card {
+                    max-width: 900px;
+                    margin: 0 auto;
+                }
+
+                .receipt-title {
+                    letter-spacing: .08em;
+                }
+
+                .signature-line {
+                    border-top: 1px solid #333;
+                    min-height: 48px;
+                    padding-top: .5rem;
+                }
+
+                @media print {
+                    aside,
+                    header,
+                    .no-print {
+                        display: none !important;
+                    }
+
+                    .app-layout,
+                    .main-content,
+                    .content-wrapper {
+                        display: block !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        width: 100% !important;
+                    }
+
+                    body {
+                        background: #fff !important;
+                    }
+
+                    .receipt-card {
+                        max-width: 100% !important;
+                        border: 0 !important;
+                        box-shadow: none !important;
+                    }
+                }
+            </style>
+
+            <div class="no-print d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Recibo de pago</h1>
+                    <div class="text-muted small">Comprobante interno para imprimir o guardar como PDF desde el navegador.</div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-secondary"
+                       th:href="@{/admin/personnel/payments(employeeId=${receipt.employeeId}, year=${receipt.periodYear}, month=${receipt.periodMonth})}">
+                        <i class="bi bi-arrow-left me-1"></i> Volver
+                    </a>
+                    <a class="btn btn-outline-secondary"
+                       th:href="@{/admin/personnel/employees/{id}(id=${receipt.employeeId}, year=${receipt.periodYear}, month=${receipt.periodMonth})}">
+                        <i class="bi bi-person-lines-fill me-1"></i> Ficha
+                    </a>
+                    <button type="button" class="btn btn-primary" onclick="window.print()">
+                        <i class="bi bi-printer me-1"></i> Imprimir
+                    </button>
+                </div>
+            </div>
+
+            <div class="card shadow-sm receipt-card">
+                <div class="card-body p-4 p-md-5">
+                    <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
+                        <div>
+                            <div class="text-uppercase text-muted small">Comprobante interno</div>
+                            <h2 class="h4 mb-1 receipt-title">RECIBO DE PAGO</h2>
+                            <div class="text-muted" th:text="${receipt.receiptNumber}">RRHH-000001</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="fw-bold fs-5" th:text="${adminBrandTitle != null ? adminBrandTitle : 'Negocio'}">Eco del Amazonas</div>
+                            <div class="text-muted small" th:text="${adminBrandSubtitle != null ? adminBrandSubtitle : 'Sistema integral'}">Sistema integral</div>
+                            <div class="text-muted small">
+                                Emitido:
+                                <span th:text="${receipt.issueDate != null ? #temporals.format(receipt.issueDate, 'dd/MM/yyyy') : '-'}">04/06/2026</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-light border mb-4">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="text-muted small">Fecha de pago</div>
+                                <div class="fw-semibold" th:text="${receipt.paymentDate != null ? #temporals.format(receipt.paymentDate, 'dd/MM/yyyy') : '-'}">01/06/2026</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-muted small">Periodo</div>
+                                <div class="fw-semibold" th:text="${receipt.periodLabel}">Junio 2026</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-muted small">Número</div>
+                                <div class="fw-semibold" th:text="${receipt.receiptNumber}">RRHH-000001</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-6">
+                            <h3 class="h6 text-uppercase text-muted">Trabajador</h3>
+                            <div class="border rounded p-3 h-100">
+                                <div class="fw-bold fs-5" th:text="${receipt.employeeName}">Raul Maylle</div>
+                                <div class="text-muted" th:text="${receipt.jobPositionName}">Repartidor</div>
+                                <div class="small mt-2">
+                                    <div>DNI: <span th:text="${#strings.isEmpty(receipt.employeeDni) ? '-' : receipt.employeeDni}">-</span></div>
+                                    <div>Teléfono: <span th:text="${#strings.isEmpty(receipt.employeePhone) ? '-' : receipt.employeePhone}">-</span></div>
+                                    <div>Correo: <span th:text="${#strings.isEmpty(receipt.employeeEmail) ? '-' : receipt.employeeEmail}">-</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <h3 class="h6 text-uppercase text-muted">Detalle de pago</h3>
+                            <div class="border rounded p-3 h-100">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Esquema</span>
+                                    <strong th:text="${receipt.paymentModeLabel}">Sueldo fijo</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Periodo salarial</span>
+                                    <strong th:text="${receipt.salaryPeriodLabel}">Mensual</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Base de cálculo</span>
+                                    <strong th:text="${'S/. ' + #numbers.formatDecimal(receipt.calculationBaseAmount, 1, 2)}">S/. 0.00</strong>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Comisión</span>
+                                    <strong th:text="${#numbers.formatDecimal(receipt.commissionRate, 1, 2) + ' %'}">0.00 %</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive mb-4">
+                        <table class="table table-bordered align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Concepto</th>
+                                <th class="text-end">Monto</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                                <td>Importe bruto</td>
+                                <td class="text-end" th:text="${'S/. ' + #numbers.formatDecimal(receipt.grossAmount, 1, 2)}">S/. 0.00</td>
+                            </tr>
+                            <tr>
+                                <td>Descuentos / adelantos aplicados</td>
+                                <td class="text-end" th:text="${'S/. ' + #numbers.formatDecimal(receipt.discountAmount, 1, 2)}">S/. 0.00</td>
+                            </tr>
+                            <tr class="table-light">
+                                <td class="fw-bold">Neto pagado</td>
+                                <td class="text-end fw-bold fs-5" th:text="${'S/. ' + #numbers.formatDecimal(receipt.netAmount, 1, 2)}">S/. 0.00</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mb-5">
+                        <h3 class="h6 text-uppercase text-muted">Observación</h3>
+                        <div class="border rounded p-3 min-vh-10"
+                             th:text="${#strings.isEmpty(receipt.observation) ? 'Sin observación registrada.' : receipt.observation}">
+                            Sin observación registrada.
+                        </div>
+                    </div>
+
+                    <div class="row g-5 mt-4">
+                        <div class="col-md-6 text-center">
+                            <div class="signature-line">
+                                Firma del trabajador
+                            </div>
+                            <div class="small text-muted mt-1" th:text="${receipt.employeeName}">Raul Maylle</div>
+                        </div>
+                        <div class="col-md-6 text-center">
+                            <div class="signature-line">
+                                Firma del responsable
+                            </div>
+                            <div class="small text-muted mt-1" th:text="${adminBrandTitle != null ? adminBrandTitle : 'Negocio'}">Eco del Amazonas</div>
+                        </div>
+                    </div>
+
+                    <div class="text-muted small mt-4">
+                        Este recibo es un comprobante interno de control de pagos del personal. No reemplaza documentos laborales o tributarios oficiales cuando correspondan.
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+</body>
+</html>

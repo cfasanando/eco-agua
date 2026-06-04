@@ -84,6 +84,27 @@ public class EmployeePaymentController {
         return "admin/personnel_payments";
     }
 
+    @GetMapping("/{paymentId}/receipt")
+    public String showPaymentReceipt(
+            @PathVariable("paymentId") Long paymentId,
+            Model model,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            HrPaymentReceipt receipt = employeePaymentService.buildPaymentReceipt(paymentId);
+
+            model.addAttribute("activePage", "personnel_payment_receipt");
+            model.addAttribute("receipt", receipt);
+
+            return "admin/personnel_payment_receipt";
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("message", "No se encontró el pago seleccionado.");
+            redirectAttributes.addFlashAttribute("messageType", "error");
+
+            return "redirect:/admin/personnel/payments";
+        }
+    }
+
     @PostMapping("/save")
     public String savePayment(
             @ModelAttribute("paymentForm") EmployeePaymentForm paymentForm,

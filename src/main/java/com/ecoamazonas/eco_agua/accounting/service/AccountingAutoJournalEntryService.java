@@ -12,6 +12,7 @@ import com.ecoamazonas.eco_agua.order.SaleOrderPayment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -38,7 +39,7 @@ public class AccountingAutoJournalEntryService {
         this.journalEntryRepository = journalEntryRepository;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void generateForSaleOrder(SaleOrder order) {
         if (order == null || order.getId() == null || order.getStatus() == null) {
             return;
@@ -64,7 +65,7 @@ public class AccountingAutoJournalEntryService {
         );
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void cancelForSaleOrder(SaleOrder order) {
         if (order == null || order.getId() == null) {
             return;
@@ -73,7 +74,7 @@ public class AccountingAutoJournalEntryService {
         cancelDraftEntries(AccountingAutomationEvent.SALE_CREDIT, order.getId());
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void generateForCreditCollection(SaleOrderPayment payment) {
         if (payment == null || payment.getId() == null) {
             return;

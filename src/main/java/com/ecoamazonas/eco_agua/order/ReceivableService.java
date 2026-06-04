@@ -2,6 +2,8 @@ package com.ecoamazonas.eco_agua.order;
 
 import com.ecoamazonas.eco_agua.accounting.service.AccountingAutoJournalEntryService;
 import jakarta.transaction.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -20,6 +22,7 @@ import java.util.Set;
 @Service
 public class ReceivableService {
 
+    private static final Logger log = LoggerFactory.getLogger(ReceivableService.class);
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
     private final SaleOrderRepository saleOrderRepository;
@@ -129,8 +132,21 @@ public class ReceivableService {
         }
 
         saleOrderRepository.save(order);
-        accountingAutoJournalEntryService.generateForCreditCollection(savedPayment);
+        generateAccountingDraftForCreditCollection(savedPayment);
         return savedPayment;
+    }
+
+
+    private void generateAccountingDraftForCreditCollection(SaleOrderPayment payment) {
+        try {
+            accountingAutoJournalEntryService.generateForCreditCollection(payment);
+        } catch (Exception ex) {
+            log.warn(
+                    "Credit collection accounting draft was not generated. paymentId={}, reason={}",
+                    payment != null ? payment.getId() : null,
+                    ex.getMessage()
+            );
+        }
     }
 
     @Transactional

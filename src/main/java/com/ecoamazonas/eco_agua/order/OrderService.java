@@ -9,6 +9,8 @@ import com.ecoamazonas.eco_agua.inventory.InventoryMovementType;
 import com.ecoamazonas.eco_agua.inventory.InventoryService;
 import com.ecoamazonas.eco_agua.product.Product;
 import com.ecoamazonas.eco_agua.product.ProductRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,7 @@ import java.util.Map;
 @Service
 public class OrderService {
 
+    private static final Logger log = LoggerFactory.getLogger(OrderService.class);
     private static final int SUGGESTION_LOOKBACK_DAYS = 60;
 
     private final SaleOrderRepository orderRepository;
@@ -216,7 +219,7 @@ public class OrderService {
             personnelExpenseAutoSyncService.syncSalaryExpensesForDate(saved.getOrderDate());
         }
 
-        accountingAutoJournalEntryService.generateForSaleOrder(saved);
+        generateAccountingDraftForSaleOrder(saved);
 
         return saved;
     }
@@ -282,9 +285,9 @@ public class OrderService {
         orderRepository.flush();
 
         if (newStatus == OrderStatus.CANCELED) {
-            accountingAutoJournalEntryService.cancelForSaleOrder(order);
+            cancelAccountingDraftForSaleOrder(order);
         } else {
-            accountingAutoJournalEntryService.generateForSaleOrder(order);
+            generateAccountingDraftForSaleOrder(order);
         }
 
         if (oldStatusAffectsStock || newStatusAffectsStock) {
@@ -293,6 +296,31 @@ public class OrderService {
         }
 
         return order;
+    }
+
+
+    private void generateAccountingDraftForSaleOrder(SaleOrder order) {
+        try {
+            accountingAutoJournalEntryService.generateForSaleOrder(order);
+        } catch (Exception ex) {
+            log.warn(
+                    "Sale accounting draft was not generated. orderId={}, reason={}",
+                    order != null ? order.getId() : null,
+                    ex.getMessage()
+            );
+        }
+    }
+
+    private void cancelAccountingDraftForSaleOrder(SaleOrder order) {
+        try {
+            accountingAutoJournalEntryService.cancelForSaleOrder(order);
+        } catch (Exception ex) {
+            log.warn(
+                    "Sale accounting draft was not cancelled. orderId={}, reason={}",
+                    order != null ? order.getId() : null,
+                    ex.getMessage()
+            );
+        }
     }
 
     @Transactional(readOnly = true)

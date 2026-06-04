@@ -15,6 +15,7 @@ public class HrDashboardObligationRow {
     private BigDecimal pendingAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     private String discountModeLabel;
     private String description;
+    private boolean active;
 
     public Long getObligationId() {
         return obligationId;
@@ -78,6 +79,18 @@ public class HrDashboardObligationRow {
 
     public void setDiscountModeLabel(String discountModeLabel) {
         this.discountModeLabel = discountModeLabel;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public boolean hasPendingAmount() {
+        return pendingAmount != null && pendingAmount.compareTo(BigDecimal.ZERO) > 0;
     }
 
     public String getDescription() {

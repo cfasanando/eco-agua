@@ -74,6 +74,73 @@ public class HrDashboardService {
         return snapshot;
     }
 
+    @Transactional(readOnly = true)
+    public HrEmployeeProfile buildEmployeeProfile(Long employeeId, Integer year, Integer month) {
+        YearMonth selectedPeriod = resolvePeriod(year, month);
+        Employee employee = employeePaymentService.findEmployee(employeeId);
+        if (employee == null) {
+            throw new IllegalArgumentException("Employee not found: " + employeeId);
+        }
+
+        List<EmployeePayment> payments = employeePaymentService.findPaymentsForMonth(
+                employee.getId(),
+                selectedPeriod.getYear(),
+                selectedPeriod.getMonthValue()
+        );
+        List<EmployeeObligation> obligations = employeePaymentService.findObligations(employee.getId());
+        List<EmployeeObligationSettlement> settlements = employeePaymentService.findSettlementsForMonth(
+                employee.getId(),
+                selectedPeriod.getYear(),
+                selectedPeriod.getMonthValue()
+        );
+
+        HrEmployeeProfile profile = new HrEmployeeProfile();
+        profile.setEmployeeId(employee.getId());
+        profile.setEmployeeName(buildEmployeeName(employee));
+        profile.setFirstName(cleanText(employee.getFirstName()));
+        profile.setLastName(cleanText(employee.getLastName()));
+        profile.setDni(cleanText(employee.getDni()));
+        profile.setEmail(cleanText(employee.getEmail()));
+        profile.setPhone(cleanText(employee.getPhone()));
+        profile.setAddress(cleanText(employee.getAddress()));
+        profile.setBirthDate(employee.getBirthDate());
+        profile.setHireDate(employee.getHireDate());
+        profile.setActive(employee.isActive());
+        profile.setSelectedYear(selectedPeriod.getYear());
+        profile.setSelectedMonth(selectedPeriod.getMonthValue());
+        profile.setSelectedMonthName(buildMonthName(selectedPeriod));
+        profile.setSummary(employeePaymentService.buildMonthlySummary(
+                employee.getId(),
+                selectedPeriod.getYear(),
+                selectedPeriod.getMonthValue()
+        ));
+        profile.setPayments(payments.stream()
+                .map(payment -> buildPaymentRow(employee, payment))
+                .toList());
+        profile.setObligations(obligations.stream()
+                .map(obligation -> buildObligationRow(employee, obligation))
+                .toList());
+        profile.setSettlements(settlements.stream()
+                .map(this::buildSettlementRow)
+                .toList());
+
+        JobPosition jobPosition = employee.getJobPosition();
+        if (jobPosition != null) {
+            profile.setJobPositionName(cleanText(jobPosition.getName()));
+            profile.setPaymentModeLabel(jobPosition.getPaymentModeLabel());
+            profile.setSalaryPeriodLabel(buildSalaryPeriodLabel(jobPosition.getSalaryPeriod()));
+            profile.setBaseSalary(jobPosition.getBaseSalary());
+            profile.setSalaryAmount(jobPosition.getSalaryAmount());
+            profile.setCommissionRate(jobPosition.getCommissionRate());
+        } else {
+            profile.setJobPositionName("Sin cargo asignado");
+            profile.setPaymentModeLabel("Sin regla de pago");
+            profile.setSalaryPeriodLabel("Sin periodo definido");
+        }
+
+        return profile;
+    }
+
     private HrDashboardEmployeeRow buildEmployeeRow(
             Employee employee,
             List<EmployeePayment> payments,
@@ -134,8 +201,44 @@ public class HrDashboardService {
         row.setPendingAmount(obligation.getPendingAmount());
         row.setDiscountModeLabel(obligation.getDiscountMode() != null ? obligation.getDiscountMode().getLabel() : "Manual");
         row.setDescription(cleanText(obligation.getDescription()));
+        row.setActive(obligation.isActive());
 
         return row;
+    }
+
+
+    private HrEmployeeProfileSettlementRow buildSettlementRow(EmployeeObligationSettlement settlement) {
+        HrEmployeeProfileSettlementRow row = new HrEmployeeProfileSettlementRow();
+        row.setSettlementId(settlement.getId());
+        row.setSettlementDate(settlement.getSettlementDate());
+        row.setAppliedAmount(settlement.getAppliedAmount());
+        row.setObservation(cleanText(settlement.getObservation()));
+
+        EmployeeObligation obligation = settlement.getEmployeeObligation();
+        if (obligation != null) {
+            row.setObligationId(obligation.getId());
+            String description = cleanText(obligation.getDescription());
+            String typeLabel = obligation.getType() != null ? obligation.getType().getLabel() : "Obligación";
+            row.setObligationLabel(description.isBlank() ? typeLabel : description);
+        } else {
+            row.setObligationLabel("Obligación");
+        }
+
+        return row;
+    }
+
+    private String buildSalaryPeriodLabel(SalaryPeriod salaryPeriod) {
+        if (salaryPeriod == null) {
+            return "Sin periodo definido";
+        }
+
+        return switch (salaryPeriod) {
+            case DAILY -> "Diario";
+            case WEEKLY -> "Semanal";
+            case BIWEEKLY -> "Quincenal";
+            case MONTHLY -> "Mensual";
+            case HOURLY -> "Por hora";
+        };
     }
 
     private HrDashboardSummary buildSummary(

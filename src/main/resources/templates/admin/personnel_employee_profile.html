@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+
+<head th:replace="fragments/head_admin :: adminHead('Ficha del trabajador')"></head>
+
+<body>
+
+<div class="app-layout" th:with="activePage='personnel_employee_profile'">
+
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-3">
+                <div>
+                    <div class="text-muted small text-uppercase">Configuración y RRHH</div>
+                    <h1 class="h4 mb-1">Ficha del trabajador</h1>
+                    <p class="text-muted mb-0">
+                        Consulta rápida de datos, pagos, adelantos, descuentos y abonos de un trabajador.
+                    </p>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-secondary" th:href="@{/admin/personnel(year=${profile.selectedYear}, month=${profile.selectedMonth})}">
+                        <i class="bi bi-arrow-left me-1"></i> Volver al resumen
+                    </a>
+                    <a class="btn btn-outline-primary" th:href="@{/admin/users}">
+                        <i class="bi bi-people me-1"></i> Personal y usuarios
+                    </a>
+                    <a class="btn btn-primary"
+                       th:href="@{/admin/personnel/payments(employeeId=${profile.employeeId}, year=${profile.selectedYear}, month=${profile.selectedMonth})}">
+                        <i class="bi bi-cash-stack me-1"></i> Registrar pago
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${message}" class="alert shadow-sm" th:classappend="${messageType == 'success'} ? ' alert-success' : ' alert-danger'" th:text="${message}">
+                Mensaje del sistema
+            </div>
+
+            <form class="card shadow-sm mb-3" method="get" th:action="@{/admin/personnel/employees/{id}(id=${profile.employeeId})}">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label" for="month">Mes</label>
+                            <select id="month" name="month" class="form-select">
+                                <option th:value="1" th:selected="${profile.selectedMonth == 1}">Enero</option>
+                                <option th:value="2" th:selected="${profile.selectedMonth == 2}">Febrero</option>
+                                <option th:value="3" th:selected="${profile.selectedMonth == 3}">Marzo</option>
+                                <option th:value="4" th:selected="${profile.selectedMonth == 4}">Abril</option>
+                                <option th:value="5" th:selected="${profile.selectedMonth == 5}">Mayo</option>
+                                <option th:value="6" th:selected="${profile.selectedMonth == 6}">Junio</option>
+                                <option th:value="7" th:selected="${profile.selectedMonth == 7}">Julio</option>
+                                <option th:value="8" th:selected="${profile.selectedMonth == 8}">Agosto</option>
+                                <option th:value="9" th:selected="${profile.selectedMonth == 9}">Setiembre</option>
+                                <option th:value="10" th:selected="${profile.selectedMonth == 10}">Octubre</option>
+                                <option th:value="11" th:selected="${profile.selectedMonth == 11}">Noviembre</option>
+                                <option th:value="12" th:selected="${profile.selectedMonth == 12}">Diciembre</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label" for="year">Año</label>
+                            <input id="year" name="year" type="number" min="2000" max="2100" class="form-control" th:value="${profile.selectedYear}">
+                        </div>
+
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search me-1"></i> Actualizar ficha
+                            </button>
+                        </div>
+
+                        <div class="col-md-3 text-md-end">
+                            <div class="text-muted small">Periodo seleccionado</div>
+                            <div class="fw-bold" th:text="${profile.selectedMonthName}">Junio 2026</div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                                <div>
+                                    <div class="text-muted small text-uppercase">Trabajador</div>
+                                    <h2 class="h4 mb-1" th:text="${profile.employeeName}">Raul Maylle</h2>
+                                    <span class="badge" th:classappend="${profile.active} ? ' bg-success' : ' bg-secondary'" th:text="${profile.active} ? 'Activo' : 'Inactivo'">Activo</span>
+                                </div>
+                                <i class="bi bi-person-badge fs-2 text-muted"></i>
+                            </div>
+
+                            <div class="small text-muted mb-3" th:if="${!profile.hasContactInfo()}">
+                                Aún no se registraron datos de contacto para este trabajador.
+                            </div>
+
+                            <dl class="row small mb-0">
+                                <dt class="col-4">DNI</dt>
+                                <dd class="col-8" th:text="${#strings.isEmpty(profile.dni) ? '-' : profile.dni}">-</dd>
+
+                                <dt class="col-4">Teléfono</dt>
+                                <dd class="col-8" th:text="${#strings.isEmpty(profile.phone) ? '-' : profile.phone}">-</dd>
+
+                                <dt class="col-4">Correo</dt>
+                                <dd class="col-8" th:text="${#strings.isEmpty(profile.email) ? '-' : profile.email}">-</dd>
+
+                                <dt class="col-4">Dirección</dt>
+                                <dd class="col-8" th:text="${#strings.isEmpty(profile.address) ? '-' : profile.address}">-</dd>
+
+                                <dt class="col-4">Ingreso</dt>
+                                <dd class="col-8" th:text="${profile.hireDate != null ? #temporals.format(profile.hireDate, 'dd/MM/yyyy') : '-'}">-</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small text-uppercase">Cargo y regla de pago</div>
+                            <h2 class="h5 mb-3" th:text="${profile.jobPositionName}">Repartidor</h2>
+
+                            <dl class="row small mb-0">
+                                <dt class="col-5">Modo</dt>
+                                <dd class="col-7" th:text="${profile.paymentModeLabel}">Sueldo fijo</dd>
+
+                                <dt class="col-5">Periodo</dt>
+                                <dd class="col-7" th:text="${profile.salaryPeriodLabel}">Mensual</dd>
+
+                                <dt class="col-5">Sueldo base</dt>
+                                <dd class="col-7" th:text="${'S/. ' + #numbers.formatDecimal(profile.baseSalary, 1, 2)}">S/. 0.00</dd>
+
+                                <dt class="col-5">Monto configurado</dt>
+                                <dd class="col-7" th:text="${'S/. ' + #numbers.formatDecimal(profile.salaryAmount, 1, 2)}">S/. 0.00</dd>
+
+                                <dt class="col-5">Comisión</dt>
+                                <dd class="col-7" th:text="${#numbers.formatDecimal(profile.commissionRate, 1, 2) + '%'}">0.00%</dd>
+                            </dl>
+
+                            <div class="alert alert-warning small mt-3 mb-0" th:if="${!profile.hasJobPosition()}">
+                                Este trabajador no tiene cargo asignado. Revisa <strong>Cargos</strong> y <strong>Personal y usuarios</strong> antes de registrar pagos.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small text-uppercase">Resumen del mes</div>
+                            <h2 class="h5 mb-3" th:text="${profile.selectedMonthName}">Junio 2026</h2>
+
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <div class="border rounded p-2 h-100">
+                                        <div class="text-muted small">Bruto</div>
+                                        <div class="fw-bold" th:text="${'S/. ' + #numbers.formatDecimal(profile.summary.totalGross, 1, 2)}">S/. 0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="border rounded p-2 h-100">
+                                        <div class="text-muted small">Descuento</div>
+                                        <div class="fw-bold" th:text="${'S/. ' + #numbers.formatDecimal(profile.summary.totalDiscount, 1, 2)}">S/. 0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="border rounded p-2 h-100">
+                                        <div class="text-muted small">Neto pagado</div>
+                                        <div class="fw-bold" th:text="${'S/. ' + #numbers.formatDecimal(profile.summary.totalNet, 1, 2)}">S/. 0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="border rounded p-2 h-100">
+                                        <div class="text-muted small">Saldo pendiente</div>
+                                        <div class="fw-bold" th:text="${'S/. ' + #numbers.formatDecimal(profile.summary.totalPendingObligations, 1, 2)}">S/. 0.00</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="small text-muted mt-3">
+                                Los montos se calculan con los pagos y obligaciones ya registrados en RRHH.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <h2 class="h5 mb-0">Pagos del periodo</h2>
+                                <div class="text-muted small">Pagos reales registrados para este trabajador.</div>
+                            </div>
+                            <a class="btn btn-sm btn-outline-primary"
+                               th:href="@{/admin/personnel/payments(employeeId=${profile.employeeId}, year=${profile.selectedYear}, month=${profile.selectedMonth})}">
+                                Gestionar pagos
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Observación</th>
+                                        <th class="text-end">Bruto</th>
+                                        <th class="text-end">Descuento</th>
+                                        <th class="text-end">Neto</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:if="${#lists.isEmpty(profile.payments)}">
+                                        <td colspan="5" class="text-center text-muted py-4">
+                                            No hay pagos registrados para este periodo.
+                                        </td>
+                                    </tr>
+                                    <tr th:each="payment : ${profile.payments}">
+                                        <td th:text="${payment.paymentDate != null ? #temporals.format(payment.paymentDate, 'dd/MM/yyyy') : '-'}">01/06/2026</td>
+                                        <td>
+                                            <div th:text="${#strings.isEmpty(payment.observation) ? '-' : payment.observation}">Pago semanal</div>
+                                            <span class="badge bg-secondary" th:if="${payment.legacy}">Legacy</span>
+                                        </td>
+                                        <td class="text-end" th:text="${'S/. ' + #numbers.formatDecimal(payment.grossAmount, 1, 2)}">S/. 0.00</td>
+                                        <td class="text-end" th:text="${'S/. ' + #numbers.formatDecimal(payment.discountAmount, 1, 2)}">S/. 0.00</td>
+                                        <td class="text-end fw-semibold" th:text="${'S/. ' + #numbers.formatDecimal(payment.netAmount, 1, 2)}">S/. 0.00</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <h2 class="h5 mb-0">Abonos directos del periodo</h2>
+                                <div class="text-muted small">Amortizaciones hechas sin registrar pago de sueldo.</div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Concepto</th>
+                                        <th class="text-end">Monto</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:if="${#lists.isEmpty(profile.settlements)}">
+                                        <td colspan="3" class="text-center text-muted py-4">
+                                            No hay abonos directos para este periodo.
+                                        </td>
+                                    </tr>
+                                    <tr th:each="settlement : ${profile.settlements}">
+                                        <td th:text="${settlement.settlementDate != null ? #temporals.format(settlement.settlementDate, 'dd/MM/yyyy') : '-'}">01/06/2026</td>
+                                        <td>
+                                            <div th:text="${settlement.obligationLabel}">Adelanto</div>
+                                            <div class="text-muted small" th:if="${!#strings.isEmpty(settlement.observation)}" th:text="${settlement.observation}">Observación</div>
+                                        </td>
+                                        <td class="text-end fw-semibold" th:text="${'S/. ' + #numbers.formatDecimal(settlement.appliedAmount, 1, 2)}">S/. 0.00</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                    <div>
+                        <h2 class="h5 mb-0">Adelantos, préstamos y descuentos</h2>
+                        <div class="text-muted small">Historial de obligaciones del trabajador.</div>
+                    </div>
+                    <a class="btn btn-sm btn-outline-primary"
+                       th:href="@{/admin/personnel/payments(employeeId=${profile.employeeId}, year=${profile.selectedYear}, month=${profile.selectedMonth})}">
+                        Registrar adelanto o descuento
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Tipo</th>
+                                <th>Descripción</th>
+                                <th>Descuento</th>
+                                <th class="text-end">Original</th>
+                                <th class="text-end">Pendiente</th>
+                                <th>Estado</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:if="${#lists.isEmpty(profile.obligations)}">
+                                <td colspan="7" class="text-center text-muted py-4">
+                                    No hay adelantos, préstamos ni descuentos registrados.
+                                </td>
+                            </tr>
+                            <tr th:each="obligation : ${profile.obligations}">
+                                <td th:text="${obligation.issueDate != null ? #temporals.format(obligation.issueDate, 'dd/MM/yyyy') : '-'}">01/06/2026</td>
+                                <td th:text="${obligation.typeLabel}">Adelanto</td>
+                                <td th:text="${#strings.isEmpty(obligation.description) ? '-' : obligation.description}">Motivo</td>
+                                <td th:text="${obligation.discountModeLabel}">Manual</td>
+                                <td class="text-end" th:text="${'S/. ' + #numbers.formatDecimal(obligation.originalAmount, 1, 2)}">S/. 0.00</td>
+                                <td class="text-end fw-semibold" th:text="${'S/. ' + #numbers.formatDecimal(obligation.pendingAmount, 1, 2)}">S/. 0.00</td>
+                                <td>
+                                    <span class="badge" th:classappend="${obligation.active} ? ' bg-warning text-dark' : ' bg-success'" th:text="${obligation.active} ? 'Pendiente' : 'Cerrado'">Pendiente</span>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<div th:replace="fragments/scripts_admin :: adminScripts"></div>
+
+</body>
+</html>

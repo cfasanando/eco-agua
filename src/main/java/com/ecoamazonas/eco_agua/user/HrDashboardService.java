@@ -75,6 +75,38 @@ public class HrDashboardService {
     }
 
     @Transactional(readOnly = true)
+    public HrMonthlyPayrollSnapshot buildMonthlyPayroll(Integer year, Integer month) {
+        YearMonth selectedPeriod = resolvePeriod(year, month);
+        List<Employee> employees = employeePaymentService.findActiveEmployees();
+        List<HrMonthlyPayrollRow> rows = new ArrayList<>();
+
+        for (Employee employee : employees) {
+            List<EmployeePayment> payments = employeePaymentService.findPaymentsForMonth(
+                    employee.getId(),
+                    selectedPeriod.getYear(),
+                    selectedPeriod.getMonthValue()
+            );
+            List<EmployeeObligation> activeObligations = employeePaymentService.findActiveObligations(employee.getId());
+
+            rows.add(buildMonthlyPayrollRow(employee, payments, activeObligations));
+        }
+
+        rows.sort(Comparator
+                .comparing(HrMonthlyPayrollRow::hasPendingObligations).reversed()
+                .thenComparing(HrMonthlyPayrollRow::hasPayments).reversed()
+                .thenComparing(HrMonthlyPayrollRow::getEmployeeName, String.CASE_INSENSITIVE_ORDER));
+
+        HrMonthlyPayrollSnapshot snapshot = new HrMonthlyPayrollSnapshot();
+        snapshot.setSelectedYear(selectedPeriod.getYear());
+        snapshot.setSelectedMonth(selectedPeriod.getMonthValue());
+        snapshot.setSelectedMonthName(buildMonthName(selectedPeriod));
+        snapshot.setRows(rows);
+        snapshot.setSummary(buildMonthlyPayrollSummary(rows));
+
+        return snapshot;
+    }
+
+    @Transactional(readOnly = true)
     public HrEmployeeProfile buildEmployeeProfile(Long employeeId, Integer year, Integer month) {
         YearMonth selectedPeriod = resolvePeriod(year, month);
         Employee employee = employeePaymentService.findEmployee(employeeId);
@@ -140,6 +172,87 @@ public class HrDashboardService {
 
         return profile;
     }
+
+    private HrMonthlyPayrollRow buildMonthlyPayrollRow(
+            Employee employee,
+            List<EmployeePayment> payments,
+            List<EmployeeObligation> activeObligations
+    ) {
+        HrMonthlyPayrollRow row = new HrMonthlyPayrollRow();
+        row.setEmployeeId(employee.getId());
+        row.setEmployeeName(buildEmployeeName(employee));
+        row.setPhone(cleanText(employee.getPhone()));
+
+        JobPosition jobPosition = employee.getJobPosition();
+        if (jobPosition != null) {
+            row.setJobPositionName(cleanText(jobPosition.getName()));
+            row.setPaymentModeLabel(jobPosition.getPaymentModeLabel());
+            row.setSalaryPeriodLabel(buildSalaryPeriodLabel(jobPosition.getSalaryPeriod()));
+            row.setConfiguredAmount(resolveConfiguredPayrollAmount(jobPosition));
+        } else {
+            row.setJobPositionName("Sin cargo asignado");
+            row.setPaymentModeLabel("Sin regla de pago");
+            row.setSalaryPeriodLabel("Sin periodo definido");
+        }
+
+        row.setPaymentCount(payments.size());
+        row.setMonthlyGross(sumPaymentGross(payments));
+        row.setMonthlyDiscount(sumPaymentDiscount(payments));
+        row.setMonthlyNet(sumPaymentNet(payments));
+        row.setPendingObligations(sumPendingObligations(activeObligations));
+        row.setActiveObligationCount(activeObligations.size());
+        row.setLastPaymentDate(payments.stream()
+                .map(EmployeePayment::getPaymentDate)
+                .filter(date -> date != null)
+                .max(LocalDate::compareTo)
+                .orElse(null));
+
+        return row;
+    }
+
+    private HrMonthlyPayrollSummary buildMonthlyPayrollSummary(List<HrMonthlyPayrollRow> rows) {
+        HrMonthlyPayrollSummary summary = new HrMonthlyPayrollSummary();
+        summary.setActiveEmployeeCount(rows.size());
+        summary.setPaidEmployeeCount((int) rows.stream().filter(HrMonthlyPayrollRow::hasPayments).count());
+        summary.setPaymentCount(rows.stream().mapToInt(HrMonthlyPayrollRow::getPaymentCount).sum());
+        summary.setActiveObligationCount(rows.stream().mapToInt(HrMonthlyPayrollRow::getActiveObligationCount).sum());
+        summary.setTotalConfiguredAmount(rows.stream()
+                .map(HrMonthlyPayrollRow::getConfiguredAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        summary.setTotalGross(rows.stream()
+                .map(HrMonthlyPayrollRow::getMonthlyGross)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        summary.setTotalDiscount(rows.stream()
+                .map(HrMonthlyPayrollRow::getMonthlyDiscount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        summary.setTotalNet(rows.stream()
+                .map(HrMonthlyPayrollRow::getMonthlyNet)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        summary.setTotalPendingObligations(rows.stream()
+                .map(HrMonthlyPayrollRow::getPendingObligations)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+
+        return summary;
+    }
+
+    private BigDecimal resolveConfiguredPayrollAmount(JobPosition jobPosition) {
+        if (jobPosition == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal salaryAmount = jobPosition.getSalaryAmount();
+        if (salaryAmount != null && salaryAmount.compareTo(BigDecimal.ZERO) > 0) {
+            return salaryAmount.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal baseSalary = jobPosition.getBaseSalary();
+        if (baseSalary != null && baseSalary.compareTo(BigDecimal.ZERO) > 0) {
+            return baseSalary.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    }
+
 
     private HrDashboardEmployeeRow buildEmployeeRow(
             Employee employee,

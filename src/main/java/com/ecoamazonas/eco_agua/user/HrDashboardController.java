@@ -32,6 +32,20 @@ public class HrDashboardController {
         return "admin/personnel_overview";
     }
 
+    @GetMapping("/monthly-payroll")
+    public String showMonthlyPayroll(
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            Model model
+    ) {
+        HrMonthlyPayrollSnapshot snapshot = hrDashboardService.buildMonthlyPayroll(year, month);
+
+        model.addAttribute("activePage", "personnel_monthly_payroll");
+        model.addAttribute("snapshot", snapshot);
+
+        return "admin/personnel_monthly_payroll";
+    }
+
     @GetMapping("/employees/{employeeId}")
     public String showEmployeeProfile(
             @PathVariable("employeeId") Long employeeId,

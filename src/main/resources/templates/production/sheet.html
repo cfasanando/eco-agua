@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Ficha de producción - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='production'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper production-sheet-page">
+            <style>
+                @media print {
+                    body { background: #fff !important; }
+                    .sidebar, aside, header, .no-print { display: none !important; }
+                    .app-layout, .main-content, .content-wrapper { display: block !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
+                    .card { box-shadow: none !important; border: 1px solid #999 !important; }
+                    .production-sheet-page { font-size: 12px; }
+                    .signature-box { min-height: 70px; }
+                }
+                .signature-box {
+                    min-height: 90px;
+                    border-top: 1px solid #777;
+                    padding-top: 0.75rem;
+                    text-align: center;
+                    color: #555;
+                }
+            </style>
+
+            <div class="d-flex justify-content-between align-items-start mb-3 no-print">
+                <div>
+                    <h1 class="h5 mb-1" th:text="'Ficha de producción #' + ${order.id}">Ficha de producción</h1>
+                    <div class="text-muted small">Documento interno para imprimir o guardar como PDF.</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-primary" onclick="window.print()">Imprimir / guardar PDF</button>
+                    <a class="btn btn-outline-primary" th:href="@{|/production/${order.id}/quality|}">Control de calidad</a>
+                    <a class="btn btn-outline-secondary" th:href="@{|/production/${order.id}|}">Detalle</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/production}">Volver</a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <div class="row align-items-start g-3">
+                        <div class="col-md-8">
+                            <h2 class="h4 mb-1">Ficha interna de producción</h2>
+                            <div class="text-muted">Control de lote, insumos, merma, costos y calidad.</div>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <div class="small text-muted">N.º interno</div>
+                            <div class="fs-5 fw-bold" th:text="${'#' + order.id}">#1</div>
+                            <div class="small text-muted">Emitido desde el sistema</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Datos generales</strong></div>
+                        <div class="card-body small">
+                            <div class="row mb-2"><div class="col-5 text-muted">Fecha</div><div class="col-7 fw-semibold" th:text="${#temporals.format(order.productionDate, 'dd/MM/yyyy')}">-</div></div>
+                            <div class="row mb-2"><div class="col-5 text-muted">Lote interno</div><div class="col-7 fw-semibold" th:text="${order.batchCode ?: '-'}">-</div></div>
+                            <div class="row mb-2"><div class="col-5 text-muted">Producto terminado</div><div class="col-7 fw-semibold" th:text="${order.product != null ? order.product.name : 'Producto #' + order.productId}">Producto</div></div>
+                            <div class="row mb-2"><div class="col-5 text-muted">Estado producción</div><div class="col-7"><span class="badge" th:classappend="${order.status.name() == 'CONFIRMED'} ? ' bg-success' : (${order.status.name() == 'DRAFT'} ? ' bg-warning text-dark' : ' bg-secondary')" th:text="${order.status}">DRAFT</span></div></div>
+                            <div class="row mb-0"><div class="col-5 text-muted">Registrado</div><div class="col-7" th:text="${order.createdAt != null ? #temporals.format(order.createdAt, 'dd/MM/yyyy HH:mm') : '-'}">-</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Cantidades y merma</strong></div>
+                        <div class="card-body small">
+                            <div class="row mb-2"><div class="col-6 text-muted">Cantidad esperada</div><div class="col-6 text-end fw-semibold" th:text="${#numbers.formatDecimal(order.quantityExpected, 1, 2)}">0.00</div></div>
+                            <div class="row mb-2"><div class="col-6 text-muted">Cantidad real producida</div><div class="col-6 text-end fw-semibold" th:text="${#numbers.formatDecimal(order.quantityProduced, 1, 2)}">0.00</div></div>
+                            <div class="row mb-2"><div class="col-6 text-muted">Merma / pérdida</div><div class="col-6 text-end fw-semibold" th:text="${#numbers.formatDecimal(order.quantityLoss, 1, 2)}">0.00</div></div>
+                            <div class="row mb-2"><div class="col-6 text-muted">% merma</div><div class="col-6 text-end fw-semibold" th:text="${#numbers.formatDecimal(order.lossRatePercent, 1, 2) + '%'}">0.00%</div></div>
+                            <div class="row mb-0"><div class="col-6 text-muted">Motivo de merma</div><div class="col-6 text-end" th:text="${order.lossReason ?: '-'}">-</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Costo total de insumos</div>
+                            <div class="fs-5 fw-bold" th:text="${'S/ ' + #numbers.formatDecimal(order.totalInputCost, 1, 2)}">S/ 0.00</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Costo unitario esperado</div>
+                            <div class="fs-5 fw-bold" th:text="${'S/ ' + #numbers.formatDecimal(order.unitCostEstimated, 1, 4)}">S/ 0.0000</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Costo unitario real</div>
+                            <div class="fs-5 fw-bold" th:text="${'S/ ' + #numbers.formatDecimal(order.realUnitCost, 1, 4)}">S/ 0.0000</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light"><strong>Insumos usados</strong></div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0 align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Insumo</th>
+                                <th>Unidad</th>
+                                <th class="text-end">Cantidad usada</th>
+                                <th class="text-end">Costo unitario</th>
+                                <th class="text-end">Subtotal</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="line : ${order.supplies}">
+                                <td th:text="${line.supply != null ? line.supply.name : 'Insumo #' + line.supplyId}">Insumo</td>
+                                <td th:text="${line.supply != null ? line.supply.unit : '-'}">-</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(line.quantityUsed, 1, 4)}">0.0000</td>
+                                <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(line.unitCostSnapshot, 1, 6)}">S/ 0.000000</td>
+                                <td class="text-end fw-semibold" th:text="${'S/ ' + #numbers.formatDecimal(line.lineTotal, 1, 2)}">S/ 0.00</td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(order.supplies)}"><td colspan="5" class="text-center text-muted py-3">No hay insumos registrados.</td></tr>
+                            </tbody>
+                            <tfoot class="table-light">
+                            <tr>
+                                <th colspan="4" class="text-end">Total</th>
+                                <th class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(order.totalInputCost, 1, 2)}">S/ 0.00</th>
+                            </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light"><strong>Control de calidad</strong></div>
+                <div class="card-body small">
+                    <div class="row g-3">
+                        <div class="col-md-3"><div class="text-muted">Estado</div><span class="badge" th:classappend="${' ' + order.qualityStatus.badgeClass}" th:text="${order.qualityStatus.label}">Pendiente</span></div>
+                        <div class="col-md-3"><div class="text-muted">Responsable</div><div th:text="${order.qualityCheckedBy ?: '-'}">-</div></div>
+                        <div class="col-md-3"><div class="text-muted">Fecha de revisión</div><div th:text="${order.qualityCheckedAt != null ? #temporals.format(order.qualityCheckedAt, 'dd/MM/yyyy HH:mm') : '-'}">-</div></div>
+                        <div class="col-md-3"><div class="text-muted">Checklist</div><div>
+                            <span th:text="${order.qualityCleaningOk ? 'Limpieza: OK' : 'Limpieza: pendiente'}">Limpieza</span><br>
+                            <span th:text="${order.qualityPackagingOk ? 'Empaque: OK' : 'Empaque: pendiente'}">Empaque</span><br>
+                            <span th:text="${order.qualityLabelingOk ? 'Etiqueta: OK' : 'Etiqueta: pendiente'}">Etiqueta</span><br>
+                            <span th:text="${order.qualityProductOk ? 'Producto: OK' : 'Producto: pendiente'}">Producto</span>
+                        </div></div>
+                        <div class="col-12"><div class="text-muted">Observación de calidad</div><div th:text="${order.qualityObservation ?: '-'}">-</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light"><strong>Observaciones</strong></div>
+                <div class="card-body small">
+                    <p class="mb-2"><strong>Observación de producción:</strong> <span th:text="${order.observation ?: '-'}">-</span></p>
+                    <p class="mb-0"><strong>Motivo de merma:</strong> <span th:text="${order.lossReason ?: '-'}">-</span></p>
+                </div>
+            </div>
+
+            <div class="row g-4 mt-4">
+                <div class="col-md-6">
+                    <div class="signature-box">Responsable de producción</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="signature-box">Responsable de revisión / calidad</div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

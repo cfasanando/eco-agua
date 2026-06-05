@@ -205,6 +205,14 @@ public class ProductionController {
         return "redirect:/production/" + id + "/quality";
     }
 
+    @GetMapping("/{id}/sheet")
+    public String sheet(@PathVariable Long id, Model model) {
+        model.addAttribute("activePage", "production");
+        model.addAttribute("order", productionService.findDetailedById(id));
+
+        return "production/sheet";
+    }
+
     @GetMapping("/{id}")
     public String detail(@PathVariable Long id, Model model) {
         model.addAttribute("activePage", "production");

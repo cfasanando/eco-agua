@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -127,6 +128,105 @@ public class ProductionService {
                 new ArrayList<>(products.values()),
                 latestOrders,
                 pendingDrafts
+        );
+    }
+
+
+    @Transactional(readOnly = true)
+    public ProductionReportSnapshot buildReport(LocalDate startDate, LocalDate endDate) {
+        LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
+        LocalDate effectiveStart = startDate != null ? startDate : effectiveEnd.minusDays(30);
+
+        if (effectiveEnd.isBefore(effectiveStart)) {
+            LocalDate tmp = effectiveStart;
+            effectiveStart = effectiveEnd;
+            effectiveEnd = tmp;
+        }
+
+        List<ProductionOrder> orders = productionOrderRepository.findByDateRangeAndStatus(effectiveStart, effectiveEnd, null);
+
+        long confirmedOrders = 0;
+        long draftOrders = 0;
+        long canceledOrders = 0;
+        BigDecimal confirmedQuantityExpected = BigDecimal.ZERO;
+        BigDecimal confirmedQuantityProduced = BigDecimal.ZERO;
+        BigDecimal confirmedQuantityLoss = BigDecimal.ZERO;
+        BigDecimal confirmedInputCost = BigDecimal.ZERO;
+        Map<Long, ProductionReportProductRow> products = new LinkedHashMap<>();
+        List<ProductionOrder> latestConfirmedOrders = new ArrayList<>();
+        List<ProductionOrder> latestCanceledOrders = new ArrayList<>();
+
+        for (ProductionOrder order : orders) {
+            if (order.getStatus() == ProductionStatus.CONFIRMED) {
+                confirmedOrders++;
+                confirmedQuantityExpected = confirmedQuantityExpected.add(valueOrZero(order.getQuantityExpected()));
+                confirmedQuantityProduced = confirmedQuantityProduced.add(valueOrZero(order.getQuantityProduced()));
+                confirmedQuantityLoss = confirmedQuantityLoss.add(valueOrZero(order.getQuantityLoss()));
+                confirmedInputCost = confirmedInputCost.add(valueOrZero(order.getTotalInputCost()));
+
+                Long productId = order.getProductId();
+                ProductionReportProductRow row = products.computeIfAbsent(
+                        productId,
+                        id -> new ProductionReportProductRow(id, resolveProductName(order))
+                );
+                row.addOrder(order);
+
+                if (latestConfirmedOrders.size() < 20) {
+                    latestConfirmedOrders.add(order);
+                }
+            } else if (order.getStatus() == ProductionStatus.DRAFT) {
+                draftOrders++;
+            } else if (order.getStatus() == ProductionStatus.CANCELED) {
+                canceledOrders++;
+                if (latestCanceledOrders.size() < 10) {
+                    latestCanceledOrders.add(order);
+                }
+            }
+        }
+
+        BigDecimal averageRealUnitCost = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+        if (confirmedQuantityProduced.compareTo(BigDecimal.ZERO) > 0) {
+            averageRealUnitCost = confirmedInputCost.divide(confirmedQuantityProduced, 4, RoundingMode.HALF_UP);
+        }
+
+        ProductionReportSummary summary = new ProductionReportSummary(
+                effectiveStart,
+                effectiveEnd,
+                orders.size(),
+                confirmedOrders,
+                draftOrders,
+                canceledOrders,
+                confirmedQuantityExpected.setScale(2, RoundingMode.HALF_UP),
+                confirmedQuantityProduced.setScale(2, RoundingMode.HALF_UP),
+                confirmedQuantityLoss.setScale(2, RoundingMode.HALF_UP),
+                confirmedInputCost.setScale(2, RoundingMode.HALF_UP),
+                averageRealUnitCost
+        );
+
+        List<ProductionReportProductRow> productRows = new ArrayList<>(products.values());
+        productRows.sort(Comparator
+                .comparing(ProductionReportProductRow::getQuantityProduced, Comparator.nullsLast(Comparator.naturalOrder()))
+                .reversed()
+                .thenComparing(ProductionReportProductRow::getProductName, Comparator.nullsLast(String::compareToIgnoreCase)));
+
+        List<ProductionReportProductRow> highWasteProductRows = productRows.stream()
+                .filter(row -> row.getQuantityLoss().compareTo(BigDecimal.ZERO) > 0)
+                .sorted((left, right) -> {
+                    int byQuantityLoss = right.getQuantityLoss().compareTo(left.getQuantityLoss());
+                    if (byQuantityLoss != 0) {
+                        return byQuantityLoss;
+                    }
+                    return right.getLossRatePercent().compareTo(left.getLossRatePercent());
+                })
+                .limit(8)
+                .toList();
+
+        return new ProductionReportSnapshot(
+                summary,
+                productRows,
+                highWasteProductRows,
+                latestConfirmedOrders,
+                latestCanceledOrders
         );
     }
 

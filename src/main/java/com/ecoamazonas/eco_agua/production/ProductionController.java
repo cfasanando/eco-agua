@@ -119,6 +119,28 @@ public class ProductionController {
         }
     }
 
+
+    @GetMapping("/reports")
+    public String reports(
+            @RequestParam(value = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Model model
+    ) {
+        LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
+        LocalDate effectiveStart = startDate != null ? startDate : effectiveEnd.minusDays(30);
+
+        ProductionReportSnapshot snapshot = productionService.buildReport(effectiveStart, effectiveEnd);
+
+        model.addAttribute("activePage", "production_reports");
+        model.addAttribute("snapshot", snapshot);
+        model.addAttribute("startDate", snapshot.getSummary().getStartDate());
+        model.addAttribute("endDate", snapshot.getSummary().getEndDate());
+
+        return "production/reports";
+    }
+
     @GetMapping("/{id}")
     public String detail(@PathVariable Long id, Model model) {
         model.addAttribute("activePage", "production");

@@ -67,12 +67,44 @@ public class ProductionController {
     }
 
     @GetMapping("/new")
-    public String newForm(Model model) {
+    public String newForm(
+            @RequestParam(value = "productId", required = false) Long selectedProductId,
+            @RequestParam(value = "quantityExpected", required = false) BigDecimal quantityExpected,
+            @RequestParam(value = "quantityProduced", required = false) BigDecimal quantityProduced,
+            Model model
+    ) {
+        BigDecimal defaultQuantityExpected = quantityExpected != null && quantityExpected.compareTo(BigDecimal.ZERO) > 0
+                ? quantityExpected
+                : BigDecimal.ONE;
+        BigDecimal defaultQuantityProduced = quantityProduced != null && quantityProduced.compareTo(BigDecimal.ZERO) > 0
+                ? quantityProduced
+                : defaultQuantityExpected;
+
         model.addAttribute("activePage", "production");
         model.addAttribute("today", LocalDate.now());
         model.addAttribute("products", productionService.findActiveProducts());
+        model.addAttribute("selectedProductId", selectedProductId);
+        model.addAttribute("quantityExpected", defaultQuantityExpected);
+        model.addAttribute("quantityProduced", defaultQuantityProduced);
 
         return "production/form";
+    }
+
+    @GetMapping("/planning")
+    public String planning(
+            @RequestParam(value = "productId", required = false) Long productId,
+            @RequestParam(value = "quantity", required = false) BigDecimal quantity,
+            Model model
+    ) {
+        ProductionPlanningSnapshot snapshot = productionService.buildPlanning(productId, quantity);
+
+        model.addAttribute("activePage", "production_planning");
+        model.addAttribute("snapshot", snapshot);
+        model.addAttribute("products", productionService.findActiveProducts());
+        model.addAttribute("selectedProductId", productId);
+        model.addAttribute("quantity", snapshot.getSummary().getPlannedQuantity());
+
+        return "production/planning";
     }
 
     @GetMapping("/product/{productId}/recipe")

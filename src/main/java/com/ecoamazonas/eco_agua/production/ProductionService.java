@@ -519,6 +519,105 @@ public class ProductionService {
         return new ProductionQualitySnapshot(summary, filteredRows, pendingRows, attentionRows);
     }
 
+
+    @Transactional(readOnly = true)
+    public ProductionPlanningSnapshot buildPlanning(Long productId, BigDecimal quantity) {
+        BigDecimal plannedQuantity = normalizePositiveQuantity(quantity);
+
+        ProductionPlanningSummary emptySummary = new ProductionPlanningSummary(
+                null,
+                null,
+                plannedQuantity,
+                0,
+                0,
+                0,
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                true
+        );
+
+        if (productId == null) {
+            return new ProductionPlanningSnapshot(emptySummary, List.of());
+        }
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
+
+        List<ProductionPlanningRequirementRow> rows = new ArrayList<>();
+        BigDecimal totalEstimatedCost = BigDecimal.ZERO;
+        int linesWithEnoughStock = 0;
+        int linesWithShortage = 0;
+
+        for (ProductSupply composition : product.getSuppliesComposition()) {
+            if (composition == null || composition.getSupply() == null) {
+                continue;
+            }
+
+            Supply supply = composition.getSupply();
+            BigDecimal quantityPerUnit = composition.getQuantityUsed() != null
+                    ? composition.getQuantityUsed()
+                    : BigDecimal.ZERO;
+
+            if (quantityPerUnit.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+
+            BigDecimal requiredQuantity = quantityPerUnit.multiply(plannedQuantity)
+                    .setScale(4, RoundingMode.HALF_UP);
+            BigDecimal availableQuantity = supply.getStock() != null
+                    ? supply.getStock()
+                    : BigDecimal.ZERO;
+            BigDecimal shortageQuantity = requiredQuantity.subtract(availableQuantity);
+
+            if (shortageQuantity.compareTo(BigDecimal.ZERO) < 0) {
+                shortageQuantity = BigDecimal.ZERO;
+            }
+
+            boolean enoughStock = shortageQuantity.compareTo(BigDecimal.ZERO) == 0;
+            if (enoughStock) {
+                linesWithEnoughStock++;
+            } else {
+                linesWithShortage++;
+            }
+
+            BigDecimal unitCost = supply.getUnitCost() != null
+                    ? supply.getUnitCost()
+                    : BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP);
+            BigDecimal requiredCost = requiredQuantity.multiply(unitCost)
+                    .setScale(2, RoundingMode.HALF_UP);
+            totalEstimatedCost = totalEstimatedCost.add(requiredCost);
+
+            rows.add(new ProductionPlanningRequirementRow(
+                    supply.getId(),
+                    supply.getName(),
+                    supply.getUnit(),
+                    quantityPerUnit.setScale(4, RoundingMode.HALF_UP),
+                    requiredQuantity.setScale(4, RoundingMode.HALF_UP),
+                    availableQuantity.setScale(4, RoundingMode.HALF_UP),
+                    shortageQuantity.setScale(4, RoundingMode.HALF_UP),
+                    unitCost,
+                    requiredCost,
+                    enoughStock
+            ));
+        }
+
+        rows.sort(Comparator
+                .comparing(ProductionPlanningRequirementRow::isEnoughStock)
+                .thenComparing(ProductionPlanningRequirementRow::getSupplyName, Comparator.nullsLast(String::compareToIgnoreCase)));
+
+        ProductionPlanningSummary summary = new ProductionPlanningSummary(
+                product.getId(),
+                product.getName(),
+                plannedQuantity,
+                rows.size(),
+                linesWithEnoughStock,
+                linesWithShortage,
+                totalEstimatedCost.setScale(2, RoundingMode.HALF_UP),
+                linesWithShortage == 0
+        );
+
+        return new ProductionPlanningSnapshot(summary, rows);
+    }
+
     @Transactional(readOnly = true)
     public ProductionOrder findDetailedById(Long id) {
         return productionOrderRepository.findDetailedById(id)

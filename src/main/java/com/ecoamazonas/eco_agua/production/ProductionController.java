@@ -141,6 +141,70 @@ public class ProductionController {
         return "production/reports";
     }
 
+    @GetMapping("/quality")
+    public String qualityDashboard(
+            @RequestParam(value = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(value = "qualityStatus", required = false) ProductionQualityStatus qualityStatus,
+            Model model
+    ) {
+        LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
+        LocalDate effectiveStart = startDate != null ? startDate : effectiveEnd.minusDays(30);
+
+        ProductionQualitySnapshot snapshot = productionService.buildQualityDashboard(effectiveStart, effectiveEnd, qualityStatus);
+
+        model.addAttribute("activePage", "production_quality");
+        model.addAttribute("snapshot", snapshot);
+        model.addAttribute("startDate", snapshot.getSummary().getStartDate());
+        model.addAttribute("endDate", snapshot.getSummary().getEndDate());
+        model.addAttribute("selectedQualityStatus", qualityStatus);
+        model.addAttribute("qualityStatuses", ProductionQualityStatus.values());
+
+        return "production/quality";
+    }
+
+    @GetMapping("/{id}/quality")
+    public String qualityForm(@PathVariable Long id, Model model) {
+        model.addAttribute("activePage", "production_quality");
+        model.addAttribute("order", productionService.findDetailedById(id));
+        model.addAttribute("qualityStatuses", ProductionQualityStatus.values());
+
+        return "production/quality_form";
+    }
+
+    @PostMapping("/{id}/quality")
+    public String updateQuality(
+            @PathVariable Long id,
+            @RequestParam(value = "qualityStatus", required = false) ProductionQualityStatus qualityStatus,
+            @RequestParam(value = "qualityCleaningOk", defaultValue = "false") boolean qualityCleaningOk,
+            @RequestParam(value = "qualityPackagingOk", defaultValue = "false") boolean qualityPackagingOk,
+            @RequestParam(value = "qualityLabelingOk", defaultValue = "false") boolean qualityLabelingOk,
+            @RequestParam(value = "qualityProductOk", defaultValue = "false") boolean qualityProductOk,
+            @RequestParam(value = "qualityCheckedBy", required = false) String qualityCheckedBy,
+            @RequestParam(value = "qualityObservation", required = false) String qualityObservation,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            productionService.updateQualityControl(
+                    id,
+                    qualityStatus,
+                    qualityCleaningOk,
+                    qualityPackagingOk,
+                    qualityLabelingOk,
+                    qualityProductOk,
+                    qualityCheckedBy,
+                    qualityObservation
+            );
+            redirectAttributes.addFlashAttribute("successMessage", "Control de calidad guardado correctamente.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+
+        return "redirect:/production/" + id + "/quality";
+    }
+
     @GetMapping("/{id}")
     public String detail(@PathVariable Long id, Model model) {
         model.addAttribute("activePage", "production");

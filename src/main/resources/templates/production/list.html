@@ -15,6 +15,7 @@
                 <div class="d-flex gap-2">
                     <a class="btn btn-outline-secondary" th:href="@{/production/overview(startDate=${startDate}, endDate=${endDate})}">Resumen</a>
                     <a class="btn btn-outline-secondary" th:href="@{/production/reports(startDate=${startDate}, endDate=${endDate})}">Reporte</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/production/quality(startDate=${startDate}, endDate=${endDate})}">Calidad</a>
                     <a class="btn btn-outline-secondary" th:href="@{/production/recipes}">Recetas</a>
                     <a class="btn btn-primary" th:href="@{/production/new}">Nueva producción</a>
                 </div>
@@ -58,6 +59,7 @@
                                 <th class="text-end">Real</th>
                                 <th class="text-end">Merma</th>
                                 <th>Estado</th>
+                                <th>Calidad</th>
                                 <th class="text-end">Costo total</th>
                                 <th class="text-end">Costo real unit.</th>
                                 <th class="text-center">Acción</th>
@@ -72,11 +74,17 @@
                                 <td class="text-end" th:text="${#numbers.formatDecimal(row.quantityProduced, 1, 2)}">0.00</td>
                                 <td class="text-end" th:text="${#numbers.formatDecimal(row.quantityLoss, 1, 2)}">0.00</td>
                                 <td><span class="badge" th:classappend="${row.status.name() == 'CONFIRMED'} ? ' bg-success' : (${row.status.name() == 'DRAFT'} ? ' bg-warning text-dark' : ' bg-secondary')" th:text="${row.status}">DRAFT</span></td>
+                                <td><span class="badge" th:classappend="${' ' + row.qualityStatus.badgeClass}" th:text="${row.qualityStatus.label}">Pendiente</span></td>
                                 <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(row.totalInputCost, 1, 2)}">S/ 0.00</td>
                                 <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(row.realUnitCost, 1, 4)}">S/ 0.0000</td>
-                                <td class="text-center"><a class="btn btn-sm btn-outline-secondary" th:href="@{|/production/${row.id}|}">Ver detalle</a></td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <a class="btn btn-outline-secondary" th:href="@{|/production/${row.id}|}">Detalle</a>
+                                        <a class="btn btn-outline-primary" th:href="@{|/production/${row.id}/quality|}">Calidad</a>
+                                    </div>
+                                </td>
                             </tr>
-                            <tr th:if="${#lists.isEmpty(rows)}"><td colspan="10" class="text-center text-muted">No hay registros de producción para mostrar.</td></tr>
+                            <tr th:if="${#lists.isEmpty(rows)}"><td colspan="11" class="text-center text-muted">No hay registros de producción para mostrar.</td></tr>
                             </tbody>
                         </table>
                     </div>

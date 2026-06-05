@@ -14,6 +14,7 @@
                 </div>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-outline-secondary" onclick="window.print()">Imprimir</button>
+                    <a class="btn btn-outline-primary" th:href="@{|/production/${order.id}/quality|}">Control de calidad</a>
                     <a class="btn btn-outline-secondary" th:href="@{/production}">Volver</a>
                 </div>
             </div>
@@ -73,6 +74,43 @@
                             <div class="text-muted small">Costo unitario real</div>
                             <div class="fs-5 fw-bold" th:text="${'S/ ' + #numbers.formatDecimal(order.realUnitCost, 1, 4)}">S/ 0.0000</div>
                             <div class="small text-muted">Costo / cantidad real producida.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <strong>Control de calidad</strong>
+                    <a class="btn btn-sm btn-outline-primary" th:href="@{|/production/${order.id}/quality|}">Registrar / revisar</a>
+                </div>
+                <div class="card-body small">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <div class="text-muted">Estado de calidad</div>
+                            <span class="badge" th:classappend="${' ' + order.qualityStatus.badgeClass}" th:text="${order.qualityStatus.label}">Pendiente</span>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted">Responsable</div>
+                            <div th:text="${order.qualityCheckedBy ?: '-'}">-</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted">Fecha de revisión</div>
+                            <div th:text="${order.qualityCheckedAt != null ? #temporals.format(order.qualityCheckedAt, 'dd/MM/yyyy HH:mm') : '-'}">-</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted">Checklist</div>
+                            <div>
+                                <span th:class="${order.qualityCleaningOk ? 'text-success' : 'text-muted'}">Limpieza</span> ·
+                                <span th:class="${order.qualityPackagingOk ? 'text-success' : 'text-muted'}">Empaque</span> ·
+                                <span th:class="${order.qualityLabelingOk ? 'text-success' : 'text-muted'}">Etiqueta</span> ·
+                                <span th:class="${order.qualityProductOk ? 'text-success' : 'text-muted'}">Producto</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="text-muted">Observación de calidad</div>
+                            <div th:text="${order.qualityObservation ?: '-'}">-</div>
                         </div>
                     </div>
                 </div>

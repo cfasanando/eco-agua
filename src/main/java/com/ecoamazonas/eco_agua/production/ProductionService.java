@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -230,6 +231,73 @@ public class ProductionService {
         );
     }
 
+
+
+    @Transactional(readOnly = true)
+    public ProductionQualitySnapshot buildQualityDashboard(
+            LocalDate startDate,
+            LocalDate endDate,
+            ProductionQualityStatus selectedQualityStatus
+    ) {
+        LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
+        LocalDate effectiveStart = startDate != null ? startDate : effectiveEnd.minusDays(30);
+
+        if (effectiveEnd.isBefore(effectiveStart)) {
+            LocalDate tmp = effectiveStart;
+            effectiveStart = effectiveEnd;
+            effectiveEnd = tmp;
+        }
+
+        List<ProductionOrder> orders = productionOrderRepository.findByDateRangeAndStatus(effectiveStart, effectiveEnd, null);
+
+        long pendingOrders = 0;
+        long approvedOrders = 0;
+        long observedOrders = 0;
+        long rejectedOrders = 0;
+        List<ProductionOrder> filteredRows = new ArrayList<>();
+        List<ProductionOrder> pendingRows = new ArrayList<>();
+        List<ProductionOrder> attentionRows = new ArrayList<>();
+
+        for (ProductionOrder order : orders) {
+            ProductionQualityStatus qualityStatus = order.getQualityStatus();
+
+            if (qualityStatus == ProductionQualityStatus.APPROVED) {
+                approvedOrders++;
+            } else if (qualityStatus == ProductionQualityStatus.OBSERVED) {
+                observedOrders++;
+            } else if (qualityStatus == ProductionQualityStatus.REJECTED) {
+                rejectedOrders++;
+            } else {
+                pendingOrders++;
+            }
+
+            if (selectedQualityStatus == null || selectedQualityStatus == qualityStatus) {
+                filteredRows.add(order);
+            }
+
+            if (qualityStatus == ProductionQualityStatus.PENDING && pendingRows.size() < 8) {
+                pendingRows.add(order);
+            }
+
+            if ((qualityStatus == ProductionQualityStatus.OBSERVED || qualityStatus == ProductionQualityStatus.REJECTED)
+                    && attentionRows.size() < 8) {
+                attentionRows.add(order);
+            }
+        }
+
+        ProductionQualitySummary summary = new ProductionQualitySummary(
+                effectiveStart,
+                effectiveEnd,
+                orders.size(),
+                pendingOrders,
+                approvedOrders,
+                observedOrders,
+                rejectedOrders
+        );
+
+        return new ProductionQualitySnapshot(summary, filteredRows, pendingRows, attentionRows);
+    }
+
     @Transactional(readOnly = true)
     public ProductionOrder findDetailedById(Long id) {
         return productionOrderRepository.findDetailedById(id)
@@ -365,6 +433,33 @@ public class ProductionService {
 
         order.setTotalInputCost(totalInputCost.setScale(2, RoundingMode.HALF_UP));
         order.refreshBatchCostFields();
+
+        return productionOrderRepository.save(order);
+    }
+
+
+
+    @Transactional
+    public ProductionOrder updateQualityControl(
+            Long productionOrderId,
+            ProductionQualityStatus qualityStatus,
+            boolean qualityCleaningOk,
+            boolean qualityPackagingOk,
+            boolean qualityLabelingOk,
+            boolean qualityProductOk,
+            String qualityCheckedBy,
+            String qualityObservation
+    ) {
+        ProductionOrder order = findDetailedById(productionOrderId);
+
+        order.setQualityStatus(qualityStatus != null ? qualityStatus : ProductionQualityStatus.PENDING);
+        order.setQualityCleaningOk(qualityCleaningOk);
+        order.setQualityPackagingOk(qualityPackagingOk);
+        order.setQualityLabelingOk(qualityLabelingOk);
+        order.setQualityProductOk(qualityProductOk);
+        order.setQualityCheckedBy(clean(qualityCheckedBy));
+        order.setQualityObservation(clean(qualityObservation));
+        order.setQualityCheckedAt(LocalDateTime.now());
 
         return productionOrderRepository.save(order);
     }

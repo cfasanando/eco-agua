@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -68,6 +69,12 @@ public class ProductionOrder {
 
     @Column(name = "quality_observation", length = 500)
     private String qualityObservation;
+
+    @Column(name = "expiry_date")
+    private LocalDate expiryDate;
+
+    @Column(name = "expiry_observation", length = 255)
+    private String expiryObservation;
 
     @Column(name = "observation", length = 255)
     private String observation;
@@ -137,6 +144,19 @@ public class ProductionOrder {
         return loss.multiply(BigDecimal.valueOf(100)).divide(quantityExpected, 2, RoundingMode.HALF_UP);
     }
 
+    @Transient
+    public ProductionExpiryStatus getExpiryStatus() {
+        return ProductionExpiryStatus.fromDate(expiryDate, LocalDate.now());
+    }
+
+    @Transient
+    public Long getExpiryDaysRemaining() {
+        if (expiryDate == null) {
+            return null;
+        }
+        return ChronoUnit.DAYS.between(LocalDate.now(), expiryDate);
+    }
+
     public void refreshBatchCostFields() {
         normalizeQuantitiesAndCosts();
     }
@@ -193,6 +213,8 @@ public class ProductionOrder {
     public boolean isQualityLabelingOk() { return qualityLabelingOk; }
     public boolean isQualityProductOk() { return qualityProductOk; }
     public String getQualityObservation() { return qualityObservation; }
+    public LocalDate getExpiryDate() { return expiryDate; }
+    public String getExpiryObservation() { return expiryObservation; }
     public String getObservation() { return observation; }
     public String getLossReason() { return lossReason; }
     public BigDecimal getTotalInputCost() { return totalInputCost; }
@@ -219,6 +241,8 @@ public class ProductionOrder {
     public void setQualityLabelingOk(boolean qualityLabelingOk) { this.qualityLabelingOk = qualityLabelingOk; }
     public void setQualityProductOk(boolean qualityProductOk) { this.qualityProductOk = qualityProductOk; }
     public void setQualityObservation(String qualityObservation) { this.qualityObservation = qualityObservation; }
+    public void setExpiryDate(LocalDate expiryDate) { this.expiryDate = expiryDate; }
+    public void setExpiryObservation(String expiryObservation) { this.expiryObservation = expiryObservation; }
     public void setObservation(String observation) { this.observation = observation; }
     public void setLossReason(String lossReason) { this.lossReason = lossReason; }
     public void setTotalInputCost(BigDecimal totalInputCost) { this.totalInputCost = totalInputCost; }

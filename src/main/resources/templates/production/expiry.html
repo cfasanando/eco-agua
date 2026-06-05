@@ -1,30 +1,29 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/head_admin :: adminHead('Trazabilidad de producción - Eco Agua')"></head>
+<head th:replace="fragments/head_admin :: adminHead('Vencimientos de producción - Eco Agua')"></head>
 <body>
-<div class="app-layout" th:with="activePage='production_traceability'">
+<div class="app-layout" th:with="activePage='production_expiry'">
     <aside th:replace="fragments/sidebar :: sidebar"></aside>
     <div class="main-content">
         <header th:replace="fragments/topbar :: topbar"></header>
         <main class="content-wrapper">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
-                    <h1 class="h5 mb-1">Trazabilidad de producción</h1>
-                    <div class="text-muted small">Seguimiento interno por lote, producto, estado de producción y control de calidad.</div>
+                    <h1 class="h5 mb-1">Vencimientos y alertas de lote</h1>
+                    <div class="text-muted small">Control interno de fechas de revisión o vencimiento por lote producido.</div>
                 </div>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-outline-secondary" onclick="window.print()">Imprimir</button>
+                    <a class="btn btn-outline-secondary" th:href="@{/production/traceability(startDate=${startDate}, endDate=${endDate})}">Trazabilidad</a>
                     <a class="btn btn-outline-secondary" th:href="@{/production/overview(startDate=${startDate}, endDate=${endDate})}">Resumen</a>
-                    <a class="btn btn-outline-secondary" th:href="@{/production/reports(startDate=${startDate}, endDate=${endDate})}">Reporte</a>
-                    <a class="btn btn-outline-secondary" th:href="@{/production/quality(startDate=${startDate}, endDate=${endDate})}">Calidad</a>
-                    <a class="btn btn-outline-secondary" th:href="@{/production/expiry(startDate=${startDate}, endDate=${endDate}, productId=${selectedProductId}, batchCode=${selectedBatchCode}, status=${selectedStatus})}">Vencimientos</a>
                     <a class="btn btn-primary" th:href="@{/production/new}">Nueva producción</a>
                 </div>
             </div>
 
             <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light"><strong>Filtros</strong></div>
                 <div class="card-body">
-                    <form class="row g-2 align-items-end" th:action="@{/production/traceability}" method="get">
+                    <form class="row g-2 align-items-end" th:action="@{/production/expiry}" method="get">
                         <div class="col-md-2">
                             <label class="form-label">Desde</label>
                             <input type="date" class="form-control" name="startDate" th:value="${startDate}">
@@ -45,7 +44,7 @@
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Lote</label>
-                            <input type="text" class="form-control" name="batchCode" placeholder="Código de lote" th:value="${selectedBatchCode}">
+                            <input type="text" class="form-control" name="batchCode" placeholder="Código" th:value="${selectedBatchCode}">
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Producción</label>
@@ -58,12 +57,12 @@
                             </select>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label">Calidad</label>
-                            <select class="form-select" name="qualityStatus">
-                                <option value="">Todas</option>
-                                <option th:each="statusItem : ${qualityStatuses}"
+                            <label class="form-label">Vencimiento</label>
+                            <select class="form-select" name="expiryStatus">
+                                <option value="">Todos</option>
+                                <option th:each="statusItem : ${expiryStatuses}"
                                         th:value="${statusItem}"
-                                        th:selected="${selectedQualityStatus != null and selectedQualityStatus == statusItem}"
+                                        th:selected="${selectedExpiryStatus != null and selectedExpiryStatus == statusItem}"
                                         th:text="${statusItem.label}">Estado</option>
                             </select>
                         </div>
@@ -78,36 +77,36 @@
                 <div class="col-md-6 col-xl-3">
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
-                            <div class="text-muted small">Órdenes encontradas</div>
+                            <div class="text-muted small">Lotes filtrados</div>
                             <div class="fs-4 fw-bold" th:text="${snapshot.summary.totalOrders}">0</div>
-                            <div class="small text-muted">Según filtros seleccionados.</div>
+                            <div class="small text-muted">Según periodo y filtros.</div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-6 col-xl-3">
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
-                            <div class="text-muted small">Producción real</div>
-                            <div class="fs-4 fw-bold" th:text="${#numbers.formatDecimal(snapshot.summary.quantityProduced, 1, 2)}">0.00</div>
-                            <div class="small text-muted">Cantidad confirmada producida.</div>
+                            <div class="text-muted small">Por vencer</div>
+                            <div class="fs-4 fw-bold text-warning" th:text="${snapshot.summary.expiringSoonOrders}">0</div>
+                            <div class="small text-muted">Dentro de los próximos 7 días.</div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-6 col-xl-3">
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
-                            <div class="text-muted small">Merma total</div>
-                            <div class="fs-4 fw-bold text-danger" th:text="${#numbers.formatDecimal(snapshot.summary.quantityLoss, 1, 2)}">0.00</div>
-                            <div class="small text-muted">Tasa: <span th:text="${#numbers.formatDecimal(snapshot.summary.lossRatePercent, 1, 2) + '%'}">0.00%</span></div>
+                            <div class="text-muted small">Vencidos</div>
+                            <div class="fs-4 fw-bold text-danger" th:text="${snapshot.summary.expiredOrders}">0</div>
+                            <div class="small text-muted">Requieren revisión inmediata.</div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-6 col-xl-3">
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
-                            <div class="text-muted small">Calidad por atender</div>
-                            <div class="fs-4 fw-bold text-warning" th:text="${snapshot.summary.pendingQualityOrders + snapshot.summary.attentionQualityOrders}">0</div>
-                            <div class="small text-muted">Pendientes, observadas o rechazadas.</div>
+                            <div class="text-muted small">Sin fecha</div>
+                            <div class="fs-4 fw-bold text-secondary" th:text="${snapshot.summary.noExpiryDate}">0</div>
+                            <div class="small text-muted">Lotes sin control de fecha.</div>
                         </div>
                     </div>
                 </div>
@@ -116,24 +115,24 @@
             <div class="row g-3 mb-3">
                 <div class="col-xl-6">
                     <div class="card shadow-sm h-100">
-                        <div class="card-header bg-light"><strong>Alertas de calidad</strong></div>
+                        <div class="card-header bg-light"><strong>Alertas por vencer</strong></div>
                         <div class="card-body">
                             <div class="list-group list-group-flush">
-                                <div class="list-group-item px-0" th:each="order : ${snapshot.qualityAttentionRows}">
+                                <div class="list-group-item px-0" th:each="order : ${snapshot.expiringSoonRows}">
                                     <div class="d-flex justify-content-between gap-2">
                                         <div>
                                             <strong th:text="${order.product != null ? order.product.name : 'Producto #' + order.productId}">Producto</strong>
                                             <div class="small text-muted">
-                                                <span th:text="${#temporals.format(order.productionDate, 'dd/MM/yyyy')}">-</span>
-                                                · Lote: <span th:text="${order.batchCode ?: '-'}">-</span>
-                                                · <span th:text="${order.qualityObservation ?: 'Sin observación'}">Observación</span>
+                                                Lote: <span th:text="${order.batchCode ?: '-'}">-</span>
+                                                · vence: <span th:text="${order.expiryDate != null ? #temporals.format(order.expiryDate, 'dd/MM/yyyy') : '-'}">-</span>
+                                                · días: <span th:text="${order.expiryDaysRemaining != null ? order.expiryDaysRemaining : '-'}">-</span>
                                             </div>
                                         </div>
-                                        <span class="badge align-self-start" th:classappend="${' ' + order.qualityStatus.badgeClass}" th:text="${order.qualityStatus.label}">Estado</span>
+                                        <a class="btn btn-sm btn-outline-secondary" th:href="@{|/production/${order.id}/sheet|}">Ficha</a>
                                     </div>
                                 </div>
-                                <div class="text-center text-muted py-3" th:if="${#lists.isEmpty(snapshot.qualityAttentionRows)}">
-                                    No hay producciones observadas o rechazadas con los filtros actuales.
+                                <div class="text-center text-muted py-3" th:if="${#lists.isEmpty(snapshot.expiringSoonRows)}">
+                                    No hay lotes por vencer con los filtros actuales.
                                 </div>
                             </div>
                         </div>
@@ -142,24 +141,24 @@
 
                 <div class="col-xl-6">
                     <div class="card shadow-sm h-100">
-                        <div class="card-header bg-light"><strong>Últimas producciones confirmadas</strong></div>
+                        <div class="card-header bg-light"><strong>Vencidos</strong></div>
                         <div class="card-body">
                             <div class="list-group list-group-flush">
-                                <div class="list-group-item px-0" th:each="order : ${snapshot.latestConfirmedRows}">
+                                <div class="list-group-item px-0" th:each="order : ${snapshot.expiredRows}">
                                     <div class="d-flex justify-content-between gap-2">
                                         <div>
                                             <strong th:text="${order.product != null ? order.product.name : 'Producto #' + order.productId}">Producto</strong>
                                             <div class="small text-muted">
-                                                <span th:text="${#temporals.format(order.productionDate, 'dd/MM/yyyy')}">-</span>
-                                                · Lote: <span th:text="${order.batchCode ?: '-'}">-</span>
-                                                · Real: <span th:text="${#numbers.formatDecimal(order.quantityProduced, 1, 2)}">0.00</span>
+                                                Lote: <span th:text="${order.batchCode ?: '-'}">-</span>
+                                                · venció: <span th:text="${order.expiryDate != null ? #temporals.format(order.expiryDate, 'dd/MM/yyyy') : '-'}">-</span>
+                                                · días: <span th:text="${order.expiryDaysRemaining != null ? order.expiryDaysRemaining : '-'}">-</span>
                                             </div>
                                         </div>
-                                        <a class="btn btn-sm btn-outline-secondary" th:href="@{|/production/${order.id}/sheet|}">Ficha</a>
+                                        <a class="btn btn-sm btn-outline-danger" th:href="@{|/production/${order.id}|}">Revisar</a>
                                     </div>
                                 </div>
-                                <div class="text-center text-muted py-3" th:if="${#lists.isEmpty(snapshot.latestConfirmedRows)}">
-                                    No hay producciones confirmadas con los filtros actuales.
+                                <div class="text-center text-muted py-3" th:if="${#lists.isEmpty(snapshot.expiredRows)}">
+                                    No hay lotes vencidos con los filtros actuales.
                                 </div>
                             </div>
                         </div>
@@ -169,7 +168,7 @@
 
             <div class="card shadow-sm">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <strong>Seguimiento por lote</strong>
+                    <strong>Vencimiento por lote</strong>
                     <span class="small text-muted" th:text="${#temporals.format(startDate, 'dd/MM/yyyy') + ' - ' + #temporals.format(endDate, 'dd/MM/yyyy')}">Periodo</span>
                 </div>
                 <div class="card-body">
@@ -177,45 +176,36 @@
                         <table class="table table-sm align-middle">
                             <thead class="table-light">
                             <tr>
-                                <th>Fecha</th>
+                                <th>Producción</th>
                                 <th>Lote</th>
                                 <th>Producto</th>
-                                <th>Producción</th>
-                                <th>Calidad</th>
-                                <th>Vencimiento</th>
-                                <th class="text-end">Esperada</th>
-                                <th class="text-end">Real</th>
-                                <th class="text-end">Merma</th>
-                                <th>Responsable calidad</th>
+                                <th>Fecha producción</th>
+                                <th>Vencimiento / revisión</th>
+                                <th>Días</th>
+                                <th>Estado</th>
+                                <th>Observación</th>
                                 <th class="text-center">Acciones</th>
                             </tr>
                             </thead>
                             <tbody>
                             <tr th:each="row : ${snapshot.rows}">
-                                <td th:text="${#temporals.format(row.productionDate, 'dd/MM/yyyy')}">-</td>
+                                <td th:text="${'#' + row.id}">#</td>
                                 <td th:text="${row.batchCode ?: '-'}">-</td>
                                 <td th:text="${row.product != null ? row.product.name : 'Producto #' + row.productId}">Producto</td>
-                                <td>
-                                    <span class="badge" th:classappend="${row.status.name() == 'CONFIRMED'} ? ' bg-success' : (${row.status.name() == 'DRAFT'} ? ' bg-warning text-dark' : ' bg-secondary')" th:text="${row.status}">DRAFT</span>
-                                </td>
-                                <td>
-                                    <span class="badge" th:classappend="${' ' + row.qualityStatus.badgeClass}" th:text="${row.qualityStatus.label}">Pendiente</span>
-                                </td>
-                                <td class="text-end" th:text="${#numbers.formatDecimal(row.quantityExpected, 1, 2)}">0.00</td>
-                                <td class="text-end" th:text="${#numbers.formatDecimal(row.quantityProduced, 1, 2)}">0.00</td>
-                                <td class="text-end" th:classappend="${row.quantityLoss != null and row.quantityLoss.compareTo(T(java.math.BigDecimal).ZERO) > 0 ? ' text-danger fw-semibold' : ''}" th:text="${#numbers.formatDecimal(row.quantityLoss, 1, 2)}">0.00</td>
-                                <td th:text="${row.qualityCheckedBy ?: '-'}">-</td>
+                                <td th:text="${#temporals.format(row.productionDate, 'dd/MM/yyyy')}">-</td>
+                                <td th:text="${row.expiryDate != null ? #temporals.format(row.expiryDate, 'dd/MM/yyyy') : '-'}">-</td>
+                                <td th:text="${row.expiryDaysRemaining != null ? row.expiryDaysRemaining : '-'}">-</td>
+                                <td><span class="badge" th:classappend="${' ' + row.expiryStatus.badgeClass}" th:text="${row.expiryStatus.label}">Estado</span></td>
+                                <td th:text="${row.expiryObservation ?: '-'}">-</td>
                                 <td class="text-center">
                                     <div class="btn-group btn-group-sm">
                                         <a class="btn btn-outline-secondary" th:href="@{|/production/${row.id}|}">Ver</a>
                                         <a class="btn btn-outline-secondary" th:href="@{|/production/${row.id}/sheet|}">Ficha</a>
-                                        <a class="btn btn-outline-primary" th:href="@{|/production/${row.id}/quality|}">Calidad</a>
-                                        <a class="btn btn-outline-secondary" th:href="@{/production/expiry(batchCode=${row.batchCode})}">Vence</a>
                                     </div>
                                 </td>
                             </tr>
                             <tr th:if="${#lists.isEmpty(snapshot.rows)}">
-                                <td colspan="11" class="text-center text-muted">No hay producciones para mostrar con los filtros seleccionados.</td>
+                                <td colspan="9" class="text-center text-muted py-3">No hay lotes para mostrar con los filtros seleccionados.</td>
                             </tr>
                             </tbody>
                         </table>

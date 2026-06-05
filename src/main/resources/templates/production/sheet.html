@@ -64,6 +64,8 @@
                             <div class="row mb-2"><div class="col-5 text-muted">Lote interno</div><div class="col-7 fw-semibold" th:text="${order.batchCode ?: '-'}">-</div></div>
                             <div class="row mb-2"><div class="col-5 text-muted">Producto terminado</div><div class="col-7 fw-semibold" th:text="${order.product != null ? order.product.name : 'Producto #' + order.productId}">Producto</div></div>
                             <div class="row mb-2"><div class="col-5 text-muted">Estado producción</div><div class="col-7"><span class="badge" th:classappend="${order.status.name() == 'CONFIRMED'} ? ' bg-success' : (${order.status.name() == 'DRAFT'} ? ' bg-warning text-dark' : ' bg-secondary')" th:text="${order.status}">DRAFT</span></div></div>
+                            <div class="row mb-2"><div class="col-5 text-muted">Vencimiento / revisión</div><div class="col-7 fw-semibold" th:text="${order.expiryDate != null ? #temporals.format(order.expiryDate, 'dd/MM/yyyy') : '-'}">-</div></div>
+                            <div class="row mb-2"><div class="col-5 text-muted">Estado vencimiento</div><div class="col-7"><span class="badge" th:classappend="${' ' + order.expiryStatus.badgeClass}" th:text="${order.expiryStatus.label}">Estado</span></div></div>
                             <div class="row mb-0"><div class="col-5 text-muted">Registrado</div><div class="col-7" th:text="${order.createdAt != null ? #temporals.format(order.createdAt, 'dd/MM/yyyy HH:mm') : '-'}">-</div></div>
                         </div>
                     </div>
@@ -167,7 +169,8 @@
                 <div class="card-header bg-light"><strong>Observaciones</strong></div>
                 <div class="card-body small">
                     <p class="mb-2"><strong>Observación de producción:</strong> <span th:text="${order.observation ?: '-'}">-</span></p>
-                    <p class="mb-0"><strong>Motivo de merma:</strong> <span th:text="${order.lossReason ?: '-'}">-</span></p>
+                    <p class="mb-2"><strong>Motivo de merma:</strong> <span th:text="${order.lossReason ?: '-'}">-</span></p>
+                    <p class="mb-0"><strong>Observación de vencimiento:</strong> <span th:text="${order.expiryObservation ?: '-'}">-</span></p>
                 </div>
             </div>
 

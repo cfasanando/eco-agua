@@ -353,6 +353,108 @@ public class ProductionService {
     }
 
     @Transactional(readOnly = true)
+    public ProductionExpirySnapshot buildExpiryDashboard(
+            LocalDate startDate,
+            LocalDate endDate,
+            Long productId,
+            String batchCode,
+            ProductionStatus selectedStatus,
+            ProductionExpiryStatus selectedExpiryStatus
+    ) {
+        LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
+        LocalDate effectiveStart = startDate != null ? startDate : effectiveEnd.minusDays(30);
+
+        if (effectiveEnd.isBefore(effectiveStart)) {
+            LocalDate tmp = effectiveStart;
+            effectiveStart = effectiveEnd;
+            effectiveEnd = tmp;
+        }
+
+        String normalizedBatch = clean(batchCode);
+        String normalizedBatchLower = normalizedBatch != null ? normalizedBatch.toLowerCase() : null;
+        LocalDate today = LocalDate.now();
+
+        List<ProductionOrder> sourceRows = productionOrderRepository.findByDateRangeAndStatus(
+                effectiveStart,
+                effectiveEnd,
+                selectedStatus
+        );
+
+        List<ProductionOrder> filteredRows = new ArrayList<>();
+        List<ProductionOrder> expiredRows = new ArrayList<>();
+        List<ProductionOrder> expiringSoonRows = new ArrayList<>();
+        List<ProductionOrder> noDateRows = new ArrayList<>();
+
+        long withExpiryDate = 0;
+        long noExpiryDate = 0;
+        long validOrders = 0;
+        long expiringSoonOrders = 0;
+        long expiredOrders = 0;
+
+        for (ProductionOrder order : sourceRows) {
+            if (productId != null && !productId.equals(order.getProductId())) {
+                continue;
+            }
+
+            if (normalizedBatchLower != null) {
+                String orderBatch = order.getBatchCode() != null ? order.getBatchCode().toLowerCase() : "";
+                if (!orderBatch.contains(normalizedBatchLower)) {
+                    continue;
+                }
+            }
+
+            ProductionExpiryStatus expiryStatus = ProductionExpiryStatus.fromDate(order.getExpiryDate(), today);
+            if (selectedExpiryStatus != null && selectedExpiryStatus != expiryStatus) {
+                continue;
+            }
+
+            filteredRows.add(order);
+
+            if (order.getExpiryDate() == null) {
+                noExpiryDate++;
+                if (noDateRows.size() < 8) {
+                    noDateRows.add(order);
+                }
+            } else {
+                withExpiryDate++;
+            }
+
+            if (expiryStatus == ProductionExpiryStatus.EXPIRED) {
+                expiredOrders++;
+                if (expiredRows.size() < 8) {
+                    expiredRows.add(order);
+                }
+            } else if (expiryStatus == ProductionExpiryStatus.EXPIRING_SOON) {
+                expiringSoonOrders++;
+                if (expiringSoonRows.size() < 8) {
+                    expiringSoonRows.add(order);
+                }
+            } else if (expiryStatus == ProductionExpiryStatus.VALID) {
+                validOrders++;
+            }
+        }
+
+        ProductionExpirySummary summary = new ProductionExpirySummary(
+                effectiveStart,
+                effectiveEnd,
+                filteredRows.size(),
+                withExpiryDate,
+                noExpiryDate,
+                validOrders,
+                expiringSoonOrders,
+                expiredOrders
+        );
+
+        return new ProductionExpirySnapshot(
+                summary,
+                filteredRows,
+                expiredRows,
+                expiringSoonRows,
+                noDateRows
+        );
+    }
+
+    @Transactional(readOnly = true)
     public ProductionQualitySnapshot buildQualityDashboard(
             LocalDate startDate,
             LocalDate endDate,
@@ -489,6 +591,8 @@ public class ProductionService {
                 null,
                 quantityProduced,
                 null,
+                null,
+                null,
                 observation,
                 null,
                 supplyIds,
@@ -503,6 +607,8 @@ public class ProductionService {
             BigDecimal quantityExpected,
             BigDecimal quantityProduced,
             String batchCode,
+            LocalDate expiryDate,
+            String expiryObservation,
             String observation,
             String lossReason,
             List<Long> supplyIds,
@@ -527,6 +633,8 @@ public class ProductionService {
         ProductionOrder order = new ProductionOrder();
         order.setProductionDate(productionDate != null ? productionDate : LocalDate.now());
         order.setBatchCode(clean(batchCode));
+        order.setExpiryDate(expiryDate);
+        order.setExpiryObservation(clean(expiryObservation));
         order.setProduct(product);
         order.setQuantityExpected(effectiveExpectedQuantity);
         order.setQuantityProduced(effectiveProducedQuantity);

@@ -17,6 +17,7 @@
                     <a class="btn btn-outline-secondary" th:href="@{|/production/${order.id}/sheet|}">Ficha imprimible</a>
                     <a class="btn btn-outline-primary" th:href="@{|/production/${order.id}/quality|}">Control de calidad</a>
                     <a class="btn btn-outline-secondary" th:href="@{/production/traceability(batchCode=${order.batchCode})}">Trazabilidad</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/production/expiry(batchCode=${order.batchCode})}">Vencimiento</a>
                     <a class="btn btn-outline-secondary" th:href="@{/production}">Volver</a>
                 </div>
             </div>
@@ -33,6 +34,9 @@
                             <p class="mb-1"><strong>Lote:</strong> <span th:text="${order.batchCode ?: '-'}">-</span></p>
                             <p class="mb-1"><strong>Producto:</strong> <span th:text="${order.product != null ? order.product.name : '-'}">-</span></p>
                             <p class="mb-1"><strong>Estado:</strong> <span th:text="${order.status}">DRAFT</span></p>
+                            <p class="mb-1"><strong>Vencimiento / revisión:</strong> <span th:text="${order.expiryDate != null ? #temporals.format(order.expiryDate, 'dd/MM/yyyy') : '-'}">-</span></p>
+                            <p class="mb-1"><strong>Estado vencimiento:</strong> <span class="badge" th:classappend="${' ' + order.expiryStatus.badgeClass}" th:text="${order.expiryStatus.label}">Estado</span></p>
+                            <p class="mb-1"><strong>Observación vencimiento:</strong> <span th:text="${order.expiryObservation ?: '-'}">-</span></p>
                             <p class="mb-1"><strong>Observación:</strong> <span th:text="${order.observation ?: '-'}">-</span></p>
                             <p class="mb-0"><strong>Motivo de merma:</strong> <span th:text="${order.lossReason ?: '-'}">-</span></p>
                         </div>

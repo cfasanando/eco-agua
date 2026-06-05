@@ -92,6 +92,9 @@ public class ProductionController {
             @RequestParam(value = "quantityExpected", required = false) BigDecimal quantityExpected,
             @RequestParam("quantityProduced") BigDecimal quantityProduced,
             @RequestParam(value = "batchCode", required = false) String batchCode,
+            @RequestParam(value = "expiryDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate expiryDate,
+            @RequestParam(value = "expiryObservation", required = false) String expiryObservation,
             @RequestParam(value = "observation", required = false) String observation,
             @RequestParam(value = "lossReason", required = false) String lossReason,
             @RequestParam(value = "supplyId", required = false) List<Long> supplyIds,
@@ -105,6 +108,8 @@ public class ProductionController {
                     quantityExpected,
                     quantityProduced,
                     batchCode,
+                    expiryDate,
+                    expiryObservation,
                     observation,
                     lossReason,
                     supplyIds,
@@ -179,6 +184,45 @@ public class ProductionController {
         model.addAttribute("endDate", snapshot.getSummary().getEndDate());
 
         return "production/reports";
+    }
+
+    @GetMapping("/expiry")
+    public String expiryDashboard(
+            @RequestParam(value = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(value = "productId", required = false) Long productId,
+            @RequestParam(value = "batchCode", required = false) String batchCode,
+            @RequestParam(value = "status", required = false) ProductionStatus status,
+            @RequestParam(value = "expiryStatus", required = false) ProductionExpiryStatus expiryStatus,
+            Model model
+    ) {
+        LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
+        LocalDate effectiveStart = startDate != null ? startDate : effectiveEnd.minusDays(30);
+
+        ProductionExpirySnapshot snapshot = productionService.buildExpiryDashboard(
+                effectiveStart,
+                effectiveEnd,
+                productId,
+                batchCode,
+                status,
+                expiryStatus
+        );
+
+        model.addAttribute("activePage", "production_expiry");
+        model.addAttribute("snapshot", snapshot);
+        model.addAttribute("startDate", snapshot.getSummary().getStartDate());
+        model.addAttribute("endDate", snapshot.getSummary().getEndDate());
+        model.addAttribute("selectedProductId", productId);
+        model.addAttribute("selectedBatchCode", batchCode);
+        model.addAttribute("selectedStatus", status);
+        model.addAttribute("selectedExpiryStatus", expiryStatus);
+        model.addAttribute("statuses", ProductionStatus.values());
+        model.addAttribute("expiryStatuses", ProductionExpiryStatus.values());
+        model.addAttribute("products", productionService.findActiveProducts());
+
+        return "production/expiry";
     }
 
     @GetMapping("/quality")

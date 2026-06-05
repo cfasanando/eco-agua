@@ -618,6 +618,152 @@ public class ProductionService {
         return new ProductionPlanningSnapshot(summary, rows);
     }
 
+
+    @Transactional(readOnly = true)
+    public ProductionCapacitySnapshot buildCapacityOverview() {
+        List<Product> products = productRepository.findByActiveTrueOrderByNameAsc();
+        List<ProductionCapacityProductRow> rows = new ArrayList<>();
+        List<ProductionCapacityProductRow> blockedRows = new ArrayList<>();
+        List<ProductionCapacityProductRow> missingRecipeRows = new ArrayList<>();
+
+        int productsWithRecipe = 0;
+        int productsWithoutRecipe = 0;
+        int producibleProducts = 0;
+        int blockedProducts = 0;
+        BigDecimal totalMaximumProducibleQuantity = BigDecimal.ZERO;
+        BigDecimal totalEstimatedUnitCost = BigDecimal.ZERO;
+
+        for (Product product : products) {
+            BigDecimal productStock = product.getStock() != null ? product.getStock() : BigDecimal.ZERO;
+            BigDecimal estimatedUnitCost = BigDecimal.ZERO;
+            BigDecimal maximumProducibleQuantity = null;
+            String limitingSupplyName = null;
+            String limitingSupplyUnit = null;
+            BigDecimal limitingQuantityPerUnit = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+            BigDecimal limitingAvailableQuantity = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+            int supplyCount = 0;
+            int blockedSupplyCount = 0;
+
+            List<ProductSupply> compositionRows = product.getSuppliesComposition() != null
+                    ? product.getSuppliesComposition()
+                    : List.of();
+
+            for (ProductSupply composition : compositionRows) {
+                if (composition == null || composition.getSupply() == null) {
+                    continue;
+                }
+
+                BigDecimal quantityPerUnit = composition.getQuantityUsed() != null
+                        ? composition.getQuantityUsed()
+                        : BigDecimal.ZERO;
+
+                if (quantityPerUnit.compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+
+                Supply supply = composition.getSupply();
+                supplyCount++;
+
+                BigDecimal availableQuantity = supply.getStock() != null ? supply.getStock() : BigDecimal.ZERO;
+                BigDecimal unitCost = supply.getUnitCost() != null
+                        ? supply.getUnitCost()
+                        : BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP);
+
+                estimatedUnitCost = estimatedUnitCost.add(quantityPerUnit.multiply(unitCost));
+
+                BigDecimal lineCapacity = availableQuantity.divide(quantityPerUnit, 2, RoundingMode.DOWN);
+                if (lineCapacity.compareTo(BigDecimal.ZERO) <= 0) {
+                    blockedSupplyCount++;
+                }
+
+                if (maximumProducibleQuantity == null || lineCapacity.compareTo(maximumProducibleQuantity) < 0) {
+                    maximumProducibleQuantity = lineCapacity;
+                    limitingSupplyName = supply.getName();
+                    limitingSupplyUnit = supply.getUnit();
+                    limitingQuantityPerUnit = quantityPerUnit.setScale(4, RoundingMode.HALF_UP);
+                    limitingAvailableQuantity = availableQuantity.setScale(4, RoundingMode.HALF_UP);
+                }
+            }
+
+            boolean hasRecipe = supplyCount > 0;
+            if (!hasRecipe) {
+                productsWithoutRecipe++;
+                maximumProducibleQuantity = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            } else {
+                productsWithRecipe++;
+                totalEstimatedUnitCost = totalEstimatedUnitCost.add(estimatedUnitCost);
+                if (maximumProducibleQuantity == null) {
+                    maximumProducibleQuantity = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                }
+            }
+
+            ProductionCapacityProductRow row = new ProductionCapacityProductRow(
+                    product.getId(),
+                    product.getName(),
+                    productStock.setScale(2, RoundingMode.HALF_UP),
+                    hasRecipe,
+                    supplyCount,
+                    blockedSupplyCount,
+                    limitingSupplyName,
+                    limitingSupplyUnit,
+                    limitingQuantityPerUnit,
+                    limitingAvailableQuantity,
+                    maximumProducibleQuantity.setScale(2, RoundingMode.HALF_UP),
+                    estimatedUnitCost.setScale(4, RoundingMode.HALF_UP)
+            );
+
+            if (row.isCanProduce()) {
+                producibleProducts++;
+                totalMaximumProducibleQuantity = totalMaximumProducibleQuantity.add(row.getMaximumProducibleQuantity());
+            } else if (hasRecipe) {
+                blockedProducts++;
+                blockedRows.add(row);
+            } else {
+                missingRecipeRows.add(row);
+            }
+
+            rows.add(row);
+        }
+
+        rows.sort((left, right) -> {
+            int byRecipe = Boolean.compare(right.isHasRecipe(), left.isHasRecipe());
+            if (byRecipe != 0) {
+                return byRecipe;
+            }
+
+            int byCapacity = Boolean.compare(right.isCanProduce(), left.isCanProduce());
+            if (byCapacity != 0) {
+                return byCapacity;
+            }
+
+            String leftName = left.getProductName() != null ? left.getProductName() : "";
+            String rightName = right.getProductName() != null ? right.getProductName() : "";
+            return leftName.compareToIgnoreCase(rightName);
+        });
+
+        blockedRows.sort(Comparator
+                .comparing(ProductionCapacityProductRow::getProductName, Comparator.nullsLast(String::compareToIgnoreCase)));
+        missingRecipeRows.sort(Comparator
+                .comparing(ProductionCapacityProductRow::getProductName, Comparator.nullsLast(String::compareToIgnoreCase)));
+
+        BigDecimal averageEstimatedUnitCost = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+        if (productsWithRecipe > 0) {
+            averageEstimatedUnitCost = totalEstimatedUnitCost.divide(BigDecimal.valueOf(productsWithRecipe), 4, RoundingMode.HALF_UP);
+        }
+
+        ProductionCapacitySummary summary = new ProductionCapacitySummary(
+                products.size(),
+                productsWithRecipe,
+                productsWithoutRecipe,
+                producibleProducts,
+                blockedProducts,
+                totalMaximumProducibleQuantity.setScale(2, RoundingMode.HALF_UP),
+                averageEstimatedUnitCost
+        );
+
+        return new ProductionCapacitySnapshot(summary, rows, blockedRows, missingRecipeRows);
+    }
+
     @Transactional(readOnly = true)
     public ProductionOrder findDetailedById(Long id) {
         return productionOrderRepository.findDetailedById(id)

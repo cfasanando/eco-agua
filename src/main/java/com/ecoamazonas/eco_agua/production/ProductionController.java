@@ -107,6 +107,17 @@ public class ProductionController {
         return "production/planning";
     }
 
+
+    @GetMapping("/capacity")
+    public String capacity(Model model) {
+        ProductionCapacitySnapshot snapshot = productionService.buildCapacityOverview();
+
+        model.addAttribute("activePage", "production_capacity");
+        model.addAttribute("snapshot", snapshot);
+
+        return "production/capacity";
+    }
+
     @GetMapping("/product/{productId}/recipe")
     @ResponseBody
     public List<ProductionRecipeLine> getRecipe(

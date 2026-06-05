@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Borrador de compra de insumos - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='production_purchase_draft'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Borrador de compra de insumos</h1>
+                    <div class="text-muted small">Prepara los ingresos de stock desde los faltantes de producción. No registra compras ni mueve stock hasta que confirmes cada ingreso.</div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap justify-content-end">
+                    <a class="btn btn-outline-secondary" th:href="@{/production/material-purchase-request(productId=${snapshot.summary.productId}, quantity=${snapshot.summary.plannedQuantity})}" th:if="${snapshot.summary.hasProduct}">Solicitud</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/production/material-requirements(productId=${snapshot.summary.productId}, quantity=${snapshot.summary.plannedQuantity})}" th:if="${snapshot.summary.hasProduct}">Requerimiento</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/warehouse/supplies-stock}">Stock de insumos</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/expenses/by-date}">Registrar gasto</a>
+                    <button type="button" class="btn btn-primary" onclick="window.print()" th:if="${snapshot.summary.hasProduct}">Imprimir</button>
+                </div>
+            </div>
+
+            <div class="alert alert-warning shadow-sm">
+                Este borrador es operativo: te ayuda a preparar la compra y luego ingresar el stock faltante. Si también deseas registrar el egreso, usa el módulo de gastos después de validar proveedor, comprobante y monto real.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light"><strong>Datos del borrador</strong></div>
+                <div class="card-body">
+                    <form class="row g-3 align-items-end" th:action="@{/production/material-purchase-draft}" method="get">
+                        <div class="col-md-6">
+                            <label class="form-label">Producto terminado</label>
+                            <select class="form-select" name="productId" required>
+                                <option value="">Seleccione producto</option>
+                                <option th:each="product : ${products}"
+                                        th:value="${product.id}"
+                                        th:text="${product.name}"
+                                        th:selected="${selectedProductId != null and selectedProductId == product.id}">
+                                    Producto
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Cantidad a producir</label>
+                            <input type="number" class="form-control" name="quantity" min="0.01" step="0.01" th:value="${quantity}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-outline-primary w-100">Preparar borrador</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Producto</div>
+                            <div class="fw-bold" th:text="${snapshot.summary.productName ?: 'Sin seleccionar'}">Sin seleccionar</div>
+                            <div class="small text-muted" th:if="${snapshot.summary.hasProduct}" th:text="${'Cantidad: ' + #numbers.formatDecimal(snapshot.summary.plannedQuantity, 1, 2)}">Cantidad</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Líneas faltantes</div>
+                            <div class="fs-4 fw-bold" th:classappend="${snapshot.summary.purchaseLineCount > 0 ? ' text-danger' : ' text-success'}" th:text="${snapshot.summary.purchaseLineCount}">0</div>
+                            <div class="small text-muted">Insumos por reponer.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Cantidad total sugerida</div>
+                            <div class="fs-4 fw-bold" th:text="${#numbers.formatDecimal(snapshot.summary.totalShortageQuantity, 1, 4)}">0.0000</div>
+                            <div class="small text-muted">Suma referencial.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Costo estimado</div>
+                            <div class="fs-4 fw-bold" th:text="${'S/ ' + #numbers.formatDecimal(snapshot.summary.totalEstimatedCost, 1, 2)}">S/ 0.00</div>
+                            <div class="small text-muted">Debe validarse con proveedor.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-info shadow-sm" th:if="${!snapshot.summary.hasProduct}">
+                Selecciona un producto y cantidad para calcular los insumos faltantes.
+            </div>
+
+            <div class="alert alert-warning shadow-sm" th:if="${snapshot.summary.hasProduct and !snapshot.summary.hasRecipe}">
+                Este producto todavía no tiene receta de insumos. Configura la receta antes de preparar una compra.
+                <a th:href="@{|/production/recipes/${snapshot.summary.productId}|}" class="alert-link">Editar receta</a>
+            </div>
+
+            <div class="alert alert-success shadow-sm" th:if="${snapshot.summary.hasProduct and snapshot.summary.hasRecipe and !snapshot.summary.hasPurchaseLines}">
+                No hay faltantes para esta cantidad. Puedes producir con el stock actual.
+            </div>
+
+            <div class="card shadow-sm" th:if="${snapshot.summary.hasPurchaseLines}">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <strong>Insumos por ingresar al stock</strong>
+                    <span class="small text-muted">Confirma cada línea solo cuando la compra real ya esté validada.</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Insumo</th>
+                                <th class="text-end">Unidad</th>
+                                <th class="text-end">Requerido</th>
+                                <th class="text-end">Disponible</th>
+                                <th class="text-end">Ingreso sugerido</th>
+                                <th class="text-end">Costo estimado</th>
+                                <th class="text-center">Acción</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row : ${snapshot.purchaseRows}">
+                                <td>
+                                    <div class="fw-semibold" th:text="${row.supplyName}">Insumo</div>
+                                    <div class="small text-muted" th:text="${'ID: ' + row.supplyId}">ID</div>
+                                </td>
+                                <td class="text-end" th:text="${row.unit ?: '-'}">unidad</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.requiredQuantity, 1, 4)}">0.0000</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.availableQuantity, 1, 4)}">0.0000</td>
+                                <td class="text-end text-danger fw-semibold" th:text="${#numbers.formatDecimal(row.shortageQuantity, 1, 4)}">0.0000</td>
+                                <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(row.estimatedCost, 1, 2)}">S/ 0.00</td>
+                                <td class="text-center">
+                                    <a class="btn btn-sm btn-success"
+                                       th:href="@{/warehouse/supplies-stock(supplyId=${row.supplyId}, quantity=${row.shortageQuantity}, observation=${'Compra sugerida por producción: ' + snapshot.summary.productName + ' x ' + snapshot.summary.plannedQuantity})}">
+                                        Preparar ingreso
+                                    </a>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="small text-muted mt-3">
+                        Al presionar <strong>Preparar ingreso</strong>, se abrirá el stock de insumos con la cantidad sugerida precargada. Revisa la cantidad real antes de guardar.
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

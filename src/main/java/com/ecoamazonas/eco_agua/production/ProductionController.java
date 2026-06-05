@@ -144,6 +144,24 @@ public class ProductionController {
     }
 
 
+    @GetMapping("/material-purchase-draft")
+    public String materialPurchaseDraft(
+            @RequestParam(value = "productId", required = false) Long productId,
+            @RequestParam(value = "quantity", required = false) BigDecimal quantity,
+            Model model
+    ) {
+        ProductionPurchaseRequestSnapshot snapshot = productionService.buildPurchaseRequest(productId, quantity);
+
+        model.addAttribute("activePage", "production_purchase_draft");
+        model.addAttribute("snapshot", snapshot);
+        model.addAttribute("products", productionService.findActiveProducts());
+        model.addAttribute("selectedProductId", productId);
+        model.addAttribute("quantity", snapshot.getSummary().getPlannedQuantity());
+
+        return "production/material_purchase_draft";
+    }
+
+
     @GetMapping("/capacity")
     public String capacity(Model model) {
         ProductionCapacitySnapshot snapshot = productionService.buildCapacityOverview();

@@ -166,6 +166,10 @@
         const inputDate = document.getElementById('assMovementDate');
         const inputObs = document.getElementById('assObservation');
 
+        const prefillSupplyId = /*[[${prefillSupplyId}]]*/ null;
+        const prefillQuantity = /*[[${prefillQuantity}]]*/ null;
+        const prefillObservation = /*[[${prefillObservation}]]*/ null;
+
         if (!window.ecoWarehouse) {
             window.ecoWarehouse = window.ecoWarehouse || {};
         }
@@ -175,29 +179,42 @@
             form.submit();
         };
 
+        function fillSupplyStockModal(button, quantity, observation) {
+            if (!button) {
+                return;
+            }
+
+            const id = button.getAttribute('data-id');
+            const name = button.getAttribute('data-name') || '';
+            const stock = button.getAttribute('data-stock') || '0.00';
+
+            adjustModal.querySelector('.modal-title').textContent =
+                'Ajustar stock: ' + name;
+
+            inputId.value = id;
+            inputName.value = name;
+            inputCurrentStock.value = stock;
+            inputQuantity.value = quantity != null ? quantity : '';
+            inputObs.value = observation != null ? observation : '';
+
+            const today = new Date().toISOString().substring(0, 10);
+            inputDate.value = today;
+            document.getElementById('assAction').value = 'IN';
+        }
+
         if (adjustModal) {
             adjustModal.addEventListener('show.bs.modal', function (event) {
-                const button = event.relatedTarget;
-                if (!button) {
-                    return;
-                }
-
-                const id = button.getAttribute('data-id');
-                const name = button.getAttribute('data-name') || '';
-                const stock = button.getAttribute('data-stock') || '0.00';
-
-                adjustModal.querySelector('.modal-title').textContent =
-                    'Ajustar stock: ' + name;
-
-                inputId.value = id;
-                inputName.value = name;
-                inputCurrentStock.value = stock;
-                inputQuantity.value = '';
-                inputObs.value = '';
-
-                const today = new Date().toISOString().substring(0, 10);
-                inputDate.value = today;
+                fillSupplyStockModal(event.relatedTarget, null, null);
             });
+
+            if (prefillSupplyId && typeof bootstrap !== 'undefined') {
+                const prefillButton = document.querySelector('[data-id="' + prefillSupplyId + '"]');
+                if (prefillButton) {
+                    fillSupplyStockModal(prefillButton, prefillQuantity, prefillObservation);
+                    const modal = new bootstrap.Modal(adjustModal);
+                    modal.show();
+                }
+            }
         }
 
         // Flash message

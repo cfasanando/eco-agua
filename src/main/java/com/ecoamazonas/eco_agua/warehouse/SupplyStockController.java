@@ -35,8 +35,16 @@ public class SupplyStockController {
     }
 
     @GetMapping
-    public String index(Model model) {
+    public String index(
+            @RequestParam(value = "supplyId", required = false) Long supplyId,
+            @RequestParam(value = "quantity", required = false) BigDecimal quantity,
+            @RequestParam(value = "observation", required = false) String observation,
+            Model model
+    ) {
         model.addAttribute("supplies", supplyService.findAll());
+        model.addAttribute("prefillSupplyId", supplyId);
+        model.addAttribute("prefillQuantity", quantity);
+        model.addAttribute("prefillObservation", observation);
         return "warehouse/supplies_stock";
     }
 

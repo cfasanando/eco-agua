@@ -9,7 +9,9 @@ public class ProductionOverviewProductRow {
     private final Long productId;
     private final String productName;
     private long orderCount;
+    private BigDecimal quantityExpected = BigDecimal.ZERO;
     private BigDecimal quantityProduced = BigDecimal.ZERO;
+    private BigDecimal quantityLoss = BigDecimal.ZERO;
     private BigDecimal inputCost = BigDecimal.ZERO;
     private LocalDate latestProductionDate;
 
@@ -24,7 +26,9 @@ public class ProductionOverviewProductRow {
         }
 
         orderCount++;
+        quantityExpected = quantityExpected.add(valueOrZero(order.getQuantityExpected()));
         quantityProduced = quantityProduced.add(valueOrZero(order.getQuantityProduced()));
+        quantityLoss = quantityLoss.add(valueOrZero(order.getQuantityLoss()));
         inputCost = inputCost.add(valueOrZero(order.getTotalInputCost()));
 
         if (order.getProductionDate() != null
@@ -45,8 +49,16 @@ public class ProductionOverviewProductRow {
         return orderCount;
     }
 
+    public BigDecimal getQuantityExpected() {
+        return quantityExpected;
+    }
+
     public BigDecimal getQuantityProduced() {
         return quantityProduced;
+    }
+
+    public BigDecimal getQuantityLoss() {
+        return quantityLoss;
     }
 
     public BigDecimal getInputCost() {
@@ -59,6 +71,14 @@ public class ProductionOverviewProductRow {
         }
 
         return inputCost.divide(quantityProduced, 4, RoundingMode.HALF_UP);
+    }
+
+    public BigDecimal getLossRatePercent() {
+        if (quantityExpected == null || quantityExpected.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        return quantityLoss.multiply(BigDecimal.valueOf(100)).divide(quantityExpected, 2, RoundingMode.HALF_UP);
     }
 
     public LocalDate getLatestProductionDate() {

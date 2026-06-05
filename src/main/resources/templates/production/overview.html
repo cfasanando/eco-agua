@@ -10,7 +10,7 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
                     <h1 class="h5 mb-1">Resumen de producción</h1>
-                    <div class="text-muted small">Vista rápida de producción confirmada, costos y borradores pendientes.</div>
+                    <div class="text-muted small">Vista rápida de producción confirmada, costos, lotes y merma.</div>
                 </div>
                 <div class="d-flex gap-2">
                     <a class="btn btn-outline-secondary" th:href="@{/production/recipes}">Recetas</a>
@@ -39,7 +39,7 @@
             </div>
 
             <div class="alert alert-info shadow-sm" th:if="${snapshot.empty}">
-                Todavía no hay registros de producción en el periodo seleccionado. Crea una producción para empezar a controlar insumos, costos y producto terminado.
+                Todavía no hay registros de producción en el periodo seleccionado. Crea una producción para empezar a controlar insumos, costos, merma y producto terminado.
             </div>
 
             <div class="row g-3 mb-3">
@@ -82,30 +82,39 @@
             </div>
 
             <div class="row g-3 mb-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
-                            <div class="text-muted small">Cantidad confirmada</div>
-                            <div class="fs-5 fw-bold" th:text="${#numbers.formatDecimal(snapshot.summary.confirmedQuantityProduced, 1, 2)}">0.00</div>
+                            <div class="text-muted small">Cantidad esperada</div>
+                            <div class="fs-5 fw-bold" th:text="${#numbers.formatDecimal(snapshot.summary.confirmedQuantityExpected, 1, 2)}">0.00</div>
                             <div class="small text-muted">Solo producción confirmada.</div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
-                            <div class="text-muted small">Costo de insumos confirmados</div>
-                            <div class="fs-5 fw-bold" th:text="${'S/ ' + #numbers.formatDecimal(snapshot.summary.confirmedInputCost, 1, 2)}">S/ 0.00</div>
-                            <div class="small text-muted">Según costo snapshot de insumos.</div>
+                            <div class="text-muted small">Cantidad real</div>
+                            <div class="fs-5 fw-bold text-success" th:text="${#numbers.formatDecimal(snapshot.summary.confirmedQuantityProduced, 1, 2)}">0.00</div>
+                            <div class="small text-muted">Ingresada al stock.</div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
-                            <div class="text-muted small">Costo unitario promedio</div>
+                            <div class="text-muted small">Merma / pérdida</div>
+                            <div class="fs-5 fw-bold text-danger" th:text="${#numbers.formatDecimal(snapshot.summary.confirmedQuantityLoss, 1, 2)}">0.00</div>
+                            <div class="small text-muted" th:text="${#numbers.formatDecimal(snapshot.summary.lossRatePercent, 1, 2) + '% del esperado'}">0.00%</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Costo unitario real promedio</div>
                             <div class="fs-5 fw-bold" th:text="${'S/ ' + #numbers.formatDecimal(snapshot.summary.averageUnitCost, 1, 4)}">S/ 0.0000</div>
-                            <div class="small text-muted">Costo de insumos / cantidad confirmada.</div>
+                            <div class="small text-muted">Costo / cantidad real.</div>
                         </div>
                     </div>
                 </div>
@@ -125,8 +134,9 @@
                                     <tr>
                                         <th>Producto</th>
                                         <th class="text-end">Órdenes</th>
-                                        <th class="text-end">Cantidad</th>
-                                        <th class="text-end">Costo total</th>
+                                        <th class="text-end">Esperada</th>
+                                        <th class="text-end">Real</th>
+                                        <th class="text-end">Merma</th>
                                         <th class="text-end">Costo unitario</th>
                                         <th>Última fecha</th>
                                     </tr>
@@ -135,13 +145,17 @@
                                     <tr th:each="row : ${snapshot.productRows}">
                                         <td th:text="${row.productName}">Producto</td>
                                         <td class="text-end" th:text="${row.orderCount}">0</td>
+                                        <td class="text-end" th:text="${#numbers.formatDecimal(row.quantityExpected, 1, 2)}">0.00</td>
                                         <td class="text-end" th:text="${#numbers.formatDecimal(row.quantityProduced, 1, 2)}">0.00</td>
-                                        <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(row.inputCost, 1, 2)}">S/ 0.00</td>
+                                        <td class="text-end">
+                                            <span th:text="${#numbers.formatDecimal(row.quantityLoss, 1, 2)}">0.00</span>
+                                            <div class="small text-muted" th:text="${#numbers.formatDecimal(row.lossRatePercent, 1, 2) + '%'}">0.00%</div>
+                                        </td>
                                         <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(row.averageUnitCost, 1, 4)}">S/ 0.0000</td>
                                         <td th:text="${row.latestProductionDate != null ? #temporals.format(row.latestProductionDate, 'dd/MM/yyyy') : '-'}">-</td>
                                     </tr>
                                     <tr th:if="${#lists.isEmpty(snapshot.productRows)}">
-                                        <td colspan="6" class="text-center text-muted">No hay producciones confirmadas en este periodo.</td>
+                                        <td colspan="7" class="text-center text-muted">No hay producciones confirmadas en este periodo.</td>
                                     </tr>
                                     </tbody>
                                 </table>
@@ -167,8 +181,9 @@
                                     </div>
                                     <div class="small text-muted">
                                         <span th:text="${#temporals.format(order.productionDate, 'dd/MM/yyyy')}">Fecha</span>
-                                        · Cantidad: <span th:text="${#numbers.formatDecimal(order.quantityProduced, 1, 2)}">0.00</span>
-                                        · Costo: <span th:text="${'S/ ' + #numbers.formatDecimal(order.totalInputCost, 1, 2)}">S/ 0.00</span>
+                                        · Lote: <span th:text="${order.batchCode ?: '-'}">-</span>
+                                        · Real: <span th:text="${#numbers.formatDecimal(order.quantityProduced, 1, 2)}">0.00</span>
+                                        · Merma: <span th:text="${#numbers.formatDecimal(order.quantityLoss, 1, 2)}">0.00</span>
                                     </div>
                                 </a>
                                 <div class="text-center text-muted py-3" th:if="${#lists.isEmpty(snapshot.pendingDrafts)}">
@@ -191,32 +206,34 @@
                             <thead class="table-light">
                             <tr>
                                 <th>Fecha</th>
+                                <th>Lote</th>
                                 <th>Producto</th>
-                                <th class="text-end">Cantidad</th>
+                                <th class="text-end">Real</th>
+                                <th class="text-end">Merma</th>
                                 <th>Estado</th>
-                                <th class="text-end">Costo total</th>
-                                <th class="text-end">Costo unitario</th>
+                                <th class="text-end">Costo real unit.</th>
                                 <th class="text-center">Acción</th>
                             </tr>
                             </thead>
                             <tbody>
                             <tr th:each="order : ${snapshot.latestOrders}">
                                 <td th:text="${#temporals.format(order.productionDate, 'dd/MM/yyyy')}">-</td>
+                                <td th:text="${order.batchCode ?: '-'}">-</td>
                                 <td th:text="${order.product != null ? order.product.name : 'Producto #' + order.productId}">Producto</td>
                                 <td class="text-end" th:text="${#numbers.formatDecimal(order.quantityProduced, 1, 2)}">0.00</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(order.quantityLoss, 1, 2)}">0.00</td>
                                 <td>
                                     <span class="badge"
                                           th:classappend="${order.status.name() == 'CONFIRMED'} ? ' bg-success' : (${order.status.name() == 'DRAFT'} ? ' bg-warning text-dark' : ' bg-secondary')"
                                           th:text="${order.status}">Estado</span>
                                 </td>
-                                <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(order.totalInputCost, 1, 2)}">S/ 0.00</td>
-                                <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(order.unitCostEstimated, 1, 4)}">S/ 0.0000</td>
+                                <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(order.realUnitCost, 1, 4)}">S/ 0.0000</td>
                                 <td class="text-center">
                                     <a class="btn btn-sm btn-outline-secondary" th:href="@{|/production/${order.id}|}">Ver</a>
                                 </td>
                             </tr>
                             <tr th:if="${#lists.isEmpty(snapshot.latestOrders)}">
-                                <td colspan="7" class="text-center text-muted">No hay órdenes en el periodo seleccionado.</td>
+                                <td colspan="8" class="text-center text-muted">No hay órdenes en el periodo seleccionado.</td>
                             </tr>
                             </tbody>
                         </table>

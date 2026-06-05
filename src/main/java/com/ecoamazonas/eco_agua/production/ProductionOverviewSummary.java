@@ -1,6 +1,7 @@
 package com.ecoamazonas.eco_agua.production;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 
 public class ProductionOverviewSummary {
@@ -11,7 +12,9 @@ public class ProductionOverviewSummary {
     private final long confirmedOrders;
     private final long draftOrders;
     private final long canceledOrders;
+    private final BigDecimal confirmedQuantityExpected;
     private final BigDecimal confirmedQuantityProduced;
+    private final BigDecimal confirmedQuantityLoss;
     private final BigDecimal confirmedInputCost;
     private final BigDecimal averageUnitCost;
 
@@ -22,7 +25,9 @@ public class ProductionOverviewSummary {
             long confirmedOrders,
             long draftOrders,
             long canceledOrders,
+            BigDecimal confirmedQuantityExpected,
             BigDecimal confirmedQuantityProduced,
+            BigDecimal confirmedQuantityLoss,
             BigDecimal confirmedInputCost,
             BigDecimal averageUnitCost
     ) {
@@ -32,7 +37,9 @@ public class ProductionOverviewSummary {
         this.confirmedOrders = confirmedOrders;
         this.draftOrders = draftOrders;
         this.canceledOrders = canceledOrders;
+        this.confirmedQuantityExpected = confirmedQuantityExpected != null ? confirmedQuantityExpected : BigDecimal.ZERO;
         this.confirmedQuantityProduced = confirmedQuantityProduced != null ? confirmedQuantityProduced : BigDecimal.ZERO;
+        this.confirmedQuantityLoss = confirmedQuantityLoss != null ? confirmedQuantityLoss : BigDecimal.ZERO;
         this.confirmedInputCost = confirmedInputCost != null ? confirmedInputCost : BigDecimal.ZERO;
         this.averageUnitCost = averageUnitCost != null ? averageUnitCost : BigDecimal.ZERO;
     }
@@ -61,8 +68,16 @@ public class ProductionOverviewSummary {
         return canceledOrders;
     }
 
+    public BigDecimal getConfirmedQuantityExpected() {
+        return confirmedQuantityExpected;
+    }
+
     public BigDecimal getConfirmedQuantityProduced() {
         return confirmedQuantityProduced;
+    }
+
+    public BigDecimal getConfirmedQuantityLoss() {
+        return confirmedQuantityLoss;
     }
 
     public BigDecimal getConfirmedInputCost() {
@@ -71,5 +86,14 @@ public class ProductionOverviewSummary {
 
     public BigDecimal getAverageUnitCost() {
         return averageUnitCost;
+    }
+
+    public BigDecimal getLossRatePercent() {
+        if (confirmedQuantityExpected == null || confirmedQuantityExpected.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        return confirmedQuantityLoss.multiply(BigDecimal.valueOf(100))
+                .divide(confirmedQuantityExpected, 2, RoundingMode.HALF_UP);
     }
 }

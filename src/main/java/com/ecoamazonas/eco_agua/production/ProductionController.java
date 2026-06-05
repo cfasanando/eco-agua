@@ -20,7 +20,6 @@ public class ProductionController {
         this.productionService = productionService;
     }
 
-
     @GetMapping("/overview")
     public String overview(
             @RequestParam(value = "startDate", required = false)
@@ -90,8 +89,11 @@ public class ProductionController {
             @RequestParam("productionDate")
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate productionDate,
             @RequestParam("productId") Long productId,
+            @RequestParam(value = "quantityExpected", required = false) BigDecimal quantityExpected,
             @RequestParam("quantityProduced") BigDecimal quantityProduced,
+            @RequestParam(value = "batchCode", required = false) String batchCode,
             @RequestParam(value = "observation", required = false) String observation,
+            @RequestParam(value = "lossReason", required = false) String lossReason,
             @RequestParam(value = "supplyId", required = false) List<Long> supplyIds,
             @RequestParam(value = "quantityUsed", required = false) List<BigDecimal> quantitiesUsed,
             RedirectAttributes redirectAttributes
@@ -100,8 +102,11 @@ public class ProductionController {
             ProductionOrder order = productionService.createDraft(
                     productionDate,
                     productId,
+                    quantityExpected,
                     quantityProduced,
+                    batchCode,
                     observation,
+                    lossReason,
                     supplyIds,
                     quantitiesUsed
             );

@@ -10,7 +10,7 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
                     <h1 class="h5 mb-1">Nueva producción</h1>
-                    <div class="text-muted small">Registrar borrador usando la receta configurada del producto</div>
+                    <div class="text-muted small">Registrar lote, cantidad esperada, cantidad real y consumo de insumos.</div>
                 </div>
                 <div class="d-flex gap-2">
                     <a class="btn btn-outline-secondary" th:href="@{/production/recipes}">Recetas</a>
@@ -41,14 +41,44 @@
                             </div>
 
                             <div class="col-md-4">
-                                <label class="form-label">Cantidad producida</label>
-                                <input type="number" min="0.01" step="0.01" class="form-control" name="quantityProduced" id="quantityProduced" value="1" required>
+                                <label class="form-label">Lote interno</label>
+                                <input type="text" class="form-control" name="batchCode" maxlength="50" placeholder="Ej. LOTE-2026-001">
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Observación</label>
-                            <input type="text" class="form-control" name="observation" maxlength="255">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Cantidad esperada</label>
+                                <input type="number" min="0.01" step="0.01" class="form-control" name="quantityExpected" id="quantityExpected" value="1" required>
+                                <div class="form-text">Se usa para calcular los insumos esperados según la receta.</div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Cantidad real producida</label>
+                                <input type="number" min="0.01" step="0.01" class="form-control" name="quantityProduced" id="quantityProduced" value="1" required>
+                                <div class="form-text">Esta cantidad ingresará al stock al confirmar.</div>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Merma calculada</label>
+                                <input type="text" class="form-control" id="quantityLossPreview" value="0.00" readonly>
+                                <div class="form-text">Esperada menos real. No afecta stock por sí sola.</div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Motivo de merma o diferencia</label>
+                                <input type="text" class="form-control" name="lossReason" maxlength="255" placeholder="Ej. envases dañados, producto no conforme, pérdida en empaque">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Observación</label>
+                                <input type="text" class="form-control" name="observation" maxlength="255">
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info small">
+                            La receta consume insumos según la cantidad esperada. El producto terminado entra al stock según la cantidad real producida.
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -75,10 +105,20 @@
                                 <tbody id="recipeLinesBody">
                                 <tr id="recipeEmptyRow">
                                     <td colspan="5" class="text-center text-muted">
-                                        Selecciona un producto y cantidad para cargar su receta.
+                                        Selecciona un producto y cantidad esperada para cargar su receta.
                                     </td>
                                 </tr>
                                 </tbody>
+                                <tfoot>
+                                <tr>
+                                    <th colspan="4" class="text-end">Costo total estimado</th>
+                                    <th class="text-end" id="inputCostTotalCell">0.00</th>
+                                </tr>
+                                <tr>
+                                    <th colspan="4" class="text-end">Costo unitario real estimado</th>
+                                    <th class="text-end" id="realUnitCostPreview">0.0000</th>
+                                </tr>
+                                </tfoot>
                             </table>
                         </div>
 
@@ -96,9 +136,13 @@
 <script>
 (function () {
     const productInput = document.getElementById('productId');
-    const quantityInput = document.getElementById('quantityProduced');
+    const expectedQuantityInput = document.getElementById('quantityExpected');
+    const producedQuantityInput = document.getElementById('quantityProduced');
+    const lossPreview = document.getElementById('quantityLossPreview');
     const loadRecipeBtn = document.getElementById('loadRecipeBtn');
     const recipeLinesBody = document.getElementById('recipeLinesBody');
+    const inputCostTotalCell = document.getElementById('inputCostTotalCell');
+    const realUnitCostPreview = document.getElementById('realUnitCostPreview');
     const form = document.getElementById('productionForm');
 
     function formatNumber(value, decimals) {
@@ -106,21 +150,31 @@
         return number.toFixed(decimals);
     }
 
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     function renderEmpty(message) {
         recipeLinesBody.innerHTML = `
             <tr id="recipeEmptyRow">
-                <td colspan="5" class="text-center text-muted">${message}</td>
+                <td colspan="5" class="text-center text-muted">${escapeHtml(message)}</td>
             </tr>
         `;
+        updateTotals();
     }
 
     function buildRow(line) {
         return `
             <tr>
                 <td>
-                    <div class="fw-semibold">${line.supplyName ?? '-'}</div>
-                    <div class="small text-muted">${line.unit ?? '-'}</div>
-                    <input type="hidden" name="supplyId" value="${line.supplyId}">
+                    <div class="fw-semibold">${escapeHtml(line.supplyName ?? '-')}</div>
+                    <div class="small text-muted">${escapeHtml(line.unit ?? '-')}</div>
+                    <input type="hidden" name="supplyId" value="${escapeHtml(line.supplyId)}">
                 </td>
                 <td class="text-end">${formatNumber(line.recipeQuantityPerUnit, 4)}</td>
                 <td class="text-end">${formatNumber(line.unitCost, 6)}</td>
@@ -140,7 +194,16 @@
         `;
     }
 
-    function recalcTotals() {
+    function updateLossPreview() {
+        const expected = Number(expectedQuantityInput?.value || 0);
+        const produced = Number(producedQuantityInput?.value || 0);
+        const loss = Math.max(expected - produced, 0);
+        lossPreview.value = formatNumber(loss, 2);
+    }
+
+    function updateTotals() {
+        let total = 0;
+
         recipeLinesBody.querySelectorAll('tr').forEach(function (row) {
             const qtyInput = row.querySelector('.quantity-used-input');
             const totalCell = row.querySelector('.line-total-cell');
@@ -151,28 +214,35 @@
 
             const qty = Number(qtyInput.value || 0);
             const unitCost = Number(qtyInput.dataset.unitCost || 0);
-            totalCell.textContent = formatNumber(qty * unitCost, 2);
+            const lineTotal = qty * unitCost;
+            total += lineTotal;
+            totalCell.textContent = formatNumber(lineTotal, 2);
         });
+
+        const produced = Number(producedQuantityInput?.value || 0);
+        inputCostTotalCell.textContent = formatNumber(total, 2);
+        realUnitCostPreview.textContent = produced > 0 ? formatNumber(total / produced, 4) : '0.0000';
+        updateLossPreview();
     }
 
     async function loadRecipe() {
         const productId = productInput?.value;
-        const quantityProduced = quantityInput?.value;
+        const quantityExpected = expectedQuantityInput?.value;
 
         if (!productId) {
             renderEmpty('Selecciona un producto para cargar la receta.');
             return;
         }
 
-        if (!quantityProduced || Number(quantityProduced) <= 0) {
-            renderEmpty('Ingresa una cantidad producida válida.');
+        if (!quantityExpected || Number(quantityExpected) <= 0) {
+            renderEmpty('Ingresa una cantidad esperada válida.');
             return;
         }
 
         renderEmpty('Cargando receta...');
 
         try {
-            const response = await fetch(`/production/product/${productId}/recipe?quantityProduced=${encodeURIComponent(quantityProduced)}`);
+            const response = await fetch(`/production/product/${productId}/recipe?quantityProduced=${encodeURIComponent(quantityExpected)}`);
             if (!response.ok) {
                 throw new Error('Unable to load recipe.');
             }
@@ -185,7 +255,7 @@
             }
 
             recipeLinesBody.innerHTML = lines.map(buildRow).join('');
-            recalcTotals();
+            updateTotals();
         } catch (error) {
             renderEmpty('No se pudo cargar la receta del producto.');
         }
@@ -193,11 +263,13 @@
 
     loadRecipeBtn?.addEventListener('click', loadRecipe);
     productInput?.addEventListener('change', loadRecipe);
-    quantityInput?.addEventListener('change', loadRecipe);
+    expectedQuantityInput?.addEventListener('change', loadRecipe);
+    expectedQuantityInput?.addEventListener('input', updateLossPreview);
+    producedQuantityInput?.addEventListener('input', updateTotals);
 
     recipeLinesBody?.addEventListener('input', function (event) {
         if (event.target.classList.contains('quantity-used-input')) {
-            recalcTotals();
+            updateTotals();
         }
     });
 
@@ -208,6 +280,8 @@
             alert('Debes cargar la receta o ingresar al menos una línea de insumo.');
         }
     });
+
+    updateTotals();
 })();
 </script>
 </body>

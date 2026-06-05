@@ -12,7 +12,10 @@
                     <h1 class="h5 mb-1" th:text="'Producción #' + ${order.id}">Producción</h1>
                     <div class="text-muted small" th:text="${order.product != null ? order.product.name : '-'}">Producto</div>
                 </div>
-                <a class="btn btn-outline-secondary" th:href="@{/production}">Volver</a>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary" onclick="window.print()">Imprimir</button>
+                    <a class="btn btn-outline-secondary" th:href="@{/production}">Volver</a>
+                </div>
             </div>
 
             <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}">OK</div>
@@ -24,21 +27,52 @@
                         <div class="card-header bg-light"><strong>Cabecera</strong></div>
                         <div class="card-body small">
                             <p class="mb-1"><strong>Fecha:</strong> <span th:text="${#temporals.format(order.productionDate, 'dd/MM/yyyy')}">-</span></p>
+                            <p class="mb-1"><strong>Lote:</strong> <span th:text="${order.batchCode ?: '-'}">-</span></p>
                             <p class="mb-1"><strong>Producto:</strong> <span th:text="${order.product != null ? order.product.name : '-'}">-</span></p>
-                            <p class="mb-1"><strong>Cantidad producida:</strong> <span th:text="${#numbers.formatDecimal(order.quantityProduced, 1, 2)}">0.00</span></p>
                             <p class="mb-1"><strong>Estado:</strong> <span th:text="${order.status}">DRAFT</span></p>
-                            <p class="mb-0"><strong>Observación:</strong> <span th:text="${order.observation} ?: '-'">-</span></p>
+                            <p class="mb-1"><strong>Observación:</strong> <span th:text="${order.observation ?: '-'}">-</span></p>
+                            <p class="mb-0"><strong>Motivo de merma:</strong> <span th:text="${order.lossReason ?: '-'}">-</span></p>
                         </div>
                     </div>
                 </div>
 
                 <div class="col-lg-6">
                     <div class="card shadow-sm h-100">
-                        <div class="card-header bg-light"><strong>Costos</strong></div>
+                        <div class="card-header bg-light"><strong>Cantidades y merma</strong></div>
                         <div class="card-body small">
-                            <p class="mb-1"><strong>Costo total insumos:</strong> <span th:text="${#numbers.formatDecimal(order.totalInputCost, 1, 2)}">0.00</span></p>
-                            <p class="mb-1"><strong>Costo unitario estimado:</strong> <span th:text="${#numbers.formatDecimal(order.unitCostEstimated, 1, 4)}">0.0000</span></p>
-                            <p class="mb-0 text-muted">El stock se mueve recién al confirmar la producción.</p>
+                            <p class="mb-1"><strong>Cantidad esperada:</strong> <span th:text="${#numbers.formatDecimal(order.quantityExpected, 1, 2)}">0.00</span></p>
+                            <p class="mb-1"><strong>Cantidad real producida:</strong> <span th:text="${#numbers.formatDecimal(order.quantityProduced, 1, 2)}">0.00</span></p>
+                            <p class="mb-1"><strong>Merma / pérdida:</strong> <span th:text="${#numbers.formatDecimal(order.quantityLoss, 1, 2)}">0.00</span></p>
+                            <p class="mb-0"><strong>% merma:</strong> <span th:text="${#numbers.formatDecimal(order.lossRatePercent, 1, 2) + '%'}">0.00%</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Costo total de insumos</div>
+                            <div class="fs-5 fw-bold" th:text="${'S/ ' + #numbers.formatDecimal(order.totalInputCost, 1, 2)}">S/ 0.00</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Costo unitario esperado</div>
+                            <div class="fs-5 fw-bold" th:text="${'S/ ' + #numbers.formatDecimal(order.unitCostEstimated, 1, 4)}">S/ 0.0000</div>
+                            <div class="small text-muted">Costo / cantidad esperada.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Costo unitario real</div>
+                            <div class="fs-5 fw-bold" th:text="${'S/ ' + #numbers.formatDecimal(order.realUnitCost, 1, 4)}">S/ 0.0000</div>
+                            <div class="small text-muted">Costo / cantidad real producida.</div>
                         </div>
                     </div>
                 </div>
@@ -49,13 +83,20 @@
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-sm align-middle">
-                            <thead class="table-light"><tr><th>Insumo</th><th class="text-end">Cantidad</th><th class="text-end">Costo unitario</th><th class="text-end">Subtotal</th></tr></thead>
+                            <thead class="table-light">
+                            <tr>
+                                <th>Insumo</th>
+                                <th class="text-end">Cantidad</th>
+                                <th class="text-end">Costo unitario</th>
+                                <th class="text-end">Subtotal</th>
+                            </tr>
+                            </thead>
                             <tbody>
                             <tr th:each="line : ${order.supplies}">
                                 <td th:text="${line.supply != null ? line.supply.name : '-'}">Insumo</td>
                                 <td class="text-end" th:text="${#numbers.formatDecimal(line.quantityUsed, 1, 4)}">0.0000</td>
-                                <td class="text-end" th:text="${#numbers.formatDecimal(line.unitCostSnapshot, 1, 6)}">0.000000</td>
-                                <td class="text-end" th:text="${#numbers.formatDecimal(line.lineTotal, 1, 2)}">0.00</td>
+                                <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(line.unitCostSnapshot, 1, 6)}">S/ 0.000000</td>
+                                <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(line.lineTotal, 1, 2)}">S/ 0.00</td>
                             </tr>
                             <tr th:if="${#lists.isEmpty(order.supplies)}"><td colspan="4" class="text-center text-muted">No hay líneas de insumos registradas.</td></tr>
                             </tbody>

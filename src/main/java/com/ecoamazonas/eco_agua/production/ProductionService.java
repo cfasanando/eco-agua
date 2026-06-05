@@ -52,7 +52,6 @@ public class ProductionService {
         return productionOrderRepository.findByDateRangeAndStatus(effectiveStart, effectiveEnd, status);
     }
 
-
     @Transactional(readOnly = true)
     public ProductionOverviewSnapshot buildOverview(LocalDate startDate, LocalDate endDate) {
         LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
@@ -69,7 +68,9 @@ public class ProductionService {
         long confirmedOrders = 0;
         long draftOrders = 0;
         long canceledOrders = 0;
+        BigDecimal confirmedQuantityExpected = BigDecimal.ZERO;
         BigDecimal confirmedQuantityProduced = BigDecimal.ZERO;
+        BigDecimal confirmedQuantityLoss = BigDecimal.ZERO;
         BigDecimal confirmedInputCost = BigDecimal.ZERO;
         Map<Long, ProductionOverviewProductRow> products = new LinkedHashMap<>();
         List<ProductionOrder> pendingDrafts = new ArrayList<>();
@@ -77,7 +78,9 @@ public class ProductionService {
         for (ProductionOrder order : orders) {
             if (order.getStatus() == ProductionStatus.CONFIRMED) {
                 confirmedOrders++;
+                confirmedQuantityExpected = confirmedQuantityExpected.add(valueOrZero(order.getQuantityExpected()));
                 confirmedQuantityProduced = confirmedQuantityProduced.add(valueOrZero(order.getQuantityProduced()));
+                confirmedQuantityLoss = confirmedQuantityLoss.add(valueOrZero(order.getQuantityLoss()));
                 confirmedInputCost = confirmedInputCost.add(valueOrZero(order.getTotalInputCost()));
 
                 Long productId = order.getProductId();
@@ -108,7 +111,9 @@ public class ProductionService {
                 confirmedOrders,
                 draftOrders,
                 canceledOrders,
+                confirmedQuantityExpected.setScale(2, RoundingMode.HALF_UP),
                 confirmedQuantityProduced.setScale(2, RoundingMode.HALF_UP),
+                confirmedQuantityLoss.setScale(2, RoundingMode.HALF_UP),
                 confirmedInputCost.setScale(2, RoundingMode.HALF_UP),
                 averageUnitCost
         );
@@ -142,7 +147,7 @@ public class ProductionService {
             throw new IllegalArgumentException("Product is required.");
         }
 
-        BigDecimal effectiveQuantity = normalizeProducedQuantity(quantityProduced);
+        BigDecimal effectiveQuantity = normalizePositiveQuantity(quantityProduced);
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
 
@@ -191,6 +196,31 @@ public class ProductionService {
             List<Long> supplyIds,
             List<BigDecimal> quantitiesUsed
     ) {
+        return createDraft(
+                productionDate,
+                productId,
+                null,
+                quantityProduced,
+                null,
+                observation,
+                null,
+                supplyIds,
+                quantitiesUsed
+        );
+    }
+
+    @Transactional
+    public ProductionOrder createDraft(
+            LocalDate productionDate,
+            Long productId,
+            BigDecimal quantityExpected,
+            BigDecimal quantityProduced,
+            String batchCode,
+            String observation,
+            String lossReason,
+            List<Long> supplyIds,
+            List<BigDecimal> quantitiesUsed
+    ) {
         if (productId == null) {
             throw new IllegalArgumentException("Product is required.");
         }
@@ -199,21 +229,29 @@ public class ProductionService {
             throw new IllegalArgumentException("Produced quantity must be greater than zero.");
         }
 
+        BigDecimal effectiveProducedQuantity = quantityProduced.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal effectiveExpectedQuantity = quantityExpected != null && quantityExpected.compareTo(BigDecimal.ZERO) > 0
+                ? quantityExpected.setScale(2, RoundingMode.HALF_UP)
+                : effectiveProducedQuantity;
+
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
 
         ProductionOrder order = new ProductionOrder();
         order.setProductionDate(productionDate != null ? productionDate : LocalDate.now());
+        order.setBatchCode(clean(batchCode));
         order.setProduct(product);
-        order.setQuantityProduced(quantityProduced.setScale(2, RoundingMode.HALF_UP));
+        order.setQuantityExpected(effectiveExpectedQuantity);
+        order.setQuantityProduced(effectiveProducedQuantity);
         order.setStatus(ProductionStatus.DRAFT);
         order.setObservation(clean(observation));
+        order.setLossReason(clean(lossReason));
 
         BigDecimal totalInputCost = BigDecimal.ZERO;
         List<ProductionOrderSupply> lines = buildManualLines(supplyIds, quantitiesUsed);
 
         if (lines.isEmpty()) {
-            lines = buildLinesFromRecipe(product, quantityProduced);
+            lines = buildLinesFromRecipe(product, effectiveExpectedQuantity);
         }
 
         if (lines.isEmpty()) {
@@ -226,7 +264,7 @@ public class ProductionService {
         }
 
         order.setTotalInputCost(totalInputCost.setScale(2, RoundingMode.HALF_UP));
-        order.setUnitCostEstimated(computeUnitCost(order.getQuantityProduced(), totalInputCost));
+        order.refreshBatchCostFields();
 
         return productionOrderRepository.save(order);
     }
@@ -246,6 +284,8 @@ public class ProductionService {
         if (order.getSupplies() == null || order.getSupplies().isEmpty()) {
             throw new IllegalArgumentException("Production must contain at least one supply line.");
         }
+
+        order.refreshBatchCostFields();
 
         for (ProductionOrderSupply line : order.getSupplies()) {
             Supply supply = line.getSupply();
@@ -369,9 +409,9 @@ public class ProductionService {
         return lines;
     }
 
-    private List<ProductionOrderSupply> buildLinesFromRecipe(Product product, BigDecimal quantityProduced) {
+    private List<ProductionOrderSupply> buildLinesFromRecipe(Product product, BigDecimal quantityExpected) {
         List<ProductionOrderSupply> lines = new ArrayList<>();
-        BigDecimal effectiveQuantity = normalizeProducedQuantity(quantityProduced);
+        BigDecimal effectiveQuantity = normalizePositiveQuantity(quantityExpected);
 
         for (ProductSupply composition : product.getSuppliesComposition()) {
             if (composition == null || composition.getSupply() == null) {
@@ -410,22 +450,13 @@ public class ProductionService {
         return line;
     }
 
-    private BigDecimal computeUnitCost(BigDecimal quantityProduced, BigDecimal totalInputCost) {
-        if (quantityProduced == null || quantityProduced.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
-        }
-
-        return totalInputCost.divide(quantityProduced, 4, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal normalizeProducedQuantity(BigDecimal quantityProduced) {
-        if (quantityProduced == null || quantityProduced.compareTo(BigDecimal.ZERO) <= 0) {
+    private BigDecimal normalizePositiveQuantity(BigDecimal quantity) {
+        if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ONE.setScale(2, RoundingMode.HALF_UP);
         }
 
-        return quantityProduced.setScale(2, RoundingMode.HALF_UP);
+        return quantity.setScale(2, RoundingMode.HALF_UP);
     }
-
 
     private String resolveProductName(ProductionOrder order) {
         if (order == null) {

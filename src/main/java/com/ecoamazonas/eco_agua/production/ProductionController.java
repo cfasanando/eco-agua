@@ -108,6 +108,24 @@ public class ProductionController {
     }
 
 
+    @GetMapping("/material-requirements")
+    public String materialRequirements(
+            @RequestParam(value = "productId", required = false) Long productId,
+            @RequestParam(value = "quantity", required = false) BigDecimal quantity,
+            Model model
+    ) {
+        ProductionMaterialRequirementSnapshot snapshot = productionService.buildMaterialRequirements(productId, quantity);
+
+        model.addAttribute("activePage", "production_material_requirements");
+        model.addAttribute("snapshot", snapshot);
+        model.addAttribute("products", productionService.findActiveProducts());
+        model.addAttribute("selectedProductId", productId);
+        model.addAttribute("quantity", snapshot.getSummary().getPlannedQuantity());
+
+        return "production/material_requirements";
+    }
+
+
     @GetMapping("/capacity")
     public String capacity(Model model) {
         ProductionCapacitySnapshot snapshot = productionService.buildCapacityOverview();

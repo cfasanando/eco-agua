@@ -620,6 +620,135 @@ public class ProductionService {
 
 
     @Transactional(readOnly = true)
+    public ProductionMaterialRequirementSnapshot buildMaterialRequirements(Long productId, BigDecimal quantity) {
+        BigDecimal plannedQuantity = normalizePositiveQuantity(quantity);
+
+        ProductionMaterialRequirementSummary emptySummary = new ProductionMaterialRequirementSummary(
+                null,
+                null,
+                plannedQuantity,
+                0,
+                0,
+                0,
+                BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
+                true
+        );
+
+        if (productId == null) {
+            return new ProductionMaterialRequirementSnapshot(emptySummary, List.of(), List.of());
+        }
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
+
+        List<ProductionMaterialRequirementRow> rows = new ArrayList<>();
+        List<ProductionMaterialRequirementRow> shortageRows = new ArrayList<>();
+        BigDecimal totalRequiredQuantity = BigDecimal.ZERO;
+        BigDecimal totalShortageQuantity = BigDecimal.ZERO;
+        BigDecimal totalEstimatedCost = BigDecimal.ZERO;
+        BigDecimal totalShortageCost = BigDecimal.ZERO;
+        int linesWithEnoughStock = 0;
+        int linesWithShortage = 0;
+
+        for (ProductSupply composition : product.getSuppliesComposition()) {
+            if (composition == null || composition.getSupply() == null) {
+                continue;
+            }
+
+            Supply supply = composition.getSupply();
+            BigDecimal quantityPerUnit = composition.getQuantityUsed() != null
+                    ? composition.getQuantityUsed()
+                    : BigDecimal.ZERO;
+
+            if (quantityPerUnit.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+
+            BigDecimal requiredQuantity = quantityPerUnit.multiply(plannedQuantity)
+                    .setScale(4, RoundingMode.HALF_UP);
+            BigDecimal availableQuantity = supply.getStock() != null
+                    ? supply.getStock()
+                    : BigDecimal.ZERO;
+            BigDecimal shortageQuantity = requiredQuantity.subtract(availableQuantity);
+
+            if (shortageQuantity.compareTo(BigDecimal.ZERO) < 0) {
+                shortageQuantity = BigDecimal.ZERO;
+            }
+
+            boolean enoughStock = shortageQuantity.compareTo(BigDecimal.ZERO) == 0;
+            if (enoughStock) {
+                linesWithEnoughStock++;
+            } else {
+                linesWithShortage++;
+            }
+
+            BigDecimal unitCost = supply.getUnitCost() != null
+                    ? supply.getUnitCost()
+                    : BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP);
+            BigDecimal requiredCost = requiredQuantity.multiply(unitCost)
+                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal shortageCost = shortageQuantity.multiply(unitCost)
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            totalRequiredQuantity = totalRequiredQuantity.add(requiredQuantity);
+            totalShortageQuantity = totalShortageQuantity.add(shortageQuantity);
+            totalEstimatedCost = totalEstimatedCost.add(requiredCost);
+            totalShortageCost = totalShortageCost.add(shortageCost);
+
+            ProductionMaterialRequirementRow row = new ProductionMaterialRequirementRow(
+                    product.getId(),
+                    product.getName(),
+                    supply.getId(),
+                    supply.getName(),
+                    supply.getUnit(),
+                    plannedQuantity,
+                    quantityPerUnit.setScale(4, RoundingMode.HALF_UP),
+                    requiredQuantity.setScale(4, RoundingMode.HALF_UP),
+                    availableQuantity.setScale(4, RoundingMode.HALF_UP),
+                    shortageQuantity.setScale(4, RoundingMode.HALF_UP),
+                    unitCost,
+                    requiredCost,
+                    shortageCost,
+                    enoughStock
+            );
+
+            if (!enoughStock) {
+                shortageRows.add(row);
+            }
+
+            rows.add(row);
+        }
+
+        rows.sort(Comparator
+                .comparing(ProductionMaterialRequirementRow::isEnoughStock)
+                .thenComparing(ProductionMaterialRequirementRow::getSupplyName, Comparator.nullsLast(String::compareToIgnoreCase)));
+        shortageRows.sort(Comparator
+                .comparing(ProductionMaterialRequirementRow::getShortageCost, Comparator.nullsLast(Comparator.naturalOrder()))
+                .reversed()
+                .thenComparing(ProductionMaterialRequirementRow::getSupplyName, Comparator.nullsLast(String::compareToIgnoreCase)));
+
+        ProductionMaterialRequirementSummary summary = new ProductionMaterialRequirementSummary(
+                product.getId(),
+                product.getName(),
+                plannedQuantity,
+                rows.size(),
+                linesWithEnoughStock,
+                linesWithShortage,
+                totalRequiredQuantity.setScale(4, RoundingMode.HALF_UP),
+                totalShortageQuantity.setScale(4, RoundingMode.HALF_UP),
+                totalEstimatedCost.setScale(2, RoundingMode.HALF_UP),
+                totalShortageCost.setScale(2, RoundingMode.HALF_UP),
+                linesWithShortage == 0
+        );
+
+        return new ProductionMaterialRequirementSnapshot(summary, rows, shortageRows);
+    }
+
+
+    @Transactional(readOnly = true)
     public ProductionCapacitySnapshot buildCapacityOverview() {
         List<Product> products = productRepository.findByActiveTrueOrderByNameAsc();
         List<ProductionCapacityProductRow> rows = new ArrayList<>();

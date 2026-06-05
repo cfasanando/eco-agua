@@ -120,6 +120,46 @@ public class ProductionController {
     }
 
 
+
+    @GetMapping("/traceability")
+    public String traceability(
+            @RequestParam(value = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(value = "productId", required = false) Long productId,
+            @RequestParam(value = "batchCode", required = false) String batchCode,
+            @RequestParam(value = "status", required = false) ProductionStatus status,
+            @RequestParam(value = "qualityStatus", required = false) ProductionQualityStatus qualityStatus,
+            Model model
+    ) {
+        LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
+        LocalDate effectiveStart = startDate != null ? startDate : effectiveEnd.minusDays(30);
+
+        ProductionTraceabilitySnapshot snapshot = productionService.buildTraceability(
+                effectiveStart,
+                effectiveEnd,
+                productId,
+                batchCode,
+                status,
+                qualityStatus
+        );
+
+        model.addAttribute("activePage", "production_traceability");
+        model.addAttribute("snapshot", snapshot);
+        model.addAttribute("startDate", snapshot.getSummary().getStartDate());
+        model.addAttribute("endDate", snapshot.getSummary().getEndDate());
+        model.addAttribute("selectedProductId", productId);
+        model.addAttribute("selectedBatchCode", batchCode);
+        model.addAttribute("selectedStatus", status);
+        model.addAttribute("selectedQualityStatus", qualityStatus);
+        model.addAttribute("statuses", ProductionStatus.values());
+        model.addAttribute("qualityStatuses", ProductionQualityStatus.values());
+        model.addAttribute("products", productionService.findActiveProducts());
+
+        return "production/traceability";
+    }
+
     @GetMapping("/reports")
     public String reports(
             @RequestParam(value = "startDate", required = false)

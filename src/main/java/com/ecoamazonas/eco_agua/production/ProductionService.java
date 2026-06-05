@@ -233,6 +233,125 @@ public class ProductionService {
 
 
 
+
+
+    @Transactional(readOnly = true)
+    public ProductionTraceabilitySnapshot buildTraceability(
+            LocalDate startDate,
+            LocalDate endDate,
+            Long productId,
+            String batchCode,
+            ProductionStatus selectedStatus,
+            ProductionQualityStatus selectedQualityStatus
+    ) {
+        LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
+        LocalDate effectiveStart = startDate != null ? startDate : effectiveEnd.minusDays(30);
+
+        if (effectiveEnd.isBefore(effectiveStart)) {
+            LocalDate tmp = effectiveStart;
+            effectiveStart = effectiveEnd;
+            effectiveEnd = tmp;
+        }
+
+        String normalizedBatch = clean(batchCode);
+        String normalizedBatchLower = normalizedBatch != null ? normalizedBatch.toLowerCase() : null;
+
+        List<ProductionOrder> sourceRows = productionOrderRepository.findByDateRangeAndStatus(
+                effectiveStart,
+                effectiveEnd,
+                selectedStatus
+        );
+
+        List<ProductionOrder> filteredRows = new ArrayList<>();
+        List<ProductionOrder> qualityAttentionRows = new ArrayList<>();
+        List<ProductionOrder> latestConfirmedRows = new ArrayList<>();
+
+        long confirmedOrders = 0;
+        long draftOrders = 0;
+        long canceledOrders = 0;
+        long approvedOrders = 0;
+        long pendingQualityOrders = 0;
+        long attentionQualityOrders = 0;
+        BigDecimal quantityExpected = BigDecimal.ZERO;
+        BigDecimal quantityProduced = BigDecimal.ZERO;
+        BigDecimal quantityLoss = BigDecimal.ZERO;
+
+        for (ProductionOrder order : sourceRows) {
+            if (productId != null && !productId.equals(order.getProductId())) {
+                continue;
+            }
+
+            if (normalizedBatchLower != null) {
+                String orderBatch = order.getBatchCode() != null ? order.getBatchCode().toLowerCase() : "";
+                if (!orderBatch.contains(normalizedBatchLower)) {
+                    continue;
+                }
+            }
+
+            ProductionQualityStatus qualityStatus = order.getQualityStatus();
+            if (selectedQualityStatus != null && selectedQualityStatus != qualityStatus) {
+                continue;
+            }
+
+            filteredRows.add(order);
+
+            if (order.getStatus() == ProductionStatus.CONFIRMED) {
+                confirmedOrders++;
+                quantityExpected = quantityExpected.add(valueOrZero(order.getQuantityExpected()));
+                quantityProduced = quantityProduced.add(valueOrZero(order.getQuantityProduced()));
+                quantityLoss = quantityLoss.add(valueOrZero(order.getQuantityLoss()));
+
+                if (latestConfirmedRows.size() < 8) {
+                    latestConfirmedRows.add(order);
+                }
+            } else if (order.getStatus() == ProductionStatus.DRAFT) {
+                draftOrders++;
+            } else if (order.getStatus() == ProductionStatus.CANCELED) {
+                canceledOrders++;
+            }
+
+            if (qualityStatus == ProductionQualityStatus.APPROVED) {
+                approvedOrders++;
+            } else if (qualityStatus == ProductionQualityStatus.OBSERVED || qualityStatus == ProductionQualityStatus.REJECTED) {
+                attentionQualityOrders++;
+                if (qualityAttentionRows.size() < 8) {
+                    qualityAttentionRows.add(order);
+                }
+            } else {
+                pendingQualityOrders++;
+            }
+        }
+
+        BigDecimal lossRatePercent = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        if (quantityExpected.compareTo(BigDecimal.ZERO) > 0) {
+            lossRatePercent = quantityLoss.multiply(BigDecimal.valueOf(100))
+                    .divide(quantityExpected, 2, RoundingMode.HALF_UP);
+        }
+
+        ProductionTraceabilitySummary summary = new ProductionTraceabilitySummary(
+                effectiveStart,
+                effectiveEnd,
+                filteredRows.size(),
+                confirmedOrders,
+                draftOrders,
+                canceledOrders,
+                approvedOrders,
+                pendingQualityOrders,
+                attentionQualityOrders,
+                quantityExpected.setScale(2, RoundingMode.HALF_UP),
+                quantityProduced.setScale(2, RoundingMode.HALF_UP),
+                quantityLoss.setScale(2, RoundingMode.HALF_UP),
+                lossRatePercent
+        );
+
+        return new ProductionTraceabilitySnapshot(
+                summary,
+                filteredRows,
+                qualityAttentionRows,
+                latestConfirmedRows
+        );
+    }
+
     @Transactional(readOnly = true)
     public ProductionQualitySnapshot buildQualityDashboard(
             LocalDate startDate,

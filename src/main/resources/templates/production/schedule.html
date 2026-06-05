@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Agenda de producción - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='production_schedule'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Agenda de producción</h1>
+                    <div class="text-muted small">Programación por fecha, estado de producción, control de calidad y lote.</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary" onclick="window.print()">Imprimir</button>
+                    <a class="btn btn-outline-secondary" th:href="@{/production/overview(startDate=${startDate}, endDate=${endDate})}">Resumen</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/production(startDate=${startDate}, endDate=${endDate}, status=${selectedStatus})}">Historial</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/production/quality(startDate=${startDate}, endDate=${endDate}, qualityStatus=${selectedQualityStatus})}">Calidad</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/production/traceability(startDate=${startDate}, endDate=${endDate}, productId=${selectedProductId}, status=${selectedStatus}, qualityStatus=${selectedQualityStatus})}">Trazabilidad</a>
+                    <a class="btn btn-primary" th:href="@{/production/new}">Nueva producción</a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" th:action="@{/production/schedule}" method="get">
+                        <div class="col-md-2">
+                            <label class="form-label">Desde</label>
+                            <input type="date" class="form-control" name="startDate" th:value="${startDate}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Hasta</label>
+                            <input type="date" class="form-control" name="endDate" th:value="${endDate}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Producto</label>
+                            <select class="form-select" name="productId">
+                                <option value="">Todos</option>
+                                <option th:each="product : ${products}"
+                                        th:value="${product.id}"
+                                        th:selected="${selectedProductId != null and selectedProductId == product.id}"
+                                        th:text="${product.name}">Producto</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Producción</label>
+                            <select class="form-select" name="status">
+                                <option value="">Todas</option>
+                                <option th:each="statusItem : ${statuses}"
+                                        th:value="${statusItem}"
+                                        th:selected="${selectedStatus != null and selectedStatus == statusItem}"
+                                        th:text="${statusItem}">Estado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Calidad</label>
+                            <select class="form-select" name="qualityStatus">
+                                <option value="">Todas</option>
+                                <option th:each="statusItem : ${qualityStatuses}"
+                                        th:value="${statusItem}"
+                                        th:selected="${selectedQualityStatus != null and selectedQualityStatus == statusItem}"
+                                        th:text="${statusItem.label}">Estado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            <button type="submit" class="btn btn-outline-primary w-100">Ver</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="alert alert-info shadow-sm" th:if="${snapshot.empty}">
+                No hay producciones programadas con los filtros seleccionados.
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Órdenes en agenda</div>
+                            <div class="fs-4 fw-bold" th:text="${snapshot.summary.totalOrders}">0</div>
+                            <div class="small text-muted">Según filtros seleccionados.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Para hoy</div>
+                            <div class="fs-4 fw-bold text-primary" th:text="${snapshot.summary.todayOrders}">0</div>
+                            <div class="small text-muted">Producciones con fecha de hoy.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Próximos 7 días</div>
+                            <div class="fs-4 fw-bold" th:text="${snapshot.summary.nextSevenDaysOrders}">0</div>
+                            <div class="small text-muted">Incluye hoy.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Borradores vencidos</div>
+                            <div class="fs-4 fw-bold text-danger" th:text="${snapshot.summary.overdueDraftOrders}">0</div>
+                            <div class="small text-muted">Borradores con fecha anterior a hoy.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Cantidad planificada</div>
+                            <div class="fs-5 fw-bold" th:text="${#numbers.formatDecimal(snapshot.summary.plannedQuantityExpected, 1, 2)}">0.00</div>
+                            <div class="small text-muted">Suma de cantidades esperadas.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Cantidad real confirmada</div>
+                            <div class="fs-5 fw-bold text-success" th:text="${#numbers.formatDecimal(snapshot.summary.confirmedQuantityProduced, 1, 2)}">0.00</div>
+                            <div class="small text-muted">Solo órdenes confirmadas.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Calidad pendiente o por atender</div>
+                            <div class="fs-5 fw-bold text-warning" th:text="${snapshot.summary.pendingQualityOrders + snapshot.summary.attentionQualityOrders}">0</div>
+                            <div class="small text-muted">Pendientes, observadas o rechazadas.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Producciones de hoy</strong></div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush">
+                                <div class="list-group-item px-0" th:each="order : ${snapshot.todayRows}">
+                                    <div class="d-flex justify-content-between gap-2">
+                                        <div>
+                                            <strong th:text="${order.product != null ? order.product.name : 'Producto #' + order.productId}">Producto</strong>
+                                            <div class="small text-muted">
+                                                Lote: <span th:text="${order.batchCode ?: '-'}">-</span>
+                                                · Esperada: <span th:text="${#numbers.formatDecimal(order.quantityExpected, 1, 2)}">0.00</span>
+                                            </div>
+                                        </div>
+                                        <span class="badge align-self-start" th:classappend="${order.status.name() == 'CONFIRMED'} ? ' bg-success' : (${order.status.name() == 'DRAFT'} ? ' bg-warning text-dark' : ' bg-secondary')" th:text="${order.status}">Estado</span>
+                                    </div>
+                                </div>
+                                <div class="text-center text-muted py-3" th:if="${#lists.isEmpty(snapshot.todayRows)}">No hay producciones para hoy.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Próximas producciones</strong></div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush">
+                                <div class="list-group-item px-0" th:each="order : ${snapshot.upcomingRows}">
+                                    <div class="d-flex justify-content-between gap-2">
+                                        <div>
+                                            <strong th:text="${order.product != null ? order.product.name : 'Producto #' + order.productId}">Producto</strong>
+                                            <div class="small text-muted">
+                                                <span th:text="${#temporals.format(order.productionDate, 'dd/MM/yyyy')}">-</span>
+                                                · Lote: <span th:text="${order.batchCode ?: '-'}">-</span>
+                                            </div>
+                                        </div>
+                                        <a class="btn btn-sm btn-outline-secondary align-self-start" th:href="@{|/production/${order.id}|}">Abrir</a>
+                                    </div>
+                                </div>
+                                <div class="text-center text-muted py-3" th:if="${#lists.isEmpty(snapshot.upcomingRows)}">No hay producciones próximas.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Calidad pendiente</strong></div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush">
+                                <div class="list-group-item px-0" th:each="order : ${snapshot.pendingQualityRows}">
+                                    <div class="d-flex justify-content-between gap-2">
+                                        <div>
+                                            <strong th:text="${order.product != null ? order.product.name : 'Producto #' + order.productId}">Producto</strong>
+                                            <div class="small text-muted">
+                                                <span th:text="${#temporals.format(order.productionDate, 'dd/MM/yyyy')}">-</span>
+                                                · Lote: <span th:text="${order.batchCode ?: '-'}">-</span>
+                                            </div>
+                                        </div>
+                                        <a class="btn btn-sm btn-outline-primary align-self-start" th:href="@{|/production/${order.id}/quality|}">Revisar</a>
+                                    </div>
+                                </div>
+                                <div class="text-center text-muted py-3" th:if="${#lists.isEmpty(snapshot.pendingQualityRows)}">No hay calidad pendiente.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <strong>Agenda detallada</strong>
+                    <span class="small text-muted">Ordenada por fecha ascendente</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Lote</th>
+                                <th>Producto</th>
+                                <th class="text-end">Esperada</th>
+                                <th class="text-end">Real</th>
+                                <th class="text-end">Merma</th>
+                                <th>Producción</th>
+                                <th>Calidad</th>
+                                <th>Vencimiento</th>
+                                <th>Observación</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="order : ${snapshot.rows}">
+                                <td th:text="${#temporals.format(order.productionDate, 'dd/MM/yyyy')}">-</td>
+                                <td th:text="${order.batchCode ?: '-'}">-</td>
+                                <td th:text="${order.product != null ? order.product.name : 'Producto #' + order.productId}">Producto</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(order.quantityExpected, 1, 2)}">0.00</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(order.quantityProduced, 1, 2)}">0.00</td>
+                                <td class="text-end text-danger" th:text="${#numbers.formatDecimal(order.quantityLoss, 1, 2)}">0.00</td>
+                                <td><span class="badge" th:classappend="${order.status.name() == 'CONFIRMED'} ? ' bg-success' : (${order.status.name() == 'DRAFT'} ? ' bg-warning text-dark' : ' bg-secondary')" th:text="${order.status}">Estado</span></td>
+                                <td><span class="badge" th:classappend="${' ' + order.qualityStatus.badgeClass}" th:text="${order.qualityStatus.label}">Calidad</span></td>
+                                <td>
+                                    <span class="badge" th:classappend="${' ' + order.expiryStatus.badgeClass}" th:text="${order.expiryStatus.label}">Vence</span>
+                                    <div class="small text-muted" th:text="${order.expiryDate != null ? #temporals.format(order.expiryDate, 'dd/MM/yyyy') : '-'}">-</div>
+                                </td>
+                                <td th:text="${order.observation ?: '-'}">-</td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <a class="btn btn-outline-secondary" th:href="@{|/production/${order.id}|}">Detalle</a>
+                                        <a class="btn btn-outline-secondary" th:href="@{|/production/${order.id}/sheet|}">Ficha</a>
+                                        <a class="btn btn-outline-primary" th:href="@{|/production/${order.id}/quality|}">Calidad</a>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(snapshot.rows)}">
+                                <td colspan="11" class="text-center text-muted">No hay producciones en la agenda seleccionada.</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

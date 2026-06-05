@@ -172,6 +172,43 @@ public class ProductionController {
         return "production/capacity";
     }
 
+    @GetMapping("/schedule")
+    public String schedule(
+            @RequestParam(value = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(value = "productId", required = false) Long productId,
+            @RequestParam(value = "status", required = false) ProductionStatus status,
+            @RequestParam(value = "qualityStatus", required = false) ProductionQualityStatus qualityStatus,
+            Model model
+    ) {
+        LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now().plusDays(14);
+        LocalDate effectiveStart = startDate != null ? startDate : LocalDate.now().minusDays(7);
+
+        ProductionScheduleSnapshot snapshot = productionService.buildSchedule(
+                effectiveStart,
+                effectiveEnd,
+                productId,
+                status,
+                qualityStatus
+        );
+
+        model.addAttribute("activePage", "production_schedule");
+        model.addAttribute("snapshot", snapshot);
+        model.addAttribute("startDate", snapshot.getSummary().getStartDate());
+        model.addAttribute("endDate", snapshot.getSummary().getEndDate());
+        model.addAttribute("selectedProductId", productId);
+        model.addAttribute("selectedStatus", status);
+        model.addAttribute("selectedQualityStatus", qualityStatus);
+        model.addAttribute("statuses", ProductionStatus.values());
+        model.addAttribute("qualityStatuses", ProductionQualityStatus.values());
+        model.addAttribute("products", productionService.findActiveProducts());
+
+        return "production/schedule";
+    }
+
+
     @GetMapping("/product/{productId}/recipe")
     @ResponseBody
     public List<ProductionRecipeLine> getRecipe(

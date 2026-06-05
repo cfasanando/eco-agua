@@ -233,6 +233,144 @@ public class ProductionService {
 
 
 
+    @Transactional(readOnly = true)
+    public ProductionScheduleSnapshot buildSchedule(
+            LocalDate startDate,
+            LocalDate endDate,
+            Long productId,
+            ProductionStatus selectedStatus,
+            ProductionQualityStatus selectedQualityStatus
+    ) {
+        LocalDate effectiveEnd = endDate != null ? endDate : LocalDate.now();
+        LocalDate effectiveStart = startDate != null ? startDate : effectiveEnd.minusDays(14);
+
+        if (effectiveEnd.isBefore(effectiveStart)) {
+            LocalDate tmp = effectiveStart;
+            effectiveStart = effectiveEnd;
+            effectiveEnd = tmp;
+        }
+
+        LocalDate today = LocalDate.now();
+        LocalDate nextSevenDays = today.plusDays(7);
+
+        List<ProductionOrder> sourceRows = productionOrderRepository.findByDateRangeAndStatus(
+                effectiveStart,
+                effectiveEnd,
+                selectedStatus
+        );
+
+        List<ProductionOrder> rows = new ArrayList<>();
+        List<ProductionOrder> todayRows = new ArrayList<>();
+        List<ProductionOrder> upcomingRows = new ArrayList<>();
+        List<ProductionOrder> pendingQualityRows = new ArrayList<>();
+        List<ProductionOrder> overdueDraftRows = new ArrayList<>();
+
+        long draftOrders = 0;
+        long confirmedOrders = 0;
+        long canceledOrders = 0;
+        long pendingQualityOrders = 0;
+        long attentionQualityOrders = 0;
+        long approvedQualityOrders = 0;
+        long todayOrders = 0;
+        long nextSevenDaysOrders = 0;
+        long overdueDraftOrders = 0;
+        BigDecimal plannedQuantityExpected = BigDecimal.ZERO;
+        BigDecimal confirmedQuantityProduced = BigDecimal.ZERO;
+        BigDecimal confirmedQuantityLoss = BigDecimal.ZERO;
+
+        for (ProductionOrder order : sourceRows) {
+            if (productId != null && !productId.equals(order.getProductId())) {
+                continue;
+            }
+
+            ProductionQualityStatus qualityStatus = order.getQualityStatus();
+            if (selectedQualityStatus != null && selectedQualityStatus != qualityStatus) {
+                continue;
+            }
+
+            rows.add(order);
+            plannedQuantityExpected = plannedQuantityExpected.add(valueOrZero(order.getQuantityExpected()));
+
+            if (order.getStatus() == ProductionStatus.CONFIRMED) {
+                confirmedOrders++;
+                confirmedQuantityProduced = confirmedQuantityProduced.add(valueOrZero(order.getQuantityProduced()));
+                confirmedQuantityLoss = confirmedQuantityLoss.add(valueOrZero(order.getQuantityLoss()));
+            } else if (order.getStatus() == ProductionStatus.DRAFT) {
+                draftOrders++;
+            } else if (order.getStatus() == ProductionStatus.CANCELED) {
+                canceledOrders++;
+            }
+
+            if (qualityStatus == ProductionQualityStatus.APPROVED) {
+                approvedQualityOrders++;
+            } else if (qualityStatus == ProductionQualityStatus.OBSERVED || qualityStatus == ProductionQualityStatus.REJECTED) {
+                attentionQualityOrders++;
+            } else {
+                pendingQualityOrders++;
+            }
+
+            LocalDate productionDate = order.getProductionDate();
+            if (today.equals(productionDate)) {
+                todayOrders++;
+                todayRows.add(order);
+            }
+
+            if (productionDate != null && !productionDate.isBefore(today) && !productionDate.isAfter(nextSevenDays)) {
+                nextSevenDaysOrders++;
+                if (upcomingRows.size() < 12) {
+                    upcomingRows.add(order);
+                }
+            }
+
+            if (order.getStatus() == ProductionStatus.DRAFT && productionDate != null && productionDate.isBefore(today)) {
+                overdueDraftOrders++;
+                if (overdueDraftRows.size() < 10) {
+                    overdueDraftRows.add(order);
+                }
+            }
+
+            if (qualityStatus == ProductionQualityStatus.PENDING && pendingQualityRows.size() < 10) {
+                pendingQualityRows.add(order);
+            }
+        }
+
+        Comparator<ProductionOrder> scheduleOrder = Comparator
+                .comparing(ProductionOrder::getProductionDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ProductionOrder::getId, Comparator.nullsLast(Comparator.naturalOrder()));
+
+        rows.sort(scheduleOrder);
+        todayRows.sort(scheduleOrder);
+        upcomingRows.sort(scheduleOrder);
+        pendingQualityRows.sort(scheduleOrder);
+        overdueDraftRows.sort(scheduleOrder);
+
+        ProductionScheduleSummary summary = new ProductionScheduleSummary(
+                effectiveStart,
+                effectiveEnd,
+                rows.size(),
+                draftOrders,
+                confirmedOrders,
+                canceledOrders,
+                pendingQualityOrders,
+                attentionQualityOrders,
+                approvedQualityOrders,
+                todayOrders,
+                nextSevenDaysOrders,
+                overdueDraftOrders,
+                plannedQuantityExpected.setScale(2, RoundingMode.HALF_UP),
+                confirmedQuantityProduced.setScale(2, RoundingMode.HALF_UP),
+                confirmedQuantityLoss.setScale(2, RoundingMode.HALF_UP)
+        );
+
+        return new ProductionScheduleSnapshot(
+                summary,
+                rows,
+                todayRows,
+                upcomingRows,
+                pendingQualityRows,
+                overdueDraftRows
+        );
+    }
 
 
     @Transactional(readOnly = true)

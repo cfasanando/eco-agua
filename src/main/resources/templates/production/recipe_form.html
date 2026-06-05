@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Editar receta de producción - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='production_recipes'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Editar receta de producción</h1>
+                    <div class="text-muted small" th:text="${snapshot.productName}">Producto terminado</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-secondary" th:href="@{/production/recipes}">Volver a recetas</a>
+                    <a class="btn btn-primary" th:href="@{/production/new}">Nueva producción</a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}">Correcto</div>
+            <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}">Error</div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Producto terminado</div>
+                            <div class="fw-bold" th:text="${snapshot.productName}">Producto</div>
+                            <div class="small text-muted" th:text="${'Stock actual: ' + #numbers.formatDecimal(snapshot.productStock, 1, 2)}">Stock actual</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Insumos en receta</div>
+                            <div class="fs-5 fw-bold" th:text="${#lists.size(snapshot.recipeRows)}">0</div>
+                            <div class="small text-muted">Cantidad por cada unidad producida.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Costo estimado por unidad</div>
+                            <div class="fs-5 fw-bold" id="estimatedUnitCostHeader" th:text="${'S/ ' + #numbers.formatDecimal(snapshot.estimatedUnitCost, 1, 4)}">S/ 0.0000</div>
+                            <div class="small text-muted">Según costo actual de insumos.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-warning shadow-sm" th:unless="${snapshot.configured}">
+                Este producto todavía no tiene receta. Puedes agregar insumos abajo y luego usar esta receta al crear una producción.
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <strong>Insumos por unidad producida</strong>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="addRecipeLineBtn">Agregar insumo</button>
+                </div>
+                <div class="card-body">
+                    <form th:action="@{|/production/recipes/${snapshot.productId}|}" method="post" id="recipeForm">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+
+                        <select id="supplyOptionsTemplate" class="d-none" aria-hidden="true">
+                            <option value="">Seleccione insumo</option>
+                            <option th:each="supply : ${snapshot.availableSupplies}"
+                                    th:value="${supply.id}"
+                                    th:text="${supply.name + ' (' + supply.unit + ')'}"
+                                    th:attr="data-unit-cost=${supply.unitCost != null ? supply.unitCost : 0},data-unit=${supply.unit != null ? supply.unit : ''}">
+                                Insumo
+                            </option>
+                        </select>
+
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm align-middle">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Insumo</th>
+                                    <th class="text-end">Unidad</th>
+                                    <th class="text-end">Cantidad por unidad</th>
+                                    <th class="text-end">Costo unitario</th>
+                                    <th class="text-end">Subtotal</th>
+                                    <th class="text-center">Acción</th>
+                                </tr>
+                                </thead>
+                                <tbody id="recipeLinesBody">
+                                <tr th:each="row : ${snapshot.recipeRows}">
+                                    <td>
+                                        <select class="form-select form-select-sm supply-select" name="supplyId" required>
+                                            <option value="">Seleccione insumo</option>
+                                            <option th:each="supply : ${snapshot.availableSupplies}"
+                                                    th:value="${supply.id}"
+                                                    th:text="${supply.name + ' (' + supply.unit + ')'}"
+                                                    th:selected="${supply.id == row.supplyId}"
+                                                    th:attr="data-unit-cost=${supply.unitCost != null ? supply.unitCost : 0},data-unit=${supply.unit != null ? supply.unit : ''}">
+                                                Insumo
+                                            </option>
+                                        </select>
+                                    </td>
+                                    <td class="text-end unit-cell" th:text="${row.unit}">unidad</td>
+                                    <td class="text-end">
+                                        <input type="number" class="form-control form-control-sm text-end quantity-input" name="quantityUsed" min="0.0001" step="0.0001" th:value="${#numbers.formatDecimal(row.quantityPerUnit, 1, 4)}" required>
+                                    </td>
+                                    <td class="text-end unit-cost-cell" th:text="${#numbers.formatDecimal(row.unitCost, 1, 6)}">0.000000</td>
+                                    <td class="text-end line-total-cell" th:text="${#numbers.formatDecimal(row.lineTotal, 1, 4)}">0.0000</td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-line-btn">Quitar</button>
+                                    </td>
+                                </tr>
+                                <tr id="emptyRecipeRow" th:if="${#lists.isEmpty(snapshot.recipeRows)}">
+                                    <td colspan="6" class="text-center text-muted">Agrega al menos un insumo para configurar la receta.</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="alert alert-info small">
+                            Si guardas sin líneas, la receta quedará vacía. La producción manual seguirá disponible, pero no se cargarán insumos automáticamente para este producto.
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a class="btn btn-outline-secondary" th:href="@{/production/recipes}">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">Guardar receta</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+(function () {
+    const addButton = document.getElementById('addRecipeLineBtn');
+    const body = document.getElementById('recipeLinesBody');
+    const optionsTemplate = document.getElementById('supplyOptionsTemplate');
+    const estimatedHeader = document.getElementById('estimatedUnitCostHeader');
+
+    function formatNumber(value, decimals) {
+        const number = Number(value || 0);
+        return number.toFixed(decimals);
+    }
+
+    function removeEmptyRow() {
+        const emptyRow = document.getElementById('emptyRecipeRow');
+        if (emptyRow) {
+            emptyRow.remove();
+        }
+    }
+
+    function buildRow() {
+        return `
+            <tr>
+                <td>
+                    <select class="form-select form-select-sm supply-select" name="supplyId" required>
+                        ${optionsTemplate.innerHTML}
+                    </select>
+                </td>
+                <td class="text-end unit-cell">-</td>
+                <td class="text-end">
+                    <input type="number" class="form-control form-control-sm text-end quantity-input" name="quantityUsed" min="0.0001" step="0.0001" value="1.0000" required>
+                </td>
+                <td class="text-end unit-cost-cell">0.000000</td>
+                <td class="text-end line-total-cell">0.0000</td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-line-btn">Quitar</button>
+                </td>
+            </tr>
+        `;
+    }
+
+    function updateRow(row) {
+        const select = row.querySelector('.supply-select');
+        const quantityInput = row.querySelector('.quantity-input');
+        const unitCell = row.querySelector('.unit-cell');
+        const unitCostCell = row.querySelector('.unit-cost-cell');
+        const lineTotalCell = row.querySelector('.line-total-cell');
+
+        const selectedOption = select?.selectedOptions?.[0];
+        const unit = selectedOption?.dataset?.unit || '-';
+        const unitCost = Number(selectedOption?.dataset?.unitCost || 0);
+        const quantity = Number(quantityInput?.value || 0);
+
+        if (unitCell) unitCell.textContent = unit;
+        if (unitCostCell) unitCostCell.textContent = formatNumber(unitCost, 6);
+        if (lineTotalCell) lineTotalCell.textContent = formatNumber(quantity * unitCost, 4);
+    }
+
+    function updateTotals() {
+        let total = 0;
+        body.querySelectorAll('tr').forEach(function (row) {
+            const select = row.querySelector('.supply-select');
+            const quantityInput = row.querySelector('.quantity-input');
+            if (!select || !quantityInput) {
+                return;
+            }
+
+            const selectedOption = select.selectedOptions?.[0];
+            const unitCost = Number(selectedOption?.dataset?.unitCost || 0);
+            const quantity = Number(quantityInput.value || 0);
+            total += quantity * unitCost;
+            updateRow(row);
+        });
+
+        if (estimatedHeader) {
+            estimatedHeader.textContent = `S/ ${formatNumber(total, 4)}`;
+        }
+    }
+
+    addButton?.addEventListener('click', function () {
+        removeEmptyRow();
+        body.insertAdjacentHTML('beforeend', buildRow());
+        updateTotals();
+    });
+
+    body?.addEventListener('change', function (event) {
+        if (event.target.classList.contains('supply-select')) {
+            updateTotals();
+        }
+    });
+
+    body?.addEventListener('input', function (event) {
+        if (event.target.classList.contains('quantity-input')) {
+            updateTotals();
+        }
+    });
+
+    body?.addEventListener('click', function (event) {
+        if (!event.target.classList.contains('remove-line-btn')) {
+            return;
+        }
+
+        event.target.closest('tr')?.remove();
+        updateTotals();
+    });
+
+    updateTotals();
+})();
+</script>
+</body>
+</html>

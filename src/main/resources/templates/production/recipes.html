@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Recetas de producción - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='production_recipes'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Recetas de producción</h1>
+                    <div class="text-muted small">Configura los insumos necesarios para producir cada producto terminado.</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-secondary" th:href="@{/production/overview}">Resumen</a>
+                    <a class="btn btn-primary" th:href="@{/production/new}">Nueva producción</a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}">Correcto</div>
+            <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}">Error</div>
+
+            <div class="alert alert-info shadow-sm">
+                Esta pantalla usa la composición de insumos del producto. Cuando registres una nueva producción, el sistema cargará esta receta como base y podrás ajustar las cantidades antes de guardar el borrador.
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Productos activos</div>
+                            <div class="fs-4 fw-bold" th:text="${snapshot.summary.totalProducts}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Recetas configuradas</div>
+                            <div class="fs-4 fw-bold text-success" th:text="${snapshot.summary.configuredRecipes}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Pendientes por configurar</div>
+                            <div class="fs-4 fw-bold text-warning" th:text="${snapshot.summary.pendingRecipes}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Costo promedio estimado</div>
+                            <div class="fs-5 fw-bold" th:text="${'S/ ' + #numbers.formatDecimal(snapshot.summary.averageEstimatedUnitCost, 1, 4)}">S/ 0.0000</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <strong>Productos y recetas</strong>
+                    <span class="small text-muted">Costo estimado por unidad producida</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Producto terminado</th>
+                                <th class="text-end">Stock</th>
+                                <th class="text-end">Insumos</th>
+                                <th class="text-end">Costo unitario estimado</th>
+                                <th>Estado</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row : ${snapshot.productRows}">
+                                <td>
+                                    <div class="fw-semibold" th:text="${row.productName}">Producto</div>
+                                    <div class="small text-muted" th:text="${'ID: ' + row.productId}">ID</div>
+                                </td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(row.productStock, 1, 2)}">0.00</td>
+                                <td class="text-end" th:text="${row.supplyCount}">0</td>
+                                <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(row.estimatedUnitCost, 1, 4)}">S/ 0.0000</td>
+                                <td>
+                                    <span th:if="${row.configured}" class="badge text-bg-success">Configurada</span>
+                                    <span th:unless="${row.configured}" class="badge text-bg-warning">Pendiente</span>
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
+                                        <a class="btn btn-outline-primary" th:href="@{|/production/recipes/${row.productId}|}">Editar receta</a>
+                                        <a class="btn btn-outline-secondary" th:href="@{/production/new}">Producir</a>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(snapshot.productRows)}">
+                                <td colspan="6" class="text-center text-muted">No hay productos activos para configurar recetas.</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

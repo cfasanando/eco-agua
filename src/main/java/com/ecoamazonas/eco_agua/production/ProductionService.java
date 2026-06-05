@@ -749,6 +749,61 @@ public class ProductionService {
 
 
     @Transactional(readOnly = true)
+    public ProductionPurchaseRequestSnapshot buildPurchaseRequest(Long productId, BigDecimal quantity) {
+        ProductionMaterialRequirementSnapshot materialSnapshot = buildMaterialRequirements(productId, quantity);
+        ProductionMaterialRequirementSummary materialSummary = materialSnapshot.getSummary();
+
+        List<ProductionPurchaseRequestRow> purchaseRows = new ArrayList<>();
+        BigDecimal totalShortageQuantity = BigDecimal.ZERO;
+        BigDecimal totalEstimatedCost = BigDecimal.ZERO;
+
+        for (ProductionMaterialRequirementRow row : materialSnapshot.getShortageRows()) {
+            if (row == null || row.isEnoughStock()) {
+                continue;
+            }
+
+            BigDecimal shortageQuantity = valueOrZero(row.getShortageQuantity()).setScale(4, RoundingMode.HALF_UP);
+            BigDecimal estimatedCost = valueOrZero(row.getShortageCost()).setScale(2, RoundingMode.HALF_UP);
+            totalShortageQuantity = totalShortageQuantity.add(shortageQuantity);
+            totalEstimatedCost = totalEstimatedCost.add(estimatedCost);
+
+            purchaseRows.add(new ProductionPurchaseRequestRow(
+                    row.getSupplyId(),
+                    row.getSupplyName(),
+                    row.getUnit(),
+                    valueOrZero(row.getRequiredQuantity()).setScale(4, RoundingMode.HALF_UP),
+                    valueOrZero(row.getAvailableQuantity()).setScale(4, RoundingMode.HALF_UP),
+                    shortageQuantity,
+                    valueOrZero(row.getUnitCost()).setScale(6, RoundingMode.HALF_UP),
+                    estimatedCost,
+                    "Por definir"
+            ));
+        }
+
+        purchaseRows.sort(Comparator
+                .comparing(ProductionPurchaseRequestRow::getEstimatedCost, Comparator.nullsLast(Comparator.naturalOrder()))
+                .reversed()
+                .thenComparing(ProductionPurchaseRequestRow::getSupplyName, Comparator.nullsLast(String::compareToIgnoreCase)));
+
+        ProductionPurchaseRequestSummary summary = new ProductionPurchaseRequestSummary(
+                materialSummary.getProductId(),
+                materialSummary.getProductName(),
+                materialSummary.getPlannedQuantity(),
+                materialSummary.getRequirementCount(),
+                purchaseRows.size(),
+                totalShortageQuantity.setScale(4, RoundingMode.HALF_UP),
+                totalEstimatedCost.setScale(2, RoundingMode.HALF_UP)
+        );
+
+        return new ProductionPurchaseRequestSnapshot(
+                summary,
+                purchaseRows,
+                materialSnapshot.getRequirementRows()
+        );
+    }
+
+
+    @Transactional(readOnly = true)
     public ProductionCapacitySnapshot buildCapacityOverview() {
         List<Product> products = productRepository.findByActiveTrueOrderByNameAsc();
         List<ProductionCapacityProductRow> rows = new ArrayList<>();

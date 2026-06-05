@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Solicitud de compra de insumos - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='production_purchase_request'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Solicitud de compra de insumos</h1>
+                    <div class="text-muted small">Genera una lista imprimible de los insumos faltantes para una producción planificada. Esta pantalla no mueve stock ni registra gastos.</div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap justify-content-end">
+                    <a class="btn btn-outline-secondary" th:href="@{/production/material-requirements}">Requerimientos</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/production/planning}">Planificación</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/warehouse/supplies-stock}">Stock de insumos</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/admin/suppliers}">Proveedores</a>
+                    <button type="button" class="btn btn-primary" onclick="window.print()" th:if="${snapshot.summary.hasProduct}">Imprimir</button>
+                </div>
+            </div>
+
+            <div class="alert alert-info shadow-sm">
+                Usa esta hoja como apoyo para coordinar compras o reposición. No crea una compra automática, no registra egresos y no afecta contabilidad.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light"><strong>Datos de la solicitud</strong></div>
+                <div class="card-body">
+                    <form class="row g-3 align-items-end" th:action="@{/production/material-purchase-request}" method="get">
+                        <div class="col-md-6">
+                            <label class="form-label">Producto terminado</label>
+                            <select class="form-select" name="productId" required>
+                                <option value="">Seleccione producto</option>
+                                <option th:each="product : ${products}"
+                                        th:value="${product.id}"
+                                        th:text="${product.name}"
+                                        th:selected="${selectedProductId != null and selectedProductId == product.id}">
+                                    Producto
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Cantidad a producir</label>
+                            <input type="number" class="form-control" name="quantity" min="0.01" step="0.01" th:value="${quantity}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-outline-primary w-100">Calcular solicitud</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Producto</div>
+                            <div class="fw-bold" th:text="${snapshot.summary.productName ?: 'Sin seleccionar'}">Sin seleccionar</div>
+                            <div class="small text-muted" th:if="${snapshot.summary.hasProduct}" th:text="${'Cantidad: ' + #numbers.formatDecimal(snapshot.summary.plannedQuantity, 1, 2)}">Cantidad</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Insumos de receta</div>
+                            <div class="fs-4 fw-bold" th:text="${snapshot.summary.requirementCount}">0</div>
+                            <div class="small text-muted">Líneas calculadas.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Líneas por comprar</div>
+                            <div class="fs-4 fw-bold" th:classappend="${snapshot.summary.purchaseLineCount > 0 ? ' text-danger' : ' text-success'}" th:text="${snapshot.summary.purchaseLineCount}">0</div>
+                            <div class="small text-muted">Solo faltantes.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Costo estimado de compra</div>
+                            <div class="fs-5 fw-bold" th:classappend="${snapshot.summary.totalEstimatedCost.compareTo(T(java.math.BigDecimal).ZERO) > 0 ? ' text-danger' : ' text-success'}" th:text="${'S/ ' + #numbers.formatDecimal(snapshot.summary.totalEstimatedCost, 1, 2)}">S/ 0.00</div>
+                            <div class="small text-muted" th:text="${'Cantidad faltante: ' + #numbers.formatDecimal(snapshot.summary.totalShortageQuantity, 1, 4)}">Cantidad faltante</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-warning shadow-sm" th:if="${snapshot.summary.hasProduct and !snapshot.summary.hasRecipe}">
+                Este producto todavía no tiene receta de insumos. Configura la receta antes de generar una solicitud de compra.
+                <a th:href="@{|/production/recipes/${snapshot.summary.productId}|}" class="alert-link">Editar receta</a>
+            </div>
+
+            <div class="alert alert-success shadow-sm" th:if="${snapshot.summary.hasProduct and snapshot.summary.hasRecipe and !snapshot.summary.hasPurchaseLines}">
+                No hay insumos faltantes para la cantidad indicada. Puedes producir con el stock actual.
+            </div>
+
+            <div class="row g-3">
+                <div class="col-xl-8">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <strong>Lista sugerida de compra</strong>
+                            <span class="small text-muted">Solo insumos faltantes</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Insumo</th>
+                                        <th class="text-end">Unidad</th>
+                                        <th class="text-end">Requerido</th>
+                                        <th class="text-end">Disponible</th>
+                                        <th class="text-end">Comprar</th>
+                                        <th class="text-end">Costo unitario</th>
+                                        <th class="text-end">Costo estimado</th>
+                                        <th>Proveedor</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="row : ${snapshot.purchaseRows}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${row.supplyName}">Insumo</div>
+                                            <div class="small text-muted" th:text="${'ID: ' + row.supplyId}">ID</div>
+                                        </td>
+                                        <td class="text-end" th:text="${row.unit ?: '-'}">unidad</td>
+                                        <td class="text-end" th:text="${#numbers.formatDecimal(row.requiredQuantity, 1, 4)}">0.0000</td>
+                                        <td class="text-end" th:text="${#numbers.formatDecimal(row.availableQuantity, 1, 4)}">0.0000</td>
+                                        <td class="text-end text-danger fw-semibold" th:text="${#numbers.formatDecimal(row.shortageQuantity, 1, 4)}">0.0000</td>
+                                        <td class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(row.unitCost, 1, 4)}">S/ 0.0000</td>
+                                        <td class="text-end fw-semibold" th:text="${'S/ ' + #numbers.formatDecimal(row.estimatedCost, 1, 2)}">S/ 0.00</td>
+                                        <td>
+                                            <span th:text="${row.suggestedSupplierName}">Por definir</span>
+                                            <div class="small text-muted">Validar proveedor antes de comprar.</div>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(snapshot.purchaseRows)}">
+                                        <td colspan="8" class="text-center text-muted">No hay insumos faltantes para mostrar o todavía no seleccionaste un producto con receta.</td>
+                                    </tr>
+                                    </tbody>
+                                    <tfoot th:if="${!#lists.isEmpty(snapshot.purchaseRows)}">
+                                    <tr>
+                                        <th colspan="4" class="text-end">Totales de compra sugerida</th>
+                                        <th class="text-end" th:text="${#numbers.formatDecimal(snapshot.summary.totalShortageQuantity, 1, 4)}">0.0000</th>
+                                        <th></th>
+                                        <th class="text-end" th:text="${'S/ ' + #numbers.formatDecimal(snapshot.summary.totalEstimatedCost, 1, 2)}">S/ 0.00</th>
+                                        <th></th>
+                                    </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+
+                            <div class="d-flex justify-content-end gap-2 mt-3 flex-wrap" th:if="${snapshot.summary.hasProduct}">
+                                <a class="btn btn-outline-secondary" th:href="@{|/production/recipes/${snapshot.summary.productId}|}">Editar receta</a>
+                                <a class="btn btn-outline-secondary" th:href="@{/production/material-requirements(productId=${snapshot.summary.productId}, quantity=${snapshot.summary.plannedQuantity})}">Ver requerimiento</a>
+                                <a class="btn btn-outline-secondary" th:href="@{/warehouse/supplies-stock}">Actualizar stock</a>
+                                <a class="btn btn-outline-secondary" th:href="@{/admin/suppliers}">Ver proveedores</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-light"><strong>Resumen para compras</strong></div>
+                        <div class="card-body">
+                            <p class="mb-2" th:if="${snapshot.summary.hasProduct}">
+                                Para producir
+                                <strong th:text="${#numbers.formatDecimal(snapshot.summary.plannedQuantity, 1, 2)}">0.00</strong>
+                                unidad(es) de
+                                <strong th:text="${snapshot.summary.productName}">Producto</strong>, se requiere comprar o reponer
+                                <strong th:text="${snapshot.summary.purchaseLineCount}">0</strong>
+                                línea(s) de insumo.
+                            </p>
+                            <p class="text-muted mb-0" th:unless="${snapshot.summary.hasProduct}">
+                                Selecciona un producto y cantidad para generar la solicitud.
+                            </p>
+                            <hr th:if="${snapshot.summary.hasProduct}">
+                            <div class="d-flex justify-content-between" th:if="${snapshot.summary.hasProduct}">
+                                <span>Costo estimado</span>
+                                <strong th:text="${'S/ ' + #numbers.formatDecimal(snapshot.summary.totalEstimatedCost, 1, 2)}">S/ 0.00</strong>
+                            </div>
+                            <div class="small text-muted mt-3">
+                                Esta solicitud es referencial. La compra real debe registrarse desde el flujo actual de gastos, compras o inventario cuando corresponda.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light"><strong>Detalle completo de insumos</strong></div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Insumo</th>
+                                        <th class="text-end">Faltante</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="row : ${snapshot.requirementRows}">
+                                        <td>
+                                            <div th:text="${row.supplyName}">Insumo</div>
+                                            <span th:if="${row.enoughStock}" class="badge text-bg-success">Alcanza</span>
+                                            <span th:unless="${row.enoughStock}" class="badge text-bg-danger">Falta</span>
+                                        </td>
+                                        <td class="text-end" th:classappend="${row.enoughStock ? ' text-success' : ' text-danger fw-semibold'}" th:text="${#numbers.formatDecimal(row.shortageQuantity, 1, 4)}">0.0000</td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(snapshot.requirementRows)}">
+                                        <td colspan="2" class="text-center text-muted">Sin detalle calculado.</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

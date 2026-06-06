@@ -1,5 +1,7 @@
 package com.ecoamazonas.eco_agua.cashflow;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -13,6 +15,8 @@ import java.util.List;
 
 @Controller
 public class CashflowController {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(CashflowController.class);
 
     private final CashflowService cashflowService;
     private final MonthlyFinancialSummaryService monthlyFinancialSummaryService;
@@ -85,7 +89,7 @@ public class CashflowController {
             netResult = summary.getNetCashResult();
             model.addAttribute("errorMessage", null);
         } catch (Exception ex) {
-            ex.printStackTrace();
+            LOGGER.error("Cashflow calculation failed for period {} to {}", start, end, ex);
 
             items = List.of();
             summary = new CashflowSummary();
@@ -123,7 +127,7 @@ public class CashflowController {
             monthlySummary = monthlyFinancialSummaryService.build(year, month);
             model.addAttribute("errorMessage", null);
         } catch (Exception ex) {
-            ex.printStackTrace();
+            LOGGER.error("Monthly financial summary calculation failed for year {} and month {}", year, month, ex);
             monthlySummary = monthlyFinancialSummaryService.build(LocalDate.now().getYear(), LocalDate.now().getMonthValue());
             model.addAttribute("errorMessage", "Error al calcular el resumen financiero mensual: " + ex.getMessage());
         }

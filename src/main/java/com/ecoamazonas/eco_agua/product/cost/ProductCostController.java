@@ -84,6 +84,7 @@ public class ProductCostController {
         model.addAttribute("product", product);
         model.addAttribute("startDate", start);
         model.addAttribute("endDate", end);
+        model.addAttribute("detail", industrialDetail);
         model.addAttribute("industrialDetail", industrialDetail);
         model.addAttribute("fullDetail", fullDetail);
         model.addAttribute("marginVsIndustrial", marginVsIndustrial);

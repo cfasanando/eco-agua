@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Rentabilidad de productos')"></head>
+<body>
+<div class="app-layout" th:with="activePage='product_profitability'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Rentabilidad de productos</h1>
+                    <p class="text-muted mb-0">
+                        Revisa ventas, costo variable, margen y utilidad bruta por producto en el periodo seleccionado.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-secondary btn-sm" th:href="@{/admin/products}">
+                        <i class="bi bi-box-seam"></i> Productos
+                    </a>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.print()">
+                        <i class="bi bi-printer"></i> Imprimir
+                    </button>
+                </div>
+            </div>
+
+            <div class="alert alert-info small mb-3">
+                Este reporte usa pedidos <strong>pagados</strong> y <strong>fiados</strong> del periodo.
+                El costo se calcula desde la receta/insumos configurados del producto. No es un reporte SUNAT oficial.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <form th:action="@{/admin/products/profitability}" method="get" class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label">Desde</label>
+                            <input type="date" class="form-control" name="start" th:value="${startDate}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Hasta</label>
+                            <input type="date" class="form-control" name="end" th:value="${endDate}">
+                        </div>
+                        <div class="col-md-4 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Analizar
+                            </button>
+                            <a th:href="@{/admin/products/profitability}" class="btn btn-outline-secondary">
+                                Limpiar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Ingresos del periodo</div>
+                            <div class="h4 mb-0">
+                                S/ <span th:text="${#numbers.formatDecimal(snapshot.summary.totalRevenue, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Costo variable estimado</div>
+                            <div class="h4 mb-0">
+                                S/ <span th:text="${#numbers.formatDecimal(snapshot.summary.totalCost, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Utilidad bruta estimada</div>
+                            <div class="h4 mb-0" th:classappend="${snapshot.summary.totalGrossProfit.signum() < 0 ? ' text-danger' : ' text-success'}">
+                                S/ <span th:text="${#numbers.formatDecimal(snapshot.summary.totalGrossProfit, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Margen promedio</div>
+                            <div class="h4 mb-0">
+                                <span th:text="${#numbers.formatDecimal(snapshot.summary.averageMarginPercent, 1, 'COMMA', 2, 'POINT')}">0.00</span>%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small mb-1">Producto más rentable</div>
+                            <div th:if="${snapshot.summary.mostProfitableProduct != null}">
+                                <div class="fw-semibold" th:text="${snapshot.summary.mostProfitableProduct.productName}">Producto</div>
+                                <div class="small text-success">
+                                    Utilidad: S/
+                                    <span th:text="${#numbers.formatDecimal(snapshot.summary.mostProfitableProduct.grossProfit, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                                </div>
+                            </div>
+                            <div th:if="${snapshot.summary.mostProfitableProduct == null}" class="text-muted small">
+                                Aún no hay ventas para comparar.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small mb-1">Producto más vendido</div>
+                            <div th:if="${snapshot.summary.topSellingProduct != null}">
+                                <div class="fw-semibold" th:text="${snapshot.summary.topSellingProduct.productName}">Producto</div>
+                                <div class="small">
+                                    Cantidad:
+                                    <span th:text="${#numbers.formatDecimal(snapshot.summary.topSellingProduct.quantitySold, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                                </div>
+                            </div>
+                            <div th:if="${snapshot.summary.topSellingProduct == null}" class="text-muted small">
+                                Aún no hay ventas para comparar.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small mb-1">Más vendido con margen bajo</div>
+                            <div th:if="${snapshot.summary.topSellingLowMarginProduct != null}">
+                                <div class="fw-semibold" th:text="${snapshot.summary.topSellingLowMarginProduct.productName}">Producto</div>
+                                <div class="small text-warning">
+                                    Margen:
+                                    <span th:text="${snapshot.summary.topSellingLowMarginProduct.marginPercent != null ? #numbers.formatDecimal(snapshot.summary.topSellingLowMarginProduct.marginPercent, 1, 'COMMA', 2, 'POINT') : '-'}">0.00</span>%
+                                </div>
+                            </div>
+                            <div th:if="${snapshot.summary.topSellingLowMarginProduct == null}" class="text-muted small">
+                                No hay productos vendidos con margen menor a 20%.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <strong>Detalle por producto</strong>
+                        <div class="small text-muted">Ordenado por utilidad bruta estimada.</div>
+                    </div>
+                    <span class="badge text-bg-light" th:text="${snapshot.summary.productCount + ' producto(s)'}">0 producto(s)</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th>Producto</th>
+                            <th class="text-end">Precio</th>
+                            <th class="text-end">Costo unit.</th>
+                            <th class="text-end">Margen unit.</th>
+                            <th class="text-end">Margen %</th>
+                            <th class="text-end">Vendidos</th>
+                            <th class="text-end">Ingresos</th>
+                            <th class="text-end">Costo total</th>
+                            <th class="text-end">Utilidad</th>
+                            <th>Estado</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(snapshot.rows)}">
+                            <td colspan="11" class="text-center text-muted py-4">No hay productos activos para analizar.</td>
+                        </tr>
+                        <tr th:each="row : ${snapshot.rows}">
+                            <td>
+                                <div class="fw-semibold" th:text="${row.productName}">Producto</div>
+                                <div class="small text-muted" th:if="${!row.hasRecipeCost}">Sin receta/costo configurado</div>
+                            </td>
+                            <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(row.salePrice, 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                            <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(row.unitCost, 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                            <td class="text-end" th:classappend="${row.unitMargin.signum() < 0 ? ' text-danger' : ''}">
+                                S/ <span th:text="${#numbers.formatDecimal(row.unitMargin, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </td>
+                            <td class="text-end">
+                                <span th:text="${row.marginPercent != null ? #numbers.formatDecimal(row.marginPercent, 1, 'COMMA', 2, 'POINT') : '-'}">0.00</span>%
+                            </td>
+                            <td class="text-end" th:text="${#numbers.formatDecimal(row.quantitySold, 1, 'COMMA', 2, 'POINT')}">0.00</td>
+                            <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(row.revenue, 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                            <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(row.totalCost, 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                            <td class="text-end fw-semibold" th:classappend="${row.grossProfit.signum() < 0 ? ' text-danger' : ' text-success'}">
+                                S/ <span th:text="${#numbers.formatDecimal(row.grossProfit, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </td>
+                            <td>
+                                <span th:if="${row.loss}" class="badge text-bg-danger">Pérdida</span>
+                                <span th:if="${!row.loss and row.lowMargin}" class="badge text-bg-warning">Margen bajo</span>
+                                <span th:if="${!row.loss and !row.lowMargin and row.hasRecipeCost}" class="badge text-bg-success">Rentable</span>
+                                <span th:if="${!row.hasRecipeCost}" class="badge text-bg-secondary">Sin costo</span>
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <a class="btn btn-outline-secondary" th:href="@{|/admin/products/${row.productId}/full-cost?start=${startDate}&end=${endDate}|}">
+                                        Costo
+                                    </a>
+                                    <a class="btn btn-outline-primary" th:href="@{|/production/recipes/${row.productId}|}">
+                                        Receta
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

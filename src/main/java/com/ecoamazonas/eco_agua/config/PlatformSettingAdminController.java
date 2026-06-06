@@ -32,15 +32,18 @@ public class PlatformSettingAdminController {
     private final PlatformSettingRepository platformSettingRepository;
     private final PlatformSettingService platformSettingService;
     private final SystemModuleService systemModuleService;
+    private final ClientBrandingPresetService clientBrandingPresetService;
     private final BusinessProperties businessProperties;
 
     public PlatformSettingAdminController(PlatformSettingRepository platformSettingRepository,
                                           PlatformSettingService platformSettingService,
                                           SystemModuleService systemModuleService,
+                                          ClientBrandingPresetService clientBrandingPresetService,
                                           BusinessProperties businessProperties) {
         this.platformSettingRepository = platformSettingRepository;
         this.platformSettingService = platformSettingService;
         this.systemModuleService = systemModuleService;
+        this.clientBrandingPresetService = clientBrandingPresetService;
         this.businessProperties = businessProperties;
     }
 
@@ -86,12 +89,28 @@ public class PlatformSettingAdminController {
                     finalValue = storePortalImage(setting, imageFile);
                 }
 
-                setting.setValue(finalValue);
+                setting.setValue(BrandingTextSanitizer.clean(finalValue));
                 platformSettingRepository.save(setting);
             }
 
             redirectAttributes.addFlashAttribute("successMessage", "Settings updated successfully.");
         } catch (IllegalArgumentException | IOException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        }
+
+        return "redirect:/admin/platform-settings";
+    }
+
+    @PostMapping("/apply-branding-preset")
+    public String applyBrandingPreset(@RequestParam("preset") String preset,
+                                      RedirectAttributes redirectAttributes) {
+        try {
+            clientBrandingPresetService.applyPreset(preset);
+            redirectAttributes.addFlashAttribute(
+                    "successMessage",
+                    "Perfil visual aplicado: " + clientBrandingPresetService.presetLabel(preset)
+            );
+        } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
         }
 

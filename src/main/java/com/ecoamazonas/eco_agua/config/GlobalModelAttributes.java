@@ -43,46 +43,46 @@ public class GlobalModelAttributes {
 
     @ModelAttribute
     public void addBusinessAttributes(Model model, Authentication authentication, HttpServletRequest request) {
-        model.addAttribute("businessProfileCode", businessProperties.getProfileCode());
-        model.addAttribute("businessName", businessProperties.getName());
-        model.addAttribute("businessShortName", businessProperties.getShortName());
-        model.addAttribute("businessTagline", businessProperties.getTagline());
-        model.addAttribute("businessType", businessProperties.getType());
-        model.addAttribute("businessAdminTitle", businessProperties.getAdminTitle());
-        model.addAttribute("businessLogo", businessProperties.getLogo());
-        model.addAttribute("businessAdminLogo", businessProperties.getAdminLogo());
-        model.addAttribute("businessWhatsappNumber", businessProperties.getWhatsappNumber());
-        model.addAttribute("businessCatalogWhatsappIntro", businessProperties.getCatalogWhatsappIntro());
-        model.addAttribute("businessProductLabel", businessProperties.getProductLabel());
-        model.addAttribute("businessProductPluralLabel", businessProperties.getProductPluralLabel());
-        model.addAttribute("businessCustomerLabel", businessProperties.getCustomerLabel());
-        model.addAttribute("businessCustomerPluralLabel", businessProperties.getCustomerPluralLabel());
-        model.addAttribute("businessSupplierLabel", businessProperties.getSupplierLabel());
-        model.addAttribute("businessSupplierPluralLabel", businessProperties.getSupplierPluralLabel());
-        model.addAttribute("businessSupplyLabel", businessProperties.getSupplyLabel());
-        model.addAttribute("businessSupplyPluralLabel", businessProperties.getSupplyPluralLabel());
-        model.addAttribute("businessDeliveryPersonLabel", businessProperties.getDeliveryPersonLabel());
-        model.addAttribute("businessDeliveryLabel", businessProperties.getDeliveryLabel());
-        model.addAttribute("businessContainerLabel", businessProperties.getContainerLabel());
-        model.addAttribute("businessContainerPluralLabel", businessProperties.getContainerPluralLabel());
-        model.addAttribute("businessProductionLabel", businessProperties.getProductionLabel());
-        model.addAttribute("businessReorderLabel", businessProperties.getReorderLabel());
-        model.addAttribute("businessProfilePriceHelpText", businessProperties.getProfilePriceHelpText());
+        String platformName = setting("platform.name", businessProperties.getName());
+        String platformTagline = setting("platform.tagline", businessProperties.getTagline());
+        String platformLogo = setting("platform.logo", businessProperties.getLogo());
+
+        model.addAttribute("businessProfileCode", clean(businessProperties.getProfileCode()));
+        model.addAttribute("businessName", platformName);
+        model.addAttribute("businessShortName", setting("platform.short_name", businessProperties.getShortName()));
+        model.addAttribute("businessTagline", platformTagline);
+        model.addAttribute("businessType", clean(businessProperties.getType()));
+        model.addAttribute("businessAdminTitle", setting("admin.brand.subtitle", businessProperties.getAdminTitle()));
+        model.addAttribute("businessLogo", platformLogo);
+        model.addAttribute("businessAdminLogo", setting("admin.brand.logo", businessProperties.getAdminLogo()));
+        model.addAttribute("businessWhatsappNumber", setting("public.whatsapp.number", businessProperties.getWhatsappNumber()));
+        model.addAttribute("businessCatalogWhatsappIntro", setting("public.catalog.whatsapp_intro", businessProperties.getCatalogWhatsappIntro()));
+        model.addAttribute("businessProductLabel", setting("business.label.product", businessProperties.getProductLabel()));
+        model.addAttribute("businessProductPluralLabel", setting("business.label.product_plural", businessProperties.getProductPluralLabel()));
+        model.addAttribute("businessCustomerLabel", setting("business.label.customer", businessProperties.getCustomerLabel()));
+        model.addAttribute("businessCustomerPluralLabel", setting("business.label.customer_plural", businessProperties.getCustomerPluralLabel()));
+        model.addAttribute("businessSupplierLabel", setting("business.label.supplier", businessProperties.getSupplierLabel()));
+        model.addAttribute("businessSupplierPluralLabel", setting("business.label.supplier_plural", businessProperties.getSupplierPluralLabel()));
+        model.addAttribute("businessSupplyLabel", setting("business.label.supply", businessProperties.getSupplyLabel()));
+        model.addAttribute("businessSupplyPluralLabel", setting("business.label.supply_plural", businessProperties.getSupplyPluralLabel()));
+        model.addAttribute("businessDeliveryPersonLabel", setting("business.label.delivery_person", businessProperties.getDeliveryPersonLabel()));
+        model.addAttribute("businessDeliveryLabel", setting("business.label.delivery", businessProperties.getDeliveryLabel()));
+        model.addAttribute("businessContainerLabel", setting("business.label.container", businessProperties.getContainerLabel()));
+        model.addAttribute("businessContainerPluralLabel", setting("business.label.container_plural", businessProperties.getContainerPluralLabel()));
+        model.addAttribute("businessProductionLabel", setting("business.label.production", businessProperties.getProductionLabel()));
+        model.addAttribute("businessReorderLabel", setting("business.label.reorder", businessProperties.getReorderLabel()));
+        model.addAttribute("businessProfilePriceHelpText", clean(businessProperties.getProfilePriceHelpText()));
 
         addModuleAttributes(model);
         Map<String, Boolean> visibleWidgets = addDashboardWidgetAttributes(model, authentication);
         addDashboardRoleDashboardAttributes(model, authentication);
 
-        String platformName = platformSettingService.get("platform.name", businessProperties.getName());
-        String platformTagline = platformSettingService.get("platform.tagline", businessProperties.getTagline());
-        String platformLogo = platformSettingService.get("platform.logo", businessProperties.getLogo());
-
-        String adminBrandTitle = platformSettingService.get("admin.brand.title", platformName);
-        String adminBrandSubtitle = platformSettingService.get("admin.brand.subtitle", businessProperties.getAdminTitle());
-        String adminBrandLogo = platformSettingService.get("admin.brand.logo", platformLogo);
-        String adminHomeBackgroundImage = platformSettingService.get("admin.home.background_image", "");
-        String adminHomeBackgroundColor = platformSettingService.get("admin.home.background_color", "#f3f5f9");
-        String adminHomeBackgroundOverlay = platformSettingService.get("admin.home.background_overlay", "rgba(243,245,249,0.88)");
+        String adminBrandTitle = setting("admin.brand.title", platformName);
+        String adminBrandSubtitle = setting("admin.brand.subtitle", businessProperties.getAdminTitle());
+        String adminBrandLogo = setting("admin.brand.logo", platformLogo);
+        String adminHomeBackgroundImage = setting("admin.home.background_image", "");
+        String adminHomeBackgroundColor = setting("admin.home.background_color", "#f3f5f9");
+        String adminHomeBackgroundOverlay = setting("admin.home.background_overlay", "rgba(243,245,249,0.88)");
 
         model.addAttribute("adminPlatformName", platformName);
         model.addAttribute("adminPlatformTagline", platformTagline);
@@ -152,6 +152,14 @@ public class GlobalModelAttributes {
             }
         }
         return false;
+    }
+
+    private String setting(String variable, String defaultValue) {
+        return platformSettingService.get(variable, defaultValue);
+    }
+
+    private String clean(String value) {
+        return BrandingTextSanitizer.clean(value);
     }
 
     private void addModuleAttributes(Model model) {

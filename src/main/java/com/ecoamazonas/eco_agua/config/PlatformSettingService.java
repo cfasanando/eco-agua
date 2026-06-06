@@ -15,10 +15,11 @@ public class PlatformSettingService {
     }
 
     public String get(String variable, String defaultValue) {
-        return platformSettingRepository.findByVariable(variable)
+        String value = platformSettingRepository.findByVariable(variable)
                 .map(PlatformSetting::getValue)
                 .filter(v -> v != null && !v.isBlank())
                 .orElse(defaultValue);
+        return BrandingTextSanitizer.clean(value);
     }
 
     /**
@@ -64,6 +65,8 @@ public class PlatformSettingService {
                 "string", "public_site", "Etiqueta del número de central en el top bar");
         ensure("public.topbar.whatsapp_label", businessProperties.getTopbarWhatsappLabel(),
                 "string", "public_site", "Texto del enlace de WhatsApp en el top bar");
+
+        ensureDefaultsForBusinessLabels();
 
         // WhatsApp / footer
         ensure("public.whatsapp.number", businessProperties.getWhatsappNumber(),
@@ -233,6 +236,42 @@ public class PlatformSettingService {
 
         ensureDefaultsForAdminBranding();
         ensureDefaultsForLoginAccess();
+    }
+
+
+    /**
+     * Ensure configurable business words exist so each client can adapt the UI
+     * without changing templates or forking the project.
+     */
+    public void ensureDefaultsForBusinessLabels() {
+        ensure("business.label.product", businessProperties.getProductLabel(),
+                "string", "platform", "Texto singular para producto");
+        ensure("business.label.product_plural", businessProperties.getProductPluralLabel(),
+                "string", "platform", "Texto plural para productos o catálogo");
+        ensure("business.label.customer", businessProperties.getCustomerLabel(),
+                "string", "platform", "Texto singular para cliente");
+        ensure("business.label.customer_plural", businessProperties.getCustomerPluralLabel(),
+                "string", "platform", "Texto plural para clientes");
+        ensure("business.label.supplier", businessProperties.getSupplierLabel(),
+                "string", "platform", "Texto singular para proveedor");
+        ensure("business.label.supplier_plural", businessProperties.getSupplierPluralLabel(),
+                "string", "platform", "Texto plural para proveedores");
+        ensure("business.label.supply", businessProperties.getSupplyLabel(),
+                "string", "platform", "Texto singular para insumo o material");
+        ensure("business.label.supply_plural", businessProperties.getSupplyPluralLabel(),
+                "string", "platform", "Texto plural para insumos o materiales");
+        ensure("business.label.delivery_person", businessProperties.getDeliveryPersonLabel(),
+                "string", "platform", "Texto para repartidor o responsable");
+        ensure("business.label.delivery", businessProperties.getDeliveryLabel(),
+                "string", "platform", "Texto para reparto o entrega");
+        ensure("business.label.container", businessProperties.getContainerLabel(),
+                "string", "platform", "Texto singular para envase o empaque");
+        ensure("business.label.container_plural", businessProperties.getContainerPluralLabel(),
+                "string", "platform", "Texto plural para envases o empaques");
+        ensure("business.label.production", businessProperties.getProductionLabel(),
+                "string", "platform", "Texto del módulo de producción, preparación o empaque");
+        ensure("business.label.reorder", businessProperties.getReorderLabel(),
+                "string", "platform", "Texto del módulo de reposición o seguimiento");
     }
 
     /**

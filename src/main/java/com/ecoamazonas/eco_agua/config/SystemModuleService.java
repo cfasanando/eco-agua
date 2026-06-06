@@ -66,6 +66,32 @@ public class SystemModuleService {
         return false;
     }
 
+    public void applyPreset(String presetKey) {
+        String normalizedPreset = normalizePresetKey(presetKey);
+
+        for (ModuleDefinition module : getModuleDefinitions()) {
+            if (module.locked()) {
+                continue;
+            }
+
+            boolean enabled = switch (normalizedPreset) {
+                case "aguaeco" -> module.recommendedForAguaEco();
+                case "belen" -> module.recommendedForBelen();
+                default -> throw new IllegalArgumentException("Unsupported module preset: " + presetKey);
+            };
+
+            updateModuleFlag(module.key(), enabled);
+        }
+    }
+
+    public String presetLabel(String presetKey) {
+        return switch (normalizePresetKey(presetKey)) {
+            case "aguaeco" -> "Agua Eco";
+            case "belen" -> "Productos de la Selva Belén";
+            default -> "Preset desconocido";
+        };
+    }
+
     public void updateModuleFlag(String key, boolean enabled) {
         ModuleDefinition definition = findDefinition(key);
         if (definition == null || definition.locked()) {
@@ -124,6 +150,23 @@ public class SystemModuleService {
         }
 
         return defaultValue;
+    }
+
+
+    private String normalizePresetKey(String presetKey) {
+        if (presetKey == null || presetKey.isBlank()) {
+            throw new IllegalArgumentException("Module preset is required.");
+        }
+
+        String normalized = presetKey.trim().toLowerCase(Locale.ROOT)
+                .replace("-", "")
+                .replace("_", "");
+
+        if (!"aguaeco".equals(normalized) && !"belen".equals(normalized)) {
+            throw new IllegalArgumentException("Unsupported module preset: " + presetKey);
+        }
+
+        return normalized;
     }
 
     private boolean defaultValueFor(String key) {

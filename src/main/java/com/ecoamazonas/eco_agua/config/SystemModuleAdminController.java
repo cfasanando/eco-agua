@@ -60,6 +60,22 @@ public class SystemModuleAdminController {
         return "redirect:/admin/system-modules";
     }
 
+    @PostMapping("/preset")
+    public String applyPreset(@RequestParam("preset") String preset,
+                              RedirectAttributes redirectAttributes) {
+        try {
+            systemModuleService.applyPreset(preset);
+            redirectAttributes.addFlashAttribute(
+                    "successMessage",
+                    "Module preset applied successfully: " + systemModuleService.presetLabel(preset) + "."
+            );
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+
+        return "redirect:/admin/system-modules";
+    }
+
     private String inputName(String moduleKey) {
         return "module_" + moduleKey;
     }

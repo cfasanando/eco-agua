@@ -26,15 +26,10 @@ public class SystemModuleAdminController {
 
         var modules = systemModuleService.getModuleDefinitions();
         long enabledCount = modules.stream().filter(SystemModuleService.ModuleDefinition::enabled).count();
-        long belenSuggestedCount = modules.stream().filter(SystemModuleService.ModuleDefinition::recommendedForBelen).count();
-        long aguaEcoSuggestedCount = modules.stream().filter(SystemModuleService.ModuleDefinition::recommendedForAguaEco).count();
-
         model.addAttribute("activePage", "system_modules");
         model.addAttribute("moduleGroups", systemModuleService.getModuleGroups());
         model.addAttribute("moduleTotalCount", modules.size());
         model.addAttribute("moduleEnabledCount", enabledCount);
-        model.addAttribute("moduleBelenSuggestedCount", belenSuggestedCount);
-        model.addAttribute("moduleAguaEcoSuggestedCount", aguaEcoSuggestedCount);
 
         return "admin/system_modules";
     }
@@ -55,22 +50,6 @@ public class SystemModuleAdminController {
             redirectAttributes.addFlashAttribute("successMessage", "System modules updated successfully.");
         } catch (RuntimeException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", "Error updating system modules: " + ex.getMessage());
-        }
-
-        return "redirect:/admin/system-modules";
-    }
-
-    @PostMapping("/preset")
-    public String applyPreset(@RequestParam("preset") String preset,
-                              RedirectAttributes redirectAttributes) {
-        try {
-            systemModuleService.applyPreset(preset);
-            redirectAttributes.addFlashAttribute(
-                    "successMessage",
-                    "Module preset applied successfully: " + systemModuleService.presetLabel(preset) + "."
-            );
-        } catch (IllegalArgumentException ex) {
-            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
         }
 
         return "redirect:/admin/system-modules";

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Rentabilidad por canal')"></head>
+<body>
+<div class="app-layout" th:with="activePage='product_channel_profitability'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Rentabilidad por canal de venta</h1>
+                    <p class="text-muted mb-0">
+                        Compara ingresos, costo estimado, utilidad bruta y margen por canal comercial.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-success btn-sm" th:href="@{/admin/products/profitability(start=${startDate},end=${endDate})}">
+                        <i class="bi bi-box-seam"></i> Por producto
+                    </a>
+                    <a class="btn btn-outline-secondary btn-sm" th:href="@{/income/sales/channels(startDate=${startDate},endDate=${endDate})}">
+                        <i class="bi bi-graph-up"></i> Ventas por canal
+                    </a>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.print()">
+                        <i class="bi bi-printer"></i> Imprimir
+                    </button>
+                </div>
+            </div>
+
+            <div class="alert alert-info small mb-3">
+                Este reporte usa pedidos <strong>pagados</strong> y <strong>fiados</strong> del periodo.
+                El costo se estima con la receta/insumos configurados por producto. Es una herramienta interna de gestión, no un reporte SUNAT oficial.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <form th:action="@{/admin/products/channel-profitability}" method="get" class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label">Desde</label>
+                            <input type="date" class="form-control" name="start" th:value="${startDate}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Hasta</label>
+                            <input type="date" class="form-control" name="end" th:value="${endDate}">
+                        </div>
+                        <div class="col-md-4 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Analizar
+                            </button>
+                            <a th:href="@{/admin/products/channel-profitability}" class="btn btn-outline-secondary">
+                                Limpiar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Ingresos por canales</div>
+                            <div class="h4 mb-0">
+                                S/ <span th:text="${#numbers.formatDecimal(snapshot.summary.totalRevenue, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted" th:text="${snapshot.summary.totalOrderCount + ' pedido(s)'}">0 pedido(s)</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Costo estimado</div>
+                            <div class="h4 mb-0">
+                                S/ <span th:text="${#numbers.formatDecimal(snapshot.summary.totalCost, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                <span th:text="${snapshot.summary.paidOrderCount}">0</span> pagados ·
+                                <span th:text="${snapshot.summary.creditOrderCount}">0</span> fiados
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Utilidad bruta estimada</div>
+                            <div class="h4 mb-0" th:classappend="${snapshot.summary.totalGrossProfit.signum() < 0 ? ' text-danger' : ' text-success'}">
+                                S/ <span th:text="${#numbers.formatDecimal(snapshot.summary.totalGrossProfit, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                <span th:text="${snapshot.summary.activeChannelCount}">0</span> canal(es) con movimiento
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Margen promedio</div>
+                            <div class="h4 mb-0">
+                                <span th:text="${#numbers.formatDecimal(snapshot.summary.averageMarginPercent, 1, 'COMMA', 2, 'POINT')}">0.00</span>%
+                            </div>
+                            <div class="small text-muted">
+                                <span th:text="${#numbers.formatDecimal(snapshot.summary.totalQuantitySold, 1, 'COMMA', 2, 'POINT')}">0.00</span> unidad(es)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small mb-1">Canal más rentable</div>
+                            <div th:if="${snapshot.summary.mostProfitableChannel != null}">
+                                <div class="fw-semibold" th:text="${snapshot.summary.mostProfitableChannel.channelLabel}">Canal</div>
+                                <div class="small text-success">
+                                    Utilidad: S/
+                                    <span th:text="${#numbers.formatDecimal(snapshot.summary.mostProfitableChannel.grossProfit, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                                </div>
+                            </div>
+                            <div th:if="${snapshot.summary.mostProfitableChannel == null}" class="text-muted small">
+                                Aún no hay ventas para comparar.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small mb-1">Canal con más ingresos</div>
+                            <div th:if="${snapshot.summary.topRevenueChannel != null}">
+                                <div class="fw-semibold" th:text="${snapshot.summary.topRevenueChannel.channelLabel}">Canal</div>
+                                <div class="small">
+                                    Ingresos: S/
+                                    <span th:text="${#numbers.formatDecimal(snapshot.summary.topRevenueChannel.revenue, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                                </div>
+                            </div>
+                            <div th:if="${snapshot.summary.topRevenueChannel == null}" class="text-muted small">
+                                Aún no hay ventas para comparar.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small mb-1">Canal vendido con margen bajo</div>
+                            <div th:if="${snapshot.summary.topSellingLowMarginChannel != null}">
+                                <div class="fw-semibold" th:text="${snapshot.summary.topSellingLowMarginChannel.channelLabel}">Canal</div>
+                                <div class="small text-warning">
+                                    Margen:
+                                    <span th:text="${snapshot.summary.topSellingLowMarginChannel.marginPercent != null ? #numbers.formatDecimal(snapshot.summary.topSellingLowMarginChannel.marginPercent, 1, 'COMMA', 2, 'POINT') : '-'}">0.00</span>%
+                                </div>
+                            </div>
+                            <div th:if="${snapshot.summary.topSellingLowMarginChannel == null}" class="text-muted small">
+                                No hay canales con margen menor a 20%.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <strong>Detalle por canal</strong>
+                        <div class="small text-muted">Ordenado por utilidad bruta estimada.</div>
+                    </div>
+                    <span class="badge text-bg-light" th:text="${snapshot.summary.channelCount + ' canal(es)'}">0 canal(es)</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th>Canal</th>
+                            <th class="text-end">Pedidos</th>
+                            <th class="text-end">Unidades</th>
+                            <th class="text-end">Ingresos</th>
+                            <th class="text-end">Costo estimado</th>
+                            <th class="text-end">Utilidad bruta</th>
+                            <th class="text-end">Margen %</th>
+                            <th class="text-end">Ticket prom.</th>
+                            <th>Lectura</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="row : ${snapshot.rows}" th:classappend="${!row.hasMovement() ? ' text-muted' : ''}">
+                            <td>
+                                <strong th:text="${row.channelLabel}">WhatsApp</strong>
+                                <div class="small text-muted" th:text="${row.channelCode}">WHATSAPP</div>
+                            </td>
+                            <td class="text-end">
+                                <span th:text="${row.orderCount}">0</span>
+                                <div class="small text-muted">
+                                    <span th:text="${row.paidOrderCount}">0</span> pag. ·
+                                    <span th:text="${row.creditOrderCount}">0</span> fiad.
+                                </div>
+                            </td>
+                            <td class="text-end" th:text="${#numbers.formatDecimal(row.quantitySold, 1, 'COMMA', 2, 'POINT')}">0.00</td>
+                            <td class="text-end">
+                                S/ <span th:text="${#numbers.formatDecimal(row.revenue, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </td>
+                            <td class="text-end">
+                                S/ <span th:text="${#numbers.formatDecimal(row.totalCost, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </td>
+                            <td class="text-end" th:classappend="${row.grossProfit.signum() < 0 ? ' text-danger' : ' text-success'}">
+                                S/ <span th:text="${#numbers.formatDecimal(row.grossProfit, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </td>
+                            <td class="text-end">
+                                <span th:text="${row.marginPercent != null ? #numbers.formatDecimal(row.marginPercent, 1, 'COMMA', 2, 'POINT') : '-'}">0.00</span>%
+                            </td>
+                            <td class="text-end">
+                                S/ <span th:text="${#numbers.formatDecimal(row.averageTicketAmount, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </td>
+                            <td>
+                                <span class="badge" th:classappend="${' ' + row.readingBadgeClass}" th:text="${row.reading}">Lectura</span>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(snapshot.rows)}">
+                            <td colspan="9" class="text-center text-muted py-4">
+                                No hay canales para mostrar.
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="alert alert-warning small mt-3 mb-0">
+                Si un canal vende mucho pero deja poco margen, revisa precios, comisiones, delivery, descuentos o promociones asociadas a ese canal.
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

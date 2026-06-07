@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Simulador de precios')"></head>
+<body>
+<div class="app-layout" th:with="activePage='product_price_simulator'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Simulador de precios y margen</h1>
+                    <p class="text-muted mb-0">
+                        Prueba precios antes de cambiarlos. Esta pantalla no modifica precios reales ni registra ventas.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-secondary btn-sm" th:href="@{/admin/products/profitability}">
+                        <i class="bi bi-graph-up-arrow"></i> Rentabilidad
+                    </a>
+                    <a class="btn btn-outline-secondary btn-sm" th:href="@{/admin/products}">
+                        <i class="bi bi-box-seam"></i> Productos
+                    </a>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.print()">
+                        <i class="bi bi-printer"></i> Imprimir
+                    </button>
+                </div>
+            </div>
+
+            <div class="alert alert-info small mb-3">
+                El simulador usa el costo variable calculado desde la receta/insumos configurados del producto.
+                No cambia el precio del catálogo y no es un reporte SUNAT oficial.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <form th:action="@{/admin/products/price-simulator}" method="get" class="row g-3 align-items-end">
+                        <div class="col-lg-5">
+                            <label class="form-label">Producto</label>
+                            <select class="form-select" name="productId" required>
+                                <option value="">Seleccionar producto</option>
+                                <option
+                                    th:each="product : ${snapshot.products}"
+                                    th:value="${product.id}"
+                                    th:selected="${snapshot.selectedProductId != null and product.id == snapshot.selectedProductId}"
+                                    th:text="${product.name + ' - S/ ' + #numbers.formatDecimal(product.price, 1, 'COMMA', 2, 'POINT')}"
+                                >Producto</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-3">
+                            <label class="form-label">Precio simulado</label>
+                            <input
+                                type="number"
+                                class="form-control"
+                                name="price"
+                                min="0"
+                                step="0.01"
+                                th:value="${snapshot.simulatedPrice != null and snapshot.simulatedPrice.signum() > 0 ? snapshot.simulatedPrice : ''}"
+                                placeholder="Ej. 4.00"
+                            >
+                        </div>
+                        <div class="col-lg-2">
+                            <label class="form-label">Cantidad estimada</label>
+                            <input
+                                type="number"
+                                class="form-control"
+                                name="quantity"
+                                min="0"
+                                step="0.01"
+                                th:value="${snapshot.estimatedQuantity != null and snapshot.estimatedQuantity.signum() > 0 ? snapshot.estimatedQuantity : 1}"
+                            >
+                        </div>
+                        <div class="col-lg-2 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-calculator"></i> Simular
+                            </button>
+                            <a th:href="@{/admin/products/price-simulator}" class="btn btn-outline-secondary">
+                                Limpiar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div th:if="${!snapshot.productSelected}" class="card shadow-sm">
+                <div class="card-body text-center text-muted py-5">
+                    Selecciona un producto, escribe un precio simulado y revisa si el margen conviene.
+                </div>
+            </div>
+
+            <th:block th:if="${snapshot.productSelected}" th:with="result=${snapshot.result}">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted small">Precio actual</div>
+                                <div class="h4 mb-0">S/ <span th:text="${#numbers.formatDecimal(result.currentPrice, 1, 'COMMA', 2, 'POINT')}">0.00</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted small">Costo unitario</div>
+                                <div class="h4 mb-0">S/ <span th:text="${#numbers.formatDecimal(result.unitCost, 1, 'COMMA', 2, 'POINT')}">0.00</span></div>
+                                <div class="small text-muted" th:if="${!result.hasRecipeCost}">Sin receta/costo configurado.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted small">Margen simulado</div>
+                                <div class="h4 mb-0" th:classappend="${result.simulatedUnitMargin.signum() < 0 ? ' text-danger' : ' text-success'}">
+                                    S/ <span th:text="${#numbers.formatDecimal(result.simulatedUnitMargin, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                                </div>
+                                <div class="small">
+                                    <span th:text="${result.simulatedMarginPercent != null ? #numbers.formatDecimal(result.simulatedMarginPercent, 1, 'COMMA', 2, 'POINT') : '-'}">0.00</span>% sobre precio
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted small">Utilidad simulada</div>
+                                <div class="h4 mb-0" th:classappend="${result.simulatedGrossProfit.signum() < 0 ? ' text-danger' : ' text-success'}">
+                                    S/ <span th:text="${#numbers.formatDecimal(result.simulatedGrossProfit, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                                </div>
+                                <div class="small text-muted">
+                                    Para <span th:text="${#numbers.formatDecimal(result.estimatedQuantity, 1, 'COMMA', 2, 'POINT')}">0.00</span> unidad(es)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-danger small" th:if="${result.belowCost}">
+                    El precio simulado está por debajo del costo unitario. Con este precio se vendería con pérdida.
+                </div>
+                <div class="alert alert-warning small" th:if="${!result.hasRecipeCost}">
+                    Este producto no tiene receta/costo configurado. Primero configura sus insumos para que el simulador sea confiable.
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-lg-7">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header">
+                                <strong>Comparación de escenario</strong>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Concepto</th>
+                                        <th class="text-end">Actual</th>
+                                        <th class="text-end">Simulado</th>
+                                        <th class="text-end">Diferencia</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr>
+                                        <td>Precio unitario</td>
+                                        <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(result.currentPrice, 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                                        <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(result.simulatedPrice, 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                                        <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(result.priceDifference, 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Margen unitario</td>
+                                        <td class="text-end" th:classappend="${result.currentUnitMargin.signum() < 0 ? ' text-danger' : ''}">
+                                            S/ <span th:text="${#numbers.formatDecimal(result.currentUnitMargin, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                                        </td>
+                                        <td class="text-end" th:classappend="${result.simulatedUnitMargin.signum() < 0 ? ' text-danger' : ' text-success'}">
+                                            S/ <span th:text="${#numbers.formatDecimal(result.simulatedUnitMargin, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                                        </td>
+                                        <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(result.simulatedUnitMargin.subtract(result.currentUnitMargin), 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Margen porcentual</td>
+                                        <td class="text-end"><span th:text="${result.currentMarginPercent != null ? #numbers.formatDecimal(result.currentMarginPercent, 1, 'COMMA', 2, 'POINT') : '-'}">0.00</span>%</td>
+                                        <td class="text-end"><span th:text="${result.simulatedMarginPercent != null ? #numbers.formatDecimal(result.simulatedMarginPercent, 1, 'COMMA', 2, 'POINT') : '-'}">0.00</span>%</td>
+                                        <td class="text-end">-</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Ingresos estimados</td>
+                                        <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(result.currentRevenue, 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                                        <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(result.simulatedRevenue, 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                                        <td class="text-end" th:classappend="${result.revenueDifference.signum() < 0 ? ' text-danger' : ' text-success'}">
+                                            S/ <span th:text="${#numbers.formatDecimal(result.revenueDifference, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Utilidad bruta estimada</td>
+                                        <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(result.currentGrossProfit, 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                                        <td class="text-end" th:classappend="${result.simulatedGrossProfit.signum() < 0 ? ' text-danger' : ' text-success'}">
+                                            S/ <span th:text="${#numbers.formatDecimal(result.simulatedGrossProfit, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                                        </td>
+                                        <td class="text-end" th:classappend="${result.profitDifference.signum() < 0 ? ' text-danger' : ' text-success'}">
+                                            S/ <span th:text="${#numbers.formatDecimal(result.profitDifference, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-5">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header">
+                                <strong>Lectura rápida</strong>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2">
+                                    Producto: <strong th:text="${result.productName}">Producto</strong>
+                                </p>
+                                <p class="mb-2">
+                                    Precio mínimo para no perder: <strong>S/ <span th:text="${#numbers.formatDecimal(result.minimumRecommendedPrice, 1, 'COMMA', 2, 'POINT')}">0.00</span></strong>
+                                </p>
+                                <p class="mb-2">
+                                    Costo variable total estimado:
+                                    <strong>S/ <span th:text="${#numbers.formatDecimal(result.totalVariableCost, 1, 'COMMA', 2, 'POINT')}">0.00</span></strong>
+                                </p>
+                                <p class="mb-0 text-muted small">
+                                    Usa este cálculo como apoyo de gestión. Antes de cambiar precios reales, revisa competencia,
+                                    promociones, reparto y forma de pago del cliente.
+                                </p>
+                            </div>
+                            <div class="card-footer d-flex gap-2 flex-wrap">
+                                <a class="btn btn-outline-secondary btn-sm" th:href="@{|/admin/products/${result.productId}/full-cost|}">
+                                    Ver costo
+                                </a>
+                                <a class="btn btn-outline-primary btn-sm" th:href="@{|/production/recipes/${result.productId}|}">
+                                    Ver receta
+                                </a>
+                                <a class="btn btn-outline-success btn-sm" th:href="@{|/admin/products/profitability|}">
+                                    Rentabilidad
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </th:block>
+        </main>
+    </div>
+</div>
+</body>
+</html>

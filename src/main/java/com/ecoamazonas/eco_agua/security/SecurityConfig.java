@@ -304,7 +304,7 @@ public class SecurityConfig {
 
                 .requestMatchers("/home").hasAnyAuthority(DASHBOARD_VIEW)
                 .requestMatchers("/dashboard/widget-preferences/**").hasAnyAuthority(DASHBOARD_VIEW)
-                .requestMatchers("/dashboard/business").hasAnyAuthority(REPORTS_VIEW)
+                .requestMatchers("/dashboard/business", "/dashboard/areas").hasAnyAuthority(REPORTS_VIEW)
                 .requestMatchers("/dashboard/business-overview", "/dashboard/monthly-followup").hasAnyAuthority(REPORTS_VIEW)
                 .requestMatchers("/dashboard/commercial-daily").hasAnyAuthority(SALES_VIEW)
 

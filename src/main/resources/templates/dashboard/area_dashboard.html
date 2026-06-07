@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Dashboard por áreas')}"></head>
+<body>
+<div class="app-layout" th:with="activePage='area_dashboard'">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Resumen por áreas</div>
+                    <h1 class="h4 mb-1">Dashboard por áreas</h1>
+                    <p class="text-muted mb-0">
+                        Vista consolidada de marketing, ventas, logística, finanzas y contabilidad interna.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-secondary btn-sm" th:href="@{/dashboard/business(start=${startDate},end=${endDate})}">
+                        <i class="bi bi-clipboard-data"></i> Gerencia
+                    </a>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.print()">
+                        <i class="bi bi-printer"></i> Imprimir
+                    </button>
+                </div>
+            </div>
+
+            <div class="alert alert-info small mb-3">
+                Este tablero resume áreas operativas para gestión interna. No reemplaza los reportes detallados ni reportes SUNAT oficiales.
+            </div>
+
+            <div class="alert alert-warning small mb-3" th:if="${snapshot.hasSectionErrors()}">
+                El dashboard cargó con datos parciales. No se pudo leer:
+                <span th:each="section, iter : ${snapshot.sectionErrors}">
+                    <strong th:text="${section}">sección</strong><span th:if="${!iter.last}">, </span>
+                </span>.
+                Las áreas restantes siguen disponibles desde sus pantallas individuales.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <form th:action="@{/dashboard/areas}" method="get" class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Desde</label>
+                            <input type="date" class="form-control" name="start" th:value="${startDate}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Hasta</label>
+                            <input type="date" class="form-control" name="end" th:value="${endDate}">
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Actualizar resumen
+                            </button>
+                        </div>
+                        <div class="col-md-3 text-md-end small text-muted">
+                            Periodo: <strong th:text="${rangeDays}">30</strong> día(s) ·
+                            Áreas: <strong th:text="${snapshot.sectionCount}">5</strong>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12" th:each="section : ${snapshot.sections}">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                            <div class="d-flex align-items-start gap-2">
+                                <div class="rounded-circle bg-light p-2 text-primary">
+                                    <i class="bi" th:classappend="${section.icon}"></i>
+                                </div>
+                                <div>
+                                    <h2 class="h5 mb-1" th:text="${section.title}">Área</h2>
+                                    <p class="text-muted small mb-0" th:text="${section.subtitle}">Resumen del área</p>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="badge" th:classappend="${' text-bg-' + section.statusClass}" th:text="${section.statusLabel}">Estado</span>
+                                <a class="btn btn-outline-primary btn-sm" th:if="${section.hasPrimaryAction()}" th:href="${section.primaryActionUrl}" th:text="${section.primaryActionLabel}">Abrir</a>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6 col-xl-3" th:each="metric : ${section.metrics}">
+                                    <div class="border rounded-3 p-3 h-100">
+                                        <div class="d-flex justify-content-between align-items-start gap-2">
+                                            <div>
+                                                <div class="text-muted small" th:text="${metric.label}">Indicador</div>
+                                                <div class="h5 mb-1" th:text="${metric.value}">0</div>
+                                            </div>
+                                            <span class="badge" th:classappend="${' text-bg-' + metric.badgeClass}">&nbsp;</span>
+                                        </div>
+                                        <div class="small text-muted mb-2" th:text="${metric.helper}">Detalle</div>
+                                        <a class="small" th:if="${metric.hasAction()}" th:href="${metric.actionUrl}" th:text="${metric.actionLabel}">Ver</a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-2" th:if="${section.hasHighlights()}">
+                                <div class="col-md-6" th:each="highlight : ${section.highlights}">
+                                    <div class="alert alert-light border small mb-0">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        <span th:text="${highlight}">Lectura rápida</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mt-3">
+                <div class="card-body small text-muted">
+                    El objetivo de esta pantalla es orientar decisiones rápidas. Para modificar datos o revisar detalles, usa las acciones de cada área.
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div th:replace="~{fragments/scripts_admin :: adminScripts}"></div>
+</body>
+</html>

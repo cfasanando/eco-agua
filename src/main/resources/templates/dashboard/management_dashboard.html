@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('Dashboard gerencial')}"></head>
+<body>
+<div class="app-layout" th:with="activePage='management_dashboard'">
+    <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+
+    <div class="main-content">
+        <header th:replace="~{fragments/topbar :: topbar}"></header>
+
+        <main class="content-wrapper">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+                <div>
+                    <div class="small text-muted mb-1">Gerencia</div>
+                    <h1 class="h4 mb-1">Dashboard gerencial</h1>
+                    <p class="text-muted mb-0">
+                        Resumen ejecutivo de ventas, caja, rentabilidad, stock, producción, cuentas pendientes y alertas.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-secondary btn-sm" th:href="@{/dashboard/business-overview}">
+                        <i class="bi bi-speedometer2"></i> Estado del negocio
+                    </a>
+                    <a class="btn btn-outline-success btn-sm" th:href="@{/admin/products/profitability(start=${startDate},end=${endDate})}">
+                        <i class="bi bi-graph-up-arrow"></i> Rentabilidad
+                    </a>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.print()">
+                        <i class="bi bi-printer"></i> Imprimir
+                    </button>
+                </div>
+            </div>
+
+            <div class="alert alert-info small mb-3">
+                Este tablero es de gestión interna. La utilidad y los costos son estimados con la información registrada.
+                No es un reporte SUNAT oficial.
+            </div>
+
+            <div class="alert alert-warning small mb-3" th:if="${snapshot.hasSectionErrors()}">
+                El dashboard cargó con datos parciales. No se pudo leer:
+                <span th:each="section, iter : ${snapshot.sectionErrors}">
+                    <strong th:text="${section}">sección</strong><span th:if="${!iter.last}">, </span>
+                </span>.
+                Las demás partes del sistema pueden seguir funcionando por separado.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <form th:action="@{/dashboard/business}" method="get" class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Desde</label>
+                            <input type="date" class="form-control" name="start" th:value="${startDate}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Hasta</label>
+                            <input type="date" class="form-control" name="end" th:value="${endDate}">
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Actualizar dashboard
+                            </button>
+                        </div>
+                        <div class="col-md-3 text-md-end small text-muted">
+                            Periodo: <strong th:text="${rangeDays}">30</strong> día(s)
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-success-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Ventas comerciales</div>
+                            <div class="h4 mb-1">
+                                S/ <span th:text="${#numbers.formatDecimal(snapshot.commercialSales, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                Pagadas: <span th:text="${snapshot.paidOrdersCount}">0</span> ·
+                                Fiadas: <span th:text="${snapshot.creditOrdersCount}">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-primary-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Ingresos registrados</div>
+                            <div class="h4 mb-1">
+                                S/ <span th:text="${#numbers.formatDecimal(snapshot.totalIncomes, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                Caja neta: S/ <span th:text="${#numbers.formatDecimal(snapshot.netResult, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100" th:classappend="${snapshot.estimatedGrossProfit.signum() < 0 ? ' border-danger-subtle' : ' border-success-subtle'}">
+                        <div class="card-body">
+                            <div class="text-muted small">Utilidad bruta estimada</div>
+                            <div class="h4 mb-1" th:classappend="${snapshot.estimatedGrossProfit.signum() < 0 ? ' text-danger' : ' text-success'}">
+                                S/ <span th:text="${#numbers.formatDecimal(snapshot.estimatedGrossProfit, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                Margen: <span th:text="${#numbers.formatDecimal(snapshot.estimatedGrossMarginPercent, 1, 'COMMA', 2, 'POINT')}">0.00</span>%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100 border-warning-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Alertas ejecutivas</div>
+                            <div class="h4 mb-1" th:text="${snapshot.alertCount}">0</div>
+                            <div class="small text-muted">
+                                Stock crítico: <span th:text="${snapshot.lowStockCount}">0</span> ·
+                                Borradores contables: <span th:text="${snapshot.accountingDraftCount}">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Cuentas por cobrar</div>
+                            <div class="h5 mb-1">
+                                S/ <span th:text="${#numbers.formatDecimal(snapshot.totalCreditPending, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <a class="small" th:href="@{/income/credit}">Ver cobranzas</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Cuentas por pagar</div>
+                            <div class="h5 mb-1">
+                                S/ <span th:text="${#numbers.formatDecimal(snapshot.accountsPayableAmount, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                            </div>
+                            <div class="small text-muted">
+                                Vencidas: <span th:text="${snapshot.overdueAccountsPayableCount}">0</span>
+                            </div>
+                            <a class="small" th:href="@{/expenses/debts}">Ver pagos</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Producción pendiente</div>
+                            <div class="h5 mb-1" th:text="${snapshot.productionDraftOrders}">0</div>
+                            <div class="small text-muted">
+                                Calidad pendiente: <span th:text="${snapshot.pendingQualityOrders}">0</span>
+                            </div>
+                            <a class="small" th:href="@{/production/schedule}">Ver agenda</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Canales activos</div>
+                            <div class="h5 mb-1" th:text="${snapshot.activeChannelCount}">0</div>
+                            <div class="small text-muted">
+                                Pedidos: <span th:text="${snapshot.channelOrderCount}">0</span>
+                            </div>
+                            <a class="small" th:href="@{/admin/products/channel-profitability(start=${startDate},end=${endDate})}">Ver canales</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>Alertas y decisiones rápidas</strong>
+                                <div class="small text-muted">Prioriza lo que requiere revisión operativa o gerencial.</div>
+                            </div>
+                            <span class="badge text-bg-light" th:text="${snapshot.alertCount + ' alerta(s)'}">0 alertas</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="vstack gap-2">
+                                <div th:each="alert : ${snapshot.alerts}" class="alert mb-0" th:classappend="${alert.alertClass}">
+                                    <div class="d-flex justify-content-between gap-2 flex-wrap">
+                                        <div>
+                                            <span class="badge me-1" th:classappend="${alert.badgeClass}" th:text="${alert.severity}">info</span>
+                                            <strong th:text="${alert.title}">Alerta</strong>
+                                            <div class="small mt-1" th:text="${alert.message}">Detalle de alerta.</div>
+                                        </div>
+                                        <a th:if="${alert.hasAction()}" class="btn btn-sm btn-outline-dark align-self-start"
+                                           th:href="${alert.actionUrl}" th:text="${alert.actionLabel}">Revisar</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <strong>Accesos gerenciales</strong>
+                            <div class="small text-muted">Pantallas clave para revisar el negocio.</div>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            <a class="list-group-item list-group-item-action d-flex justify-content-between" th:href="@{/admin/products/profitability(start=${startDate},end=${endDate})}">
+                                <span><i class="bi bi-graph-up-arrow me-2"></i>Rentabilidad por producto</span>
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                            <a class="list-group-item list-group-item-action d-flex justify-content-between" th:href="@{/admin/products/price-simulator}">
+                                <span><i class="bi bi-calculator me-2"></i>Simulador de precios</span>
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                            <a class="list-group-item list-group-item-action d-flex justify-content-between" th:href="@{/cashflow}">
+                                <span><i class="bi bi-cash-stack me-2"></i>Flujo de caja</span>
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                            <a class="list-group-item list-group-item-action d-flex justify-content-between" th:href="@{/warehouse/reorder-suggestions}">
+                                <span><i class="bi bi-box-seam me-2"></i>Reposición y stock</span>
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                            <a class="list-group-item list-group-item-action d-flex justify-content-between" th:href="@{/accounting/control-panel}">
+                                <span><i class="bi bi-journal-check me-2"></i>Control contable</span>
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <strong>Productos más importantes</strong>
+                            <a class="small" th:href="@{/admin/products/profitability(start=${startDate},end=${endDate})}">Ver detalle</a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th class="text-end">Unidades</th>
+                                    <th class="text-end">Ingresos</th>
+                                    <th class="text-end">Utilidad</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:if="${#lists.isEmpty(snapshot.productRows)}">
+                                    <td colspan="4" class="text-center text-muted py-4">No hay información de productos.</td>
+                                </tr>
+                                <tr th:each="row, iter : ${snapshot.productRows}" th:if="${iter.index < 6}">
+                                    <td>
+                                        <div class="fw-semibold" th:text="${row.productName}">Producto</div>
+                                        <div class="small text-muted">
+                                            Margen: <span th:text="${row.marginPercent != null ? #numbers.formatDecimal(row.marginPercent, 1, 'COMMA', 2, 'POINT') + '%' : 'Sin precio'}">0%</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-end" th:text="${#numbers.formatDecimal(row.quantitySold, 1, 'COMMA', 2, 'POINT')}">0.00</td>
+                                    <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(row.revenue, 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                                    <td class="text-end" th:classappend="${row.grossProfit != null and row.grossProfit.signum() < 0 ? ' text-danger' : ' text-success'}">
+                                        S/ <span th:text="${#numbers.formatDecimal(row.grossProfit, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <strong>Canales de venta</strong>
+                            <a class="small" th:href="@{/admin/products/channel-profitability(start=${startDate},end=${endDate})}">Ver detalle</a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                <tr>
+                                    <th>Canal</th>
+                                    <th class="text-end">Pedidos</th>
+                                    <th class="text-end">Ingresos</th>
+                                    <th class="text-end">Margen</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:if="${#lists.isEmpty(snapshot.channelRows)}">
+                                    <td colspan="4" class="text-center text-muted py-4">No hay información de canales.</td>
+                                </tr>
+                                <tr th:each="row, iter : ${snapshot.channelRows}" th:if="${iter.index < 6}">
+                                    <td>
+                                        <div class="fw-semibold" th:text="${row.channelLabel}">Canal</div>
+                                        <span class="badge" th:classappend="${row.readingBadgeClass}" th:text="${row.reading}">Lectura</span>
+                                    </td>
+                                    <td class="text-end" th:text="${row.orderCount}">0</td>
+                                    <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(row.revenue, 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                                    <td class="text-end">
+                                        <span th:text="${row.marginPercent != null ? #numbers.formatDecimal(row.marginPercent, 1, 'COMMA', 2, 'POINT') + '%' : '0.00%'}">0.00%</span>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <strong>Stock crítico</strong>
+                            <a class="small" th:href="@{/warehouse/products-stock}">Ver stock</a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <tbody>
+                                <tr th:if="${#lists.isEmpty(snapshot.lowStockProducts)}">
+                                    <td class="text-center text-muted py-4">No hay productos con stock crítico.</td>
+                                </tr>
+                                <tr th:each="row : ${snapshot.lowStockProducts}">
+                                    <td>
+                                        <div class="fw-semibold" th:text="${row.productName}">Producto</div>
+                                        <span class="badge" th:classappend="${row.badgeClass}" th:text="${row.stockLabel}">Estado</span>
+                                    </td>
+                                    <td class="text-end">Stock: <span th:text="${#numbers.formatDecimal(row.stock, 1, 'COMMA', 2, 'POINT')}">0.00</span></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <strong>Producción por atender</strong>
+                            <a class="small" th:href="@{/production/schedule}">Ver agenda</a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <tbody>
+                                <tr th:if="${#lists.isEmpty(snapshot.pendingQualityRows)}">
+                                    <td class="text-center text-muted py-4">No hay controles de calidad pendientes.</td>
+                                </tr>
+                                <tr th:each="row : ${snapshot.pendingQualityRows}">
+                                    <td>
+                                        <div class="fw-semibold" th:text="${row.product != null ? row.product.name : 'Producto'}">Producto</div>
+                                        <div class="small text-muted">
+                                            Fecha: <span th:text="${row.productionDate != null ? #temporals.format(row.productionDate, 'dd/MM/yyyy') : 'Sin fecha'}">01/06/2026</span>
+                                            · Lote: <span th:text="${row.batchCode ?: 'Sin lote'}">Sin lote</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-end">
+                                        <a class="btn btn-outline-primary btn-sm" th:href="@{/production/{id}/quality(id=${row.id})}">Calidad</a>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<div th:replace="~{fragments/scripts_admin :: adminScripts}"></div>
+</body>
+</html>

@@ -51,6 +51,7 @@ public class SystemModuleAccessFilter extends OncePerRequestFilter {
             ModuleRoute.prefix("/cashflow/break-even", "break_even"),
             ModuleRoute.prefix("/cashflow", "cashflow"),
             ModuleRoute.prefix("/admin/price-simulator", "price_simulator"),
+            ModuleRoute.prefix("/dashboard/business", "dashboard"),
             ModuleRoute.prefix("/dashboard/business-overview", "business_overview"),
             ModuleRoute.prefix("/dashboard/monthly-followup", "monthly_followup"),
             ModuleRoute.prefix("/dashboard/commercial-daily", "commercial_daily"),

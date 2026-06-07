@@ -118,11 +118,22 @@ public class SecurityConfig {
             "ver_cashflow", "ver_contabilidad", "ver_punto_equilibrio", "ver_finanzas"
     );
 
+    private static final String[] FINANCE_WRITE = authorities(
+            ROLE_OWNER, ROLE_FINANCE,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_ADMIN_CONT
+    );
+
     private static final String[] PRODUCTS_VIEW = authorities(
             ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_SALES, ROLE_FINANCE, ROLE_LOGISTICS,
             ROLE_PRODUCTION, ROLE_READONLY,
             LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_ADMIN_MKT, LEGACY_SUPERVISOR, LEGACY_OPERARIO,
             "ver_productos", "administra_productos"
+    );
+
+    private static final String[] PROFITABILITY_VIEW = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_READONLY,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_ADMIN_CONT,
+            "ver_reportes", "ver_finanzas"
     );
 
     private static final String[] PRODUCTS_WRITE = authorities(
@@ -293,6 +304,7 @@ public class SecurityConfig {
 
                 .requestMatchers("/home").hasAnyAuthority(DASHBOARD_VIEW)
                 .requestMatchers("/dashboard/widget-preferences/**").hasAnyAuthority(DASHBOARD_VIEW)
+                .requestMatchers("/dashboard/business").hasAnyAuthority(REPORTS_VIEW)
                 .requestMatchers("/dashboard/business-overview", "/dashboard/monthly-followup").hasAnyAuthority(REPORTS_VIEW)
                 .requestMatchers("/dashboard/commercial-daily").hasAnyAuthority(SALES_VIEW)
 
@@ -309,11 +321,16 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/expenses/**").hasAnyAuthority(EXPENSE_WRITE)
                 .requestMatchers("/expenses/**").hasAnyAuthority(EXPENSE_VIEW)
 
+                .requestMatchers(HttpMethod.POST, "/accounting/**", "/cashflow/**", "/admin/price-simulator/**").hasAnyAuthority(FINANCE_WRITE)
                 .requestMatchers("/accounting/**", "/cashflow/**", "/admin/price-simulator/**").hasAnyAuthority(FINANCE_VIEW)
 
                 .requestMatchers(HttpMethod.POST, "/admin/clients/**", "/admin/client-profiles/**").hasAnyAuthority(CLIENTS_WRITE)
                 .requestMatchers("/admin/clients/**", "/admin/client-profiles/**").hasAnyAuthority(CLIENTS_VIEW)
 
+                .requestMatchers("/admin/products/profitability", "/admin/products/profitability/**",
+                        "/admin/products/channel-profitability", "/admin/products/channel-profitability/**",
+                        "/admin/products/price-simulator", "/admin/products/price-simulator/**")
+                    .hasAnyAuthority(PROFITABILITY_VIEW)
                 .requestMatchers(HttpMethod.POST, "/admin/products/**").hasAnyAuthority(PRODUCTS_WRITE)
                 .requestMatchers("/admin/products/**").hasAnyAuthority(PRODUCTS_VIEW)
                 .requestMatchers(HttpMethod.POST, "/admin/categories/**").hasAnyAuthority(CATEGORIES_WRITE)

@@ -37,6 +37,7 @@
     <th:block th:if="${moduleBusinessOverviewEnabled or moduleMonthlyFollowupEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','ADMIN_RRHH','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_HR','ROLE_READONLY')">
       <a
         th:if="${moduleBusinessOverviewEnabled}"
+        sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_READONLY','ver_reportes','ver_finanzas')"
         th:href="@{/dashboard/business}"
         class="menu-link"
         th:classappend="${activePage == 'management_dashboard' ? ' active' : ''}"
@@ -47,6 +48,7 @@
 
       <a
         th:if="${moduleBusinessOverviewEnabled}"
+        sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_READONLY','ver_reportes','ver_finanzas')"
         th:href="@{/dashboard/business-overview}"
         class="menu-link"
         th:classappend="${activePage == 'business_overview' ? ' active' : ''}"
@@ -57,6 +59,7 @@
 
       <a
         th:if="${moduleMonthlyFollowupEnabled}"
+        sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_READONLY','ver_reportes','ver_finanzas')"
         th:href="@{/dashboard/monthly-followup}"
         class="menu-link"
         th:classappend="${activePage == 'monthly_followup' ? ' active' : ''}"
@@ -392,6 +395,7 @@
                 <span th:text="${businessProductPluralLabel} ?: 'Productos'">Productos</span>
               </a>
               <a
+                sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_READONLY','ver_reportes','ver_finanzas')"
                 th:href="@{/admin/products/profitability}"
                 class="menu-link submenu"
                 th:classappend="${activePage == 'product_profitability' ? ' active' : ''}"
@@ -400,6 +404,7 @@
                 <span>Costos y rentabilidad</span>
               </a>
               <a
+                sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_READONLY','ver_reportes','ver_finanzas')"
                 th:href="@{/admin/products/price-simulator}"
                 class="menu-link submenu"
                 th:classappend="${activePage == 'product_price_simulator' ? ' active' : ''}"
@@ -408,6 +413,7 @@
                 <span>Simulador de precios</span>
               </a>
               <a
+                sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_READONLY','ver_reportes','ver_finanzas')"
                 th:href="@{/admin/products/channel-profitability}"
                 class="menu-link submenu"
                 th:classappend="${activePage == 'product_channel_profitability' ? ' active' : ''}"
@@ -547,7 +553,7 @@
         </div>
       </th:block>
 
-      <th:block th:if="${moduleFinanceSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE')">
+      <th:block th:if="${moduleFinanceSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_READONLY','ver_finanzas','ver_contabilidad','ver_cashflow')">
         <div
           class="menu-group"
           th:with="isFinanceActive=${activePage == 'accounting_sales_registry'

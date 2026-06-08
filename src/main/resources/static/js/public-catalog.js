@@ -253,11 +253,48 @@
         }
     }
 
+    function openCatalogFilters() {
+        document.body.classList.add('catalog-filter-open');
+        const trigger = document.querySelector('.js-catalog-filter-open');
+        const panel = document.querySelector('#catalogFilterPanel');
+        if (trigger) {
+            trigger.setAttribute('aria-expanded', 'true');
+        }
+        if (panel) {
+            const firstField = panel.querySelector('input, select, button');
+            window.setTimeout(() => {
+                if (firstField) {
+                    firstField.focus({ preventScroll: true });
+                }
+            }, 120);
+        }
+    }
+
+    function closeCatalogFilters() {
+        document.body.classList.remove('catalog-filter-open');
+        const trigger = document.querySelector('.js-catalog-filter-open');
+        if (trigger) {
+            trigger.setAttribute('aria-expanded', 'false');
+        }
+    }
+
     document.addEventListener('click', function (event) {
         const addButton = event.target.closest('.js-inquiry-add');
         if (addButton) {
             event.preventDefault();
             addProduct(addButton);
+            return;
+        }
+
+        if (event.target.closest('.js-catalog-filter-open')) {
+            event.preventDefault();
+            openCatalogFilters();
+            return;
+        }
+
+        if (event.target.closest('.js-catalog-filter-close')) {
+            event.preventDefault();
+            closeCatalogFilters();
             return;
         }
 
@@ -298,6 +335,12 @@
         }
     });
 
+    document.addEventListener('submit', function (event) {
+        if (event.target.matches('#catalogFilterPanel')) {
+            closeCatalogFilters();
+        }
+    });
+
     document.addEventListener('input', function (event) {
         if (event.target.matches('[data-inquiry-customer-name], [data-inquiry-delivery-zone], [data-inquiry-notes]')) {
             writeCustomer();
@@ -307,6 +350,7 @@
     document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') {
             closeCart();
+            closeCatalogFilters();
         }
     });
 

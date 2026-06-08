@@ -91,7 +91,33 @@
             </div>
         </section>
 
-        <form class="catalog-filter-card mb-4" method="get" th:action="@{/catalogo}">
+        <div class="catalog-mobile-filter-toolbar d-lg-none mb-3">
+            <button type="button" class="catalog-mobile-filter-button js-catalog-filter-open" aria-controls="catalogFilterPanel" aria-expanded="false">
+                <span>
+                    <i class="bi bi-sliders"></i>
+                    Filtrar productos
+                </span>
+                <small th:if="${hasCatalogFilters}">Filtros activos</small>
+                <small th:unless="${hasCatalogFilters}">Buscar, ordenar y filtrar</small>
+            </button>
+            <a th:href="@{/catalogo}" class="catalog-mobile-clear-button" th:if="${hasCatalogFilters}">
+                <i class="bi bi-x-lg"></i>
+                Limpiar
+            </a>
+        </div>
+
+        <div class="catalog-filter-backdrop js-catalog-filter-close" aria-hidden="true"></div>
+
+        <form id="catalogFilterPanel" class="catalog-filter-card catalog-filter-drawer mb-4" method="get" th:action="@{/catalogo}" aria-label="Filtros del catálogo">
+            <div class="catalog-filter-mobile-head d-lg-none">
+                <div>
+                    <span>Filtros</span>
+                    <strong>Encuentra productos más rápido</strong>
+                </div>
+                <button type="button" class="catalog-filter-close-button js-catalog-filter-close" aria-label="Cerrar filtros">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
             <div class="row g-3 align-items-end">
                 <div class="col-12 col-lg-4">
                     <label class="form-label small fw-semibold">Buscar producto</label>
@@ -134,10 +160,11 @@
                 </div>
                 <div class="col-12 col-lg-2 d-flex gap-2">
                     <button type="submit" class="btn btn-success flex-fill catalog-filter-button">
-                        <i class="bi bi-funnel"></i> Filtrar
+                        <i class="bi bi-funnel"></i> Aplicar filtros
                     </button>
                     <a th:href="@{/catalogo}" class="btn btn-outline-secondary catalog-clear-button" title="Limpiar filtros">
                         <i class="bi bi-x-lg"></i>
+                        <span class="d-lg-none ms-1">Limpiar</span>
                     </a>
                 </div>
             </div>

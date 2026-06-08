@@ -86,12 +86,18 @@ public class PublicSiteController {
             );
         }
 
+        List<Product> activeCatalogProducts = productRepository.findByActiveTrueOrderByNameAsc();
+        List<Category> homeCatalogCategories = categoryRepository.findByTypeAndActiveTrueOrderByNameAsc(CategoryType.PRODUCT);
+
         List<BlogPost> latestPosts = blogPostRepository.findTop3ByStatusOrderByPublishedAtDesc(BlogPost.Status.PUBLISHED);
         List<DeliveryZone> deliveryZones = deliveryZoneRepository.findAllByOrderByNameAsc();
         List<Testimonial> testimonials = testimonialRepository.findTop5ByActiveTrueOrderByDisplayOrderAscIdAsc();
 
         model.addAttribute("promotions", promotions);
         model.addAttribute("featuredProducts", featuredProducts);
+        model.addAttribute("homeCatalogCategories", homeCatalogCategories);
+        model.addAttribute("homeCatalogProductCount", activeCatalogProducts.size());
+        model.addAttribute("homeCatalogCategoryCount", homeCatalogCategories.size());
         model.addAttribute("latestBlogPosts", latestPosts);
         model.addAttribute("deliveryZones", deliveryZones);
         model.addAttribute("testimonials", testimonials);
@@ -387,6 +393,17 @@ public class PublicSiteController {
         model.addAttribute("promotionsTitle", setting("public.promotions.title", "Promociones del mes"));
         model.addAttribute("promotionsSubtitle", setting("public.promotions.subtitle", "Aprovecha los precios especiales por volumen y recarga frecuente."));
         model.addAttribute("promotionsEmptyText", setting("public.promotions.empty_text", "No hay promociones activas por ahora."));
+
+        model.addAttribute("homeShopKicker", setting("public.home.shop.kicker", "Compra fácil por WhatsApp"));
+        model.addAttribute("homeShopTitle", setting("public.home.shop.title", "Explora el catálogo y arma tu consulta"));
+        model.addAttribute("homeShopSubtitle", setting("public.home.shop.subtitle", "Revisa productos, filtra por categoría y envíanos una consulta completa por WhatsApp. Confirmamos stock, presentación, precio final y entrega."));
+        model.addAttribute("homeShopPrimaryCta", setting("public.home.shop.primary_cta", "Ver catálogo completo"));
+        model.addAttribute("homeShopSecondaryCta", setting("public.home.shop.secondary_cta", "Ver mi consulta"));
+        model.addAttribute("homeShopCategoryLabel", setting("public.home.shop.category_label", "Categorías disponibles"));
+        model.addAttribute("homeShopEmptyCategoryText", setting("public.home.shop.empty_category_text", "Aún no hay categorías configuradas."));
+        model.addAttribute("homeConsultTitle", setting("public.home.consult.title", "¿Quieres consultar varios productos?"));
+        model.addAttribute("homeConsultText", setting("public.home.consult.text", "Agrega productos a tu consulta, indica tu zona y envía todo en un solo mensaje de WhatsApp."));
+        model.addAttribute("homeConsultCta", setting("public.home.consult.cta", "Abrir consulta"));
 
         model.addAttribute("featuredProductsTitle", setting("public.featured_products.title", "Productos destacados"));
         model.addAttribute("featuredProductsSubtitle", setting("public.featured_products.subtitle", "Los productos más pedidos por nuestros clientes."));

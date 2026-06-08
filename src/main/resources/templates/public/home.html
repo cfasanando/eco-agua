@@ -222,6 +222,76 @@
         </div>
     </section>
 
+    <section class="py-5 bg-white border-bottom home-shop-section" th:if="${featurePublicCatalog}">
+        <div class="container">
+            <div class="row g-4 align-items-stretch">
+                <div class="col-lg-5">
+                    <div class="home-shop-copy h-100">
+                        <span class="section-kicker">
+                            <i class="bi bi-bag-heart-fill me-1"></i>
+                            <span th:text="${homeShopKicker}">Compra fácil por WhatsApp</span>
+                        </span>
+                        <h2 class="section-title mb-2" th:text="${homeShopTitle}">Explora el catálogo y arma tu consulta</h2>
+                        <p class="section-subtitle mb-4" th:text="${homeShopSubtitle}">Revisa productos y consulta por WhatsApp.</p>
+
+                        <div class="home-shop-actions">
+                            <a class="btn btn-success btn-lg" th:href="@{/catalogo}">
+                                <i class="bi bi-grid-3x3-gap-fill me-2"></i>
+                                <span th:text="${homeShopPrimaryCta}">Ver catálogo completo</span>
+                            </a>
+                            <button type="button" class="btn btn-outline-success btn-lg js-inquiry-open">
+                                <i class="bi bi-bag-check me-2"></i>
+                                <span th:text="${homeShopSecondaryCta}">Ver mi consulta</span>
+                                <span class="inquiry-inline-count ms-1" data-inquiry-count>0</span>
+                            </button>
+                        </div>
+
+                        <div class="home-consult-card mt-4">
+                            <i class="bi bi-whatsapp"></i>
+                            <div>
+                                <h3 th:text="${homeConsultTitle}">¿Quieres consultar varios productos?</h3>
+                                <p th:text="${homeConsultText}">Agrega productos y envía una consulta completa por WhatsApp.</p>
+                                <button type="button" class="btn btn-sm btn-success js-inquiry-open" th:text="${homeConsultCta}">Abrir consulta</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <div class="home-category-panel h-100">
+                        <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                            <div>
+                                <span class="small text-muted d-block" th:text="${homeShopCategoryLabel}">Categorías disponibles</span>
+                                <strong>
+                                    <span th:text="${homeCatalogProductCount}">0</span>
+                                    productos activos
+                                </strong>
+                            </div>
+                            <span class="home-category-count">
+                                <span th:text="${homeCatalogCategoryCount}">0</span> categorías
+                            </span>
+                        </div>
+
+                        <div class="home-category-grid" th:if="${!#lists.isEmpty(homeCatalogCategories)}">
+                            <a class="home-category-card"
+                               th:each="category : ${homeCatalogCategories}"
+                               th:href="@{/catalogo(categoryId=${category.id})}">
+                                <span class="home-category-icon"><i class="bi bi-tags"></i></span>
+                                <span th:text="${category.name}">Categoría</span>
+                                <i class="bi bi-arrow-right-short"></i>
+                            </a>
+                        </div>
+
+                        <div class="home-category-empty" th:if="${#lists.isEmpty(homeCatalogCategories)}">
+                            <i class="bi bi-info-circle"></i>
+                            <span th:text="${homeShopEmptyCategoryText}">Aún no hay categorías configuradas.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section class="py-5 bg-white border-bottom promotions-section" th:if="${featureMarketing}">
         <div class="container">
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3 mb-4">
@@ -345,44 +415,69 @@
         </div>
     </div>
 
-    <section class="py-5 bg-light" th:if="${featurePublicCatalog}">
+    <section class="py-5 bg-light home-featured-products" th:if="${featurePublicCatalog}">
         <div class="container">
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3 mb-4">
                 <div>
+                    <span class="section-kicker">
+                        <i class="bi bi-stars me-1"></i>
+                        Selección recomendada
+                    </span>
                     <h2 class="section-title mb-1" th:text="${featuredProductsTitle}">Productos destacados</h2>
                     <p class="section-subtitle mb-0" th:text="${featuredProductsSubtitle}">Los productos más pedidos.</p>
                 </div>
-                <a class="btn btn-sm btn-outline-primary" th:href="@{/catalogo}" th:text="${featuredProductsLinkLabel}">
-                    Ver catálogo completo »
+                <a class="btn btn-outline-primary" th:href="@{/catalogo}">
+                    <span th:text="${featuredProductsLinkLabel}">Ver catálogo completo »</span>
                 </a>
             </div>
 
-            <div th:if="${#lists.isEmpty(featuredProducts)}" class="text-muted" th:text="${featuredProductsEmptyText}">
+            <div th:if="${#lists.isEmpty(featuredProducts)}" class="catalog-empty-state bg-white" th:text="${featuredProductsEmptyText}">
                 No hay productos destacados configurados.
             </div>
 
-            <div class="row g-4" th:if="${!#lists.isEmpty(featuredProducts)}">
+            <div class="row g-3 g-lg-4" th:if="${!#lists.isEmpty(featuredProducts)}">
                 <div class="col-6 col-md-4 col-lg-3" th:each="product : ${featuredProducts}">
-                    <div class="card h-100 shadow-sm product-card d-flex flex-column">
-                        <div class="ratio ratio-4x3 bg-light d-flex align-items-center justify-content-center product-image-wrapper">
+                    <div class="card product-card catalog-product-card catalog-marketplace-card home-product-card border-0 h-100"
+                         th:attr="data-id=${product.id}, data-name=${product.name}, data-price=${#numbers.formatDecimal(product.price, 1, 'POINT', 2, 'POINT')}, data-image=${product.imagePath != null and !#strings.isEmpty(product.imagePath) ? product.imagePath : catalogProductPlaceholderImage}, data-category=${product.category != null ? product.category.name : 'Sin categoría'}">
+                        <div class="catalog-marketplace-image-wrap">
+                            <span class="catalog-stock-pill">Consulta disponibilidad</span>
                             <img th:src="${product.imagePath != null and !#strings.isEmpty(product.imagePath) ? product.imagePath : catalogProductPlaceholderImage}"
                                  th:alt="${product.name}"
-                                 class="img-fluid">
+                                 class="product-card-img catalog-product-image catalog-marketplace-image">
                         </div>
-                        <div class="card-body d-flex flex-column">
-                            <h3 class="h6 mb-1" th:text="${product.name}">Producto</h3>
-                            <p class="text-muted small mb-2" th:text="${product.category != null ? product.category.name : 'Sin categoría'}">Categoría</p>
-                            <p class="fw-bold mb-3">
-                                S/. <span th:text="${#numbers.formatDecimal(product.price, 1, 'COMMA', 2, 'POINT')}">0.00</span>
+                        <div class="card-body d-flex flex-column catalog-product-body catalog-marketplace-body">
+                            <p class="catalog-product-category catalog-marketplace-category mb-2" th:if="${product.category != null}">
+                                <i class="bi bi-tag"></i>
+                                <span th:text="${product.category.name}">Categoría</span>
                             </p>
-                            <div class="mt-auto">
+                            <h3 class="card-title product-card-title catalog-product-title catalog-marketplace-product-title" th:text="${product.name}">Producto</h3>
+
+                            <div class="card-text product-card-description catalog-card-description catalog-marketplace-description" th:utext="${product.description}">
+                                Descripción…
+                            </div>
+
+                            <div class="catalog-marketplace-price-row mt-auto">
+                                <span>Precio referencial</span>
+                                <strong>S/ <span th:text="${#numbers.formatDecimal(product.price, 1, 'POINT', 2, 'POINT')}">0.00</span></strong>
+                            </div>
+
+                            <div class="catalog-marketplace-actions">
+                                <a class="btn btn-light btn-sm catalog-detail-button"
+                                   th:href="@{/catalogo/producto/{id}(id=${product.id})}">
+                                    <i class="bi bi-eye me-1"></i>
+                                    <span th:text="${catalogDetailsButtonLabel}">Ver detalles</span>
+                                </a>
                                 <button type="button"
-                                        class="btn btn-primary w-100 btn-sm"
+                                        class="btn btn-outline-success btn-sm catalog-inquiry-add-button js-inquiry-add"
+                                        th:attr="data-id=${product.id}, data-name=${product.name}, data-price=${#numbers.formatDecimal(product.price, 1, 'POINT', 2, 'POINT')}, data-image=${product.imagePath != null and !#strings.isEmpty(product.imagePath) ? product.imagePath : catalogProductPlaceholderImage}, data-category=${product.category != null ? product.category.name : 'Sin categoría'}">
+                                    <i class="bi bi-bag-plus me-1"></i> Agregar
+                                </button>
+                                <button type="button"
+                                        class="btn btn-primary btn-sm catalog-whatsapp-button"
                                         data-bs-toggle="modal"
                                         data-bs-target="#orderModal"
-                                        th:attr="data-id=${product.id}, data-name=${product.name}, data-price=${#numbers.formatDecimal(product.price, 1, 'COMMA', 2, 'POINT')}">
-                                    <i class="bi bi-whatsapp me-1"></i>
-                                    <span th:text="${catalogOrderButtonLabel}">Pedir por WhatsApp</span>
+                                        th:attr="data-id=${product.id}, data-name=${product.name}, data-price=${#numbers.formatDecimal(product.price, 1, 'POINT', 2, 'POINT')}">
+                                    <i class="bi bi-whatsapp me-1"></i> <span th:text="${catalogOrderButtonLabel}">Pedir por WhatsApp</span>
                                 </button>
                             </div>
                         </div>
@@ -455,6 +550,51 @@
             </div>
         </div>
     </div>
+
+    <button type="button" class="inquiry-cart-fab js-inquiry-open" aria-label="Ver consulta por WhatsApp" th:if="${featurePublicCatalog}">
+        <i class="bi bi-bag-check"></i>
+        <span data-inquiry-count>0</span>
+    </button>
+
+    <div class="inquiry-cart-overlay js-inquiry-close" aria-hidden="true" th:if="${featurePublicCatalog}"></div>
+    <aside class="inquiry-cart-panel" aria-label="Consulta por WhatsApp" aria-hidden="true" th:if="${featurePublicCatalog}">
+        <div class="inquiry-cart-header">
+            <div>
+                <span class="inquiry-cart-kicker">Consulta rápida</span>
+                <h2>Tu consulta por WhatsApp</h2>
+            </div>
+            <button type="button" class="inquiry-cart-close js-inquiry-close" aria-label="Cerrar consulta">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="inquiry-cart-body">
+            <div class="inquiry-cart-empty" data-inquiry-empty>
+                <i class="bi bi-bag"></i>
+                <strong>Aún no agregaste productos</strong>
+                <p>Agrega productos destacados o del catálogo y envía una consulta completa por WhatsApp.</p>
+            </div>
+            <div class="inquiry-cart-items" data-inquiry-items></div>
+
+            <div class="inquiry-customer-card">
+                <label class="form-label small fw-semibold">Tu nombre</label>
+                <input type="text" class="form-control" data-inquiry-customer-name placeholder="Ej: Christian">
+                <label class="form-label small fw-semibold mt-2">Zona de entrega</label>
+                <input type="text" class="form-control" data-inquiry-delivery-zone placeholder="Ej: Ate, Santa Anita, Iquitos...">
+                <label class="form-label small fw-semibold mt-2">Nota adicional</label>
+                <textarea class="form-control" rows="2" data-inquiry-notes placeholder="Ej: quiero saber presentación, stock y costo de envío"></textarea>
+            </div>
+        </div>
+
+        <div class="inquiry-cart-footer">
+            <button type="button" class="btn btn-outline-secondary btn-sm js-inquiry-clear">
+                Vaciar consulta
+            </button>
+            <button type="button" class="btn btn-success btn-sm js-inquiry-send">
+                <i class="bi bi-whatsapp me-1"></i> Enviar consulta
+            </button>
+        </div>
+    </aside>
 
     <section class="py-5 bg-white border-top border-bottom">
         <div class="container">
@@ -654,6 +794,13 @@
     const ADMIN_WHATSAPP = /*[[${whatsappNumber} ?: '51999999999']]*/ '51999999999';
     const HOME_WHATSAPP_INTRO = /*[[${homeWhatsappIntro} ?: 'Hola, deseo hacer un pedido desde la web']]*/ 'Hola, deseo hacer un pedido desde la web';
     const PRODUCT_LABEL = /*[[${businessProductLabel} ?: 'Producto']]*/ 'Producto';
+
+    window.PUBLIC_CATALOG_CONFIG = {
+        whatsappNumber: ADMIN_WHATSAPP,
+        intro: /*[[${businessCatalogWhatsappIntro} ?: 'Hola, deseo consultar disponibilidad desde el catálogo']]*/ 'Hola, deseo consultar disponibilidad desde el catálogo',
+        productLabel: PRODUCT_LABEL,
+        businessName: /*[[${platformName} ?: 'Eco del Amazonas']]*/ 'Eco del Amazonas'
+    };
 
     function sendWhatsappOrderFromHome(event) {
         event.preventDefault();
@@ -939,6 +1086,7 @@
         }
     });
 </script>
+<script th:src="@{/js/public-catalog.js}"></script>
 
 <script th:if="${googleMapsApiKey != null and !#strings.isEmpty(googleMapsApiKey)}"
         th:src="'https://maps.googleapis.com/maps/api/js?key=' + ${googleMapsApiKey} + '&callback=initDeliveryMap'"

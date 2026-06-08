@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/head_public :: publicHead(${catalogPageTitle} + ' - ' + ${platformName})}"></head>
-<body th:style="'--eco-primary:' + ${publicPrimaryColor} + '; --eco-secondary:' + ${publicSecondaryColor} + ';'">
+<body class="public-catalog-body" th:style="'--eco-primary:' + ${publicPrimaryColor} + '; --eco-secondary:' + ${publicSecondaryColor} + ';'">
 
 <div class="top-bar text-white py-1">
     <div class="container d-flex flex-wrap justify-content-between align-items-center small">
@@ -81,9 +81,11 @@
                                 <span th:text="${allProductsCount}">0</span>
                             </strong>
                         </div>
-                        <a th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank" class="summary-whatsapp-link">
-                            <i class="bi bi-whatsapp"></i> Consultar por WhatsApp
-                        </a>
+                        <button type="button" class="summary-whatsapp-link border-0 js-inquiry-open">
+                            <i class="bi bi-bag-check"></i>
+                            Ver consulta
+                            <span class="inquiry-inline-count" data-inquiry-count>0</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -198,6 +200,11 @@
                                 <span th:text="${catalogDetailsButtonLabel}">Ver detalles</span>
                             </a>
                             <button type="button"
+                                    class="btn btn-outline-success btn-sm catalog-inquiry-add-button js-inquiry-add"
+                                    th:attr="data-id=${p.id}, data-name=${p.name}, data-price=${#numbers.formatDecimal(p.price, 1, 'POINT', 2, 'POINT')}, data-image=${p.imagePath != null and !#strings.isEmpty(p.imagePath) ? p.imagePath : catalogProductPlaceholderImage}, data-category=${p.category != null ? p.category.name : 'Sin categoría'}">
+                                <i class="bi bi-bag-plus me-1"></i> Agregar
+                            </button>
+                            <button type="button"
                                     class="btn btn-primary btn-sm catalog-whatsapp-button"
                                     data-bs-toggle="modal"
                                     data-bs-target="#orderModal"
@@ -303,11 +310,50 @@
     </div>
 </div>
 
-<div style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999;">
-    <a th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank" class="btn btn-success btn-lg rounded-circle d-flex align-items-center justify-content-center shadow">
-        <i class="bi bi-whatsapp fs-3"></i>
-    </a>
-</div>
+<button type="button" class="inquiry-cart-fab js-inquiry-open" aria-label="Ver consulta por WhatsApp">
+    <i class="bi bi-bag-check"></i>
+    <span data-inquiry-count>0</span>
+</button>
+
+<div class="inquiry-cart-overlay js-inquiry-close" aria-hidden="true"></div>
+<aside class="inquiry-cart-panel" aria-label="Consulta por WhatsApp" aria-hidden="true">
+    <div class="inquiry-cart-header">
+        <div>
+            <span class="inquiry-cart-kicker">Consulta rápida</span>
+            <h2>Tu consulta por WhatsApp</h2>
+        </div>
+        <button type="button" class="inquiry-cart-close js-inquiry-close" aria-label="Cerrar consulta">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+
+    <div class="inquiry-cart-body">
+        <div class="inquiry-cart-empty" data-inquiry-empty>
+            <i class="bi bi-bag"></i>
+            <strong>Aún no agregaste productos</strong>
+            <p>Agrega productos del catálogo y envía una consulta completa por WhatsApp.</p>
+        </div>
+        <div class="inquiry-cart-items" data-inquiry-items></div>
+
+        <div class="inquiry-customer-card">
+            <label class="form-label small fw-semibold">Tu nombre</label>
+            <input type="text" class="form-control" data-inquiry-customer-name placeholder="Ej: Christian">
+            <label class="form-label small fw-semibold mt-2">Zona de entrega</label>
+            <input type="text" class="form-control" data-inquiry-delivery-zone placeholder="Ej: Ate, Santa Anita, Iquitos...">
+            <label class="form-label small fw-semibold mt-2">Nota adicional</label>
+            <textarea class="form-control" rows="2" data-inquiry-notes placeholder="Ej: quiero saber presentación, stock y costo de envío"></textarea>
+        </div>
+    </div>
+
+    <div class="inquiry-cart-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm js-inquiry-clear">
+            Vaciar consulta
+        </button>
+        <button type="button" class="btn btn-success btn-sm js-inquiry-send">
+            <i class="bi bi-whatsapp me-1"></i> Enviar consulta
+        </button>
+    </div>
+</aside>
 
 <footer class="border-top py-3 bg-white mt-4">
     <div class="container d-flex flex-wrap justify-content-between align-items-center small text-muted">
@@ -326,6 +372,13 @@
     const ADMIN_WHATSAPP = /*[[${whatsappNumber} ?: '51999999999']]*/ '51999999999';
     const BUSINESS_CATALOG_WHATSAPP_INTRO = /*[[${businessCatalogWhatsappIntro} ?: 'Hola, deseo hacer un pedido desde el catálogo']]*/ 'Hola, deseo hacer un pedido desde el catálogo';
     const PRODUCT_LABEL = /*[[${businessProductLabel} ?: 'Producto']]*/ 'Producto';
+
+    window.PUBLIC_CATALOG_CONFIG = {
+        whatsappNumber: ADMIN_WHATSAPP,
+        intro: BUSINESS_CATALOG_WHATSAPP_INTRO,
+        productLabel: PRODUCT_LABEL,
+        businessName: /*[[${platformName} ?: 'Eco del Amazonas']]*/ 'Eco del Amazonas'
+    };
 
     function sendWhatsappOrderFromCatalog(event) {
         event.preventDefault();
@@ -453,5 +506,6 @@
         }
     });
 </script>
+<script th:src="@{/js/public-catalog.js}"></script>
 </body>
 </html>

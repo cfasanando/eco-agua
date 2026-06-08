@@ -215,10 +215,98 @@
         });
     };
 
+
+
+    // Sidebar visual behavior
+    ecoAdmin.initSidebarNavigation = function () {
+        const body = document.body;
+        const sidebar = document.querySelector('.sidebar');
+        const toggleButton = document.querySelector('[data-sidebar-toggle]');
+        const storageKey = 'ecoAdmin.sidebarCollapsed';
+
+        if (!sidebar) {
+            return;
+        }
+
+        const updateToggleState = function () {
+            const isCollapsed = body.classList.contains('sidebar-collapsed');
+            if (toggleButton) {
+                toggleButton.setAttribute('aria-label', isCollapsed ? 'Expandir menú' : 'Contraer menú');
+                toggleButton.setAttribute('title', isCollapsed ? 'Expandir menú' : 'Contraer menú');
+            }
+        };
+
+        if (window.localStorage && window.localStorage.getItem(storageKey) === 'true') {
+            body.classList.add('sidebar-collapsed');
+        }
+
+        sidebar.querySelectorAll('.menu-link').forEach(function (link) {
+            const label = Array.from(link.children)
+                .filter(function (child) { return !child.classList.contains('icon') && !child.classList.contains('caret'); })
+                .map(function (child) { return child.textContent ? child.textContent.trim() : ''; })
+                .filter(Boolean)
+                .join(' ');
+
+            if (label && !link.getAttribute('title')) {
+                link.setAttribute('title', label);
+            }
+        });
+
+        if (toggleButton) {
+            toggleButton.addEventListener('click', function () {
+                body.classList.toggle('sidebar-collapsed');
+                if (window.localStorage) {
+                    window.localStorage.setItem(storageKey, body.classList.contains('sidebar-collapsed') ? 'true' : 'false');
+                }
+                updateToggleState();
+            });
+        }
+
+        sidebar.querySelectorAll('.menu-toggle').forEach(function (checkbox) {
+            checkbox.addEventListener('change', function () {
+                if (!checkbox.checked || body.classList.contains('sidebar-collapsed')) {
+                    return;
+                }
+
+                const currentGroup = checkbox.closest('.menu-group');
+                if (!currentGroup || !currentGroup.parentElement) {
+                    return;
+                }
+
+                // Keep the accordion behavior scoped to the current menu level.
+                // Nested groups, such as Finance > Accounting sections, must not close their parent group.
+                Array.from(currentGroup.parentElement.children).forEach(function (siblingGroup) {
+                    if (siblingGroup === currentGroup || !siblingGroup.classList || !siblingGroup.classList.contains('menu-group')) {
+                        return;
+                    }
+
+                    const siblingToggle = siblingGroup.querySelector(':scope > .menu-toggle');
+                    if (siblingToggle) {
+                        siblingToggle.checked = false;
+                    }
+
+                    siblingGroup.querySelectorAll('.menu-toggle').forEach(function (nestedToggle) {
+                        nestedToggle.checked = false;
+                    });
+                });
+            });
+        });
+
+        const activeLink = sidebar.querySelector('.menu-link.active');
+        if (activeLink && !body.classList.contains('sidebar-collapsed')) {
+            setTimeout(function () {
+                activeLink.scrollIntoView({ block: 'nearest' });
+            }, 80);
+        }
+
+        updateToggleState();
+    };
+
     // Auto-init clock on every admin page
     document.addEventListener('DOMContentLoaded', function () {
         ecoAdmin.initTickingClock();
         ecoAdmin.initBootstrapTooltips();
+        ecoAdmin.initSidebarNavigation();
     });
 
     window.ecoAdmin = ecoAdmin;

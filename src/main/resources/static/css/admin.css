@@ -1072,3 +1072,363 @@ div.dt-button-collection .dt-button {
         grid-template-columns: 1fr;
     }
 }
+
+/* Sidebar UI refinement: clearer hierarchy, active state and collapsed mode */
+.sidebar {
+    width: 282px;
+    background:
+        radial-gradient(circle at top left, rgba(46, 204, 113, 0.18), transparent 28%),
+        linear-gradient(180deg, #34405f 0%, #2d3752 48%, #222a3f 100%);
+    box-shadow: 6px 0 24px rgba(15, 23, 42, 0.18);
+    transition: width 0.22s ease;
+    z-index: 30;
+}
+
+.sidebar-brand {
+    position: relative;
+    padding: 16px 14px 14px 16px;
+    background: rgba(15, 23, 42, 0.14);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-brand-logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 16px;
+}
+
+.sidebar-collapse-button {
+    width: 34px;
+    height: 34px;
+    margin-left: auto;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #eaf0ff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+
+.sidebar-collapse-button:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.28);
+    transform: translateY(-1px);
+}
+
+.sidebar-nav {
+    padding: 12px 10px 20px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.menu-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 16px 8px 7px;
+    padding: 0 8px;
+    font-size: 0.67rem;
+    font-weight: 800;
+    letter-spacing: 0.095em;
+    color: rgba(226, 232, 240, 0.78);
+    opacity: 1;
+}
+
+.menu-section-title::after {
+    content: "";
+    height: 1px;
+    flex: 1;
+    background: linear-gradient(90deg, rgba(226, 232, 240, 0.22), transparent);
+}
+
+.menu-group {
+    margin: 6px 2px 8px;
+}
+
+.menu-link {
+    position: relative;
+    min-height: 42px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    color: rgba(226, 232, 240, 0.9);
+    font-weight: 500;
+    letter-spacing: 0.002em;
+    transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.menu-link:hover {
+    background: rgba(255, 255, 255, 0.075);
+    border-color: rgba(255, 255, 255, 0.08);
+    transform: translateX(2px);
+}
+
+.menu-link .icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(226, 232, 240, 0.94);
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.menu-link.active {
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.28), rgba(34, 197, 94, 0.18));
+    border-color: rgba(45, 212, 191, 0.42);
+    color: #ffffff;
+    box-shadow: 0 10px 24px rgba(20, 184, 166, 0.12), inset 3px 0 0 rgba(153, 246, 228, 0.9);
+}
+
+.menu-link.active .icon {
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+}
+
+.menu-link.has-children {
+    min-height: 44px;
+    font-weight: 750;
+    color: #f8fafc;
+    background: rgba(255, 255, 255, 0.035);
+    border-color: rgba(255, 255, 255, 0.055);
+}
+
+.menu-link.has-children .caret {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.055);
+}
+
+.menu-toggle:checked + .menu-link.has-children {
+    background: rgba(255, 255, 255, 0.085);
+    border-color: rgba(255, 255, 255, 0.13);
+    box-shadow: inset 3px 0 0 rgba(129, 140, 248, 0.7);
+}
+
+.submenu-container {
+    margin: 6px 0 10px 10px;
+    padding: 7px 0 7px 12px;
+    border-left: 1px solid rgba(148, 163, 184, 0.32);
+    border-radius: 0 16px 16px 0;
+    background: rgba(15, 23, 42, 0.13);
+}
+
+.submenu-container .menu-link {
+    min-height: 38px;
+    margin: 2px 8px 2px 0;
+    padding: 8px 10px;
+    font-size: 0.835rem;
+    color: rgba(226, 232, 240, 0.82);
+    border-radius: 12px;
+}
+
+.submenu-container .menu-link .icon {
+    width: 22px;
+    height: 22px;
+    font-size: 0.9rem;
+    background: transparent;
+    color: rgba(203, 213, 225, 0.88);
+}
+
+.submenu-container .menu-link:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: #ffffff;
+}
+
+.submenu-container .menu-link.active {
+    background: rgba(20, 184, 166, 0.24);
+    border-color: rgba(45, 212, 191, 0.32);
+    color: #ffffff;
+    box-shadow: inset 3px 0 0 rgba(153, 246, 228, 0.95);
+}
+
+.submenu-container .menu-group {
+    margin: 4px 8px 7px 0;
+}
+
+.submenu-container .menu-link.has-children {
+    min-height: 38px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.045);
+    color: rgba(241, 245, 249, 0.92);
+}
+
+.submenu-container .menu-toggle:checked + .menu-link.has-children {
+    background: rgba(255, 255, 255, 0.085);
+    box-shadow: inset 3px 0 0 rgba(129, 140, 248, 0.78);
+}
+
+.submenu-container .submenu-container {
+    margin: 5px 0 8px 16px;
+    padding: 6px 0 6px 10px;
+    border-left: 1px dashed rgba(148, 163, 184, 0.34);
+    border-radius: 0 14px 14px 0;
+    background: rgba(15, 23, 42, 0.18);
+}
+
+.submenu-container .submenu-container .menu-link {
+    font-size: 0.805rem;
+    margin-right: 6px;
+}
+
+.menu-toggle:checked + .menu-link.has-children + .submenu-container {
+    max-height: 1200px;
+}
+
+body.sidebar-collapsed .sidebar {
+    width: 78px;
+    overflow: visible;
+}
+
+body.sidebar-collapsed .sidebar-brand {
+    justify-content: center;
+    padding: 14px 10px;
+}
+
+body.sidebar-collapsed .sidebar-brand-copy {
+    display: none;
+}
+
+body.sidebar-collapsed .sidebar-collapse-button {
+    position: absolute;
+    right: -14px;
+    top: 18px;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #334155;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.22);
+}
+
+body.sidebar-collapsed .sidebar-collapse-button i {
+    transform: rotate(180deg);
+}
+
+body.sidebar-collapsed .sidebar-nav {
+    overflow: visible;
+    padding: 12px 8px 18px;
+}
+
+body.sidebar-collapsed .menu-section-title {
+    display: none;
+}
+
+body.sidebar-collapsed .menu-group {
+    position: relative;
+    margin: 5px 0;
+}
+
+body.sidebar-collapsed .menu-link {
+    width: 52px;
+    min-height: 44px;
+    justify-content: center;
+    margin: 4px auto;
+    padding: 9px;
+    gap: 0;
+    border-radius: 16px;
+}
+
+body.sidebar-collapsed .menu-link span:not(.icon):not(.caret) {
+    display: none;
+}
+
+body.sidebar-collapsed .menu-link .caret {
+    display: none;
+}
+
+body.sidebar-collapsed .menu-link .icon {
+    width: 28px;
+    height: 28px;
+}
+
+body.sidebar-collapsed > .sidebar .sidebar-nav > .menu-group > .submenu-container {
+    display: none;
+    position: absolute;
+    left: 66px;
+    top: 0;
+    width: 328px;
+    max-height: min(78vh, 760px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 18px;
+    background: linear-gradient(180deg, #303a56 0%, #25304a 100%);
+    box-shadow: 18px 18px 40px rgba(15, 23, 42, 0.32);
+    z-index: 1000;
+}
+
+body.sidebar-collapsed > .sidebar .sidebar-nav > .menu-group:hover > .submenu-container,
+body.sidebar-collapsed > .sidebar .sidebar-nav > .menu-group:focus-within > .submenu-container {
+    display: block;
+}
+
+body.sidebar-collapsed .submenu-container .menu-link {
+    width: auto;
+    justify-content: flex-start;
+    margin: 3px 0;
+    padding: 9px 10px;
+    gap: 10px;
+}
+
+body.sidebar-collapsed .submenu-container .menu-link span:not(.icon):not(.caret) {
+    display: inline;
+}
+
+body.sidebar-collapsed .submenu-container .menu-link .icon {
+    width: 24px;
+    height: 24px;
+}
+
+body.sidebar-collapsed .submenu-container .menu-link .caret {
+    display: inline-flex;
+    margin-left: auto;
+}
+
+/* In collapsed mode only the first submenu floats. Nested submenus stay inside the floating panel. */
+body.sidebar-collapsed .submenu-container .submenu-container {
+    position: static;
+    display: block;
+    width: auto;
+    max-height: 0;
+    overflow: hidden;
+    margin: 0 0 0 14px;
+    padding: 0 0 0 10px;
+    border: 0;
+    border-left: 1px dashed rgba(148, 163, 184, 0.34);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+body.sidebar-collapsed .submenu-container .menu-toggle:checked + .menu-link.has-children + .submenu-container {
+    max-height: 900px;
+    padding-top: 5px;
+    padding-bottom: 6px;
+}
+
+body.sidebar-collapsed .submenu-container .submenu-container .menu-link {
+    min-height: 34px;
+    padding: 7px 9px;
+    font-size: 0.78rem;
+    background: rgba(15, 23, 42, 0.12);
+}
+
+@media (max-width: 900px) {
+    .sidebar-collapse-button {
+        display: none;
+    }
+}

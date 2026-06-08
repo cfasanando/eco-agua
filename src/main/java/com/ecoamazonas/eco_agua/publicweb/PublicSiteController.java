@@ -2,6 +2,9 @@ package com.ecoamazonas.eco_agua.publicweb;
 
 import com.ecoamazonas.eco_agua.blog.BlogPost;
 import com.ecoamazonas.eco_agua.blog.BlogPostRepository;
+import com.ecoamazonas.eco_agua.category.Category;
+import com.ecoamazonas.eco_agua.category.CategoryRepository;
+import com.ecoamazonas.eco_agua.category.CategoryType;
 import com.ecoamazonas.eco_agua.config.BusinessProperties;
 import com.ecoamazonas.eco_agua.config.PlatformSettingService;
 import com.ecoamazonas.eco_agua.delivery.DeliveryZone;
@@ -17,21 +20,26 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 @Controller
 public class PublicSiteController {
 
     private final ProductRepository productRepository;
+    private final CategoryRepository categoryRepository;
     private final PromotionRepository promotionRepository;
     private final BlogPostRepository blogPostRepository;
     private final DeliveryZoneRepository deliveryZoneRepository;
@@ -46,6 +54,7 @@ public class PublicSiteController {
     private String googleMapsApiKey;
 
     public PublicSiteController(ProductRepository productRepository,
+                                CategoryRepository categoryRepository,
                                 PromotionRepository promotionRepository,
                                 BlogPostRepository blogPostRepository,
                                 DeliveryZoneRepository deliveryZoneRepository,
@@ -53,6 +62,7 @@ public class PublicSiteController {
                                 BusinessProperties businessProperties,
                                 TestimonialRepository testimonialRepository) {
         this.productRepository = productRepository;
+        this.categoryRepository = categoryRepository;
         this.promotionRepository = promotionRepository;
         this.blogPostRepository = blogPostRepository;
         this.deliveryZoneRepository = deliveryZoneRepository;
@@ -90,19 +100,84 @@ public class PublicSiteController {
         addPublicLayoutSettings(model);
         addHomeContentSettings(model);
         addCatalogContentSettings(model);
+        addPublicOrderSettings(model);
 
         return "public/home";
     }
 
     @GetMapping("/catalogo")
-    public String catalog(Model model) {
-        List<Product> products = productRepository.findByActiveTrueOrderByCategoryNameAscNameAsc();
+    public String catalog(
+            Model model,
+            @RequestParam(value = "q", required = false) String query,
+            @RequestParam(value = "categoryId", required = false) String categoryIdValue,
+            @RequestParam(value = "minPrice", required = false) String minPriceValue,
+            @RequestParam(value = "maxPrice", required = false) String maxPriceValue,
+            @RequestParam(value = "sort", required = false, defaultValue = "category") String sort
+    ) {
+        Long selectedCategoryId = parseLong(categoryIdValue);
+        BigDecimal minPrice = parseMoney(minPriceValue);
+        BigDecimal maxPrice = parseMoney(maxPriceValue);
+        String cleanQuery = clean(query);
+        String cleanSort = clean(sort);
+
+        List<Product> allProducts = new ArrayList<>(productRepository.findByActiveTrueOrderByCategoryNameAscNameAsc());
+        List<Product> products = allProducts.stream()
+                .filter(product -> matchesCatalogQuery(product, cleanQuery))
+                .filter(product -> matchesCatalogCategory(product, selectedCategoryId))
+                .filter(product -> matchesCatalogPrice(product, minPrice, maxPrice))
+                .toList();
+
+        products = new ArrayList<>(products);
+        sortCatalogProducts(products, cleanSort);
+
+        List<Category> categories = categoryRepository.findByTypeAndActiveTrueOrderByNameAsc(CategoryType.PRODUCT);
 
         model.addAttribute("products", products);
+        model.addAttribute("catalogCategories", categories);
+        model.addAttribute("allProductsCount", allProducts.size());
+        model.addAttribute("filteredProductsCount", products.size());
+        model.addAttribute("q", cleanQuery);
+        model.addAttribute("selectedCategoryId", selectedCategoryId);
+        model.addAttribute("minPrice", minPriceValue != null ? minPriceValue.trim() : "");
+        model.addAttribute("maxPrice", maxPriceValue != null ? maxPriceValue.trim() : "");
+        model.addAttribute("sort", cleanSort.isBlank() ? "category" : cleanSort);
+        model.addAttribute("hasCatalogFilters", hasCatalogFilters(cleanQuery, selectedCategoryId, minPrice, maxPrice));
         addPublicLayoutSettings(model);
         addCatalogContentSettings(model);
+        addPublicOrderSettings(model);
 
         return "public/catalog";
+    }
+
+
+    @GetMapping("/catalogo/producto/{id}")
+    public String productDetail(@PathVariable Long id, Model model) {
+        Product product = productRepository.findById(id)
+                .filter(Product::isActive)
+                .orElse(null);
+
+        if (product == null) {
+            return "redirect:/catalogo";
+        }
+
+        List<Product> relatedProducts = findRelatedProducts(product);
+        String productImage = product.getImagePath() != null && !product.getImagePath().isBlank()
+                ? product.getImagePath()
+                : setting("public.catalog.product_placeholder_image", "/img/product-default.svg");
+
+        model.addAttribute("product", product);
+        model.addAttribute("productImage", productImage);
+        model.addAttribute("relatedProducts", relatedProducts);
+        model.addAttribute("encodedProductWhatsappMessage", URLEncoder.encode(buildProductDetailWhatsAppMessage(product), StandardCharsets.UTF_8));
+        model.addAttribute("productDetailHowTitle", setting("public.product_detail.how_title", "¿Cómo comprar?"));
+        model.addAttribute("productDetailDeliveryTitle", setting("public.product_detail.delivery_title", "Entrega y disponibilidad"));
+        model.addAttribute("productDetailRelatedTitle", setting("public.product_detail.related_title", "También te puede interesar"));
+
+        addPublicLayoutSettings(model);
+        addCatalogContentSettings(model);
+        addPublicOrderSettings(model);
+
+        return "public/product_detail";
     }
 
     @PostMapping("/order/whatsapp")
@@ -132,6 +207,113 @@ public class PublicSiteController {
         String whatsappNumber = setting("public.whatsapp.number", getDefaultWhatsappNumber());
 
         return "redirect:https://wa.me/" + whatsappNumber + "?text=" + encoded;
+    }
+
+
+    private boolean matchesCatalogQuery(Product product, String query) {
+        if (query == null || query.isBlank()) {
+            return true;
+        }
+
+        String normalizedQuery = query.toLowerCase(Locale.ROOT);
+        String searchableText = (safeText(product.getName()) + " "
+                + safeText(product.getDescription()) + " "
+                + safeText(product.getCategory() != null ? product.getCategory().getName() : null))
+                .toLowerCase(Locale.ROOT);
+
+        return searchableText.contains(normalizedQuery);
+    }
+
+    private boolean matchesCatalogCategory(Product product, Long selectedCategoryId) {
+        if (selectedCategoryId == null) {
+            return true;
+        }
+
+        if (product.getCategory() == null || product.getCategory().getId() == null) {
+            return false;
+        }
+
+        return selectedCategoryId.equals(product.getCategory().getId());
+    }
+
+    private boolean matchesCatalogPrice(Product product, BigDecimal minPrice, BigDecimal maxPrice) {
+        BigDecimal price = safeMoney(product.getPrice());
+
+        if (minPrice != null && price.compareTo(minPrice) < 0) {
+            return false;
+        }
+
+        if (maxPrice != null && price.compareTo(maxPrice) > 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private void sortCatalogProducts(List<Product> products, String sort) {
+        Comparator<Product> byCategoryAndName = Comparator
+                .comparing((Product product) -> safeText(product.getCategory() != null ? product.getCategory().getName() : ""), String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(product -> safeText(product.getName()), String.CASE_INSENSITIVE_ORDER);
+
+        Comparator<Product> comparator = switch (sort) {
+            case "price_asc" -> Comparator
+                    .comparing((Product product) -> safeMoney(product.getPrice()))
+                    .thenComparing(product -> safeText(product.getName()), String.CASE_INSENSITIVE_ORDER);
+            case "price_desc" -> Comparator
+                    .comparing((Product product) -> safeMoney(product.getPrice()), Comparator.reverseOrder())
+                    .thenComparing(product -> safeText(product.getName()), String.CASE_INSENSITIVE_ORDER);
+            case "name_desc" -> Comparator
+                    .comparing((Product product) -> safeText(product.getName()), String.CASE_INSENSITIVE_ORDER)
+                    .reversed();
+            case "name_asc" -> Comparator
+                    .comparing((Product product) -> safeText(product.getName()), String.CASE_INSENSITIVE_ORDER);
+            default -> byCategoryAndName;
+        };
+
+        products.sort(comparator);
+    }
+
+    private boolean hasCatalogFilters(String query, Long selectedCategoryId, BigDecimal minPrice, BigDecimal maxPrice) {
+        return (query != null && !query.isBlank())
+                || selectedCategoryId != null
+                || minPrice != null
+                || maxPrice != null;
+    }
+
+    private Long parseLong(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private BigDecimal parseMoney(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        try {
+            return new BigDecimal(value.trim().replace(",", "."));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private BigDecimal safeMoney(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
+    private String safeText(String value) {
+        return value != null ? value : "";
+    }
+
+    private String clean(String value) {
+        return value != null ? value.trim() : "";
     }
 
     private void addPublicLayoutSettings(Model model) {
@@ -255,6 +437,51 @@ public class PublicSiteController {
         model.addAttribute("catalogDetailsButtonLabel", setting("public.catalog.details_button_label", "Ver detalles"));
         model.addAttribute("catalogProductPlaceholderImage", setting("public.catalog.product_placeholder_image", "/img/product-default.svg"));
         model.addAttribute("businessCatalogWhatsappIntro", setting("public.catalog.whatsapp_intro", businessProperties.getCatalogWhatsappIntro()));
+    }
+
+
+    private void addPublicOrderSettings(Model model) {
+        model.addAttribute("orderModalTitle", setting("public.order_modal.title", "Pedido por WhatsApp"));
+        model.addAttribute("orderModalIntro", setting("public.order_modal.intro", "Para coordinar la entrega, por favor completa tus datos:"));
+        model.addAttribute("orderModalQuantityLabel", setting("public.order_modal.quantity_label", "Cantidad"));
+        model.addAttribute("orderModalAddressLabel", setting("public.order_modal.address_label", "Dirección (incluye distrito y referencia)"));
+        model.addAttribute("orderModalNotesLabel", setting("public.order_modal.notes_label", "Notas para la entrega (opcional)"));
+        model.addAttribute("orderModalNotesPlaceholder", setting("public.order_modal.notes_placeholder", "Ej: Prefiero entrega por la tarde"));
+        model.addAttribute("orderModalSubmitLabel", setting("public.order_modal.submit_label", "Enviar por WhatsApp"));
+    }
+
+    private List<Product> findRelatedProducts(Product product) {
+        List<Product> activeProducts = new ArrayList<>(productRepository.findByActiveTrueOrderByCategoryNameAscNameAsc());
+        Long productId = product.getId();
+        Long categoryId = product.getCategory() != null ? product.getCategory().getId() : null;
+
+        List<Product> relatedProducts = activeProducts.stream()
+                .filter(candidate -> candidate.getId() != null && !candidate.getId().equals(productId))
+                .filter(candidate -> categoryId != null
+                        && candidate.getCategory() != null
+                        && categoryId.equals(candidate.getCategory().getId()))
+                .limit(4)
+                .toList();
+
+        if (!relatedProducts.isEmpty()) {
+            return relatedProducts;
+        }
+
+        return activeProducts.stream()
+                .filter(candidate -> candidate.getId() != null && !candidate.getId().equals(productId))
+                .limit(4)
+                .toList();
+    }
+
+    private String buildProductDetailWhatsAppMessage(Product product) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(setting("public.catalog.whatsapp_intro", businessProperties.getCatalogWhatsappIntro()))
+                .append("\n\n");
+        sb.append("Hola, deseo consultar disponibilidad de este producto:").append("\n");
+        sb.append("- Producto: ").append(product.getName()).append("\n");
+        sb.append("- Precio referencial: S/. ").append(product.getPrice()).append("\n\n");
+        sb.append("Por favor confirmar presentación, stock y forma de entrega. Gracias.");
+        return sb.toString();
     }
 
     private String buildWhatsAppMessage(

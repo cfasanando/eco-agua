@@ -453,6 +453,11 @@ public class PublicSiteController {
         model.addAttribute("catalogOrderButtonLabel", setting("public.catalog.order_button_label", "Pedir por WhatsApp"));
         model.addAttribute("catalogDetailsButtonLabel", setting("public.catalog.details_button_label", "Ver detalles"));
         model.addAttribute("catalogProductPlaceholderImage", setting("public.catalog.product_placeholder_image", "/img/product-default.svg"));
+        model.addAttribute("catalogBadgeFeaturedLabel", setting("public.catalog.badge.featured", "Destacado"));
+        model.addAttribute("catalogBadgeAvailabilityLabel", setting("public.catalog.badge.availability", "Consultar disponibilidad"));
+        model.addAttribute("catalogBadgeReferencePriceLabel", setting("public.catalog.badge.reference_price", "Precio referencial"));
+        model.addAttribute("catalogBadgeLocalProductLabel", setting("public.catalog.badge.local_product", "Producto amazónico"));
+        model.addAttribute("catalogRelatedCtaLabel", setting("public.catalog.related_cta_label", "Ver producto"));
         model.addAttribute("businessCatalogWhatsappIntro", setting("public.catalog.whatsapp_intro", businessProperties.getCatalogWhatsappIntro()));
     }
 

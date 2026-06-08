@@ -168,7 +168,16 @@
                 <div class="card product-card catalog-product-card catalog-marketplace-card border-0 h-100"
                      th:attr="data-id=${p.id}, data-name=${p.name}, data-price=${#numbers.formatDecimal(p.price, 1, 'POINT', 2, 'POINT')}, data-image=${p.imagePath != null and !#strings.isEmpty(p.imagePath) ? p.imagePath : catalogProductPlaceholderImage}, data-category=${p.category != null ? p.category.name : 'Sin categoría'}">
                     <div class="catalog-marketplace-image-wrap">
-                        <span class="catalog-stock-pill">Consulta disponibilidad</span>
+                        <div class="catalog-badge-stack">
+                            <span class="catalog-card-badge catalog-card-badge-featured" th:if="${p.featured}">
+                                <i class="bi bi-star-fill"></i>
+                                <span th:text="${catalogBadgeFeaturedLabel}">Destacado</span>
+                            </span>
+                            <span class="catalog-card-badge catalog-card-badge-availability">
+                                <i class="bi bi-chat-dots-fill"></i>
+                                <span th:text="${catalogBadgeAvailabilityLabel}">Consultar disponibilidad</span>
+                            </span>
+                        </div>
                         <img th:src="${p.imagePath != null and !#strings.isEmpty(p.imagePath) ? p.imagePath : catalogProductPlaceholderImage}"
                              class="product-card-img catalog-product-image catalog-marketplace-image"
                              th:alt="${p.name}">
@@ -179,6 +188,21 @@
                             <span th:text="${p.category.name}">Categoría</span>
                         </p>
                         <h5 class="card-title product-card-title catalog-product-title catalog-marketplace-product-title" th:text="${p.name}">Nombre</h5>
+
+                        <div class="catalog-commerce-badges" aria-label="Etiquetas del producto">
+                            <span th:if="${p.featured}" class="catalog-commerce-badge catalog-commerce-badge-featured">
+                                <i class="bi bi-star-fill"></i>
+                                <span th:text="${catalogBadgeFeaturedLabel}">Destacado</span>
+                            </span>
+                            <span th:if="${p.category != null}" class="catalog-commerce-badge catalog-commerce-badge-local">
+                                <i class="bi bi-tree-fill"></i>
+                                <span th:text="${catalogBadgeLocalProductLabel}">Producto amazónico</span>
+                            </span>
+                            <span class="catalog-commerce-badge catalog-commerce-badge-price">
+                                <i class="bi bi-tag-fill"></i>
+                                <span th:text="${catalogBadgeReferencePriceLabel}">Precio referencial</span>
+                            </span>
+                        </div>
 
                         <div class="card-text product-card-description catalog-card-description catalog-marketplace-description" th:utext="${p.description}">
                             Descripción…

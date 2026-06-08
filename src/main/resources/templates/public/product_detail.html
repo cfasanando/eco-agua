@@ -72,7 +72,16 @@
             <div class="row g-4 align-items-start">
                 <div class="col-lg-6">
                     <div class="product-detail-main-image-card">
-                        <span class="product-detail-stock-badge">Consulta disponibilidad</span>
+                        <div class="product-detail-badge-stack">
+                            <span class="product-detail-stock-badge" th:if="${product.featured}">
+                                <i class="bi bi-star-fill me-1"></i>
+                                <span th:text="${catalogBadgeFeaturedLabel}">Destacado</span>
+                            </span>
+                            <span class="product-detail-stock-badge product-detail-stock-badge-soft">
+                                <i class="bi bi-chat-dots-fill me-1"></i>
+                                <span th:text="${catalogBadgeAvailabilityLabel}">Consultar disponibilidad</span>
+                            </span>
+                        </div>
                         <img th:src="${productImage}" th:alt="${product.name}" class="product-detail-main-image">
                     </div>
                 </div>
@@ -85,6 +94,21 @@
                         </span>
 
                         <h1 th:text="${product.name}">Nombre del producto</h1>
+
+                        <div class="product-detail-commerce-badges" aria-label="Etiquetas comerciales del producto">
+                            <span th:if="${product.featured}" class="catalog-commerce-badge catalog-commerce-badge-featured">
+                                <i class="bi bi-star-fill"></i>
+                                <span th:text="${catalogBadgeFeaturedLabel}">Destacado</span>
+                            </span>
+                            <span th:if="${product.category != null}" class="catalog-commerce-badge catalog-commerce-badge-local">
+                                <i class="bi bi-tree-fill"></i>
+                                <span th:text="${catalogBadgeLocalProductLabel}">Producto amazónico</span>
+                            </span>
+                            <span class="catalog-commerce-badge catalog-commerce-badge-price">
+                                <i class="bi bi-tag-fill"></i>
+                                <span th:text="${catalogBadgeReferencePriceLabel}">Precio referencial</span>
+                            </span>
+                        </div>
 
                         <div class="product-detail-description" th:if="${product.description != null and !#strings.isEmpty(product.description)}" th:utext="${product.description}">
                             Descripción del producto.
@@ -182,6 +206,10 @@
                 <div class="col-6 col-md-4 col-xl-3" th:each="related : ${relatedProducts}">
                     <a class="product-related-card" th:href="@{/catalogo/producto/{id}(id=${related.id})}">
                         <div class="product-related-image-wrap">
+                            <span class="product-related-badge" th:if="${related.featured}">
+                                <i class="bi bi-star-fill"></i>
+                                <span th:text="${catalogBadgeFeaturedLabel}">Destacado</span>
+                            </span>
                             <img th:src="${related.imagePath != null and !#strings.isEmpty(related.imagePath) ? related.imagePath : catalogProductPlaceholderImage}"
                                  th:alt="${related.name}">
                         </div>
@@ -189,6 +217,11 @@
                             <span th:if="${related.category != null}" th:text="${related.category.name}">Categoría</span>
                             <strong th:text="${related.name}">Producto relacionado</strong>
                             <small>S/ <span th:text="${#numbers.formatDecimal(related.price, 1, 'POINT', 2, 'POINT')}">0.00</span></small>
+                            <em>Consultar disponibilidad</em>
+                        </div>
+                        <div class="product-related-footer">
+                            <span th:text="${catalogRelatedCtaLabel}">Ver producto</span>
+                            <i class="bi bi-arrow-right"></i>
                         </div>
                     </a>
                 </div>

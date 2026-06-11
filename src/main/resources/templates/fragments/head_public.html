@@ -3,17 +3,43 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title th:text="${pageTitle}">Eco Agua</title>
+    <title th:text="${seoTitle != null and !#strings.isEmpty(seoTitle) ? seoTitle : pageTitle}">Eco Agua</title>
+    <meta name="description"
+          th:content="${seoDescription != null and !#strings.isEmpty(seoDescription) ? seoDescription : platformTagline}" />
+    <meta name="robots" content="index,follow" />
+    <link rel="canonical"
+          th:if="${seoCanonicalUrl != null and !#strings.isEmpty(seoCanonicalUrl)}"
+          th:href="${seoCanonicalUrl}" />
 
-    <!-- Bootstrap CSS (CDN) -->
+    <meta property="og:locale" content="es_PE" />
+    <meta property="og:type"
+          th:content="${seoOgType != null and !#strings.isEmpty(seoOgType) ? seoOgType : 'website'}" />
+    <meta property="og:title"
+          th:content="${seoTitle != null and !#strings.isEmpty(seoTitle) ? seoTitle : pageTitle}" />
+    <meta property="og:description"
+          th:content="${seoDescription != null and !#strings.isEmpty(seoDescription) ? seoDescription : platformTagline}" />
+    <meta property="og:url"
+          th:if="${seoCanonicalUrl != null and !#strings.isEmpty(seoCanonicalUrl)}"
+          th:content="${seoCanonicalUrl}" />
+    <meta property="og:image"
+          th:if="${seoOgImage != null and !#strings.isEmpty(seoOgImage)}"
+          th:content="${seoOgImage}" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title"
+          th:content="${seoTitle != null and !#strings.isEmpty(seoTitle) ? seoTitle : pageTitle}" />
+    <meta name="twitter:description"
+          th:content="${seoDescription != null and !#strings.isEmpty(seoDescription) ? seoDescription : platformTagline}" />
+    <meta name="twitter:image"
+          th:if="${seoOgImage != null and !#strings.isEmpty(seoOgImage)}"
+          th:content="${seoOgImage}" />
+
     <link rel="stylesheet"
           th:href="@{https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css}" />
 
-    <!-- Bootstrap Icons (CDN) -->
     <link rel="stylesheet"
           th:href="@{https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css}" />
 
-    <!-- Your existing styles -->
     <link rel="stylesheet" th:href="@{/css/admin.css}" />
     <link rel="stylesheet" th:href="@{/css/public.css}" />
 </head>

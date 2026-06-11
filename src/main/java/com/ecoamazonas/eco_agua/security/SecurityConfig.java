@@ -294,7 +294,7 @@ public class SecurityConfig {
         http
             .addFilterBefore(systemModuleAccessFilter, AuthorizationFilter.class)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/portal", "/catalogo", "/catalogo/**", "/order/whatsapp").permitAll()
+                .requestMatchers("/", "/portal", "/catalogo", "/catalogo/**", "/order/whatsapp", "/robots.txt", "/sitemap.xml").permitAll()
                 .requestMatchers("/blog", "/blog/**").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/img/**", "/uploads/**", "/webjars/**").permitAll()
                 .requestMatchers("/login", "/error").permitAll()

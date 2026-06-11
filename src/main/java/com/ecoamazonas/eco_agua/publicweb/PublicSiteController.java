@@ -15,6 +15,7 @@ import com.ecoamazonas.eco_agua.product.Product;
 import com.ecoamazonas.eco_agua.product.ProductRepository;
 import com.ecoamazonas.eco_agua.promotion.Promotion;
 import com.ecoamazonas.eco_agua.promotion.PromotionRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -23,16 +24,20 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Controller
@@ -98,6 +103,13 @@ public class PublicSiteController {
         model.addAttribute("homeCatalogCategories", homeCatalogCategories);
         model.addAttribute("homeCatalogProductCount", activeCatalogProducts.size());
         model.addAttribute("homeCatalogCategoryCount", homeCatalogCategories.size());
+        model.addAttribute("productPublicUrls", buildProductPublicUrls(featuredProducts));
+        addPublicSeo(model,
+                setting("public.home.seo.title", setting("public.home.title", businessProperties.getHeroTitle()) + " - " + setting("platform.name", businessProperties.getName())),
+                setting("public.home.seo.description", businessProperties.getHeroSubtitle()),
+                "/",
+                setting("public.home.seo.image", setting("public.hero.main_image", setting("platform.logo", businessProperties.getLogo()))),
+                "website");
         model.addAttribute("latestBlogPosts", latestPosts);
         model.addAttribute("deliveryZones", deliveryZones);
         model.addAttribute("testimonials", testimonials);
@@ -148,6 +160,13 @@ public class PublicSiteController {
         model.addAttribute("maxPrice", maxPriceValue != null ? maxPriceValue.trim() : "");
         model.addAttribute("sort", cleanSort.isBlank() ? "category" : cleanSort);
         model.addAttribute("hasCatalogFilters", hasCatalogFilters(cleanQuery, selectedCategoryId, minPrice, maxPrice));
+        model.addAttribute("productPublicUrls", buildProductPublicUrls(products));
+        addPublicSeo(model,
+                setting("public.catalog.seo.title", setting("public.catalog.title", "Catálogo de productos") + " - " + setting("platform.name", businessProperties.getName())),
+                setting("public.catalog.seo.description", setting("public.catalog.subtitle", "Consulta productos, precios referenciales y disponibilidad por WhatsApp.")),
+                "/catalogo",
+                setting("public.catalog.seo.image", setting("platform.logo", businessProperties.getLogo())),
+                "website");
         addPublicLayoutSettings(model);
         addCatalogContentSettings(model);
         addPublicOrderSettings(model);
@@ -156,8 +175,13 @@ public class PublicSiteController {
     }
 
 
-    @GetMapping("/catalogo/producto/{id}")
-    public String productDetail(@PathVariable Long id, Model model) {
+    @GetMapping("/catalogo/producto/{productPath}")
+    public String productDetail(@PathVariable String productPath, Model model) {
+        Long id = parseProductId(productPath);
+        if (id == null) {
+            return "redirect:/catalogo";
+        }
+
         Product product = productRepository.findById(id)
                 .filter(Product::isActive)
                 .orElse(null);
@@ -178,12 +202,49 @@ public class PublicSiteController {
         model.addAttribute("productDetailHowTitle", setting("public.product_detail.how_title", "¿Cómo comprar?"));
         model.addAttribute("productDetailDeliveryTitle", setting("public.product_detail.delivery_title", "Entrega y disponibilidad"));
         model.addAttribute("productDetailRelatedTitle", setting("public.product_detail.related_title", "También te puede interesar"));
+        model.addAttribute("productPublicUrls", buildProductPublicUrls(relatedProducts));
+        model.addAttribute("productDetailUrl", productPublicPath(product));
+        addPublicSeo(model,
+                product.getName() + " - " + setting("platform.name", businessProperties.getName()),
+                productSeoDescription(product),
+                productPublicPath(product),
+                productImage,
+                "product");
 
         addPublicLayoutSettings(model);
         addCatalogContentSettings(model);
         addPublicOrderSettings(model);
 
         return "public/product_detail";
+    }
+
+    @GetMapping(value = "/robots.txt", produces = "text/plain")
+    @ResponseBody
+    public String robotsTxt(HttpServletRequest request) {
+        String siteBaseUrl = publicBaseUrl(request);
+        StringBuilder content = new StringBuilder();
+        content.append("User-agent: *\n");
+        content.append("Allow: /\n");
+        if (!siteBaseUrl.isBlank()) {
+            content.append("Sitemap: ").append(trimTrailingSlash(siteBaseUrl)).append("/sitemap.xml\n");
+        }
+        return content.toString();
+    }
+
+    @GetMapping(value = "/sitemap.xml", produces = "application/xml")
+    @ResponseBody
+    public String sitemapXml(HttpServletRequest request) {
+        String base = publicBaseUrl(request);
+        StringBuilder xml = new StringBuilder();
+        xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        xml.append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
+        appendSitemapUrl(xml, base + "/");
+        appendSitemapUrl(xml, base + "/catalogo");
+        for (Product product : productRepository.findByActiveTrueOrderByNameAsc()) {
+            appendSitemapUrl(xml, base + productPublicPath(product));
+        }
+        xml.append("</urlset>\n");
+        return xml.toString();
     }
 
     @PostMapping("/order/whatsapp")
@@ -215,6 +276,127 @@ public class PublicSiteController {
         return "redirect:https://wa.me/" + whatsappNumber + "?text=" + encoded;
     }
 
+
+    private Long parseProductId(String productPath) {
+        if (productPath == null || productPath.isBlank()) {
+            return null;
+        }
+
+        String idPart = productPath.trim();
+        int separatorIndex = idPart.indexOf('-');
+        if (separatorIndex > 0) {
+            idPart = idPart.substring(0, separatorIndex);
+        }
+
+        return parseLong(idPart);
+    }
+
+    private Map<Long, String> buildProductPublicUrls(List<Product> products) {
+        Map<Long, String> urls = new LinkedHashMap<>();
+        if (products == null) {
+            return urls;
+        }
+
+        for (Product product : products) {
+            if (product != null && product.getId() != null) {
+                urls.put(product.getId(), productPublicPath(product));
+            }
+        }
+        return urls;
+    }
+
+    private String productPublicPath(Product product) {
+        if (product == null || product.getId() == null) {
+            return "/catalogo";
+        }
+        return "/catalogo/producto/" + product.getId() + "-" + slugify(product.getName());
+    }
+
+    private String slugify(String value) {
+        String normalized = Normalizer.normalize(safeText(value), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("(^-|-$)", "");
+
+        return normalized.isBlank() ? "producto" : normalized;
+    }
+
+    private String productSeoDescription(Product product) {
+        String description = stripHtml(safeText(product.getDescription()));
+        if (description.isBlank()) {
+            description = "Consulta disponibilidad, presentación, precio referencial y entrega de " + product.getName() + " por WhatsApp.";
+        }
+        return limitText(description, 160);
+    }
+
+    private String stripHtml(String value) {
+        return safeText(value)
+                .replaceAll("<[^>]*>", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private String limitText(String value, int maxLength) {
+        String cleanValue = safeText(value).trim();
+        if (cleanValue.length() <= maxLength) {
+            return cleanValue;
+        }
+        return cleanValue.substring(0, Math.max(0, maxLength - 1)).trim() + "…";
+    }
+
+    private void addPublicSeo(Model model, String title, String description, String canonicalPath, String imagePath, String type) {
+        String cleanTitle = safeText(title).isBlank() ? setting("platform.name", businessProperties.getName()) : title.trim();
+        String cleanDescription = safeText(description).isBlank() ? setting("platform.tagline", businessProperties.getTagline()) : limitText(stripHtml(description), 160);
+        String cleanPath = safeText(canonicalPath).isBlank() ? "/" : canonicalPath.trim();
+        String siteBaseUrl = trimTrailingSlash(setting("public.site.base_url", ""));
+
+        model.addAttribute("seoTitle", cleanTitle);
+        model.addAttribute("seoDescription", cleanDescription);
+        model.addAttribute("seoCanonicalPath", cleanPath);
+        model.addAttribute("seoCanonicalUrl", siteBaseUrl.isBlank() ? cleanPath : siteBaseUrl + cleanPath);
+        model.addAttribute("seoOgImage", safeText(imagePath).isBlank() ? setting("platform.logo", businessProperties.getLogo()) : imagePath);
+        model.addAttribute("seoOgType", safeText(type).isBlank() ? "website" : type);
+    }
+
+    private String publicBaseUrl(HttpServletRequest request) {
+        String configuredBaseUrl = trimTrailingSlash(setting("public.site.base_url", ""));
+        if (!configuredBaseUrl.isBlank()) {
+            return configuredBaseUrl;
+        }
+
+        String scheme = request.getScheme();
+        String serverName = request.getServerName();
+        int serverPort = request.getServerPort();
+        boolean defaultPort = ("http".equalsIgnoreCase(scheme) && serverPort == 80)
+                || ("https".equalsIgnoreCase(scheme) && serverPort == 443);
+
+        return scheme + "://" + serverName + (defaultPort ? "" : ":" + serverPort);
+    }
+
+    private String trimTrailingSlash(String value) {
+        String cleanValue = safeText(value).trim();
+        while (cleanValue.endsWith("/")) {
+            cleanValue = cleanValue.substring(0, cleanValue.length() - 1);
+        }
+        return cleanValue;
+    }
+
+    private void appendSitemapUrl(StringBuilder xml, String location) {
+        if (location == null || location.isBlank()) {
+            return;
+        }
+        xml.append("  <url><loc>").append(escapeXml(location)).append("</loc></url>\n");
+    }
+
+    private String escapeXml(String value) {
+        return safeText(value)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&apos;");
+    }
 
     private boolean matchesCatalogQuery(Product product, String query) {
         if (query == null || query.isBlank()) {

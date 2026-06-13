@@ -157,6 +157,8 @@ public class DeliveryDailyController {
         model.addAttribute("inRouteCount", countByStatus(routeRows, DeliveryStatus.IN_ROUTE));
         model.addAttribute("deliveredCount", countByStatus(rows, DeliveryStatus.DELIVERED));
         model.addAttribute("notDeliveredCount", countByStatus(rows, DeliveryStatus.NOT_DELIVERED));
+        model.addAttribute("paymentMethods", deliveryDailyService.findPaymentMethods());
+        model.addAttribute("incidentReasons", deliveryDailyService.findIncidentReasons());
         model.addAttribute("openStreetMapRouteUrl", deliveryDailyService.buildOpenStreetMapRouteUrl(routeRows));
 
         return "delivery/mobile";
@@ -182,6 +184,48 @@ public class DeliveryDailyController {
                 default -> throw new IllegalArgumentException("Unsupported mobile quick delivery status.");
             }
             redirectAttributes.addFlashAttribute("successMessage", "Estado de entrega actualizado.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+
+        UriComponentsBuilder redirect = UriComponentsBuilder.fromPath("/delivery/mobile");
+        if (date != null) {
+            redirect.queryParam("date", date);
+        }
+        if (deliveryPerson != null && !deliveryPerson.isBlank()) {
+            redirect.queryParam("deliveryPerson", deliveryPerson);
+        }
+        if (selectedDeliveryStatus != null) {
+            redirect.queryParam("deliveryStatus", selectedDeliveryStatus);
+        }
+        return "redirect:" + redirect.toUriString();
+    }
+
+    @PostMapping("/mobile/orders/{id}/outcome")
+    public String registerMobileOutcome(@PathVariable Long id,
+                                        @RequestParam("deliveryStatus") DeliveryStatus deliveryStatus,
+                                        @RequestParam(value = "observation", required = false) String observation,
+                                        @RequestParam(value = "incidentReason", required = false) String incidentReason,
+                                        @RequestParam(value = "proofReference", required = false) String proofReference,
+                                        @RequestParam(value = "paymentAmount", required = false) BigDecimal paymentAmount,
+                                        @RequestParam(value = "paymentMethod", required = false) String paymentMethod,
+                                        @RequestParam(value = "paymentReference", required = false) String paymentReference,
+                                        @RequestParam(value = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                        @RequestParam(value = "deliveryPerson", required = false) String deliveryPerson,
+                                        @RequestParam(value = "selectedDeliveryStatus", required = false) DeliveryStatus selectedDeliveryStatus,
+                                        RedirectAttributes redirectAttributes) {
+        try {
+            deliveryDailyService.registerDeliveryOutcome(
+                    id,
+                    deliveryStatus,
+                    observation,
+                    incidentReason,
+                    proofReference,
+                    paymentAmount,
+                    paymentMethod,
+                    paymentReference
+            );
+            redirectAttributes.addFlashAttribute("successMessage", "Resultado de entrega registrado correctamente.");
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
         }
@@ -266,6 +310,8 @@ public class DeliveryDailyController {
         model.addAttribute("order", order);
         model.addAttribute("zones", deliveryDailyService.findZones());
         model.addAttribute("events", deliveryDailyService.findEvents(id));
+        model.addAttribute("paymentMethods", deliveryDailyService.findPaymentMethods());
+        model.addAttribute("incidentReasons", deliveryDailyService.findIncidentReasons());
         model.addAttribute("whatsappUrl", deliveryDailyService.buildWhatsappUrl(order));
         model.addAttribute("mapsUrl", deliveryDailyService.buildGoogleMapsUrl(order));
         model.addAttribute("openStreetMapUrl", deliveryDailyService.buildOpenStreetMapUrl(order));
@@ -302,6 +348,34 @@ public class DeliveryDailyController {
                 default -> throw new IllegalArgumentException("Unsupported delivery status for manual change.");
             }
             redirectAttributes.addFlashAttribute("successMessage", "Estado de entrega actualizado correctamente.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/delivery/orders/" + id;
+    }
+
+    @PostMapping("/orders/{id}/outcome")
+    public String registerDetailOutcome(@PathVariable Long id,
+                                        @RequestParam("deliveryStatus") DeliveryStatus deliveryStatus,
+                                        @RequestParam(value = "observation", required = false) String observation,
+                                        @RequestParam(value = "incidentReason", required = false) String incidentReason,
+                                        @RequestParam(value = "proofReference", required = false) String proofReference,
+                                        @RequestParam(value = "paymentAmount", required = false) BigDecimal paymentAmount,
+                                        @RequestParam(value = "paymentMethod", required = false) String paymentMethod,
+                                        @RequestParam(value = "paymentReference", required = false) String paymentReference,
+                                        RedirectAttributes redirectAttributes) {
+        try {
+            deliveryDailyService.registerDeliveryOutcome(
+                    id,
+                    deliveryStatus,
+                    observation,
+                    incidentReason,
+                    proofReference,
+                    paymentAmount,
+                    paymentMethod,
+                    paymentReference
+            );
+            redirectAttributes.addFlashAttribute("successMessage", "Resultado de entrega y cobranza registrado correctamente.");
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
         }

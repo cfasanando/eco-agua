@@ -7,5 +7,6 @@ public enum DeliveryEventType {
     NOT_DELIVERED,
     RESCHEDULED,
     CANCELED,
+    PAYMENT,
     NOTE
 }

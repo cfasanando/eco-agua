@@ -17,6 +17,9 @@ public class DeliveryDailyRow {
     private final String deliveryPerson;
     private final DeliveryStatus deliveryStatus;
     private final BigDecimal totalAmount;
+    private final BigDecimal paidAmount;
+    private final BigDecimal pendingAmount;
+    private final String orderStatusLabel;
     private final Integer borrowedBottles;
     private final BigDecimal latitude;
     private final BigDecimal longitude;
@@ -33,6 +36,9 @@ public class DeliveryDailyRow {
             String deliveryPerson,
             DeliveryStatus deliveryStatus,
             BigDecimal totalAmount,
+            BigDecimal paidAmount,
+            BigDecimal pendingAmount,
+            String orderStatusLabel,
             Integer borrowedBottles,
             BigDecimal latitude,
             BigDecimal longitude
@@ -48,6 +54,9 @@ public class DeliveryDailyRow {
         this.deliveryPerson = deliveryPerson;
         this.deliveryStatus = deliveryStatus;
         this.totalAmount = totalAmount;
+        this.paidAmount = paidAmount;
+        this.pendingAmount = pendingAmount;
+        this.orderStatusLabel = orderStatusLabel;
         this.borrowedBottles = borrowedBottles;
         this.latitude = latitude;
         this.longitude = longitude;
@@ -64,6 +73,10 @@ public class DeliveryDailyRow {
     public String getDeliveryPerson() { return deliveryPerson; }
     public DeliveryStatus getDeliveryStatus() { return deliveryStatus; }
     public BigDecimal getTotalAmount() { return totalAmount; }
+    public BigDecimal getPaidAmount() { return paidAmount; }
+    public BigDecimal getPendingAmount() { return pendingAmount; }
+    public String getOrderStatusLabel() { return orderStatusLabel; }
+    public boolean hasPendingPayment() { return pendingAmount != null && pendingAmount.compareTo(BigDecimal.ZERO) > 0; }
     public Integer getBorrowedBottles() { return borrowedBottles; }
     public BigDecimal getLatitude() { return latitude; }
     public BigDecimal getLongitude() { return longitude; }

@@ -2,7 +2,9 @@ package com.ecoamazonas.eco_agua.delivery;
 
 import com.ecoamazonas.eco_agua.client.Client;
 import com.ecoamazonas.eco_agua.order.OrderStatus;
+import com.ecoamazonas.eco_agua.order.ReceivableService;
 import com.ecoamazonas.eco_agua.order.SaleOrder;
+import com.ecoamazonas.eco_agua.order.SaleOrderPayment;
 import com.ecoamazonas.eco_agua.order.SaleOrderRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,11 +28,18 @@ public class DeliveryDailyService {
     private final SaleOrderRepository saleOrderRepository;
     private final DeliveryZoneRepository deliveryZoneRepository;
     private final SaleOrderDeliveryEventRepository deliveryEventRepository;
+    private final ReceivableService receivableService;
 
-    public DeliveryDailyService(SaleOrderRepository saleOrderRepository, DeliveryZoneRepository deliveryZoneRepository, SaleOrderDeliveryEventRepository deliveryEventRepository) {
+    public DeliveryDailyService(
+            SaleOrderRepository saleOrderRepository,
+            DeliveryZoneRepository deliveryZoneRepository,
+            SaleOrderDeliveryEventRepository deliveryEventRepository,
+            ReceivableService receivableService
+    ) {
         this.saleOrderRepository = saleOrderRepository;
         this.deliveryZoneRepository = deliveryZoneRepository;
         this.deliveryEventRepository = deliveryEventRepository;
+        this.receivableService = receivableService;
     }
 
     @Transactional(readOnly = true)
@@ -57,6 +66,9 @@ public class DeliveryDailyService {
                         order.getDeliveryPerson(),
                         order.getDeliveryStatus(),
                         order.getTotalAmount(),
+                        order.getPaidAmount(),
+                        order.getPendingAmount(),
+                        order.getStatusLabel(),
                         order.getBorrowedBottles(),
                         order.getClient() != null ? order.getClient().getLatitude() : null,
                         order.getClient() != null ? order.getClient().getLongitude() : null
@@ -197,11 +209,79 @@ public class DeliveryDailyService {
         return order;
     }
 
+    public List<String> findPaymentMethods() {
+        return List.of("EFECTIVO", "YAPE", "PLIN", "TRANSFERENCIA", "OTRO");
+    }
+
+    public List<String> findIncidentReasons() {
+        return List.of(
+                "Cliente no contestó",
+                "Cliente ausente",
+                "Dirección incorrecta",
+                "Cliente reprogramó",
+                "Pedido rechazado",
+                "Falta de stock",
+                "Zona no atendida",
+                "Otro"
+        );
+    }
+
     @Transactional public SaleOrder markInRoute(Long orderId, String observation) { return updateDeliveryStatus(orderId, DeliveryStatus.IN_ROUTE, DeliveryEventType.IN_ROUTE, observation, false); }
     @Transactional public SaleOrder markDelivered(Long orderId, String observation) { return updateDeliveryStatus(orderId, DeliveryStatus.DELIVERED, DeliveryEventType.DELIVERED, observation, true); }
     @Transactional public SaleOrder markNotDelivered(Long orderId, String observation) { return updateDeliveryStatus(orderId, DeliveryStatus.NOT_DELIVERED, DeliveryEventType.NOT_DELIVERED, observation, false); }
     @Transactional public SaleOrder markRescheduled(Long orderId, String observation) { return updateDeliveryStatus(orderId, DeliveryStatus.RESCHEDULED, DeliveryEventType.RESCHEDULED, observation, false); }
     @Transactional public SaleOrder markCanceled(Long orderId, String observation) { return updateDeliveryStatus(orderId, DeliveryStatus.CANCELED, DeliveryEventType.CANCELED, observation, false); }
+
+    @Transactional
+    public SaleOrder registerDeliveryOutcome(
+            Long orderId,
+            DeliveryStatus deliveryStatus,
+            String observation,
+            String incidentReason,
+            String proofReference,
+            BigDecimal paymentAmount,
+            String paymentMethod,
+            String paymentReference
+    ) {
+        DeliveryEventType eventType = eventTypeForStatus(deliveryStatus);
+        boolean setDeliveredAt = deliveryStatus == DeliveryStatus.DELIVERED;
+        SaleOrder order = updateDeliveryStatusWithDetails(
+                orderId,
+                deliveryStatus,
+                eventType,
+                observation,
+                setDeliveredAt,
+                incidentReason,
+                proofReference,
+                paymentAmount,
+                paymentMethod,
+                paymentReference
+        );
+
+        if (hasPositivePayment(paymentAmount)) {
+            BigDecimal normalizedAmount = paymentAmount.setScale(2, RoundingMode.HALF_UP);
+            SaleOrderPayment payment = receivableService.registerPayment(
+                    orderId,
+                    LocalDate.now(),
+                    normalizedAmount,
+                    paymentMethod,
+                    paymentReference,
+                    buildPaymentObservation(observation, proofReference)
+            );
+            registerEvent(
+                    order,
+                    DeliveryEventType.PAYMENT,
+                    "Cobro registrado en ruta.",
+                    null,
+                    proofReference,
+                    payment.getAmount(),
+                    payment.getPaymentMethod(),
+                    payment.getReference()
+            );
+        }
+
+        return saleOrderRepository.findDeliveryOrderById(orderId).orElse(order);
+    }
 
     public String buildWhatsappUrl(SaleOrder order) {
         if (order == null || order.getClient() == null) {
@@ -268,6 +348,21 @@ public class DeliveryDailyService {
     }
 
     private SaleOrder updateDeliveryStatus(Long orderId, DeliveryStatus deliveryStatus, DeliveryEventType eventType, String observation, boolean setDeliveredAt) {
+        return updateDeliveryStatusWithDetails(orderId, deliveryStatus, eventType, observation, setDeliveredAt, null, null, null, null, null);
+    }
+
+    private SaleOrder updateDeliveryStatusWithDetails(
+            Long orderId,
+            DeliveryStatus deliveryStatus,
+            DeliveryEventType eventType,
+            String observation,
+            boolean setDeliveredAt,
+            String incidentReason,
+            String proofReference,
+            BigDecimal paymentAmount,
+            String paymentMethod,
+            String paymentReference
+    ) {
         SaleOrder order = saleOrderRepository.findById(orderId).orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
         order.setDeliveryStatus(deliveryStatus);
         order.setDeliveryObservation(clean(observation));
@@ -279,20 +374,68 @@ public class DeliveryDailyService {
         }
 
         saleOrderRepository.save(order);
-        registerEvent(order, eventType, observation);
+        registerEvent(order, eventType, observation, incidentReason, proofReference, paymentAmount, paymentMethod, paymentReference);
         return order;
     }
 
     private void registerEvent(SaleOrder order, DeliveryEventType eventType, String observation) {
+        registerEvent(order, eventType, observation, null, null, null, null, null);
+    }
+
+    private void registerEvent(
+            SaleOrder order,
+            DeliveryEventType eventType,
+            String observation,
+            String incidentReason,
+            String proofReference,
+            BigDecimal paymentAmount,
+            String paymentMethod,
+            String paymentReference
+    ) {
         SaleOrderDeliveryEvent event = new SaleOrderDeliveryEvent();
         event.setSaleOrderId(order.getId());
         event.setEventDate(LocalDateTime.now());
         event.setEventType(eventType);
         event.setObservation(clean(observation));
+        event.setIncidentReason(clean(incidentReason));
+        event.setProofReference(clean(proofReference));
+        event.setPaymentAmount(hasPositivePayment(paymentAmount) ? paymentAmount.setScale(2, RoundingMode.HALF_UP) : null);
+        event.setPaymentMethod(clean(paymentMethod));
+        event.setPaymentReference(clean(paymentReference));
         event.setContainersDeliveredSnapshot(0);
         event.setContainersReturnedSnapshot(0);
         event.setDeliveryPersonSnapshot(order.getDeliveryPerson());
         deliveryEventRepository.save(event);
+    }
+
+    private DeliveryEventType eventTypeForStatus(DeliveryStatus deliveryStatus) {
+        if (deliveryStatus == null) {
+            throw new IllegalArgumentException("Delivery status is required.");
+        }
+
+        return switch (deliveryStatus) {
+            case IN_ROUTE -> DeliveryEventType.IN_ROUTE;
+            case DELIVERED -> DeliveryEventType.DELIVERED;
+            case NOT_DELIVERED -> DeliveryEventType.NOT_DELIVERED;
+            case RESCHEDULED -> DeliveryEventType.RESCHEDULED;
+            case CANCELED -> DeliveryEventType.CANCELED;
+            case PENDING -> throw new IllegalArgumentException("Pending status cannot be registered as a delivery outcome.");
+        };
+    }
+
+    private boolean hasPositivePayment(BigDecimal amount) {
+        return amount != null && amount.compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    private String buildPaymentObservation(String observation, String proofReference) {
+        String cleanObservation = clean(observation);
+        String cleanProof = clean(proofReference);
+        if (cleanProof == null) {
+            return cleanObservation != null ? cleanObservation : "Cobro registrado en ruta.";
+        }
+
+        String base = cleanObservation != null ? cleanObservation : "Cobro registrado en ruta.";
+        return base + " Evidencia: " + cleanProof;
     }
 
     private DeliveryDailyRow findNearest(double latitude, double longitude, List<DeliveryDailyRow> rows) {

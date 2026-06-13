@@ -127,6 +127,78 @@ public class DeliveryDailyController {
         return "delivery/routes";
     }
 
+
+    @GetMapping("/mobile")
+    public String mobile(
+            @RequestParam(value = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(value = "deliveryPerson", required = false) String deliveryPerson,
+            @RequestParam(value = "deliveryStatus", required = false) DeliveryStatus deliveryStatus,
+            Model model
+    ) {
+        LocalDate effectiveDate = date != null ? date : LocalDate.now();
+        List<DeliveryDailyRow> rows = deliveryDailyService.findRows(effectiveDate, deliveryPerson, deliveryStatus);
+        List<DeliveryDailyRow> routeRows = deliveryDailyService.buildSuggestedRoute(deliveryDailyService.filterRouteRows(rows, deliveryStatus));
+        DeliveryRouteSummary routeSummary = deliveryDailyService.buildRouteSummary(rows, routeRows);
+
+        model.addAttribute("activePage", "delivery_mobile");
+        model.addAttribute("today", effectiveDate);
+        model.addAttribute("rows", rows);
+        model.addAttribute("routeRows", routeRows);
+        model.addAttribute("routeSummary", routeSummary);
+        model.addAttribute("deliveryEmployees", employeeRepository.findByActiveTrueOrderByFirstNameAscLastNameAsc());
+        model.addAttribute("deliveryStatuses", DeliveryStatus.values());
+        model.addAttribute("selectedDeliveryPerson", deliveryPerson);
+        model.addAttribute("selectedDeliveryStatus", deliveryStatus);
+        model.addAttribute("totalAmount", routeRows.stream()
+                .map(DeliveryDailyRow::getTotalAmount)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        model.addAttribute("pendingCount", countByStatus(routeRows, DeliveryStatus.PENDING));
+        model.addAttribute("inRouteCount", countByStatus(routeRows, DeliveryStatus.IN_ROUTE));
+        model.addAttribute("deliveredCount", countByStatus(rows, DeliveryStatus.DELIVERED));
+        model.addAttribute("notDeliveredCount", countByStatus(rows, DeliveryStatus.NOT_DELIVERED));
+        model.addAttribute("openStreetMapRouteUrl", deliveryDailyService.buildOpenStreetMapRouteUrl(routeRows));
+
+        return "delivery/mobile";
+    }
+
+    @PostMapping("/mobile/orders/{id}/quick-status")
+    public String updateMobileQuickStatus(@PathVariable Long id,
+                                          @RequestParam("deliveryStatus") DeliveryStatus deliveryStatus,
+                                          @RequestParam(value = "observation", required = false) String observation,
+                                          @RequestParam(value = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                          @RequestParam(value = "deliveryPerson", required = false) String deliveryPerson,
+                                          @RequestParam(value = "selectedDeliveryStatus", required = false) DeliveryStatus selectedDeliveryStatus,
+                                          RedirectAttributes redirectAttributes) {
+        try {
+            String effectiveObservation = observation != null && !observation.isBlank()
+                    ? observation
+                    : "Actualizado desde modo repartidor móvil.";
+            switch (deliveryStatus) {
+                case IN_ROUTE -> deliveryDailyService.markInRoute(id, effectiveObservation);
+                case DELIVERED -> deliveryDailyService.markDelivered(id, effectiveObservation);
+                case NOT_DELIVERED -> deliveryDailyService.markNotDelivered(id, effectiveObservation);
+                case RESCHEDULED -> deliveryDailyService.markRescheduled(id, effectiveObservation);
+                default -> throw new IllegalArgumentException("Unsupported mobile quick delivery status.");
+            }
+            redirectAttributes.addFlashAttribute("successMessage", "Estado de entrega actualizado.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+
+        UriComponentsBuilder redirect = UriComponentsBuilder.fromPath("/delivery/mobile");
+        if (date != null) {
+            redirect.queryParam("date", date);
+        }
+        if (deliveryPerson != null && !deliveryPerson.isBlank()) {
+            redirect.queryParam("deliveryPerson", deliveryPerson);
+        }
+        if (selectedDeliveryStatus != null) {
+            redirect.queryParam("deliveryStatus", selectedDeliveryStatus);
+        }
+        return "redirect:" + redirect.toUriString();
+    }
+
     @PostMapping("/routes/save-order")
     public String saveRouteOrder(@RequestParam(value = "orderIds", required = false) List<Long> orderIds,
                                  @RequestParam(value = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,

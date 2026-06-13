@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Modo repartidor - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='delivery_mobile'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper delivery-mobile-page">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Modo repartidor</h1>
+                    <div class="text-muted small" th:text="${#temporals.format(today, 'dd/MM/yyyy')}">Fecha</div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-secondary btn-sm" th:href="@{/delivery(date=${today}, deliveryPerson=${selectedDeliveryPerson}, deliveryStatus=${selectedDeliveryStatus})}">
+                        <i class="bi bi-list-check me-1"></i> Lista
+                    </a>
+                    <a class="btn btn-outline-info btn-sm" th:href="@{/delivery/map(date=${today}, deliveryPerson=${selectedDeliveryPerson}, deliveryStatus=${selectedDeliveryStatus})}">
+                        <i class="bi bi-map me-1"></i> Mapa
+                    </a>
+                    <a class="btn btn-outline-success btn-sm" th:href="@{/delivery/routes(date=${today}, deliveryPerson=${selectedDeliveryPerson}, deliveryStatus=${selectedDeliveryStatus})}">
+                        <i class="bi bi-signpost-split me-1"></i> Ruta
+                    </a>
+                    <a class="btn btn-primary btn-sm" th:if="${openStreetMapRouteUrl != null}" target="_blank" th:href="${openStreetMapRouteUrl}">
+                        <i class="bi bi-compass me-1"></i> Navegar
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}">OK</div>
+            <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}">Error</div>
+
+            <div class="alert alert-info border-0 shadow-sm small mb-3">
+                <strong>Modo móvil:</strong>
+                pensado para el repartidor en campo. Usa los botones grandes para WhatsApp, navegación y actualización rápida de estados.
+            </div>
+
+            <form class="card shadow-sm mb-3" th:action="@{/delivery/mobile}" method="get">
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small">Fecha</label>
+                            <input type="date" class="form-control" name="date" th:value="${today}">
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label class="form-label small">Repartidor</label>
+                            <select class="form-select" name="deliveryPerson">
+                                <option value="">Todos</option>
+                                <option th:each="employee : ${deliveryEmployees}"
+                                        th:value="${employee.firstName + ' ' + employee.lastName}"
+                                        th:selected="${selectedDeliveryPerson != null and selectedDeliveryPerson == (employee.firstName + ' ' + employee.lastName)}"
+                                        th:text="${employee.firstName + ' ' + employee.lastName}">Responsable</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small">Estado</label>
+                            <select class="form-select" name="deliveryStatus">
+                                <option value="">Pendientes y en ruta</option>
+                                <option th:each="status : ${deliveryStatuses}"
+                                        th:value="${status}"
+                                        th:selected="${selectedDeliveryStatus != null and selectedDeliveryStatus == status}"
+                                        th:text="${status.name() == 'PENDING' ? 'Pendiente' : (status.name() == 'IN_ROUTE' ? 'En ruta' : (status.name() == 'DELIVERED' ? 'Entregado' : (status.name() == 'NOT_DELIVERED' ? 'No entregado' : (status.name() == 'RESCHEDULED' ? 'Reprogramado' : 'Cancelado'))))}">Estado</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2 d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Filtrar</button>
+                            <a class="btn btn-outline-secondary" th:href="@{/delivery/mobile}">Hoy</a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-md-3">
+                    <div class="mobile-kpi card shadow-sm h-100">
+                        <div class="card-body py-2">
+                            <div class="small text-muted">Paradas</div>
+                            <div class="h4 mb-0" th:text="${routeSummary.totalStops}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="mobile-kpi card shadow-sm h-100 border-primary-subtle">
+                        <div class="card-body py-2">
+                            <div class="small text-muted">En ruta</div>
+                            <div class="h4 mb-0 text-primary" th:text="${inRouteCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="mobile-kpi card shadow-sm h-100 border-success-subtle">
+                        <div class="card-body py-2">
+                            <div class="small text-muted">Entregados</div>
+                            <div class="h4 mb-0 text-success" th:text="${deliveredCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="mobile-kpi card shadow-sm h-100 border-info-subtle">
+                        <div class="card-body py-2">
+                            <div class="small text-muted">Tiempo aprox.</div>
+                            <div class="h5 mb-0 text-info" th:text="${routeSummary.estimatedTimeLabel}">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${#lists.isEmpty(routeRows)}" class="card shadow-sm">
+                <div class="card-body text-center text-muted py-5">
+                    No hay paradas con ubicación para el modo repartidor.
+                    Revisa la fecha, el responsable o registra la ubicación exacta del cliente.
+                </div>
+            </div>
+
+            <div class="delivery-mobile-list" th:if="${!#lists.isEmpty(routeRows)}">
+                <article th:each="row, iter : ${routeRows}" class="card shadow-sm mobile-stop-card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="mobile-stop-number" th:text="${iter.index + 1}">1</div>
+                                <div>
+                                    <h2 class="h6 mb-0" th:text="${row.clientName}">Cliente</h2>
+                                    <div class="small text-muted" th:text="${'Pedido #' + row.orderNumber}">Pedido</div>
+                                </div>
+                            </div>
+                            <span class="badge" th:classappend="${row.deliveryStatusBadgeClass}" th:text="${row.deliveryStatusLabel}">Estado</span>
+                        </div>
+
+                        <div class="small mb-2">
+                            <i class="bi bi-geo-alt me-1"></i>
+                            <span th:text="${row.addressSummary}">Dirección</span>
+                        </div>
+                        <div class="small text-muted mb-2" th:if="${row.zoneName != null}" th:text="${'Zona: ' + row.zoneName}">Zona</div>
+                        <div class="small text-muted mb-3" th:if="${row.deliveryPerson != null}" th:text="${'Responsable: ' + row.deliveryPerson}">Responsable</div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <a th:if="${row.hasPhone()}" class="btn btn-success w-100 mobile-action-btn" th:href="${row.whatsappUrl}" target="_blank">
+                                    <i class="bi bi-whatsapp me-1"></i> WhatsApp
+                                </a>
+                                <button th:unless="${row.hasPhone()}" type="button" class="btn btn-outline-secondary w-100 mobile-action-btn" disabled>
+                                    <i class="bi bi-whatsapp me-1"></i> Sin WhatsApp
+                                </button>
+                            </div>
+                            <div class="col-6">
+                                <a class="btn btn-primary w-100 mobile-action-btn" th:href="${row.googleMapsUrl}" target="_blank">
+                                    <i class="bi bi-navigation me-1"></i> Navegar
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a class="btn btn-outline-info w-100 mobile-action-btn" th:href="${row.openStreetMapUrl}" target="_blank">
+                                    <i class="bi bi-map me-1"></i> OSM
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a class="btn btn-outline-secondary w-100 mobile-action-btn" th:href="@{|/delivery/orders/${row.orderId}|}">
+                                    <i class="bi bi-card-list me-1"></i> Detalle
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <form th:if="${!row.isDelivered() and !row.isInRoute()}" th:action="@{|/delivery/mobile/orders/${row.orderId}/quick-status|}" method="post">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                <input type="hidden" name="date" th:value="${today}" />
+                                <input type="hidden" name="deliveryPerson" th:value="${selectedDeliveryPerson}" />
+                                <input type="hidden" name="selectedDeliveryStatus" th:if="${selectedDeliveryStatus != null}" th:value="${selectedDeliveryStatus}" />
+                                <input type="hidden" name="deliveryStatus" th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).IN_ROUTE}" />
+                                <button type="submit" class="btn btn-outline-primary w-100 mobile-status-btn">
+                                    <i class="bi bi-truck me-1"></i> Marcar en ruta
+                                </button>
+                            </form>
+
+                            <form th:if="${!row.isDelivered()}" th:action="@{|/delivery/mobile/orders/${row.orderId}/quick-status|}" method="post">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                <input type="hidden" name="date" th:value="${today}" />
+                                <input type="hidden" name="deliveryPerson" th:value="${selectedDeliveryPerson}" />
+                                <input type="hidden" name="selectedDeliveryStatus" th:if="${selectedDeliveryStatus != null}" th:value="${selectedDeliveryStatus}" />
+                                <input type="hidden" name="deliveryStatus" th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).DELIVERED}" />
+                                <input type="hidden" name="observation" value="Entregado desde modo repartidor móvil." />
+                                <button type="submit" class="btn btn-success w-100 mobile-status-btn">
+                                    <i class="bi bi-check2-circle me-1"></i> Entregado
+                                </button>
+                            </form>
+                        </div>
+
+                        <details class="mt-3">
+                            <summary class="small text-muted">No se pudo entregar / reprogramar</summary>
+                            <form class="mt-2" th:action="@{|/delivery/mobile/orders/${row.orderId}/quick-status|}" method="post">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                <input type="hidden" name="date" th:value="${today}" />
+                                <input type="hidden" name="deliveryPerson" th:value="${selectedDeliveryPerson}" />
+                                <input type="hidden" name="selectedDeliveryStatus" th:if="${selectedDeliveryStatus != null}" th:value="${selectedDeliveryStatus}" />
+                                <label class="form-label small">Motivo / observación</label>
+                                <textarea class="form-control form-control-sm mb-2" name="observation" rows="2" placeholder="Ejemplo: cliente no contestó, dirección incorrecta, volver en la tarde"></textarea>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <button type="submit" name="deliveryStatus" th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).NOT_DELIVERED}" class="btn btn-outline-danger w-100">
+                                            <i class="bi bi-x-circle me-1"></i> No entregado
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button type="submit" name="deliveryStatus" th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).RESCHEDULED}" class="btn btn-outline-warning w-100">
+                                            <i class="bi bi-calendar2-plus me-1"></i> Reprogramar
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </details>
+                    </div>
+                </article>
+            </div>
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+<style>
+    .delivery-mobile-page {
+        max-width: 980px;
+        margin: 0 auto;
+    }
+    .mobile-stop-card {
+        border-radius: 1rem;
+    }
+    .mobile-stop-number {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: #0d6efd;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        flex: 0 0 38px;
+    }
+    .mobile-action-btn,
+    .mobile-status-btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+    }
+    @media (max-width: 767.98px) {
+        .delivery-mobile-page {
+            padding-left: .75rem;
+            padding-right: .75rem;
+        }
+        .mobile-kpi .card-body {
+            padding-left: .75rem;
+            padding-right: .75rem;
+        }
+    }
+</style>
+</body>
+</html>

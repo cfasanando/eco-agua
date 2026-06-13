@@ -93,6 +93,100 @@ public class DeliveryDailyController {
         return "delivery/map";
     }
 
+    @GetMapping("/routes")
+    public String routes(
+            @RequestParam(value = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(value = "deliveryPerson", required = false) String deliveryPerson,
+            @RequestParam(value = "deliveryStatus", required = false) DeliveryStatus deliveryStatus,
+            Model model
+    ) {
+        LocalDate effectiveDate = date != null ? date : LocalDate.now();
+        List<DeliveryDailyRow> rows = deliveryDailyService.findRows(effectiveDate, deliveryPerson, deliveryStatus);
+        List<DeliveryDailyRow> routeRows = deliveryDailyService.buildSuggestedRoute(deliveryDailyService.filterRouteRows(rows, deliveryStatus));
+        DeliveryRouteSummary routeSummary = deliveryDailyService.buildRouteSummary(rows, routeRows);
+
+        model.addAttribute("activePage", "delivery_routes");
+        model.addAttribute("today", effectiveDate);
+        model.addAttribute("rows", rows);
+        model.addAttribute("routeRows", routeRows);
+        model.addAttribute("routeSummary", routeSummary);
+        model.addAttribute("deliveryEmployees", employeeRepository.findByActiveTrueOrderByFirstNameAscLastNameAsc());
+        model.addAttribute("deliveryStatuses", DeliveryStatus.values());
+        model.addAttribute("selectedDeliveryPerson", deliveryPerson);
+        model.addAttribute("selectedDeliveryStatus", deliveryStatus);
+        model.addAttribute("totalAmount", routeRows.stream()
+                .map(DeliveryDailyRow::getTotalAmount)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        model.addAttribute("pendingCount", countByStatus(routeRows, DeliveryStatus.PENDING));
+        model.addAttribute("inRouteCount", countByStatus(routeRows, DeliveryStatus.IN_ROUTE));
+        model.addAttribute("deliveredCount", countByStatus(routeRows, DeliveryStatus.DELIVERED));
+        model.addAttribute("notDeliveredCount", countByStatus(routeRows, DeliveryStatus.NOT_DELIVERED));
+        model.addAttribute("openStreetMapRouteUrl", deliveryDailyService.buildOpenStreetMapRouteUrl(routeRows));
+
+        return "delivery/routes";
+    }
+
+    @PostMapping("/routes/save-order")
+    public String saveRouteOrder(@RequestParam(value = "orderIds", required = false) List<Long> orderIds,
+                                 @RequestParam(value = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                 @RequestParam(value = "deliveryPerson", required = false) String deliveryPerson,
+                                 @RequestParam(value = "selectedDeliveryStatus", required = false) DeliveryStatus selectedDeliveryStatus,
+                                 RedirectAttributes redirectAttributes) {
+        int updated = deliveryDailyService.saveRouteOrder(orderIds, deliveryPerson);
+        if (updated > 0) {
+            redirectAttributes.addFlashAttribute("successMessage", "Ruta diaria guardada con " + updated + " parada(s).");
+        } else {
+            redirectAttributes.addFlashAttribute("errorMessage", "No se encontraron paradas para guardar.");
+        }
+
+        UriComponentsBuilder redirect = UriComponentsBuilder.fromPath("/delivery/routes");
+        if (date != null) {
+            redirect.queryParam("date", date);
+        }
+        if (deliveryPerson != null && !deliveryPerson.isBlank()) {
+            redirect.queryParam("deliveryPerson", deliveryPerson);
+        }
+        if (selectedDeliveryStatus != null) {
+            redirect.queryParam("deliveryStatus", selectedDeliveryStatus);
+        }
+        return "redirect:" + redirect.toUriString();
+    }
+
+    @PostMapping("/routes/orders/{id}/quick-status")
+    public String updateRouteQuickStatus(@PathVariable Long id,
+                                         @RequestParam("deliveryStatus") DeliveryStatus deliveryStatus,
+                                         @RequestParam(value = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                         @RequestParam(value = "deliveryPerson", required = false) String deliveryPerson,
+                                         @RequestParam(value = "selectedDeliveryStatus", required = false) DeliveryStatus selectedDeliveryStatus,
+                                         RedirectAttributes redirectAttributes) {
+        try {
+            String observation = "Actualizado desde rutas del día.";
+            switch (deliveryStatus) {
+                case IN_ROUTE -> deliveryDailyService.markInRoute(id, observation);
+                case DELIVERED -> deliveryDailyService.markDelivered(id, observation);
+                case NOT_DELIVERED -> deliveryDailyService.markNotDelivered(id, observation);
+                case RESCHEDULED -> deliveryDailyService.markRescheduled(id, observation);
+                default -> throw new IllegalArgumentException("Unsupported route quick delivery status.");
+            }
+            redirectAttributes.addFlashAttribute("successMessage", "Estado de entrega actualizado.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+
+        UriComponentsBuilder redirect = UriComponentsBuilder.fromPath("/delivery/routes");
+        if (date != null) {
+            redirect.queryParam("date", date);
+        }
+        if (deliveryPerson != null && !deliveryPerson.isBlank()) {
+            redirect.queryParam("deliveryPerson", deliveryPerson);
+        }
+        if (selectedDeliveryStatus != null) {
+            redirect.queryParam("deliveryStatus", selectedDeliveryStatus);
+        }
+        return "redirect:" + redirect.toUriString();
+    }
+
     @GetMapping("/orders/{id}")
     public String detail(@PathVariable Long id, Model model) {
         SaleOrder order = deliveryDailyService.findDetailedOrder(id);

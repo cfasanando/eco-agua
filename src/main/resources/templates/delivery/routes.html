@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Rutas del día - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='delivery_routes'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Rutas del día</h1>
+                    <div class="text-muted small" th:text="${#temporals.format(today, 'dd/MM/yyyy')}">Fecha</div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-secondary btn-sm" th:href="@{/delivery}">
+                        <i class="bi bi-arrow-left me-1"></i> Reparto diario
+                    </a>
+                    <a class="btn btn-outline-info btn-sm" th:href="@{/delivery/map(date=${today}, deliveryPerson=${selectedDeliveryPerson}, deliveryStatus=${selectedDeliveryStatus})}">
+                        <i class="bi bi-map me-1"></i> Mapa general
+                    </a>
+                    <a class="btn btn-outline-primary btn-sm" th:if="${openStreetMapRouteUrl != null}" target="_blank" th:href="${openStreetMapRouteUrl}">
+                        <i class="bi bi-signpost-split me-1"></i> Abrir ruta OSM
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}">OK</div>
+            <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}">Error</div>
+
+            <div class="alert alert-info border-0 shadow-sm small mb-3">
+                <strong>Modo repartidor:</strong>
+                esta pantalla sugiere un orden de paradas por cercanía, muestra la ruta en mapa y permite marcar estados rápidos sin entrar al detalle de cada pedido.
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Paradas en ruta</div>
+                            <div class="fs-4 fw-bold" th:text="${routeSummary.totalStops}">0</div>
+                            <div class="small text-muted">con ubicación</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-primary-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Distancia aprox.</div>
+                            <div class="fs-4 fw-bold text-primary"><span th:text="${#numbers.formatDecimal(routeSummary.estimatedDistanceKm, 1, 2)}">0.00</span> km</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-info-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Tiempo estimado</div>
+                            <div class="fs-4 fw-bold text-info" th:text="${routeSummary.estimatedTimeLabel}">-</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-warning-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Pendientes</div>
+                            <div class="fs-4 fw-bold text-warning" th:text="${pendingCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-success-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">En ruta</div>
+                            <div class="fs-4 fw-bold text-success" th:text="${inRouteCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-danger-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Sin ubicación</div>
+                            <div class="fs-4 fw-bold text-danger" th:text="${routeSummary.missingLocationStops}">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light"><strong>Filtros de ruta</strong></div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" th:action="@{/delivery/routes}" method="get">
+                        <div class="col-md-3">
+                            <label class="form-label">Fecha</label>
+                            <input type="date" class="form-control" name="date" th:value="${today}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Responsable de entrega</label>
+                            <select class="form-select" name="deliveryPerson">
+                                <option value="">Todos</option>
+                                <option th:each="employee : ${deliveryEmployees}"
+                                        th:value="${employee.firstName + ' ' + employee.lastName}"
+                                        th:selected="${selectedDeliveryPerson != null and selectedDeliveryPerson == (employee.firstName + ' ' + employee.lastName)}"
+                                        th:text="${employee.firstName + ' ' + employee.lastName}">Responsable</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Estado</label>
+                            <select class="form-select" name="deliveryStatus">
+                                <option value="">Pendientes y en ruta</option>
+                                <option th:each="status : ${deliveryStatuses}"
+                                        th:value="${status}"
+                                        th:selected="${selectedDeliveryStatus != null and selectedDeliveryStatus == status}"
+                                        th:text="${status.name() == 'PENDING' ? 'Pendiente' : (status.name() == 'IN_ROUTE' ? 'En ruta' : (status.name() == 'DELIVERED' ? 'Entregado' : (status.name() == 'NOT_DELIVERED' ? 'No entregado' : (status.name() == 'RESCHEDULED' ? 'Reprogramado' : 'Cancelado'))))}">Estado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Buscar</button>
+                            <a class="btn btn-outline-secondary" th:href="@{/delivery/routes}">Limpiar</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-xl-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <strong>Mapa de ruta sugerida</strong>
+                            <span class="small text-muted">Orden aproximado por cercanía desde Iquitos.</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div id="deliveryRoutesMap" style="height: 620px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <strong>Timeline de paradas</strong>
+                            <span class="badge text-bg-primary" th:text="${#lists.size(routeRows) + ' parada(s)'}">0 paradas</span>
+                        </div>
+                        <div class="card-body">
+                            <div th:if="${#lists.isEmpty(routeRows)}" class="text-center text-muted p-4">
+                                No hay pedidos con ubicación para construir una ruta.
+                            </div>
+
+                            <form th:if="${!#lists.isEmpty(routeRows)}" th:action="@{/delivery/routes/save-order}" method="post" class="mb-3">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                <input type="hidden" name="date" th:value="${today}" />
+                                <input type="hidden" name="selectedDeliveryStatus" th:if="${selectedDeliveryStatus != null}" th:value="${selectedDeliveryStatus}" />
+                                <div th:each="row : ${routeRows}">
+                                    <input type="hidden" name="orderIds" th:value="${row.orderId}" />
+                                </div>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-8">
+                                        <label class="form-label small">Asignar responsable a esta ruta</label>
+                                        <input type="text" class="form-control form-control-sm" name="deliveryPerson" th:value="${selectedDeliveryPerson}" placeholder="Ejemplo: Operario 1">
+                                    </div>
+                                    <div class="col-md-4 d-grid">
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            <i class="bi bi-save me-1"></i> Guardar ruta
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-text">Guarda el orden sugerido como orden oficial de reparto del día.</div>
+                            </form>
+
+                            <div class="route-timeline">
+                                <div th:each="row, iter : ${routeRows}"
+                                     class="route-stop-item border rounded-3 p-3 mb-2"
+                                     th:attr="data-lat=${row.latitude},
+                                              data-lng=${row.longitude},
+                                              data-status=${row.deliveryStatus},
+                                              data-title=${row.clientName},
+                                              data-label=${'Pedido #' + row.orderNumber},
+                                              data-address=${row.addressSummary},
+                                              data-detail=@{|/delivery/orders/${row.orderId}|},
+                                              data-osm=${row.openStreetMapUrl},
+                                              data-whatsapp=${row.whatsappUrl}">
+                                    <div class="d-flex gap-3">
+                                        <div class="route-stop-number" th:text="${iter.index + 1}">1</div>
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex flex-wrap justify-content-between gap-2">
+                                                <div>
+                                                    <div class="fw-semibold" th:text="${row.clientName}">Cliente</div>
+                                                    <div class="small text-muted" th:text="${'Pedido #' + row.orderNumber}">Pedido</div>
+                                                </div>
+                                                <span class="badge align-self-start" th:classappend="${row.deliveryStatusBadgeClass}" th:text="${row.deliveryStatusLabel}">Estado</span>
+                                            </div>
+                                            <div class="small mt-2" th:text="${row.addressSummary}">Dirección</div>
+                                            <div class="small text-muted" th:if="${row.zoneName != null}" th:text="${'Zona: ' + row.zoneName}">Zona</div>
+                                            <div class="d-flex flex-wrap gap-1 mt-2">
+                                                <a class="btn btn-sm btn-outline-secondary" th:href="@{|/delivery/orders/${row.orderId}|}" title="Ver detalle">
+                                                    <i class="bi bi-card-list"></i>
+                                                </a>
+                                                <a class="btn btn-sm btn-outline-info" th:href="${row.openStreetMapUrl}" target="_blank" title="Abrir ubicación">
+                                                    <i class="bi bi-map"></i>
+                                                </a>
+                                                <a th:if="${row.hasPhone()}" class="btn btn-sm btn-outline-success" th:href="${row.whatsappUrl}" target="_blank" title="WhatsApp">
+                                                    <i class="bi bi-whatsapp"></i>
+                                                </a>
+                                                <form th:action="@{|/delivery/routes/orders/${row.orderId}/quick-status|}" method="post" class="d-inline">
+                                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                                    <input type="hidden" name="date" th:value="${today}" />
+                                                    <input type="hidden" name="deliveryPerson" th:value="${selectedDeliveryPerson}" />
+                                                    <input type="hidden" name="selectedDeliveryStatus" th:if="${selectedDeliveryStatus != null}" th:value="${selectedDeliveryStatus}" />
+                                                    <input type="hidden" name="deliveryStatus" th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).IN_ROUTE}" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary" title="Marcar en ruta">
+                                                        <i class="bi bi-truck"></i>
+                                                    </button>
+                                                </form>
+                                                <form th:action="@{|/delivery/routes/orders/${row.orderId}/quick-status|}" method="post" class="d-inline">
+                                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                                    <input type="hidden" name="date" th:value="${today}" />
+                                                    <input type="hidden" name="deliveryPerson" th:value="${selectedDeliveryPerson}" />
+                                                    <input type="hidden" name="selectedDeliveryStatus" th:if="${selectedDeliveryStatus != null}" th:value="${selectedDeliveryStatus}" />
+                                                    <input type="hidden" name="deliveryStatus" th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).DELIVERED}" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Marcar entregado">
+                                                        <i class="bi bi-check2-circle"></i>
+                                                    </button>
+                                                </form>
+                                                <form th:action="@{|/delivery/routes/orders/${row.orderId}/quick-status|}" method="post" class="d-inline">
+                                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                                                    <input type="hidden" name="date" th:value="${today}" />
+                                                    <input type="hidden" name="deliveryPerson" th:value="${selectedDeliveryPerson}" />
+                                                    <input type="hidden" name="selectedDeliveryStatus" th:if="${selectedDeliveryStatus != null}" th:value="${selectedDeliveryStatus}" />
+                                                    <input type="hidden" name="deliveryStatus" th:value="${T(com.ecoamazonas.eco_agua.delivery.DeliveryStatus).NOT_DELIVERED}" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Marcar no entregado">
+                                                        <i class="bi bi-x-circle"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${routeSummary.missingLocationStops > 0}" class="alert alert-warning small mt-3 mb-0">
+                Hay <strong th:text="${routeSummary.missingLocationStops}">0</strong> pedido(s) sin ubicación.
+                Edita la ficha del cliente y marca su punto exacto para incluirlo en rutas del día.
+            </div>
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+<link rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        const mapEl = document.getElementById('deliveryRoutesMap');
+        if (!mapEl || typeof L === 'undefined') {
+            return;
+        }
+
+        const defaultCenter = [-3.743673, -73.251632];
+        const map = L.map('deliveryRoutesMap').setView(defaultCenter, 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        const markerGroup = L.featureGroup().addTo(map);
+        const routePoints = [];
+
+        function markerClass(status) {
+            if (status === 'DELIVERED') {
+                return 'route-marker route-marker-delivered';
+            }
+            if (status === 'IN_ROUTE') {
+                return 'route-marker route-marker-active';
+            }
+            if (status === 'NOT_DELIVERED') {
+                return 'route-marker route-marker-failed';
+            }
+            if (status === 'RESCHEDULED') {
+                return 'route-marker route-marker-rescheduled';
+            }
+            return 'route-marker route-marker-pending';
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        document.querySelectorAll('.route-stop-item').forEach(function (item, index) {
+            const lat = parseFloat(item.dataset.lat);
+            const lng = parseFloat(item.dataset.lng);
+            if (Number.isNaN(lat) || Number.isNaN(lng)) {
+                return;
+            }
+
+            const point = [lat, lng];
+            routePoints.push(point);
+
+            const icon = L.divIcon({
+                className: markerClass(item.dataset.status),
+                html: '<span>' + (index + 1) + '</span>',
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+
+            const actions = [];
+            if (item.dataset.detail) {
+                actions.push('<a class="btn btn-sm btn-outline-secondary me-1 mb-1" href="' + item.dataset.detail + '">Detalle</a>');
+            }
+            if (item.dataset.osm) {
+                actions.push('<a class="btn btn-sm btn-outline-info me-1 mb-1" target="_blank" href="' + item.dataset.osm + '">OSM</a>');
+            }
+            if (item.dataset.whatsapp) {
+                actions.push('<a class="btn btn-sm btn-outline-success me-1 mb-1" target="_blank" href="' + item.dataset.whatsapp + '">WhatsApp</a>');
+            }
+
+            const popup = '<div style="min-width:220px">'
+                + '<strong>' + escapeHtml(item.dataset.title || 'Parada') + '</strong>'
+                + '<div class="small text-muted mb-1">' + escapeHtml(item.dataset.label || '') + '</div>'
+                + '<div class="small mb-2">' + escapeHtml(item.dataset.address || '-') + '</div>'
+                + '<div>' + actions.join('') + '</div>'
+                + '</div>';
+
+            L.marker(point, {icon: icon}).bindPopup(popup).addTo(markerGroup);
+        });
+
+        if (routePoints.length > 1) {
+            L.polyline(routePoints, {weight: 5, opacity: 0.7}).addTo(markerGroup);
+        }
+
+        if (routePoints.length > 0) {
+            map.fitBounds(markerGroup.getBounds().pad(0.2));
+        }
+    });
+</script>
+<style>
+    .route-timeline {
+        max-height: 650px;
+        overflow-y: auto;
+        padding-right: .25rem;
+    }
+    .route-stop-number {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: #0d6efd;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        flex: 0 0 34px;
+    }
+    .route-marker {
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,.35);
+        font-size: .8rem;
+        font-weight: 700;
+        color: #fff;
+    }
+    .route-marker span { line-height: 1; }
+    .route-marker-pending { background: #f59f00; }
+    .route-marker-active { background: #0d6efd; }
+    .route-marker-delivered { background: #198754; }
+    .route-marker-failed { background: #dc3545; }
+    .route-marker-rescheduled { background: #0dcaf0; color: #052c33; }
+</style>
+</body>
+</html>

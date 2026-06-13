@@ -47,6 +47,7 @@
                             <th>Documento</th>
                             <th>Celular / teléfono</th>
                             <th>Dirección</th>
+                            <th>Mapa</th>
                             <th>Perfil</th>
                             <th class="text-center">Acciones</th>
                         </tr>
@@ -99,6 +100,22 @@
                                 <span th:if="${(client.address == null || #strings.isEmpty(client.address)) && (client.reference == null || #strings.isEmpty(client.reference))}"
                                       class="text-muted">
                                     Sin dirección
+                                </span>
+                            </td>
+
+                            <td class="text-center">
+                                <a th:if="${client.latitude != null && client.longitude != null}"
+                                   th:href="@{|https://www.openstreetmap.org/?mlat=${client.latitude}&mlon=${client.longitude}#map=18/${client.latitude}/${client.longitude}|}"
+                                   target="_blank"
+                                   rel="noopener"
+                                   class="btn btn-sm btn-outline-success"
+                                   title="Abrir ubicación del cliente">
+                                    <i class="bi bi-geo-alt-fill"></i>
+                                </a>
+                                <span th:unless="${client.latitude != null && client.longitude != null}"
+                                      class="badge text-bg-warning"
+                                      title="Cliente sin punto exacto en mapa">
+                                    Sin punto
                                 </span>
                             </td>
 
@@ -166,6 +183,25 @@
                                    title="Ver estadísticas del cliente">
                                     <i class="bi bi-bar-chart-line"></i>
                                 </a>
+
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-success me-1"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#clientModal"
+                                        th:attr="data-id=${client.id},
+                                                 data-name=${client.name},
+                                                 data-doc-type=${client.docType},
+                                                 data-doc-number=${client.docNumber},
+                                                 data-phone=${client.phone},
+                                                 data-address=${client.address},
+                                                 data-reference=${client.reference},
+                                                 data-profile-id=${client.profile != null ? client.profile.id : null},
+                                                 data-latitude=${client.latitude},
+                                                 data-longitude=${client.longitude},
+                                                 data-promotion-ids=${#strings.listJoin(client.promotions.![id], ',')}"
+                                        title="Editar ubicación del cliente">
+                                    <i class="bi bi-geo-alt"></i>
+                                </button>
 
                                 <button type="button"
                                         class="btn btn-sm btn-outline-primary me-1"
@@ -282,20 +318,42 @@
                             <input class="form-control" name="reference" id="clientReference">
                         </div>
 
-                        <div class="col-12 d-flex justify-content-end">
-                            <button type="button"
-                                    class="btn btn-outline-secondary btn-sm"
-                                    id="btnGeocodeClient">
-                                <i class="bi bi-geo-alt"></i> Buscar en mapa
-                            </button>
-                        </div>
-
                         <div class="col-12">
-                            <label class="form-label">Mapa de ubicación</label>
-                            <div id="clientMapContainer" class="border rounded" style="height: 320px;"></div>
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                <div>
+                                    <label class="form-label mb-0">Mapa de ubicación</label>
+                                    <div id="clientLocationSummary" class="form-text text-muted">
+                                        Todavía no se seleccionó un punto exacto.
+                                    </div>
+                                </div>
+                                <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Acciones de ubicación">
+                                    <button type="button"
+                                            class="btn btn-outline-secondary"
+                                            id="btnGeocodeClient">
+                                        <i class="bi bi-search"></i> Buscar dirección
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-outline-primary"
+                                            id="btnUseMapCenter">
+                                        <i class="bi bi-crosshair"></i> Usar centro
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-outline-success"
+                                            id="btnOpenClientMap"
+                                            disabled>
+                                        <i class="bi bi-box-arrow-up-right"></i> Abrir mapa
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-outline-danger"
+                                            id="btnClearClientLocation">
+                                        <i class="bi bi-x-circle"></i> Limpiar
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="clientMapContainer" class="border rounded" style="height: 340px;"></div>
                             <small class="text-muted">
-                                Haz clic en el mapa para marcar la ubicación del cliente
-                                o usa el botón "Buscar en mapa" con la dirección.
+                                Haz clic en el mapa, mueve el marcador o busca la dirección.
+                                En Iquitos conviene guardar también una referencia clara.
                             </small>
                         </div>
 
@@ -365,11 +423,21 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
         crossorigin=""></script>
 
+<style>
+    #clientAddressSuggestions .list-group-item:last-child {
+        border-bottom: 0 !important;
+    }
+
+    #clientMapContainer {
+        background: #f8f9fa;
+    }
+</style>
+
 <script th:inline="javascript">
     document.addEventListener('DOMContentLoaded', function () {
         'use strict';
 
-        window.ecoAdmin.initStandardDataTable('#clientsTable', [0, 7]);
+        window.ecoAdmin.initStandardDataTable('#clientsTable', [0, 8]);
         window.ecoAdmin.registerCheckAll('#checkAll', '.row-check');
         window.ecoAdmin.registerSingleDelete('.delete-form-single', '¿Eliminar este cliente?');
 
@@ -397,6 +465,10 @@
         const latInput = document.getElementById('clientLatitude');
         const lngInput = document.getElementById('clientLongitude');
         const geocodeBtn = document.getElementById('btnGeocodeClient');
+        const useMapCenterBtn = document.getElementById('btnUseMapCenter');
+        const clearLocationBtn = document.getElementById('btnClearClientLocation');
+        const openClientMapBtn = document.getElementById('btnOpenClientMap');
+        const locationSummary = document.getElementById('clientLocationSummary');
         const addressHelp = document.getElementById('clientAddressHelp');
         const addrInput = document.getElementById('clientAddress');
 
@@ -458,12 +530,7 @@
                 btn.addEventListener('click', function (e) {
                     e.preventDefault();
 
-                    if (latInput) {
-                        latInput.value = item.lat.toFixed(7);
-                    }
-                    if (lngInput) {
-                        lngInput.value = item.lng.toFixed(7);
-                    }
+                    updateHiddenCoordinates(item.lat, item.lng);
 
                     initClientMap();
 
@@ -559,6 +626,68 @@
             docHelp.className = 'form-text text-muted';
         }
 
+        function getCurrentCoordinates() {
+            if (!latInput || !lngInput) {
+                return null;
+            }
+
+            const latVal = parseFloat(latInput.value);
+            const lngVal = parseFloat(lngInput.value);
+
+            if (isNaN(latVal) || isNaN(lngVal)) {
+                return null;
+            }
+
+            return { lat: latVal, lng: lngVal };
+        }
+
+        function updateLocationSummary() {
+            const coords = getCurrentCoordinates();
+
+            if (!coords) {
+                if (locationSummary) {
+                    locationSummary.textContent = 'Todavía no se seleccionó un punto exacto.';
+                    locationSummary.className = 'form-text text-muted';
+                }
+                if (openClientMapBtn) {
+                    openClientMapBtn.disabled = true;
+                }
+                return;
+            }
+
+            if (locationSummary) {
+                locationSummary.textContent = 'Coordenadas guardadas: ' + coords.lat.toFixed(7) + ', ' + coords.lng.toFixed(7);
+                locationSummary.className = 'form-text text-success';
+            }
+            if (openClientMapBtn) {
+                openClientMapBtn.disabled = false;
+            }
+        }
+
+        function updateHiddenCoordinates(lat, lng) {
+            if (latInput) {
+                latInput.value = lat.toFixed(7);
+            }
+            if (lngInput) {
+                lngInput.value = lng.toFixed(7);
+            }
+
+            updateLocationSummary();
+        }
+
+        function bindMarkerDrag() {
+            if (!clientMarker) {
+                return;
+            }
+
+            clientMarker.off('dragend');
+            clientMarker.on('dragend', function () {
+                const pos = clientMarker.getLatLng();
+                updateHiddenCoordinates(pos.lat, pos.lng);
+                setAddressHelp('Ubicación ajustada manualmente en el mapa.', 'success');
+            });
+        }
+
         function setMarkerLatLng(lat, lng) {
             if (!clientMap) {
                 return;
@@ -568,10 +697,13 @@
             clientMap.setView(latLng, 16);
 
             if (!clientMarker) {
-                clientMarker = L.marker(latLng).addTo(clientMap);
+                clientMarker = L.marker(latLng, { draggable: true }).addTo(clientMap);
+                bindMarkerDrag();
             } else {
                 clientMarker.setLatLng(latLng);
             }
+
+            updateLocationSummary();
         }
 
         function initClientMap() {
@@ -593,37 +725,65 @@
                 const lat = e.latlng.lat;
                 const lng = e.latlng.lng;
 
+                updateHiddenCoordinates(lat, lng);
                 setMarkerLatLng(lat, lng);
-
-                if (latInput) {
-                    latInput.value = lat.toFixed(7);
-                }
-                if (lngInput) {
-                    lngInput.value = lng.toFixed(7);
-                }
+                setAddressHelp('Ubicación marcada manualmente en el mapa.', 'success');
             });
         }
 
         function setMarkerFromInputs() {
-            if (!clientMap || !latInput || !lngInput) {
+            if (!clientMap) {
                 return;
             }
 
-            const latVal = parseFloat(latInput.value);
-            const lngVal = parseFloat(lngInput.value);
+            const coords = getCurrentCoordinates();
 
-            if (!isNaN(latVal) && !isNaN(lngVal)) {
-                setMarkerLatLng(latVal, lngVal);
+            if (coords) {
+                setMarkerLatLng(coords.lat, coords.lng);
             } else if (clientMarker) {
                 clientMap.removeLayer(clientMarker);
                 clientMarker = null;
+                updateLocationSummary();
+            } else {
+                updateLocationSummary();
             }
         }
 
+        function clearClientLocation() {
+            if (latInput) {
+                latInput.value = '';
+            }
+            if (lngInput) {
+                lngInput.value = '';
+            }
+            if (clientMap && clientMarker) {
+                clientMap.removeLayer(clientMarker);
+                clientMarker = null;
+            }
+            updateLocationSummary();
+            setAddressHelp('Ubicación del mapa limpiada. Puedes guardar el cliente sin punto exacto.', 'warning');
+        }
+
+        function openClientLocation() {
+            const coords = getCurrentCoordinates();
+            if (!coords) {
+                return;
+            }
+
+            const url = 'https://www.openstreetmap.org/?mlat=' + coords.lat.toFixed(7)
+                + '&mlon=' + coords.lng.toFixed(7)
+                + '#map=18/' + coords.lat.toFixed(7) + '/' + coords.lng.toFixed(7);
+            window.open(url, '_blank', 'noopener');
+        }
+
         function fetchGeocode(address, limit) {
+            const normalizedAddress = /per[úu]|peru/i.test(address)
+                ? address
+                : address + ', Iquitos, Loreto, Perú';
+
             const url = NOMINATIM_BASE_URL
-                + '?format=json&addressdetails=1&limit=' + encodeURIComponent(limit || 1)
-                + '&q=' + encodeURIComponent(address);
+                + '?format=json&addressdetails=1&countrycodes=pe&accept-language=es&limit=' + encodeURIComponent(limit || 1)
+                + '&q=' + encodeURIComponent(normalizedAddress);
 
             return fetch(url, {
                 method: 'GET',
@@ -678,12 +838,7 @@
                         return;
                     }
 
-                    if (latInput) {
-                        latInput.value = lat.toFixed(7);
-                    }
-                    if (lngInput) {
-                        lngInput.value = lng.toFixed(7);
-                    }
+                    updateHiddenCoordinates(lat, lng);
 
                     initClientMap();
                     setTimeout(function () {
@@ -763,10 +918,36 @@
             });
         }
 
+        if (useMapCenterBtn) {
+            useMapCenterBtn.addEventListener('click', function () {
+                initClientMap();
+                if (!clientMap) {
+                    return;
+                }
+
+                const center = clientMap.getCenter();
+                updateHiddenCoordinates(center.lat, center.lng);
+                setMarkerLatLng(center.lat, center.lng);
+                setAddressHelp('Se usó el centro actual del mapa como ubicación del cliente.', 'success');
+            });
+        }
+
+        if (clearLocationBtn) {
+            clearLocationBtn.addEventListener('click', function () {
+                clearClientLocation();
+            });
+        }
+
+        if (openClientMapBtn) {
+            openClientMapBtn.addEventListener('click', function () {
+                openClientLocation();
+            });
+        }
+
         if (addrInput) {
             addrInput.addEventListener('blur', function () {
-                if (this.value.trim().length >= 6) {
-                    geocodeClientAddress();
+                if (this.value.trim().length >= 6 && !getCurrentCoordinates()) {
+                    setAddressHelp('Puedes buscar esta dirección o marcar el punto manualmente en el mapa.', 'muted');
                 }
             });
 
@@ -831,9 +1012,12 @@
 
                     updateDocumentUi();
 
+                    updateLocationSummary();
+
                     if (latInput && lngInput && latInput.value && lngInput.value) {
-                        setAddressHelp('Ubicación guardada para este cliente.', 'success');
+                        setAddressHelp('Ubicación guardada para este cliente. Puedes mover el marcador para corregirla.', 'success');
                     } else {
+                        updateLocationSummary();
                         setAddressHelp('Ejemplo: Jirón Yavarí 1425, Iquitos, Loreto, Perú.', 'muted');
                     }
                 } else {
@@ -852,6 +1036,7 @@
                         lngInput.value = '';
                     }
 
+                    updateLocationSummary();
                     setAddressHelp('Ejemplo: Jirón Yavarí 1425, Iquitos, Loreto, Perú.', 'muted');
                 }
             });

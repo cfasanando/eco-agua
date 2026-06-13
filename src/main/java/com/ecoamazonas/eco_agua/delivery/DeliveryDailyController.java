@@ -52,8 +52,45 @@ public class DeliveryDailyController {
         model.addAttribute("notDeliveredCount", countByStatus(rows, DeliveryStatus.NOT_DELIVERED));
         model.addAttribute("rescheduledCount", countByStatus(rows, DeliveryStatus.RESCHEDULED));
         model.addAttribute("canceledCount", countByStatus(rows, DeliveryStatus.CANCELED));
+        model.addAttribute("locatedCount", rows.stream().filter(DeliveryDailyRow::hasLocation).count());
+        model.addAttribute("openStreetMapRouteUrl", deliveryDailyService.buildOpenStreetMapRouteUrl(rows));
 
         return "delivery/daily_list";
+    }
+
+    @GetMapping("/map")
+    public String map(
+            @RequestParam(value = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(value = "deliveryPerson", required = false) String deliveryPerson,
+            @RequestParam(value = "deliveryStatus", required = false) DeliveryStatus deliveryStatus,
+            Model model
+    ) {
+        LocalDate effectiveDate = date != null ? date : LocalDate.now();
+        List<DeliveryDailyRow> rows = deliveryDailyService.findRows(effectiveDate, deliveryPerson, deliveryStatus);
+        List<DeliveryDailyRow> locatedRows = rows.stream()
+                .filter(DeliveryDailyRow::hasLocation)
+                .toList();
+
+        model.addAttribute("activePage", "delivery_map");
+        model.addAttribute("today", effectiveDate);
+        model.addAttribute("rows", rows);
+        model.addAttribute("locatedRows", locatedRows);
+        model.addAttribute("missingLocationCount", rows.size() - locatedRows.size());
+        model.addAttribute("deliveryEmployees", employeeRepository.findByActiveTrueOrderByFirstNameAscLastNameAsc());
+        model.addAttribute("deliveryStatuses", DeliveryStatus.values());
+        model.addAttribute("selectedDeliveryPerson", deliveryPerson);
+        model.addAttribute("selectedDeliveryStatus", deliveryStatus);
+        model.addAttribute("totalAmount", rows.stream()
+                .map(DeliveryDailyRow::getTotalAmount)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        model.addAttribute("pendingCount", countByStatus(rows, DeliveryStatus.PENDING));
+        model.addAttribute("inRouteCount", countByStatus(rows, DeliveryStatus.IN_ROUTE));
+        model.addAttribute("deliveredCount", countByStatus(rows, DeliveryStatus.DELIVERED));
+        model.addAttribute("notDeliveredCount", countByStatus(rows, DeliveryStatus.NOT_DELIVERED));
+        model.addAttribute("openStreetMapRouteUrl", deliveryDailyService.buildOpenStreetMapRouteUrl(rows));
+
+        return "delivery/map";
     }
 
     @GetMapping("/orders/{id}")
@@ -65,6 +102,7 @@ public class DeliveryDailyController {
         model.addAttribute("events", deliveryDailyService.findEvents(id));
         model.addAttribute("whatsappUrl", deliveryDailyService.buildWhatsappUrl(order));
         model.addAttribute("mapsUrl", deliveryDailyService.buildGoogleMapsUrl(order));
+        model.addAttribute("openStreetMapUrl", deliveryDailyService.buildOpenStreetMapUrl(order));
         return "delivery/daily_detail";
     }
 

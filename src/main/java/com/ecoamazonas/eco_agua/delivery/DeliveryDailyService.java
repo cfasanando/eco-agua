@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class DeliveryDailyService {
@@ -51,7 +52,9 @@ public class DeliveryDailyService {
                         order.getDeliveryPerson(),
                         order.getDeliveryStatus(),
                         order.getTotalAmount(),
-                        order.getBorrowedBottles()
+                        order.getBorrowedBottles(),
+                        order.getClient() != null ? order.getClient().getLatitude() : null,
+                        order.getClient() != null ? order.getClient().getLongitude() : null
                 ))
                 .toList();
     }
@@ -120,6 +123,41 @@ public class DeliveryDailyService {
         }
 
         return "https://www.google.com/maps/search/?api=1&query=" + client.getLatitude() + "," + client.getLongitude();
+    }
+
+    public String buildOpenStreetMapUrl(SaleOrder order) {
+        if (order == null || order.getClient() == null) {
+            return null;
+        }
+
+        Client client = order.getClient();
+        if (client.getLatitude() == null || client.getLongitude() == null) {
+            return null;
+        }
+
+        return "https://www.openstreetmap.org/?mlat=" + client.getLatitude()
+                + "&mlon=" + client.getLongitude()
+                + "#map=18/" + client.getLatitude() + "/" + client.getLongitude();
+    }
+
+    public String buildOpenStreetMapRouteUrl(List<DeliveryDailyRow> rows) {
+        if (rows == null) {
+            return null;
+        }
+
+        List<DeliveryDailyRow> locatedRows = rows.stream()
+                .filter(DeliveryDailyRow::hasLocation)
+                .toList();
+
+        if (locatedRows.size() < 2) {
+            return null;
+        }
+
+        String route = locatedRows.stream()
+                .map(row -> row.getLatitude() + "," + row.getLongitude())
+                .collect(Collectors.joining(";"));
+
+        return "https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=" + route;
     }
 
     private SaleOrder updateDeliveryStatus(Long orderId, DeliveryStatus deliveryStatus, DeliveryEventType eventType, String observation, boolean setDeliveredAt) {

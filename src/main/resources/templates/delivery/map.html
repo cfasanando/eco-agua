@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Mapa de reparto - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='delivery_map'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                <div>
+                    <h1 class="h5 mb-1" th:text="|Mapa de ${#strings.toLowerCase(businessDeliveryLabel ?: 'reparto')}|">Mapa de reparto</h1>
+                    <div class="text-muted small" th:text="${#temporals.format(today, 'dd/MM/yyyy')}">Fecha</div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-secondary btn-sm" th:href="@{/delivery}">
+                        <i class="bi bi-list-check me-1"></i> Lista diaria
+                    </a>
+                    <a class="btn btn-outline-secondary btn-sm" th:href="@{/delivery/map}">
+                        <i class="bi bi-calendar-day me-1"></i> Hoy
+                    </a>
+                    <a class="btn btn-outline-primary btn-sm" th:if="${openStreetMapRouteUrl != null}" target="_blank" th:href="${openStreetMapRouteUrl}">
+                        <i class="bi bi-signpost-split me-1"></i> Abrir ruta OSM
+                    </a>
+                </div>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small mb-3">
+                <strong>Cómo usar este mapa:</strong>
+                registra la ubicación del cliente en Clientes, filtra pedidos del día y usa los marcadores para abrir WhatsApp, detalle o navegación.
+                Si un pedido no aparece en el mapa, falta latitud/longitud en la ficha del cliente.
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Pedidos filtrados</div>
+                            <div class="fs-4 fw-bold" th:text="${#lists.size(rows)}">0</div>
+                            <div class="small text-muted" th:text="|'S/ ' + ${#numbers.formatDecimal(totalAmount, 1, 2)}|">S/ 0.00</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-success-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Con ubicación</div>
+                            <div class="fs-4 fw-bold text-success" th:text="${#lists.size(locatedRows)}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-warning-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Sin ubicación</div>
+                            <div class="fs-4 fw-bold text-warning" th:text="${missingLocationCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-warning-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Pendientes</div>
+                            <div class="fs-4 fw-bold text-warning" th:text="${pendingCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-primary-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">En ruta</div>
+                            <div class="fs-4 fw-bold text-primary" th:text="${inRouteCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-danger-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">No entregados</div>
+                            <div class="fs-4 fw-bold text-danger" th:text="${notDeliveredCount}">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light"><strong>Filtros del mapa</strong></div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" th:action="@{/delivery/map}" method="get">
+                        <div class="col-md-3">
+                            <label class="form-label">Fecha</label>
+                            <input type="date" class="form-control" name="date" th:value="${today}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Responsable de entrega</label>
+                            <select class="form-select" name="deliveryPerson">
+                                <option value="">Todos</option>
+                                <option th:each="employee : ${deliveryEmployees}"
+                                        th:value="${employee.firstName + ' ' + employee.lastName}"
+                                        th:selected="${selectedDeliveryPerson != null and selectedDeliveryPerson == (employee.firstName + ' ' + employee.lastName)}"
+                                        th:text="${employee.firstName + ' ' + employee.lastName}">Responsable</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Estado</label>
+                            <select class="form-select" name="deliveryStatus">
+                                <option value="">Todos</option>
+                                <option th:each="status : ${deliveryStatuses}"
+                                        th:value="${status}"
+                                        th:selected="${selectedDeliveryStatus != null and selectedDeliveryStatus == status}"
+                                        th:text="${status.name() == 'PENDING' ? 'Pendiente' : (status.name() == 'IN_ROUTE' ? 'En ruta' : (status.name() == 'DELIVERED' ? 'Entregado' : (status.name() == 'NOT_DELIVERED' ? 'No entregado' : (status.name() == 'RESCHEDULED' ? 'Reprogramado' : 'Cancelado'))))}">Estado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Buscar</button>
+                            <a class="btn btn-outline-secondary" th:href="@{/delivery/map}">Limpiar</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-xl-8">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <strong>Mapa de paradas</strong>
+                            <span class="small text-muted">OpenStreetMap + Leaflet</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div id="deliveryMap" style="height: 640px; min-height: 420px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center gap-2">
+                            <strong>Paradas ubicadas</strong>
+                            <span class="badge text-bg-light" th:text="${#lists.size(locatedRows)}">0</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="list-group list-group-flush" style="max-height: 640px; overflow-y: auto;">
+                                <div th:each="row, stat : ${locatedRows}"
+                                     class="list-group-item delivery-stop-item"
+                                     th:attr="data-lat=${row.latitude},
+                                              data-lng=${row.longitude},
+                                              data-title=${'#' + (row.orderNumber != null ? row.orderNumber : row.orderId) + ' - ' + row.clientName},
+                                              data-status=${row.deliveryStatus != null ? row.deliveryStatus.name() : 'NONE'},
+                                              data-label=${row.deliveryStatusLabel},
+                                              data-address=${row.addressSummary},
+                                              data-whatsapp=${row.whatsappUrl},
+                                              data-detail=@{|/delivery/orders/${row.orderId}|},
+                                              data-osm=${row.openStreetMapUrl}">
+                                    <div class="d-flex justify-content-between gap-2">
+                                        <div>
+                                            <div class="fw-semibold">
+                                                <span class="text-muted" th:text="${stat.index + 1} + '.'">1.</span>
+                                                <span th:text="${row.clientName}">Cliente</span>
+                                            </div>
+                                            <div class="small text-muted" th:text="${row.addressSummary}">Dirección</div>
+                                        </div>
+                                        <span class="badge align-self-start" th:classappend="${row.deliveryStatusBadgeClass}" th:text="${row.deliveryStatusLabel}">Estado</span>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-1 mt-2">
+                                        <a class="btn btn-sm btn-outline-secondary" th:href="@{|/delivery/orders/${row.orderId}|}">
+                                            <i class="bi bi-card-list"></i> Detalle
+                                        </a>
+                                        <a class="btn btn-sm btn-outline-info" th:href="${row.openStreetMapUrl}" target="_blank">
+                                            <i class="bi bi-map"></i> OSM
+                                        </a>
+                                        <a th:if="${row.hasPhone()}" class="btn btn-sm btn-outline-success" th:href="${row.whatsappUrl}" target="_blank">
+                                            <i class="bi bi-whatsapp"></i> WhatsApp
+                                        </a>
+                                    </div>
+                                </div>
+                                <div th:if="${#lists.isEmpty(locatedRows)}" class="p-4 text-center text-muted">
+                                    No hay pedidos con ubicación guardada para mostrar en el mapa.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${missingLocationCount > 0}" class="alert alert-warning small mt-3 mb-0">
+                Hay <strong th:text="${missingLocationCount}">0</strong> pedido(s) sin ubicación.
+                Edita la ficha del cliente y marca su punto exacto en el mapa para incluirlo en las rutas.
+            </div>
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+<link rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        const mapEl = document.getElementById('deliveryMap');
+        if (!mapEl || typeof L === 'undefined') {
+            return;
+        }
+
+        const defaultCenter = [-3.743673, -73.251632];
+        const map = L.map('deliveryMap').setView(defaultCenter, 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        const markerGroup = L.featureGroup().addTo(map);
+        const routePoints = [];
+
+        function statusClass(status) {
+            if (status === 'DELIVERED') {
+                return 'delivery-marker delivery-marker-delivered';
+            }
+            if (status === 'IN_ROUTE') {
+                return 'delivery-marker delivery-marker-route';
+            }
+            if (status === 'NOT_DELIVERED') {
+                return 'delivery-marker delivery-marker-failed';
+            }
+            if (status === 'RESCHEDULED') {
+                return 'delivery-marker delivery-marker-rescheduled';
+            }
+            return 'delivery-marker delivery-marker-pending';
+        }
+
+        document.querySelectorAll('.delivery-stop-item').forEach(function (item, index) {
+            const lat = parseFloat(item.dataset.lat);
+            const lng = parseFloat(item.dataset.lng);
+            if (Number.isNaN(lat) || Number.isNaN(lng)) {
+                return;
+            }
+
+            const point = [lat, lng];
+            routePoints.push(point);
+
+            const icon = L.divIcon({
+                className: statusClass(item.dataset.status),
+                html: '<span>' + (index + 1) + '</span>',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+
+            const actions = [];
+            if (item.dataset.detail) {
+                actions.push('<a class="btn btn-sm btn-outline-secondary me-1 mb-1" href="' + item.dataset.detail + '">Detalle</a>');
+            }
+            if (item.dataset.osm) {
+                actions.push('<a class="btn btn-sm btn-outline-info me-1 mb-1" target="_blank" href="' + item.dataset.osm + '">OSM</a>');
+            }
+            if (item.dataset.whatsapp) {
+                actions.push('<a class="btn btn-sm btn-outline-success me-1 mb-1" target="_blank" href="' + item.dataset.whatsapp + '">WhatsApp</a>');
+            }
+
+            const popup = '<div style="min-width:220px">'
+                + '<strong>' + (item.dataset.title || 'Pedido') + '</strong>'
+                + '<div class="small text-muted mb-1">' + (item.dataset.label || '') + '</div>'
+                + '<div class="small mb-2">' + (item.dataset.address || '-') + '</div>'
+                + '<div>' + actions.join('') + '</div>'
+                + '</div>';
+
+            L.marker(point, {icon: icon}).bindPopup(popup).addTo(markerGroup);
+        });
+
+        if (routePoints.length > 1) {
+            L.polyline(routePoints, {weight: 4, opacity: 0.65}).addTo(markerGroup);
+        }
+
+        if (routePoints.length > 0) {
+            map.fitBounds(markerGroup.getBounds().pad(0.2));
+        }
+    });
+</script>
+<style>
+    .delivery-marker {
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,.35);
+        font-size: .8rem;
+        font-weight: 700;
+        color: #fff;
+    }
+    .delivery-marker span { line-height: 1; }
+    .delivery-marker-pending { background: #f59f00; }
+    .delivery-marker-route { background: #0d6efd; }
+    .delivery-marker-delivered { background: #198754; }
+    .delivery-marker-failed { background: #dc3545; }
+    .delivery-marker-rescheduled { background: #0dcaf0; color: #052c33; }
+</style>
+</body>
+</html>

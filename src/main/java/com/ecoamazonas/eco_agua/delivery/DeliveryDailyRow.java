@@ -18,8 +18,25 @@ public class DeliveryDailyRow {
     private final DeliveryStatus deliveryStatus;
     private final BigDecimal totalAmount;
     private final Integer borrowedBottles;
+    private final BigDecimal latitude;
+    private final BigDecimal longitude;
 
-    public DeliveryDailyRow(Long orderId, Integer orderNumber, LocalDate orderDate, String clientName, String phone, String address, String reference, String zoneName, String deliveryPerson, DeliveryStatus deliveryStatus, BigDecimal totalAmount, Integer borrowedBottles) {
+    public DeliveryDailyRow(
+            Long orderId,
+            Integer orderNumber,
+            LocalDate orderDate,
+            String clientName,
+            String phone,
+            String address,
+            String reference,
+            String zoneName,
+            String deliveryPerson,
+            DeliveryStatus deliveryStatus,
+            BigDecimal totalAmount,
+            Integer borrowedBottles,
+            BigDecimal latitude,
+            BigDecimal longitude
+    ) {
         this.orderId = orderId;
         this.orderNumber = orderNumber;
         this.orderDate = orderDate;
@@ -32,6 +49,8 @@ public class DeliveryDailyRow {
         this.deliveryStatus = deliveryStatus;
         this.totalAmount = totalAmount;
         this.borrowedBottles = borrowedBottles;
+        this.latitude = latitude;
+        this.longitude = longitude;
     }
 
     public Long getOrderId() { return orderId; }
@@ -46,6 +65,8 @@ public class DeliveryDailyRow {
     public DeliveryStatus getDeliveryStatus() { return deliveryStatus; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public Integer getBorrowedBottles() { return borrowedBottles; }
+    public BigDecimal getLatitude() { return latitude; }
+    public BigDecimal getLongitude() { return longitude; }
 
     public String getDeliveryStatusLabel() {
         if (deliveryStatus == null) {
@@ -97,6 +118,10 @@ public class DeliveryDailyRow {
         return normalizePhone(phone) != null;
     }
 
+    public boolean hasLocation() {
+        return latitude != null && longitude != null;
+    }
+
     public String getWhatsappUrl() {
         String normalizedPhone = normalizePhone(phone);
         if (normalizedPhone == null) {
@@ -107,6 +132,22 @@ public class DeliveryDailyRow {
                 + (orderNumber != null ? orderNumber : orderId)
                 + ".";
         return "https://wa.me/" + normalizedPhone + "?text=" + URLEncoder.encode(message, StandardCharsets.UTF_8);
+    }
+
+    public String getOpenStreetMapUrl() {
+        if (!hasLocation()) {
+            return null;
+        }
+
+        return "https://www.openstreetmap.org/?mlat=" + latitude + "&mlon=" + longitude + "#map=18/" + latitude + "/" + longitude;
+    }
+
+    public String getGoogleMapsUrl() {
+        if (!hasLocation()) {
+            return null;
+        }
+
+        return "https://www.google.com/maps/search/?api=1&query=" + latitude + "," + longitude;
     }
 
     public String getAddressSummary() {

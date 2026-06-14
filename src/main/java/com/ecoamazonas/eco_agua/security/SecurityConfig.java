@@ -367,6 +367,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/production/**").hasAnyAuthority(PRODUCTION_WRITE)
                 .requestMatchers("/production/**").hasAnyAuthority(PRODUCTION_VIEW)
 
+                .requestMatchers("/my-courses/**").authenticated()
                 .requestMatchers(HttpMethod.POST, "/admin/academy/**").hasAnyAuthority(ACADEMY_WRITE)
                 .requestMatchers("/admin/academy/**").hasAnyAuthority(ACADEMY_VIEW)
 

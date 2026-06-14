@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="fragments/head_admin :: adminHead(${selectedLesson != null ? selectedLesson.title : 'Lección'})"></th:block>
+    <style>
+        .academy-card { border:0; border-radius:18px; box-shadow:0 2px 12px rgba(15,23,42,.08); }
+        .lesson-frame { width:100%; min-height:360px; border:0; border-radius:12px; background:#000; }
+        .lesson-link { display:block; padding:.55rem 0; border-bottom:1px solid #e2e8f0; text-decoration:none; }
+        .lesson-content { white-space:pre-line; line-height:1.65; }
+    </style>
+</head>
+<body>
+<div class="app-layout" th:with="activePage='my_courses'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <p><a class="btn btn-outline-secondary btn-sm" th:href="@{|/my-courses/${course.slug}|}"><i class="bi bi-arrow-left"></i> Volver al curso</a></p>
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <main class="card academy-card">
+                        <div class="card-body">
+                            <h1 class="h4" th:text="${selectedLesson.title}">Lección</h1>
+                            <p class="text-muted" th:text="${selectedLesson.description}">Descripción</p>
+
+                            <div th:if="${selectedLesson.videoUrl != null and !#strings.isEmpty(selectedLesson.videoUrl)}" class="my-3">
+                                <iframe class="lesson-frame" th:src="${selectedLesson.videoUrl}" allowfullscreen></iframe>
+                            </div>
+
+                            <div class="lesson-content" th:text="${selectedLesson.contentText}">Contenido</div>
+
+                            <p th:if="${selectedLesson.materialUrl != null and !#strings.isEmpty(selectedLesson.materialUrl)}" class="mt-3">
+                                <a class="btn btn-outline-primary" th:href="${selectedLesson.materialUrl}" target="_blank">
+                                    <i class="bi bi-paperclip"></i> Abrir material
+                                </a>
+                            </p>
+
+                            <form th:action="@{|/my-courses/${course.slug}/lesson/${selectedLesson.id}/complete|}" method="post" class="mt-4">
+                                <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="bi bi-check-circle"></i> Marcar como completada
+                                </button>
+                            </form>
+                        </div>
+                    </main>
+                </div>
+                <div class="col-lg-4">
+                    <aside class="card academy-card">
+                        <div class="card-header bg-white border-0">
+                            <h2 class="h6 mb-0">Temario</h2>
+                        </div>
+                        <div class="card-body">
+                            <div th:each="moduleView : ${curriculum}" class="mb-3">
+                                <h3 class="small text-uppercase text-muted" th:text="${moduleView.module.title}">Unidad</h3>
+                                <a class="lesson-link" th:each="lesson : ${moduleView.lessons}" th:href="@{|/my-courses/${course.slug}/lesson/${lesson.id}|}">
+                                    <span th:text="${lesson.title}">Lección</span>
+                                    <span th:if="${completedLessonIds.contains(lesson.id)}" class="text-success"> ✓</span>
+                                </a>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+</body>
+</html>

@@ -90,6 +90,18 @@
       </a>
     </th:block>
 
+    <th:block th:if="${featureAcademy}" sec:authorize="isAuthenticated()">
+      <div class="menu-section-title">Aprendizaje</div>
+      <a
+        th:href="@{/my-courses}"
+        class="menu-link"
+        th:classappend="${activePage == 'my_academy_courses' ? ' active' : ''}"
+      >
+        <span class="icon"><i class="bi bi-journal-check"></i></span>
+        <span>Mis cursos</span>
+      </a>
+    </th:block>
+
     <th:block th:if="${moduleOperationSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_PRODUCTION','ROLE_READONLY','ver_delivery','administra_delivery','ver_recompras','administra_recompras')">
       <div class="menu-section-title">Operación diaria</div>
 
@@ -953,6 +965,7 @@
         or activePage == 'blog_posts'
         or activePage == 'blog'
         or activePage == 'academy_courses'
+        or activePage == 'academy_enrollments'
         or activePage == 'testimonials'}"
       >
         <input
@@ -1067,6 +1080,16 @@
           >
             <span class="icon"><i class="bi bi-mortarboard"></i></span>
             <span>Academia / cursos</span>
+          </a>
+
+          <a
+            th:if="${featureAcademy}"
+            th:href="@{/admin/academy/enrollments}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'academy_enrollments' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-person-check"></i></span>
+            <span>Inscripciones</span>
           </a>
 
           <a

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="fragments/head_admin :: adminHead('Mis cursos')"></th:block>
+    <style>
+        .academy-student-hero {
+            border-radius: 20px;
+            background: linear-gradient(135deg, #0f766e, #2563eb);
+            color: #fff;
+            padding: 1.25rem;
+            box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18);
+        }
+        .academy-course-card {
+            border: 0;
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(15, 23, 42, 0.08);
+            height: 100%;
+        }
+        .academy-cover {
+            height: 150px;
+            background: #dbeafe;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            overflow:hidden;
+        }
+        .academy-cover img { width:100%; height:100%; object-fit:cover; }
+        .academy-progress { height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+        .academy-progress-bar { height:100%; background:#2563eb; }
+    </style>
+</head>
+<body>
+<div class="app-layout" th:with="activePage='my_courses'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <section class="academy-student-hero mb-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                    <div>
+                        <div class="small text-white-50 mb-1">Academia digital</div>
+                        <h1 class="h4 mb-1">Mis cursos</h1>
+                        <p class="mb-0 text-white-75">Continúa tus capacitaciones y revisa tu avance.</p>
+                    </div>
+                    <a class="btn btn-light btn-sm" th:href="@{/academy}" target="_blank">
+                        <i class="bi bi-box-arrow-up-right"></i> Ver catálogo público
+                    </a>
+                </div>
+            </section>
+
+            <section th:if="${#lists.isEmpty(enrollments)}" class="card border-0 shadow-sm rounded-4">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-mortarboard fs-1 text-primary d-block mb-3"></i>
+                    <h2 class="h5">Aún no tienes cursos inscritos</h2>
+                    <p class="text-muted">Cuando un administrador te inscriba, tus cursos aparecerán aquí.</p>
+                    <a class="btn btn-primary" th:href="@{/academy}" target="_blank">Ver catálogo público</a>
+                </div>
+            </section>
+
+            <section class="row g-4" th:if="${!#lists.isEmpty(enrollments)}">
+                <div class="col-xl-4 col-md-6" th:each="enrollment : ${enrollments}">
+                    <article class="card academy-course-card">
+                        <div class="academy-cover">
+                            <img th:if="${!#strings.isEmpty(enrollment.coverImageUrl)}" th:src="${enrollment.coverImageUrl}" th:alt="${enrollment.courseTitle}">
+                            <strong th:if="${#strings.isEmpty(enrollment.coverImageUrl)}">Academia</strong>
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <div class="mb-2">
+                                <span class="badge bg-primary-subtle text-primary" th:text="${enrollment.courseCategory}">Categoría</span>
+                                <span class="badge bg-info-subtle text-info" th:text="${enrollment.statusLabel}">Estado</span>
+                            </div>
+                            <h2 class="h5" th:text="${enrollment.courseTitle}">Curso</h2>
+                            <p class="small text-muted flex-grow-1" th:text="${enrollment.shortDescription}">Descripción</p>
+                            <div class="small text-muted mb-1">Avance: <strong><span th:text="${enrollment.progressPercent}">0</span>%</strong></div>
+                            <div class="academy-progress mb-2"><div class="academy-progress-bar" th:style="|width:${enrollment.progressPercent}%|"></div></div>
+                            <div class="small text-muted mb-3">
+                                <span th:text="${enrollment.completedLessons}">0</span>/<span th:text="${enrollment.totalLessons}">0</span> lecciones completadas
+                            </div>
+                            <a class="btn btn-primary mt-auto" th:href="@{|/my-courses/${enrollment.courseSlug}|}">
+                                <i class="bi bi-play-circle"></i> Continuar curso
+                            </a>
+                        </div>
+                    </article>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+</body>
+</html>

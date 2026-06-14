@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="fragments/head_admin :: adminHead(${course != null ? course.title : 'Curso'})"></th:block>
+    <style>
+        .academy-detail-hero { border-radius:20px; background:linear-gradient(135deg,#0f766e,#2563eb); color:#fff; padding:1.25rem; box-shadow:0 8px 28px rgba(15,23,42,.18); }
+        .academy-card { border:0; border-radius:18px; box-shadow:0 2px 12px rgba(15,23,42,.08); }
+        .academy-progress { height:8px; background:#e2e8f0; border-radius:999px; overflow:hidden; }
+        .academy-progress-bar { height:100%; background:#2563eb; }
+        .lesson-row { border-top:1px solid #e2e8f0; padding:.9rem 0; }
+    </style>
+</head>
+<body>
+<div class="app-layout" th:with="activePage='my_courses'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <p><a class="btn btn-outline-secondary btn-sm" th:href="@{/my-courses}"><i class="bi bi-arrow-left"></i> Mis cursos</a></p>
+            <section class="academy-detail-hero mb-4">
+                <h1 class="h4 mb-2" th:text="${course != null ? course.title : 'Curso'}">Curso</h1>
+                <p class="mb-3 text-white-75" th:text="${course != null ? course.shortDescription : ''}">Descripción</p>
+                <div class="small text-white-50 mb-1">Avance: <strong><span th:text="${enrollment.progressPercent}">0</span>%</strong></div>
+                <div class="academy-progress mb-2"><div class="academy-progress-bar" th:style="|width:${enrollment.progressPercent}%|"></div></div>
+                <div class="small text-white-50 mb-3"><span th:text="${enrollment.completedLessons}">0</span>/<span th:text="${enrollment.totalLessons}">0</span> lecciones completadas</div>
+                <a th:if="${firstLesson != null}" class="btn btn-light" th:href="@{|/my-courses/${course.slug}/lesson/${firstLesson.id}|}">
+                    <i class="bi bi-play-circle"></i> Empezar / continuar
+                </a>
+            </section>
+
+            <section class="card academy-card">
+                <div class="card-header bg-white border-0">
+                    <h2 class="h5 mb-0">Temario</h2>
+                </div>
+                <div class="card-body">
+                    <div th:if="${#lists.isEmpty(curriculum)}" class="text-muted">No hay lecciones publicadas.</div>
+                    <div th:each="moduleView : ${curriculum}" class="mb-4">
+                        <h3 class="h6" th:text="${moduleView.module.title}">Unidad</h3>
+                        <p class="small text-muted" th:text="${moduleView.module.description}">Descripción</p>
+                        <div th:each="lesson : ${moduleView.lessons}" class="lesson-row d-flex justify-content-between align-items-center gap-3">
+                            <div>
+                                <div class="fw-semibold" th:text="${lesson.title}">Lección</div>
+                                <div class="small text-muted" th:text="${lesson.durationLabel}">Duración</div>
+                            </div>
+                            <div class="text-end">
+                                <span th:if="${completedLessonIds.contains(lesson.id)}" class="badge bg-success-subtle text-success me-2">Completada</span>
+                                <a class="btn btn-outline-primary btn-sm" th:href="@{|/my-courses/${course.slug}/lesson/${lesson.id}|}">Abrir</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+</body>
+</html>

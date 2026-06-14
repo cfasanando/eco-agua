@@ -240,6 +240,7 @@ public class PublicSiteController {
         xml.append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
         appendSitemapUrl(xml, base + "/");
         appendSitemapUrl(xml, base + "/catalogo");
+        appendSitemapUrl(xml, base + "/academy");
         for (Product product : productRepository.findByActiveTrueOrderByNameAsc()) {
             appendSitemapUrl(xml, base + productPublicPath(product));
         }
@@ -529,6 +530,7 @@ public class PublicSiteController {
         model.addAttribute("publicNavHomeLabel", setting("public.nav.home_label", "Inicio"));
         model.addAttribute("publicNavCatalogLabel", setting("public.nav.catalog_label", "Catálogo"));
         model.addAttribute("publicNavBlogLabel", setting("public.nav.blog_label", "Blog & consejos"));
+        model.addAttribute("publicNavAcademyLabel", setting("public.nav.academy_label", "Academia"));
         model.addAttribute("publicNavWhatsappLabel", setting("public.nav.whatsapp_label", "Pedir por WhatsApp"));
         model.addAttribute("publicAccessLabel", setting("public.nav.access_label", "Acceso colaboradores"));
     }

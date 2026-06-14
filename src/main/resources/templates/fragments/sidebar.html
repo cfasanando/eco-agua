@@ -95,7 +95,7 @@
       <a
         th:href="@{/my-courses}"
         class="menu-link"
-        th:classappend="${activePage == 'my_academy_courses' ? ' active' : ''}"
+        th:classappend="${activePage == 'my_courses' or activePage == 'my_course_detail' or activePage == 'my_lesson' or activePage == 'my_assessments' or activePage == 'my_assessment' or activePage == 'my_certificate' ? ' active' : ''}"
       >
         <span class="icon"><i class="bi bi-journal-check"></i></span>
         <span>Mis cursos</span>
@@ -949,7 +949,7 @@
       </th:block>
     </th:block>
 
-    <th:block th:if="${featureMarketingSection}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING')">
+    <th:block th:if="${featureMarketingSection or featureAcademy}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_READONLY','ver_academia','administra_academia')">
       <div class="menu-section-title">Gestión de marca</div>
 
       <div
@@ -964,6 +964,7 @@
         or activePage == 'marketing_image_library'
         or activePage == 'blog_posts'
         or activePage == 'blog'
+        or activePage == 'academy_dashboard'
         or activePage == 'academy_courses'
         or activePage == 'academy_enrollments'
         or activePage == 'academy_assessments'
@@ -1078,6 +1079,18 @@
 
           <a
             th:if="${featureAcademy}"
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_READONLY','ver_academia','administra_academia')"
+            th:href="@{/admin/academy/dashboard}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'academy_dashboard' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-speedometer2"></i></span>
+            <span>Panel Academia</span>
+          </a>
+
+          <a
+            th:if="${featureAcademy}"
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_READONLY','ver_academia','administra_academia')"
             th:href="@{/admin/academy/courses}"
             class="menu-link submenu"
             th:classappend="${activePage == 'academy_courses' ? ' active' : ''}"
@@ -1088,6 +1101,7 @@
 
           <a
             th:if="${featureAcademy}"
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_READONLY','ver_academia','administra_academia')"
             th:href="@{/admin/academy/enrollments}"
             class="menu-link submenu"
             th:classappend="${activePage == 'academy_enrollments' ? ' active' : ''}"
@@ -1098,6 +1112,7 @@
 
           <a
             th:if="${featureAcademy}"
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_READONLY','ver_academia','administra_academia')"
             th:href="@{/admin/academy/leads}"
             class="menu-link submenu"
             th:classappend="${activePage == 'academy_leads' ? ' active' : ''}"
@@ -1108,6 +1123,7 @@
 
           <a
             th:if="${featureAcademy}"
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_READONLY','ver_academia','administra_academia')"
             th:href="@{/admin/academy/assessment-results}"
             class="menu-link submenu"
             th:classappend="${activePage == 'academy_assessment_results' or activePage == 'academy_assessments' ? ' active' : ''}"
@@ -1119,6 +1135,7 @@
 
           <a
             th:if="${featureAcademy}"
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_READONLY','ver_academia','administra_academia')"
             th:href="@{/admin/academy/certificates}"
             class="menu-link submenu"
             th:classappend="${activePage == 'academy_certificates' ? ' active' : ''}"

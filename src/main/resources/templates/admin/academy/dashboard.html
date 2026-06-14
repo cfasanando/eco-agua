@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <th:block th:replace="fragments/head_admin :: adminHead('Academia / Dashboard')"></th:block>
+    <style>
+        .academy-dashboard-hero {
+            border-radius: 22px;
+            background: linear-gradient(135deg, #312e81, #0f766e);
+            color: #ffffff;
+            padding: 1.35rem;
+            box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18);
+        }
+        .academy-kpi-card,
+        .academy-panel-card {
+            border: 0;
+            border-radius: 18px;
+            box-shadow: 0 2px 14px rgba(15, 23, 42, 0.08);
+        }
+        .academy-kpi-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #eef2ff;
+            color: #4338ca;
+            font-size: 1.25rem;
+        }
+        .academy-mini-stat {
+            border-radius: 14px;
+            background: #f8fafc;
+            padding: .85rem;
+        }
+        .academy-progress-sm {
+            height: .55rem;
+            border-radius: 999px;
+        }
+        .academy-course-title {
+            max-width: 360px;
+        }
+        .academy-action-grid .btn {
+            border-radius: 14px;
+            min-height: 72px;
+            text-align: left;
+        }
+        .academy-activity-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #ecfeff;
+            color: #0891b2;
+        }
+        @media (max-width: 767.98px) {
+            .academy-dashboard-hero .d-flex {
+                align-items: stretch !important;
+            }
+            .academy-action-grid .btn {
+                width: 100%;
+            }
+        }
+    
+        .academy-readonly-banner {
+            border: 0;
+            border-radius: 16px;
+            background: #eff6ff;
+            color: #1e3a8a;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+        }
+    </style>
+</head>
+<body>
+<div class="app-layout" th:with="activePage='academy_dashboard'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <div th:if="${academyReadOnly}" class="alert academy-readonly-banner mb-4" role="alert">
+                <i class="bi bi-eye me-1"></i>
+                <strong>Modo consulta.</strong> Puedes revisar la información de Academia, pero las acciones de creación, edición, publicación, inscripción y anulación están ocultas para este usuario.
+            </div>
+
+            <div class="academy-dashboard-hero mb-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                    <div>
+                        <div class="small text-white-50 mb-1">Academia digital</div>
+                        <h1 class="h4 mb-1">Panel de control de Academia</h1>
+                        <p class="mb-0 text-white-75">
+                            Revisa cursos, alumnos, avance, evaluaciones, certificados e interesados desde una sola pantalla.
+                        </p>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 academy-action-grid">
+                        <a class="btn btn-light btn-sm" th:href="@{/admin/academy/courses}">
+                            <i class="bi bi-mortarboard me-1"></i> Cursos
+                        </a>
+                        <a class="btn btn-outline-light btn-sm" th:href="@{/admin/academy/enrollments}">
+                            <i class="bi bi-person-check me-1"></i> Inscripciones
+                        </a>
+                        <a class="btn btn-outline-light btn-sm" th:href="@{/admin/academy/leads}">
+                            <i class="bi bi-person-lines-fill me-1"></i> Interesados
+                        </a>
+                        <a class="btn btn-outline-light btn-sm" th:href="@{/academy}" target="_blank">
+                            <i class="bi bi-box-arrow-up-right me-1"></i> Catálogo público
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-sm-6 col-xl-3">
+                    <div class="card academy-kpi-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between gap-3">
+                                <div>
+                                    <div class="text-muted small">Cursos publicados</div>
+                                    <div class="display-6 fw-semibold" th:text="${summary.courseStats.publishedCourses}">0</div>
+                                </div>
+                                <span class="academy-kpi-icon"><i class="bi bi-journal-richtext"></i></span>
+                            </div>
+                            <div class="small text-muted mt-2">
+                                Total cursos: <strong th:text="${summary.courseStats.totalCourses}">0</strong> ·
+                                Destacados: <strong th:text="${summary.courseStats.featuredCourses}">0</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl-3">
+                    <div class="card academy-kpi-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between gap-3">
+                                <div>
+                                    <div class="text-muted small">Alumnos inscritos</div>
+                                    <div class="display-6 fw-semibold" th:text="${summary.enrollmentStats.totalEnrollments}">0</div>
+                                </div>
+                                <span class="academy-kpi-icon"><i class="bi bi-people"></i></span>
+                            </div>
+                            <div class="small text-muted mt-2">
+                                Avance promedio: <strong th:text="|${summary.enrollmentStats.averageProgress}%|">0%</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl-3">
+                    <div class="card academy-kpi-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between gap-3">
+                                <div>
+                                    <div class="text-muted small">Interesados</div>
+                                    <div class="display-6 fw-semibold" th:text="${summary.leadStats.totalLeads}">0</div>
+                                </div>
+                                <span class="academy-kpi-icon"><i class="bi bi-person-lines-fill"></i></span>
+                            </div>
+                            <div class="small text-muted mt-2">
+                                Nuevos: <strong th:text="${summary.leadStats.freshLeads}">0</strong> ·
+                                Conversión: <strong th:text="|${summary.leadStats.conversionRate}%|">0%</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl-3">
+                    <div class="card academy-kpi-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between gap-3">
+                                <div>
+                                    <div class="text-muted small">Certificados activos</div>
+                                    <div class="display-6 fw-semibold" th:text="${summary.certificateStats.activeCertificates}">0</div>
+                                </div>
+                                <span class="academy-kpi-icon"><i class="bi bi-award"></i></span>
+                            </div>
+                            <div class="small text-muted mt-2">
+                                Evaluaciones aprobadas: <strong th:text="${summary.assessmentStats.passedAttempts}">0</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-lg-4">
+                    <div class="card academy-panel-card h-100">
+                        <div class="card-header bg-white border-0 pb-0">
+                            <h2 class="h6 mb-1">Estado de inscripciones</h2>
+                            <p class="small text-muted mb-0">Distribución de alumnos por avance administrativo.</p>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex flex-column gap-3">
+                                <div th:each="row : ${summary.enrollmentStatusRows}">
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span th:text="${row.label}">Estado</span>
+                                        <strong th:text="|${row.count} (${row.percent}%)|">0</strong>
+                                    </div>
+                                    <div class="progress academy-progress-sm">
+                                        <div class="progress-bar" role="progressbar" th:style="|width:${row.percent}%|"
+                                             th:attr="aria-valuenow=${row.percent}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card academy-panel-card h-100">
+                        <div class="card-header bg-white border-0 pb-0">
+                            <h2 class="h6 mb-1">Embudo de interesados</h2>
+                            <p class="small text-muted mb-0">Control comercial de solicitudes de inscripción.</p>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex flex-column gap-3">
+                                <div th:each="row : ${summary.leadStatusRows}">
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span th:text="${row.label}">Estado</span>
+                                        <strong th:text="|${row.count} (${row.percent}%)|">0</strong>
+                                    </div>
+                                    <div class="progress academy-progress-sm">
+                                        <div class="progress-bar" role="progressbar" th:style="|width:${row.percent}%|"
+                                             th:attr="aria-valuenow=${row.percent}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card academy-panel-card h-100">
+                        <div class="card-header bg-white border-0 pb-0">
+                            <h2 class="h6 mb-1">Resumen académico</h2>
+                            <p class="small text-muted mb-0">Contenido, evaluaciones y certificados.</p>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <div class="academy-mini-stat">
+                                        <div class="small text-muted">Lecciones</div>
+                                        <div class="h4 mb-0" th:text="${summary.courseStats.totalLessons}">0</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="academy-mini-stat">
+                                        <div class="small text-muted">Vista previa</div>
+                                        <div class="h4 mb-0" th:text="${summary.courseStats.previewLessons}">0</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="academy-mini-stat">
+                                        <div class="small text-muted">Tasa aprobación</div>
+                                        <div class="h4 mb-0" th:text="|${summary.assessmentStats.passRate}%|">0%</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="academy-mini-stat">
+                                        <div class="small text-muted">Nota promedio</div>
+                                        <div class="h4 mb-0" th:text="|${summary.assessmentStats.averageScore}%|">0%</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="d-grid gap-2 academy-action-grid">
+                                <a class="btn btn-outline-primary" th:href="@{/admin/academy/assessment-results}">
+                                    <i class="bi bi-ui-checks me-1"></i> Revisar resultados
+                                </a>
+                                <a class="btn btn-outline-success" th:href="@{/admin/academy/certificates}">
+                                    <i class="bi bi-award me-1"></i> Gestionar certificados
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-xl-8">
+                    <div class="card academy-panel-card h-100">
+                        <div class="card-header bg-white border-0 pb-0 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <div>
+                                <h2 class="h6 mb-1">Cursos con mayor movimiento</h2>
+                                <p class="small text-muted mb-0">Comparación de interesados, inscritos, avance y certificados.</p>
+                            </div>
+                            <a class="btn btn-sm btn-outline-primary" th:href="@{/admin/academy/courses}">
+                                <i class="bi bi-plus-lg"></i> Gestionar cursos
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Curso</th>
+                                        <th class="text-end">Lecciones</th>
+                                        <th class="text-end">Interesados</th>
+                                        <th class="text-end">Inscritos</th>
+                                        <th>Avance</th>
+                                        <th class="text-end">Cert.</th>
+                                        <th></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="course : ${summary.topCourses}">
+                                        <td>
+                                            <div class="fw-semibold academy-course-title" th:text="${course.title}">Curso</div>
+                                            <div class="small text-muted">
+                                                <span th:text="${course.category}">Categoría</span>
+                                                <span class="badge text-bg-light ms-1" th:text="${course.statusLabel}">Estado</span>
+                                                <span th:if="${course.featured}" class="badge text-bg-warning ms-1">Destacado</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-end" th:text="${course.lessons}">0</td>
+                                        <td class="text-end" th:text="${course.leads}">0</td>
+                                        <td class="text-end">
+                                            <span th:text="${course.enrollments}">0</span>
+                                            <div class="small text-muted" th:text="|${course.completed} completados|">0 completados</div>
+                                        </td>
+                                        <td style="min-width: 130px;">
+                                            <div class="d-flex justify-content-between small mb-1">
+                                                <span>Promedio</span>
+                                                <strong th:text="|${course.averageProgress}%|">0%</strong>
+                                            </div>
+                                            <div class="progress academy-progress-sm">
+                                                <div class="progress-bar" role="progressbar" th:style="|width:${course.averageProgress}%|"
+                                                     th:attr="aria-valuenow=${course.averageProgress}" aria-valuemin="0" aria-valuemax="100"></div>
+                                            </div>
+                                        </td>
+                                        <td class="text-end" th:text="${course.certificates}">0</td>
+                                        <td class="text-end">
+                                            <a class="btn btn-sm btn-outline-secondary" th:href="@{|/admin/academy/courses/${course.courseId}/content|}" title="Contenido">
+                                                <i class="bi bi-list-task"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(summary.topCourses)}">
+                                        <td colspan="7" class="text-center text-muted py-4">
+                                            Todavía no hay cursos registrados.
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4">
+                    <div class="card academy-panel-card h-100">
+                        <div class="card-header bg-white border-0 pb-0">
+                            <h2 class="h6 mb-1">Actividad reciente</h2>
+                            <p class="small text-muted mb-0">Últimos movimientos relevantes del módulo.</p>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex flex-column gap-3">
+                                <div th:each="item : ${summary.recentActivity}" class="d-flex gap-3">
+                                    <span class="academy-activity-icon"><i th:class="${item.iconClass}"></i></span>
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex justify-content-between gap-2">
+                                            <strong class="small" th:text="${item.type}">Tipo</strong>
+                                            <span class="small text-muted" th:text="${#temporals.format(item.date, 'dd/MM HH:mm')}">Fecha</span>
+                                        </div>
+                                        <div class="small" th:text="${item.actor}">Actor</div>
+                                        <div class="small text-muted" th:text="${item.target}">Curso</div>
+                                        <div class="small text-muted" th:text="${item.detail}">Detalle</div>
+                                    </div>
+                                </div>
+                                <div th:if="${#lists.isEmpty(summary.recentActivity)}" class="text-center text-muted py-4">
+                                    Todavía no hay actividad reciente.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/admin.js}"></script>
+
+<script th:if="${academyReadOnly}">
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('form[method="post"], form[method="POST"]').forEach(function (form) {
+            var badge = document.createElement('span');
+            badge.className = 'badge bg-secondary-subtle text-secondary border';
+            badge.textContent = 'Solo lectura';
+            form.replaceWith(badge);
+        });
+
+        document.querySelectorAll('a[href*="/admin/academy/courses?id="], a[href*="/admin/academy/courses/"][href*="?"], a[href$="/admin/academy/courses"]').forEach(function (link) {
+            if (link.textContent.toLowerCase().includes('nuevo') || link.title.toLowerCase().includes('editar') || link.href.includes('?id=')) {
+                link.classList.add('disabled');
+                link.setAttribute('aria-disabled', 'true');
+                link.setAttribute('tabindex', '-1');
+                link.title = 'Solo lectura';
+            }
+        });
+    });
+</script>
+</body>
+</html>

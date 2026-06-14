@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="fragments/head_admin :: adminHead('Mis evaluaciones')"></th:block>
+    <style>
+        .academy-hero { border-radius:20px; background:linear-gradient(135deg,#4338ca,#2563eb); color:#fff; padding:1.25rem; box-shadow:0 8px 28px rgba(15,23,42,.18); }
+        .academy-card { border:0; border-radius:18px; box-shadow:0 2px 12px rgba(15,23,42,.08); }
+    </style>
+</head>
+<body>
+<div class="app-layout" th:with="activePage='my_academy_courses'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <p><a class="btn btn-outline-secondary btn-sm" th:href="@{|/my-courses/${course.slug}|}"><i class="bi bi-arrow-left"></i> Volver al curso</a></p>
+            <section class="academy-hero mb-4">
+                <h1 class="h4 mb-2">Evaluaciones</h1>
+                <p class="mb-0 text-white-75" th:text="${course.title}">Curso</p>
+            </section>
+
+            <div th:if="${successMessage != null}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle me-1"></i><span th:text="${successMessage}">Guardado.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+            <div th:if="${warningMessage != null}" class="alert alert-warning alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-1"></i><span th:text="${warningMessage}">Aviso.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-6" th:each="assessment : ${assessments}">
+                    <div class="card academy-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between gap-3">
+                                <div>
+                                    <h2 class="h5 mb-1" th:text="${assessment.title}">Evaluación</h2>
+                                    <p class="small text-muted mb-3" th:text="${assessment.description}">Descripción</p>
+                                </div>
+                                <span th:if="${assessment.bestPercent != null}" class="badge align-self-start" th:classappend="${assessment.bestPassed} ? ' bg-success' : ' bg-danger'" th:text="${assessment.bestPassed} ? 'Aprobado' : 'Pendiente'">Estado</span>
+                            </div>
+                            <div class="small text-muted mb-3">
+                                Apruebas con <strong><span th:text="${assessment.passingScore}">70</span>%</strong> ·
+                                Intentos usados <strong><span th:text="${assessment.attemptCount}">0</span>/<span th:text="${assessment.maxAttempts}">3</span></strong>
+                            </div>
+                            <div th:if="${assessment.bestPercent != null}" class="mb-3">
+                                Mejor nota: <strong><span th:text="${assessment.bestPercent}">0</span>%</strong>
+                            </div>
+                            <a th:if="${assessment.canAttempt}" class="btn btn-primary" th:href="@{|/my-courses/${course.slug}/assessment/${assessment.assessmentId}|}">
+                                <i class="bi bi-play-circle"></i> Rendir evaluación
+                            </a>
+                            <a th:unless="${assessment.canAttempt}" class="btn btn-outline-secondary" th:href="@{|/my-courses/${course.slug}/assessment/${assessment.assessmentId}|}">
+                                <i class="bi bi-eye"></i> Ver intentos
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div th:if="${#lists.isEmpty(assessments)}" class="col-12">
+                    <div class="card academy-card"><div class="card-body text-center text-muted py-5">Este curso todavía no tiene evaluaciones publicadas.</div></div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+</body>
+</html>

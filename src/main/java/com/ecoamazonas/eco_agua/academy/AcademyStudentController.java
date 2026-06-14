@@ -6,9 +6,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.security.Principal;
+import java.util.Map;
 
 @Controller
 @RequestMapping("/my-courses")
@@ -16,11 +18,14 @@ public class AcademyStudentController {
 
     private final AcademyEnrollmentService enrollmentService;
     private final AcademyCourseContentService contentService;
+    private final AcademyAssessmentService assessmentService;
 
     public AcademyStudentController(AcademyEnrollmentService enrollmentService,
-                                    AcademyCourseContentService contentService) {
+                                    AcademyCourseContentService contentService,
+                                    AcademyAssessmentService assessmentService) {
         this.enrollmentService = enrollmentService;
         this.contentService = contentService;
+        this.assessmentService = assessmentService;
     }
 
     @GetMapping
@@ -51,6 +56,7 @@ public class AcademyStudentController {
         model.addAttribute("curriculum", contentService.findPublishedModuleViews(course));
         model.addAttribute("completedLessonIds", enrollmentService.findCompletedLessonIds(enrollment));
         model.addAttribute("firstLesson", firstLesson);
+        model.addAttribute("assessments", assessmentService.findStudentAssessmentCards(enrollment));
         return "academy/my_course_detail";
     }
 
@@ -90,6 +96,60 @@ public class AcademyStudentController {
         enrollmentService.markLessonCompleted(username(principal), courseSlug, lessonId);
         redirectAttributes.addFlashAttribute("successMessage", "Lección marcada como completada.");
         return "redirect:/my-courses/" + courseSlug + "/lesson/" + lessonId;
+    }
+
+    @GetMapping("/{courseSlug}/assessment")
+    public String myAssessments(@PathVariable String courseSlug,
+                                Principal principal,
+                                Model model) {
+        AcademyEnrollment enrollment = enrollmentService.findMyEnrollment(username(principal), courseSlug);
+        if (enrollment == null) {
+            return "redirect:/academy/course/" + courseSlug;
+        }
+        model.addAttribute("activePage", "my_academy_courses");
+        model.addAttribute("course", enrollment.getCourse());
+        model.addAttribute("enrollment", enrollment);
+        model.addAttribute("assessments", assessmentService.findStudentAssessmentCards(enrollment));
+        return "academy/my_assessments";
+    }
+
+    @GetMapping("/{courseSlug}/assessment/{assessmentId}")
+    public String takeAssessment(@PathVariable String courseSlug,
+                                 @PathVariable Long assessmentId,
+                                 @RequestParam(required = false) Long attemptId,
+                                 Principal principal,
+                                 Model model,
+                                 RedirectAttributes redirectAttributes) {
+        AcademyEnrollment enrollment = enrollmentService.findMyEnrollment(username(principal), courseSlug);
+        if (enrollment == null) {
+            return "redirect:/academy/course/" + courseSlug;
+        }
+        AcademyAssessmentService.AssessmentTakeView assessmentView = assessmentService.buildTakeView(enrollment, assessmentId, attemptId);
+        if (assessmentView == null) {
+            redirectAttributes.addFlashAttribute("warningMessage", "La evaluación no está disponible.");
+            return "redirect:/my-courses/" + courseSlug;
+        }
+        model.addAttribute("activePage", "my_academy_courses");
+        model.addAttribute("course", enrollment.getCourse());
+        model.addAttribute("enrollment", enrollment);
+        model.addAttribute("assessmentView", assessmentView);
+        return "academy/my_assessment";
+    }
+
+    @PostMapping("/{courseSlug}/assessment/{assessmentId}/submit")
+    public String submitAssessment(@PathVariable String courseSlug,
+                                   @PathVariable Long assessmentId,
+                                   @RequestParam Map<String, String> parameters,
+                                   Principal principal,
+                                   RedirectAttributes redirectAttributes) {
+        try {
+            Long attemptId = assessmentService.submitAssessment(username(principal), courseSlug, assessmentId, parameters);
+            redirectAttributes.addFlashAttribute("successMessage", "Evaluación enviada correctamente.");
+            return "redirect:/my-courses/" + courseSlug + "/assessment/" + assessmentId + "?attemptId=" + attemptId;
+        } catch (IllegalStateException e) {
+            redirectAttributes.addFlashAttribute("warningMessage", "Ya no tienes intentos disponibles para esta evaluación.");
+            return "redirect:/my-courses/" + courseSlug + "/assessment/" + assessmentId;
+        }
     }
 
     private String username(Principal principal) {

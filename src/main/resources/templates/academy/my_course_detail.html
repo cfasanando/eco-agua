@@ -28,6 +28,47 @@
                 </a>
             </section>
 
+            <section class="card academy-card mb-4">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h2 class="h5 mb-0"><i class="bi bi-award text-warning"></i> Certificado</h2>
+                        <p class="small text-muted mb-0">Se emite al completar el curso y aprobar las evaluaciones publicadas.</p>
+                    </div>
+                    <span th:if="${certificateStatus != null and certificateStatus.hasCertificate()}" class="badge bg-success">Emitido</span>
+                    <span th:if="${certificateStatus == null or !certificateStatus.hasCertificate()}" class="badge bg-secondary">Pendiente</span>
+                </div>
+                <div class="card-body">
+                    <div th:if="${certificateStatus != null and certificateStatus.hasCertificate()}" class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <div>
+                            <div class="fw-semibold">Código: <span th:text="${certificateStatus.certificateCode}">ACA-000</span></div>
+                            <div class="small text-muted">Emitido el <span th:text="${certificateStatus.issuedAt != null ? #temporals.format(certificateStatus.issuedAt, 'dd/MM/yyyy HH:mm') : '-'}">-</span></div>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a class="btn btn-primary btn-sm" th:href="@{|/my-courses/${course.slug}/certificate|}"><i class="bi bi-award"></i> Ver certificado</a>
+                            <a class="btn btn-outline-secondary btn-sm" target="_blank" th:href="@{|/academy/certificate/verify/${certificateStatus.certificateCode}|}"><i class="bi bi-shield-check"></i> Verificación pública</a>
+                        </div>
+                    </div>
+                    <div th:unless="${certificateStatus != null and certificateStatus.hasCertificate()}">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-lg-8">
+                                <div class="small text-muted mb-2" th:text="${certificateStatus != null ? certificateStatus.message : 'Certificado pendiente.'}">Certificado pendiente.</div>
+                                <div class="small">
+                                    Avance: <strong><span th:text="${certificateStatus != null ? certificateStatus.progressPercent : enrollment.progressPercent}">0</span>%</strong>
+                                    · Evaluaciones aprobadas: <strong><span th:text="${certificateStatus != null ? certificateStatus.passedAssessments : 0}">0</span>/<span th:text="${certificateStatus != null ? certificateStatus.requiredAssessments : 0}">0</span></strong>
+                                </div>
+                            </div>
+                            <div class="col-lg-4 text-lg-end">
+                                <form th:if="${certificateStatus != null and certificateStatus.eligible}" th:action="@{|/my-courses/${course.slug}/certificate/generate|}" method="post">
+                                    <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                    <button class="btn btn-success" type="submit"><i class="bi bi-award"></i> Emitir certificado</button>
+                                </form>
+                                <button th:unless="${certificateStatus != null and certificateStatus.eligible}" class="btn btn-outline-secondary" type="button" disabled>Requisitos pendientes</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section class="card academy-card mb-4" th:if="${assessments != null and !#lists.isEmpty(assessments)}">
                 <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
                     <div>

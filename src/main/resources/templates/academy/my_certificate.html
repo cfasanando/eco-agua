@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="fragments/head_admin :: adminHead('Mi certificado')"></th:block>
+    <style>
+        .certificate-sheet { background:#fff; border:12px solid #0f766e; border-radius:24px; padding:3rem; box-shadow:0 8px 30px rgba(15,23,42,.12); position:relative; overflow:hidden; }
+        .certificate-sheet:before { content:""; position:absolute; inset:18px; border:2px solid #f59e0b; border-radius:14px; pointer-events:none; }
+        .certificate-title { letter-spacing:.08em; text-transform:uppercase; color:#0f766e; }
+        .certificate-code { font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+        @media print { .no-print, aside, header { display:none !important; } .main-content { margin:0 !important; } .content-wrapper { padding:0 !important; } .certificate-sheet { box-shadow:none; min-height:90vh; } }
+    </style>
+</head>
+<body>
+<div class="app-layout" th:with="activePage='my_academy_courses'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="no-print d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <a class="btn btn-outline-secondary btn-sm" th:href="@{|/my-courses/${course.slug}|}"><i class="bi bi-arrow-left"></i> Volver al curso</a>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-primary btn-sm" target="_blank" th:href="@{|/academy/certificate/verify/${certificate.certificateCode}|}"><i class="bi bi-shield-check"></i> Verificación pública</a>
+                    <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
+                </div>
+            </div>
+
+            <section class="certificate-sheet text-center">
+                <div class="position-relative">
+                    <div class="mb-4"><i class="bi bi-award-fill text-warning" style="font-size:4rem;"></i></div>
+                    <div class="certificate-title small fw-bold mb-2">Certificado de finalización</div>
+                    <h1 class="display-6 fw-bold mb-4">Academia Eco Amazonas</h1>
+                    <p class="lead mb-1">Se certifica que</p>
+                    <h2 class="h1 fw-bold mb-3" th:text="${certificate.student != null ? certificate.student.username : 'Alumno'}">Alumno</h2>
+                    <p class="lead mb-1">ha completado satisfactoriamente el curso</p>
+                    <h3 class="h2 fw-semibold mb-4" th:text="${course.title}">Curso</h3>
+                    <p class="text-muted mb-4">Cumpliendo el avance requerido y las evaluaciones publicadas.</p>
+                    <div class="row justify-content-center g-3 mb-4">
+                        <div class="col-md-4">
+                            <div class="border rounded-4 p-3">
+                                <div class="small text-muted">Fecha de emisión</div>
+                                <div class="fw-semibold" th:text="${#temporals.format(certificate.issuedAt, 'dd/MM/yyyy')}">Fecha</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded-4 p-3">
+                                <div class="small text-muted">Instructor</div>
+                                <div class="fw-semibold" th:text="${course.instructor ?: 'Academia'}">Instructor</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="certificate-code small text-muted">
+                        Código de verificación: <strong th:text="${certificate.certificateCode}">ACA</strong>
+                    </div>
+                    <div class="small text-muted mt-2">Verificar en: <span th:text="@{|/academy/certificate/verify/${certificate.certificateCode}|}">URL</span></div>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+</body>
+</html>

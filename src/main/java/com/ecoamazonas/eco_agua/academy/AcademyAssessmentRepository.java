@@ -31,4 +31,6 @@ public interface AcademyAssessmentRepository extends JpaRepository<AcademyAssess
     Optional<AcademyAssessment> findByIdForAdmin(@Param("id") Long id);
 
     long countByCourse(AcademyCourse course);
+
+    long countByCourseAndActiveTrueAndStatus(AcademyCourse course, AcademyAssessment.Status status);
 }

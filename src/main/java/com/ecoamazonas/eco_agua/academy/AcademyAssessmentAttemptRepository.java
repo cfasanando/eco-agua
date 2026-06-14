@@ -38,6 +38,26 @@ public interface AcademyAssessmentAttemptRepository extends JpaRepository<Academ
     long countByAssessment(AcademyAssessment assessment);
 
     @Query("""
+        select count(distinct attempt.assessment.id)
+        from AcademyAssessmentAttempt attempt
+        where attempt.enrollment = :enrollment
+          and attempt.passed = true
+          and attempt.status = com.ecoamazonas.eco_agua.academy.AcademyAssessmentAttempt.Status.SUBMITTED
+        """)
+    long countPassedAssessmentsByEnrollment(@Param("enrollment") AcademyEnrollment enrollment);
+
+    @Query("""
+        select attempt
+        from AcademyAssessmentAttempt attempt
+        join fetch attempt.assessment assessment
+        where attempt.enrollment = :enrollment
+          and attempt.passed = true
+          and attempt.status = com.ecoamazonas.eco_agua.academy.AcademyAssessmentAttempt.Status.SUBMITTED
+        order by attempt.submittedAt desc, attempt.id desc
+        """)
+    List<AcademyAssessmentAttempt> findPassedAttemptsByEnrollment(@Param("enrollment") AcademyEnrollment enrollment);
+
+    @Query("""
         select attempt
         from AcademyAssessmentAttempt attempt
         join fetch attempt.student student

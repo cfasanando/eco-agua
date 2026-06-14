@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="fragments/head_public :: publicHead(${certificate.valid ? 'Certificado válido' : 'Verificar certificado'})"></th:block>
+    <style>
+        .verify-page { min-height:100vh; background:linear-gradient(135deg,#ecfeff,#fef3c7); padding:3rem 1rem; }
+        .verify-card { max-width:900px; margin:0 auto; border:0; border-radius:26px; box-shadow:0 14px 45px rgba(15,23,42,.14); overflow:hidden; }
+        .verify-hero { background:linear-gradient(135deg,#0f766e,#2563eb); color:#fff; padding:2rem; }
+        .code-pill { font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+        @media print { .no-print { display:none !important; } .verify-page { background:#fff; padding:0; } .verify-card { box-shadow:none; border:1px solid #e2e8f0; } }
+    </style>
+</head>
+<body>
+<main class="verify-page">
+    <section class="card verify-card">
+        <div class="verify-hero text-center">
+            <div th:if="${certificate.valid}">
+                <i class="bi bi-shield-check" style="font-size:4rem;"></i>
+                <h1 class="h2 mt-3 mb-1">Certificado válido</h1>
+                <p class="mb-0 text-white-50">Este certificado fue emitido por Academia Eco Amazonas.</p>
+            </div>
+            <div th:unless="${certificate.valid}">
+                <i class="bi bi-shield-x" style="font-size:4rem;"></i>
+                <h1 class="h2 mt-3 mb-1" th:text="${certificate.statusMessage}">Certificado no encontrado</h1>
+                <p class="mb-0 text-white-50">Revisa el código ingresado o solicita una nueva verificación.</p>
+            </div>
+        </div>
+        <div class="card-body p-4 p-lg-5">
+            <div class="row g-4" th:if="${certificate.valid}">
+                <div class="col-md-6">
+                    <div class="small text-muted">Alumno</div>
+                    <div class="h4" th:text="${certificate.username}">Alumno</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="small text-muted">Curso</div>
+                    <div class="h4" th:text="${certificate.courseTitle}">Curso</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="small text-muted">Instructor</div>
+                    <div class="fw-semibold" th:text="${certificate.instructor ?: '-'}">Instructor</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="small text-muted">Fecha de emisión</div>
+                    <div class="fw-semibold" th:text="${certificate.issuedAt != null ? #temporals.format(certificate.issuedAt, 'dd/MM/yyyy HH:mm') : '-'}">Fecha</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="small text-muted">Estado</div>
+                    <span class="badge bg-success" th:text="${certificate.statusLabel}">Activo</span>
+                </div>
+            </div>
+
+            <div class="alert" th:classappend="${certificate.valid} ? ' alert-success' : ' alert-warning'" role="alert">
+                <div class="small text-muted">Código de verificación</div>
+                <div class="h5 code-pill mb-0" th:text="${certificate.certificateCode}">ACA</div>
+            </div>
+
+            <p th:if="${certificate.notes != null and !#strings.isEmpty(certificate.notes)}" class="text-muted" th:text="${certificate.notes}">Notas</p>
+
+            <div class="d-flex justify-content-between gap-2 flex-wrap no-print mt-4">
+                <a class="btn btn-outline-secondary" th:href="@{/academy}"><i class="bi bi-mortarboard"></i> Ver cursos</a>
+                <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir verificación</button>
+            </div>
+        </div>
+    </section>
+</main>
+</body>
+</html>

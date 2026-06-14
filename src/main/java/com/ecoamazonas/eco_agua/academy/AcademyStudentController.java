@@ -19,13 +19,16 @@ public class AcademyStudentController {
     private final AcademyEnrollmentService enrollmentService;
     private final AcademyCourseContentService contentService;
     private final AcademyAssessmentService assessmentService;
+    private final AcademyCertificateService certificateService;
 
     public AcademyStudentController(AcademyEnrollmentService enrollmentService,
                                     AcademyCourseContentService contentService,
-                                    AcademyAssessmentService assessmentService) {
+                                    AcademyAssessmentService assessmentService,
+                                    AcademyCertificateService certificateService) {
         this.enrollmentService = enrollmentService;
         this.contentService = contentService;
         this.assessmentService = assessmentService;
+        this.certificateService = certificateService;
     }
 
     @GetMapping
@@ -57,6 +60,7 @@ public class AcademyStudentController {
         model.addAttribute("completedLessonIds", enrollmentService.findCompletedLessonIds(enrollment));
         model.addAttribute("firstLesson", firstLesson);
         model.addAttribute("assessments", assessmentService.findStudentAssessmentCards(enrollment));
+        model.addAttribute("certificateStatus", certificateService.buildStudentStatus(enrollment));
         return "academy/my_course_detail";
     }
 
@@ -96,6 +100,43 @@ public class AcademyStudentController {
         enrollmentService.markLessonCompleted(username(principal), courseSlug, lessonId);
         redirectAttributes.addFlashAttribute("successMessage", "Lección marcada como completada.");
         return "redirect:/my-courses/" + courseSlug + "/lesson/" + lessonId;
+    }
+
+
+    @PostMapping("/{courseSlug}/certificate/generate")
+    public String generateCertificate(@PathVariable String courseSlug,
+                                      Principal principal,
+                                      RedirectAttributes redirectAttributes) {
+        try {
+            AcademyCertificate certificate = certificateService.issueForStudent(username(principal), courseSlug);
+            redirectAttributes.addFlashAttribute("successMessage", "Certificado emitido correctamente.");
+            return "redirect:/my-courses/" + courseSlug + "/certificate";
+        } catch (IllegalStateException e) {
+            redirectAttributes.addFlashAttribute("warningMessage", e.getMessage());
+            return "redirect:/my-courses/" + courseSlug;
+        }
+    }
+
+    @GetMapping("/{courseSlug}/certificate")
+    public String myCertificate(@PathVariable String courseSlug,
+                                Principal principal,
+                                Model model,
+                                RedirectAttributes redirectAttributes) {
+        AcademyEnrollment enrollment = enrollmentService.findMyEnrollment(username(principal), courseSlug);
+        if (enrollment == null) {
+            return "redirect:/academy/course/" + courseSlug;
+        }
+        AcademyCertificate certificate = certificateService.findStudentCertificate(username(principal), courseSlug)
+                .orElse(null);
+        if (certificate == null) {
+            redirectAttributes.addFlashAttribute("warningMessage", "Aún no tienes certificado emitido para este curso.");
+            return "redirect:/my-courses/" + courseSlug;
+        }
+        model.addAttribute("activePage", "my_academy_courses");
+        model.addAttribute("course", enrollment.getCourse());
+        model.addAttribute("enrollment", enrollment);
+        model.addAttribute("certificate", certificate);
+        return "academy/my_certificate";
     }
 
     @GetMapping("/{courseSlug}/assessment")

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="fragments/head_admin :: adminHead('Hoja de ruta importada - Eco Agua')"></head>
 <body>
 <div class="app-layout" th:with="activePage='delivery_import'">
@@ -25,6 +25,9 @@
 
             <div th:if="${successMessage}" class="alert alert-success no-print" th:text="${successMessage}">OK</div>
             <div th:if="${errorMessage}" class="alert alert-danger no-print" th:text="${errorMessage}">Error</div>
+            <div class="alert alert-info small" sec:authorize="!hasAnyAuthority('ROLE_OWNER','ROLE_LOGISTICS','ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','administra_delivery')">
+                Estás en modo consulta. Puedes revisar el reparto, mapas y rutas, pero las acciones operativas están ocultas para tu rol.
+            </div>
 
             <div class="row g-3 mb-3">
                 <div class="col-md-2">
@@ -47,7 +50,7 @@
                 </div>
             </div>
 
-            <div class="card shadow-sm mb-3 no-print">
+            <div class="card shadow-sm mb-3 no-print" sec:authorize="hasAnyAuthority('ROLE_OWNER','ROLE_LOGISTICS','ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','administra_delivery')">
                 <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <div>
                         <strong>Integración con operación real</strong>
@@ -58,7 +61,7 @@
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-lg-6">
-                            <form th:action="@{/delivery/import/{id}/integrate-clients(id=${batch.id})}" method="post" class="border rounded p-3 h-100">
+                            <form th:action="@{/delivery/import/{id}/integrate-clients(id=${batch.id})}" method="post" class="border rounded p-3 h-100" sec:authorize="hasAnyAuthority('ROLE_OWNER','ROLE_LOGISTICS','ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','administra_delivery')">
                                 <h2 class="h6 mb-2">1. Vincular o crear clientes</h2>
                                 <p class="small text-muted mb-3">Busca clientes por teléfono o nombre. Si no existe, puede crearlo con dirección, referencia y coordenadas.</p>
                                 <div class="form-check form-switch mb-2">
@@ -73,7 +76,7 @@
                             </form>
                         </div>
                         <div class="col-lg-6">
-                            <form th:action="@{/delivery/import/{id}/create-orders(id=${batch.id})}" method="post" class="border rounded p-3 h-100">
+                            <form th:action="@{/delivery/import/{id}/create-orders(id=${batch.id})}" method="post" class="border rounded p-3 h-100" sec:authorize="hasAnyAuthority('ROLE_OWNER','ROLE_LOGISTICS','ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','administra_delivery')">
                                 <h2 class="h6 mb-2">2. Crear pedidos reales</h2>
                                 <p class="small text-muted mb-3">Crea pedidos sin líneas de producto para operación de courier/ruta externa. Luego aparecen en reparto, mapa, móvil y dashboard.</p>
                                 <label class="form-label small" for="batchOrderStatus">Estado inicial</label>
@@ -111,7 +114,7 @@
                             <th class="text-end">Monto</th>
                             <th>Estado</th>
                             <th>Sistema</th>
-                            <th class="no-print text-end">Acciones</th>
+                            <th class="no-print text-end" sec:authorize="hasAnyAuthority('ROLE_OWNER','ROLE_LOGISTICS','ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','administra_delivery')">Acciones</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -151,9 +154,9 @@
                                 </div>
                                 <div class="small text-muted" th:if="${stop.integrationObservation != null}" th:text="${stop.integrationObservation}">Integración</div>
                             </td>
-                            <td class="no-print text-end" style="min-width: 360px;">
+                            <td class="no-print text-end" style="min-width: 300px;" sec:authorize="hasAnyAuthority('ROLE_OWNER','ROLE_LOGISTICS','ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','administra_delivery')">
                                 <div class="d-flex flex-column gap-2 align-items-end">
-                                    <form class="d-flex gap-1 justify-content-end" th:action="@{/delivery/import/{batchId}/stops/{stopId}/status(batchId=${batch.id}, stopId=${stop.id})}" method="post">
+                                    <form class="d-flex gap-1 justify-content-end" th:action="@{/delivery/import/{batchId}/stops/{stopId}/status(batchId=${batch.id}, stopId=${stop.id})}" method="post" sec:authorize="hasAnyAuthority('ROLE_OWNER','ROLE_LOGISTICS','ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','administra_delivery')">
                                         <select name="status" class="form-select form-select-sm" style="max-width: 150px;">
                                             <option th:each="status : ${statuses}" th:value="${status}" th:selected="${stop.status == status}" th:text="${status.label}">Estado</option>
                                         </select>
@@ -161,27 +164,27 @@
                                         <button type="submit" class="btn btn-sm btn-outline-primary" title="Guardar estado"><i class="bi bi-check-lg"></i></button>
                                     </form>
 
-                                    <form th:if="${stop.clientId == null}" class="d-flex gap-1 justify-content-end" th:action="@{/delivery/import/{batchId}/stops/{stopId}/client(batchId=${batch.id}, stopId=${stop.id})}" method="post">
+                                    <form th:if="${stop.clientId == null}" class="d-flex gap-1 justify-content-end" th:action="@{/delivery/import/{batchId}/stops/{stopId}/client(batchId=${batch.id}, stopId=${stop.id})}" method="post" sec:authorize="hasAnyAuthority('ROLE_OWNER','ROLE_LOGISTICS','ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','administra_delivery')">
                                         <input type="hidden" name="createIfMissing" value="true">
                                         <input type="hidden" name="updateExisting" value="true">
-                                        <button type="submit" class="btn btn-sm btn-outline-primary" title="Vincular o crear cliente"><i class="bi bi-person-plus"></i> Cliente</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-primary" title="Vincular o crear cliente" aria-label="Vincular o crear cliente"><i class="bi bi-person-plus"></i></button>
                                     </form>
 
-                                    <form th:if="${stop.saleOrderId == null}" class="d-flex gap-1 justify-content-end" th:action="@{/delivery/import/{batchId}/stops/{stopId}/order(batchId=${batch.id}, stopId=${stop.id})}" method="post">
+                                    <form th:if="${stop.saleOrderId == null}" class="d-flex gap-1 justify-content-end" th:action="@{/delivery/import/{batchId}/stops/{stopId}/order(batchId=${batch.id}, stopId=${stop.id})}" method="post" sec:authorize="hasAnyAuthority('ROLE_OWNER','ROLE_LOGISTICS','ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','administra_delivery')">
                                         <select name="orderStatus" class="form-select form-select-sm" style="max-width: 140px;">
                                             <option value="">Auto</option>
                                             <option th:each="status : ${orderStatuses}" th:value="${status}" th:text="${status}">CREDIT</option>
                                         </select>
-                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Crear pedido real"><i class="bi bi-receipt"></i> Pedido</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Crear pedido real" aria-label="Crear pedido real"><i class="bi bi-receipt"></i></button>
                                     </form>
 
-                                    <form th:if="${stop.saleOrderId != null and stop.amount != null and stop.amount.compareTo(T(java.math.BigDecimal).ZERO) > 0}" class="d-flex flex-wrap gap-1 justify-content-end" th:action="@{/delivery/import/{batchId}/stops/{stopId}/payment(batchId=${batch.id}, stopId=${stop.id})}" method="post">
+                                    <form th:if="${stop.saleOrderId != null and stop.amount != null and stop.amount.compareTo(T(java.math.BigDecimal).ZERO) > 0}" class="d-flex flex-wrap gap-1 justify-content-end" th:action="@{/delivery/import/{batchId}/stops/{stopId}/payment(batchId=${batch.id}, stopId=${stop.id})}" method="post" sec:authorize="hasAnyAuthority('ROLE_OWNER','ROLE_LOGISTICS','ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','administra_delivery')">
                                         <input type="number" step="0.01" min="0.01" name="paymentAmount" class="form-control form-control-sm" th:value="${stop.amount}" style="max-width: 100px;">
                                         <select name="paymentMethod" class="form-select form-select-sm" style="max-width: 130px;">
                                             <option th:each="method : ${paymentMethods}" th:value="${method}" th:text="${method}">YAPE</option>
                                         </select>
                                         <input type="text" name="paymentReference" class="form-control form-control-sm" placeholder="Referencia" style="max-width: 120px;">
-                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Registrar cobro real"><i class="bi bi-cash-coin"></i> Cobrar</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Registrar cobro real" aria-label="Registrar cobro real"><i class="bi bi-cash-coin"></i></button>
                                     </form>
                                 </div>
                             </td>

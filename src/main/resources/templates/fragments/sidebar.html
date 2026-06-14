@@ -90,7 +90,7 @@
       </a>
     </th:block>
 
-    <th:block th:if="${moduleOperationSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_PRODUCTION')">
+    <th:block th:if="${moduleOperationSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_PRODUCTION','ROLE_READONLY','ver_delivery','administra_delivery','ver_recompras','administra_recompras')">
       <div class="menu-section-title">Operación diaria</div>
 
       <div
@@ -216,7 +216,7 @@
             </a>
           </th:block>
 
-          <th:block th:if="${featureDelivery}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES')">
+          <th:block th:if="${featureDelivery}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES','ROLE_READONLY','ver_delivery','administra_delivery')">
             <a
               th:href="@{/admin/delivery-zones}"
               class="menu-link submenu"
@@ -227,7 +227,7 @@
             </a>
           </th:block>
 
-          <th:block th:if="${featureDelivery}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES')">
+          <th:block th:if="${featureDelivery}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES','ROLE_READONLY','ver_delivery','administra_delivery')">
             <a
               th:href="@{/delivery/dashboard}"
               class="menu-link submenu"
@@ -278,7 +278,7 @@
             </a>
           </th:block>
 
-          <th:block th:if="${featureReorder}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES')">
+          <th:block th:if="${featureReorder}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES','ROLE_READONLY','ver_recompras','administra_recompras')">
             <a
               th:href="@{/reorder-agenda}"
               class="menu-link submenu"
@@ -410,7 +410,7 @@
         </div>
       </th:block>
 
-      <th:block th:if="${moduleInventorySectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES')">
+      <th:block th:if="${moduleInventorySectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_LOGISTICS','ROLE_SALES','ROLE_READONLY','ver_delivery','administra_delivery')">
         <div
           class="menu-group"
           th:with="isInventoryActive=${activePage == 'products'
@@ -952,6 +952,7 @@
         or activePage == 'marketing_image_library'
         or activePage == 'blog_posts'
         or activePage == 'blog'
+        or activePage == 'academy_courses'
         or activePage == 'testimonials'}"
       >
         <input
@@ -1056,6 +1057,16 @@
           >
             <span class="icon"><i class="bi bi-journal-text"></i></span>
             <span>Blog / consejos</span>
+          </a>
+
+          <a
+            th:if="${featureAcademy}"
+            th:href="@{/admin/academy/courses}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'academy_courses' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-mortarboard"></i></span>
+            <span>Academia / cursos</span>
           </a>
 
           <a

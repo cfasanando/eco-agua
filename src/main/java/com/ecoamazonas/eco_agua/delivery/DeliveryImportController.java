@@ -100,7 +100,7 @@ public class DeliveryImportController {
                                    @RequestParam(value = "observation", required = false) String observation,
                                    RedirectAttributes redirectAttributes) {
         try {
-            deliveryImportService.updateStopStatus(stopId, status, observation);
+            deliveryImportService.updateStopStatus(batchId, stopId, status, observation);
             redirectAttributes.addFlashAttribute("successMessage", "Estado de parada actualizado.");
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
@@ -115,7 +115,7 @@ public class DeliveryImportController {
                              @RequestParam(value = "updateExisting", defaultValue = "true") boolean updateExisting,
                              RedirectAttributes redirectAttributes) {
         try {
-            deliveryImportService.linkOrCreateClient(stopId, createIfMissing, updateExisting);
+            deliveryImportService.linkOrCreateClient(batchId, stopId, createIfMissing, updateExisting);
             redirectAttributes.addFlashAttribute("successMessage", "Cliente vinculado correctamente.");
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
@@ -129,7 +129,7 @@ public class DeliveryImportController {
                               @RequestParam(value = "orderStatus", required = false) OrderStatus orderStatus,
                               RedirectAttributes redirectAttributes) {
         try {
-            deliveryImportService.createOrderFromStop(stopId, orderStatus);
+            deliveryImportService.createOrderFromStop(batchId, stopId, orderStatus);
             redirectAttributes.addFlashAttribute("successMessage", "Pedido creado desde la parada importada.");
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
@@ -145,7 +145,7 @@ public class DeliveryImportController {
                                   @RequestParam(value = "paymentReference", required = false) String paymentReference,
                                   RedirectAttributes redirectAttributes) {
         try {
-            deliveryImportService.registerPaymentForStop(stopId, paymentAmount, paymentMethod, paymentReference);
+            deliveryImportService.registerPaymentForStop(batchId, stopId, paymentAmount, paymentMethod, paymentReference);
             redirectAttributes.addFlashAttribute("successMessage", "Cobro registrado y vinculado al pedido.");
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());

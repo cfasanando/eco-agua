@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_public :: publicHead(${academyTitle} + ' - ' + ${platformName})}"></head>
+<body class="public-catalog-body" th:style="'--eco-primary:' + ${publicPrimaryColor} + '; --eco-secondary:' + ${publicSecondaryColor} + ';'">
+
+<div class="top-bar text-white py-1">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center small">
+        <span><i class="bi bi-geo-alt-fill me-1"></i><span th:text="${topbarLocation}">Iquitos y alrededores</span></span>
+        <span class="d-flex align-items-center">
+            <i class="bi bi-telephone-fill me-1"></i>
+            <span class="me-3"><span th:text="${topbarPhoneLabel}">Central:</span> <span th:text="${topbarPhone}">(065) 000000</span></span>
+            <i class="bi bi-whatsapp me-1"></i>
+            <a class="text-white text-decoration-none fw-semibold" th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank">
+                <span th:text="${topbarWhatsappLabel}">WhatsApp</span>
+            </a>
+        </span>
+    </div>
+</div>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+    <div class="container">
+        <a class="navbar-brand fw-bold d-flex align-items-center" th:href="@{/portal}">
+            <img th:src="@{${platformLogo}}" th:alt="${platformName}" height="36" class="me-2">
+            <span>
+                <span class="d-block brand-title" th:text="${platformName}">Eco del Amazonas</span>
+                <span class="d-block brand-subtitle" th:text="${platformTagline}">Agua de mesa</span>
+            </span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarPublic" aria-controls="navbarPublic" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarPublic">
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
+                <li class="nav-item"><a class="nav-link" th:href="@{/portal}" th:text="${publicNavHomeLabel}">Inicio</a></li>
+                <li class="nav-item" th:if="${featurePublicCatalog}"><a class="nav-link" th:href="@{/catalogo}" th:text="${publicNavCatalogLabel}">Catálogo</a></li>
+                <li class="nav-item" th:if="${featureBlog}"><a class="nav-link" th:href="@{/blog}" th:text="${publicNavBlogLabel}">Blog</a></li>
+                <li class="nav-item" th:if="${featureAcademy}"><a class="nav-link active" th:href="@{/academy}" th:text="${publicNavAcademyLabel}">Academia</a></li>
+                <li class="nav-item">
+                    <a class="nav-link" th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank">
+                        <i class="bi bi-whatsapp"></i> <span th:text="${publicNavWhatsappLabel}">WhatsApp</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<main class="py-4 bg-light catalog-page academy-public-page">
+    <div class="container">
+        <section class="catalog-marketplace-header mb-4">
+            <div class="row g-3 align-items-end">
+                <div class="col-lg-8">
+                    <span class="catalog-marketplace-kicker"><i class="bi bi-mortarboard"></i> <span th:text="${academyKicker}">Capacitación digital</span></span>
+                    <h1 class="catalog-marketplace-title mb-2" th:text="${academyTitle}">Academia y cursos</h1>
+                    <p class="catalog-marketplace-subtitle mb-0" th:text="${academySubtitle}">
+                        Cursos prácticos para aprender, emprender y mejorar la gestión de negocios.
+                    </p>
+                </div>
+                <div class="col-lg-4">
+                    <div class="catalog-marketplace-summary">
+                        <div>
+                            <span class="summary-label">Cursos visibles</span>
+                            <strong><span th:text="${filteredCoursesCount}">0</span></strong>
+                        </div>
+                        <a class="summary-whatsapp-link text-decoration-none" th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank">
+                            <i class="bi bi-whatsapp"></i> Consultar cursos
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <form class="catalog-filter-card mb-4" method="get" th:action="@{/academy}">
+            <div class="row g-3 align-items-end">
+                <div class="col-lg-6">
+                    <label class="form-label small fw-semibold">Buscar curso</label>
+                    <div class="catalog-search-control">
+                        <i class="bi bi-search"></i>
+                        <input type="search" name="q" class="form-control" th:value="${q}" placeholder="Ej: ventas, Excel, contabilidad, negocio...">
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <label class="form-label small fw-semibold">Categoría</label>
+                    <select class="form-select" name="category">
+                        <option value="">Todas las categorías</option>
+                        <option th:each="category : ${courseCategories}" th:value="${category}" th:selected="${selectedCategory == category}" th:text="${category}">Categoría</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 d-grid">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> Filtrar</button>
+                </div>
+            </div>
+        </form>
+
+        <section class="mb-4" th:if="${!#lists.isEmpty(featuredCourses)}">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h5 mb-0">Cursos destacados</h2>
+                <a class="small text-decoration-none" th:href="@{/academy}">Ver todos</a>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-6 col-xl-4" th:each="course : ${featuredCourses}">
+                    <article class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden">
+                        <img th:if="${course.coverImageUrl != null and !#strings.isEmpty(course.coverImageUrl)}" th:src="${course.coverImageUrl}" th:alt="${course.title}" class="card-img-top" style="height:180px;object-fit:cover;">
+                        <div th:unless="${course.coverImageUrl != null and !#strings.isEmpty(course.coverImageUrl)}" class="d-flex align-items-center justify-content-center bg-primary-subtle text-primary" style="height:180px;">
+                            <i class="bi bi-mortarboard fs-1"></i>
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <span class="badge bg-warning-subtle text-warning-emphasis align-self-start mb-2">Destacado</span>
+                            <h3 class="h6" th:text="${course.title}">Curso destacado</h3>
+                            <p class="small text-muted" th:text="${course.shortDescription}">Descripción corta</p>
+                            <div class="small text-muted mb-3 mt-auto">
+                                <i class="bi bi-person"></i> <span th:text="${course.instructor}">Instructor</span>
+                                · <i class="bi bi-clock"></i> <span th:text="${course.durationLabel}">Duración</span>
+                            </div>
+                            <a class="btn btn-outline-primary btn-sm" th:href="@{|/academy/course/${course.slug}|}">Ver curso</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h5 mb-0">Todos los cursos</h2>
+                <span class="small text-muted"><span th:text="${filteredCoursesCount}">0</span> resultado(s)</span>
+            </div>
+
+            <div class="row g-4" th:if="${!#lists.isEmpty(courses)}">
+                <div class="col-md-6 col-xl-4" th:each="course : ${courses}">
+                    <article class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden">
+                        <img th:if="${course.coverImageUrl != null and !#strings.isEmpty(course.coverImageUrl)}" th:src="${course.coverImageUrl}" th:alt="${course.title}" class="card-img-top" style="height:180px;object-fit:cover;">
+                        <div th:unless="${course.coverImageUrl != null and !#strings.isEmpty(course.coverImageUrl)}" class="d-flex align-items-center justify-content-center bg-light text-primary" style="height:180px;">
+                            <i class="bi bi-play-circle fs-1"></i>
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                <span class="badge bg-primary-subtle text-primary" th:text="${course.category}">Categoría</span>
+                                <span class="badge bg-secondary-subtle text-secondary" th:text="${course.levelLabel}">Nivel</span>
+                            </div>
+                            <h3 class="h6" th:text="${course.title}">Curso</h3>
+                            <p class="small text-muted" th:text="${course.shortDescription}">Descripción</p>
+                            <div class="small text-muted mb-2 mt-auto">
+                                <i class="bi bi-person"></i> <span th:text="${course.instructor}">Instructor</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong th:if="${course.hasPrice()}">S/ <span th:text="${#numbers.formatDecimal(course.price, 1, 'COMMA', 2, 'POINT')}">0.00</span></strong>
+                                <strong th:unless="${course.hasPrice()}" class="text-success">Gratis / consultar</strong>
+                                <a class="btn btn-primary btn-sm" th:href="@{|/academy/course/${course.slug}|}">Detalles</a>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </div>
+
+            <div th:if="${#lists.isEmpty(courses)}" class="text-center text-muted py-5 bg-white rounded-4 shadow-sm">
+                <i class="bi bi-mortarboard fs-1 d-block mb-2"></i>
+                <p class="mb-0" th:text="${academyEmptyText}">Aún no hay cursos publicados.</p>
+            </div>
+        </section>
+    </div>
+</main>
+
+<footer class="border-top py-3 bg-white">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center small text-muted">
+        <span>© <span th:text="${#temporals.format(#temporals.createNow(), 'yyyy')}">2026</span> <span th:text="${platformName}">Eco del Amazonas</span></span>
+        <span th:text="${footerRight}">Capacitación y servicios digitales.</span>
+    </div>
+</footer>
+
+<script th:src="@{https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js}"></script>
+</body>
+</html>

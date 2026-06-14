@@ -192,6 +192,7 @@ public class GlobalModelAttributes {
         boolean modulePriceSimulator = flag(moduleFlags, "price_simulator");
         boolean moduleMarketing = flag(moduleFlags, "marketing");
         boolean moduleBlog = flag(moduleFlags, "blog");
+        boolean moduleAcademy = flag(moduleFlags, "academy");
         boolean moduleTestimonials = flag(moduleFlags, "testimonials");
         boolean modulePublicSite = flag(moduleFlags, "public_site");
         boolean modulePublicCatalog = flag(moduleFlags, "public_catalog");
@@ -200,7 +201,7 @@ public class GlobalModelAttributes {
         boolean moduleRolesPermissions = flag(moduleFlags, "roles_permissions");
         boolean modulePlatformSettings = flag(moduleFlags, "platform_settings");
 
-        boolean moduleMarketingSection = moduleMarketing || moduleBlog || moduleTestimonials;
+        boolean moduleMarketingSection = moduleMarketing || moduleBlog || moduleAcademy || moduleTestimonials;
         boolean moduleCommercialSection = moduleCrm && (moduleCommercialDaily || moduleClients || modulePromotions || moduleDelivery || moduleReorder);
         boolean moduleInventorySection = moduleInventory && (moduleProducts || moduleCategories || moduleWarehouse || moduleSupplies || moduleContainers || moduleProduction);
         boolean moduleFinanceSection = moduleFinance && (moduleAccounting || moduleCashflow || moduleBreakEven || modulePriceSimulator);
@@ -237,6 +238,7 @@ public class GlobalModelAttributes {
         model.addAttribute("modulePriceSimulatorEnabled", modulePriceSimulator);
         model.addAttribute("moduleMarketingEnabled", moduleMarketing);
         model.addAttribute("moduleBlogEnabled", moduleBlog);
+        model.addAttribute("moduleAcademyEnabled", moduleAcademy);
         model.addAttribute("moduleTestimonialsEnabled", moduleTestimonials);
         model.addAttribute("modulePublicSiteEnabled", modulePublicSite);
         model.addAttribute("modulePublicCatalogEnabled", modulePublicCatalog);
@@ -258,6 +260,7 @@ public class GlobalModelAttributes {
         model.addAttribute("featureReorder", moduleReorder);
         model.addAttribute("featureMarketing", moduleMarketing);
         model.addAttribute("featureBlog", moduleBlog);
+        model.addAttribute("featureAcademy", moduleAcademy);
         model.addAttribute("featureTestimonials", moduleTestimonials);
         model.addAttribute("featurePublicCatalog", modulePublicCatalog);
         model.addAttribute("featureSupplies", moduleSupplies);

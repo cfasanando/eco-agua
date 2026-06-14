@@ -135,6 +135,7 @@ public class SystemModuleService {
             case "reorder" -> clientFeatureProperties.isReorder();
             case "marketing" -> clientFeatureProperties.isMarketing();
             case "blog" -> clientFeatureProperties.isBlog();
+            case "academy" -> true;
             case "testimonials" -> clientFeatureProperties.isTestimonials();
             case "public_catalog" -> clientFeatureProperties.isPublicCatalog();
             case "supplies" -> clientFeatureProperties.isSupplies();
@@ -205,6 +206,7 @@ public class SystemModuleService {
 
         modules.add(new ModuleDefinition("marketing", "Marketing y portal público", "Marketing / campañas", "Marketing campaign management.", true, false, false));
         modules.add(new ModuleDefinition("blog", "Marketing y portal público", "Blog / consejos", "Blog and public content management.", true, false, false));
+        modules.add(new ModuleDefinition("academy", "Marketing y portal público", "Academia / cursos", "Course catalog and digital training module.", true, false, false));
         modules.add(new ModuleDefinition("testimonials", "Marketing y portal público", "Testimonios", "Testimonial management and display.", false, false, false));
         modules.add(new ModuleDefinition("public_site", "Marketing y portal público", "Portal público", "Public website module.", true, false, false));
         modules.add(new ModuleDefinition("public_catalog", "Marketing y portal público", "Catálogo público", "Public catalog module.", true, false, false));

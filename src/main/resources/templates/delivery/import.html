@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="fragments/head_admin :: adminHead('Importar ruta - Eco Agua')"></head>
 <body>
 <div class="app-layout" th:with="activePage='delivery_import'">
@@ -21,6 +21,9 @@
 
             <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}">OK</div>
             <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}">Error</div>
+            <div class="alert alert-info small" sec:authorize="!hasAnyAuthority('ROLE_OWNER','ROLE_LOGISTICS','ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','administra_delivery')">
+                Estás en modo consulta. Puedes revisar el reparto, mapas y rutas, pero las acciones operativas están ocultas para tu rol.
+            </div>
 
             <div class="alert alert-info border-0 shadow-sm small">
                 <strong>Formato CSV:</strong>
@@ -33,7 +36,7 @@
                     <div class="card shadow-sm h-100">
                         <div class="card-header bg-light"><strong>Nueva importación</strong></div>
                         <div class="card-body">
-                            <form th:action="@{/delivery/import}" method="post" enctype="multipart/form-data" class="vstack gap-3">
+                            <form th:action="@{/delivery/import}" method="post" enctype="multipart/form-data" class="vstack gap-3" sec:authorize="hasAnyAuthority('ROLE_OWNER','ROLE_LOGISTICS','ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','administra_delivery')">
                                 <div>
                                     <label class="form-label">Título de la ruta</label>
                                     <input type="text" name="title" class="form-control" placeholder="Ruta marketplace / reparto mañana">

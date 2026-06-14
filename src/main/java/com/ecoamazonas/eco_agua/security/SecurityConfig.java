@@ -214,6 +214,18 @@ public class SecurityConfig {
             "administra_marketing", "administra_promos", "administra_blog", "administra_testimonios"
     );
 
+    private static final String[] ACADEMY_VIEW = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_READONLY,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_ADMIN_MKT,
+            "ver_academia", "administra_academia"
+    );
+
+    private static final String[] ACADEMY_WRITE = authorities(
+            ROLE_OWNER, ROLE_MARKETING,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_ADMIN_MKT,
+            "administra_academia"
+    );
+
     private static final String[] PRODUCTION_VIEW = authorities(
             ROLE_OWNER, ROLE_MANAGEMENT, ROLE_PRODUCTION, ROLE_READONLY,
             LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
@@ -240,13 +252,13 @@ public class SecurityConfig {
 
     private static final String[] REORDER_VIEW = authorities(
             ROLE_OWNER, ROLE_MANAGEMENT, ROLE_SALES, ROLE_LOGISTICS, ROLE_READONLY,
-            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR, LEGACY_OPERARIO,
             "ver_recompras", "administra_recompras"
     );
 
     private static final String[] REORDER_WRITE = authorities(
             ROLE_OWNER, ROLE_SALES, ROLE_LOGISTICS,
-            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_OPERARIO,
             "administra_recompras"
     );
 
@@ -296,6 +308,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/portal", "/catalogo", "/catalogo/**", "/order/whatsapp", "/robots.txt", "/sitemap.xml").permitAll()
                 .requestMatchers("/blog", "/blog/**").permitAll()
+                .requestMatchers("/academy", "/academy/**").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/img/**", "/uploads/**", "/webjars/**").permitAll()
                 .requestMatchers("/login", "/error").permitAll()
                 .requestMatchers(HttpMethod.GET, "/logout").permitAll()
@@ -353,6 +366,9 @@ public class SecurityConfig {
 
                 .requestMatchers(HttpMethod.POST, "/production/**").hasAnyAuthority(PRODUCTION_WRITE)
                 .requestMatchers("/production/**").hasAnyAuthority(PRODUCTION_VIEW)
+
+                .requestMatchers(HttpMethod.POST, "/admin/academy/**").hasAnyAuthority(ACADEMY_WRITE)
+                .requestMatchers("/admin/academy/**").hasAnyAuthority(ACADEMY_VIEW)
 
                 .requestMatchers(HttpMethod.POST, "/admin/promotions/**", "/marketing/admin/**", "/admin/blog/**").hasAnyAuthority(MARKETING_WRITE)
                 .requestMatchers("/admin/promotions/**", "/marketing/admin/**", "/admin/blog/**").hasAnyAuthority(MARKETING_VIEW)

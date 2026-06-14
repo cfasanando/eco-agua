@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_public :: publicHead(${course.title} + ' - ' + ${platformName})}"></head>
+<body class="public-catalog-body" th:style="'--eco-primary:' + ${publicPrimaryColor} + '; --eco-secondary:' + ${publicSecondaryColor} + ';'">
+
+<div class="top-bar text-white py-1">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center small">
+        <span><i class="bi bi-geo-alt-fill me-1"></i><span th:text="${topbarLocation}">Iquitos y alrededores</span></span>
+        <span class="d-flex align-items-center">
+            <i class="bi bi-whatsapp me-1"></i>
+            <a class="text-white text-decoration-none fw-semibold" th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank">
+                <span th:text="${topbarWhatsappLabel}">WhatsApp</span>
+            </a>
+        </span>
+    </div>
+</div>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+    <div class="container">
+        <a class="navbar-brand fw-bold d-flex align-items-center" th:href="@{/portal}">
+            <img th:src="@{${platformLogo}}" th:alt="${platformName}" height="36" class="me-2">
+            <span>
+                <span class="d-block brand-title" th:text="${platformName}">Eco del Amazonas</span>
+                <span class="d-block brand-subtitle" th:text="${platformTagline}">Agua de mesa</span>
+            </span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarPublic" aria-controls="navbarPublic" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarPublic">
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
+                <li class="nav-item"><a class="nav-link" th:href="@{/portal}" th:text="${publicNavHomeLabel}">Inicio</a></li>
+                <li class="nav-item" th:if="${featurePublicCatalog}"><a class="nav-link" th:href="@{/catalogo}" th:text="${publicNavCatalogLabel}">Catálogo</a></li>
+                <li class="nav-item" th:if="${featureBlog}"><a class="nav-link" th:href="@{/blog}" th:text="${publicNavBlogLabel}">Blog</a></li>
+                <li class="nav-item" th:if="${featureAcademy}"><a class="nav-link active" th:href="@{/academy}" th:text="${publicNavAcademyLabel}">Academia</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<main class="bg-light py-4">
+    <div class="container">
+        <nav class="small mb-3">
+            <a th:href="@{/academy}" class="text-decoration-none">Academia</a>
+            <span class="text-muted">/</span>
+            <span class="text-muted" th:text="${course.title}">Curso</span>
+        </nav>
+
+        <section class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+            <div class="row g-0">
+                <div class="col-lg-6">
+                    <img th:if="${course.coverImageUrl != null and !#strings.isEmpty(course.coverImageUrl)}" th:src="${course.coverImageUrl}" th:alt="${course.title}" class="img-fluid w-100 h-100" style="min-height:320px;object-fit:cover;">
+                    <div th:unless="${course.coverImageUrl != null and !#strings.isEmpty(course.coverImageUrl)}" class="d-flex align-items-center justify-content-center bg-primary-subtle text-primary h-100" style="min-height:320px;">
+                        <i class="bi bi-mortarboard" style="font-size:4rem;"></i>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="p-4 p-lg-5 h-100 d-flex flex-column">
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <span class="badge bg-primary-subtle text-primary" th:text="${course.category}">Categoría</span>
+                            <span class="badge bg-secondary-subtle text-secondary" th:text="${course.levelLabel}">Nivel</span>
+                            <span class="badge bg-warning-subtle text-warning-emphasis" th:if="${course.featured}">Destacado</span>
+                        </div>
+                        <h1 class="display-6 fw-bold mb-3" th:text="${course.title}">Título del curso</h1>
+                        <p class="lead text-muted" th:text="${course.shortDescription}">Descripción corta del curso.</p>
+
+                        <div class="row g-3 my-3 small">
+                            <div class="col-sm-6">
+                                <div class="border rounded-3 p-3 bg-light h-100">
+                                    <i class="bi bi-person-check text-primary"></i>
+                                    <span class="d-block text-muted">Instructor</span>
+                                    <strong th:text="${course.instructor}">Instructor</strong>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="border rounded-3 p-3 bg-light h-100">
+                                    <i class="bi bi-clock text-primary"></i>
+                                    <span class="d-block text-muted">Duración</span>
+                                    <strong th:text="${course.durationLabel}">Duración</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-auto d-flex flex-wrap align-items-center gap-3">
+                            <div>
+                                <span class="small text-muted d-block">Inversión</span>
+                                <strong class="fs-4" th:if="${course.hasPrice()}">S/ <span th:text="${#numbers.formatDecimal(course.price, 1, 'COMMA', 2, 'POINT')}">0.00</span></strong>
+                                <strong class="fs-4 text-success" th:unless="${course.hasPrice()}">Gratis / consultar</strong>
+                            </div>
+                            <a class="btn btn-success btn-lg ms-sm-auto" th:href="'https://wa.me/' + ${whatsappNumber} + '?text=' + ${encodedCourseWhatsappMessage}" target="_blank">
+                                <i class="bi bi-whatsapp"></i> <span th:text="${academyWhatsappCta}">Solicitar información</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <article class="card border-0 shadow-sm rounded-4">
+                    <div class="card-body p-4">
+                        <h2 class="h5 mb-3">Sobre este curso</h2>
+                        <p th:if="${course.longDescription != null and !#strings.isEmpty(course.longDescription)}" style="white-space: pre-line;" th:text="${course.longDescription}">
+                            Descripción completa.
+                        </p>
+                        <p th:unless="${course.longDescription != null and !#strings.isEmpty(course.longDescription)}" class="text-muted">
+                            Pronto se agregará el temario completo de este curso.
+                        </p>
+
+                        <div th:if="${course.promoVideoUrl != null and !#strings.isEmpty(course.promoVideoUrl)}" class="alert alert-primary mt-4 mb-0">
+                            <i class="bi bi-play-circle"></i>
+                            Video promocional:
+                            <a th:href="${course.promoVideoUrl}" target="_blank" rel="noopener" th:text="${course.promoVideoUrl}">Ver video</a>
+                        </div>
+                    </div>
+                </article>
+            </div>
+            <div class="col-lg-4">
+                <aside class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <h2 class="h6">¿Cómo inscribirte?</h2>
+                        <ol class="small text-muted ps-3 mb-3">
+                            <li>Revisa la información del curso.</li>
+                            <li>Escríbenos por WhatsApp.</li>
+                            <li>Confirmamos disponibilidad, horario y forma de pago.</li>
+                        </ol>
+                        <a class="btn btn-success w-100" th:href="'https://wa.me/' + ${whatsappNumber} + '?text=' + ${encodedCourseWhatsappMessage}" target="_blank">
+                            <i class="bi bi-whatsapp"></i> Consultar por WhatsApp
+                        </a>
+                    </div>
+                </aside>
+
+                <aside class="card border-0 shadow-sm rounded-4" th:if="${!#lists.isEmpty(relatedCourses)}">
+                    <div class="card-body p-4">
+                        <h2 class="h6">Cursos relacionados</h2>
+                        <div class="d-flex flex-column gap-3">
+                            <a class="text-decoration-none" th:each="related : ${relatedCourses}" th:href="@{|/academy/course/${related.slug}|}">
+                                <div class="small fw-semibold text-dark" th:text="${related.title}">Curso relacionado</div>
+                                <div class="small text-muted" th:text="${related.shortDescription}">Descripción</div>
+                            </a>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer class="border-top py-3 bg-white">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center small text-muted">
+        <span>© <span th:text="${#temporals.format(#temporals.createNow(), 'yyyy')}">2026</span> <span th:text="${platformName}">Eco del Amazonas</span></span>
+        <a th:href="@{/academy}" class="text-decoration-none">Volver a Academia</a>
+    </div>
+</footer>
+
+<script th:src="@{https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js}"></script>
+</body>
+</html>

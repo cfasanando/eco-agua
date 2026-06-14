@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <th:block th:replace="fragments/head_admin :: adminHead('Academia / Cursos')"></th:block>
+    <style>
+        .academy-admin-hero {
+            border-radius: 20px;
+            background: linear-gradient(135deg, #0f766e, #2563eb);
+            color: #ffffff;
+            padding: 1.25rem;
+            box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18);
+        }
+        .academy-form-card,
+        .academy-list-card {
+            border: 0;
+            border-radius: 18px;
+            box-shadow: 0 2px 12px rgba(15, 23, 42, 0.08);
+        }
+        .academy-course-thumb {
+            width: 72px;
+            height: 52px;
+            border-radius: 12px;
+            object-fit: cover;
+            background: #eef2ff;
+        }
+        .academy-course-placeholder {
+            width: 72px;
+            height: 52px;
+            border-radius: 12px;
+            background: #eef2ff;
+            color: #4f46e5;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .academy-actions .btn {
+            width: 34px;
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-layout" th:with="activePage='academy_courses'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <div class="academy-admin-hero mb-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                    <div>
+                        <div class="small text-white-50 mb-1">Academia digital</div>
+                        <h1 class="h4 mb-1">Cursos y capacitaciones</h1>
+                        <p class="mb-0 text-white-75">
+                            Crea cursos promocionales o pagados para vender conocimientos, talleres y capacitaciones.
+                        </p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a class="btn btn-light btn-sm" th:href="@{/academy}" target="_blank">
+                            <i class="bi bi-box-arrow-up-right"></i> Ver catálogo público
+                        </a>
+                        <a class="btn btn-outline-light btn-sm" th:href="@{/admin/academy/courses}">
+                            <i class="bi bi-plus-lg"></i> Nuevo curso
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${successMessage != null}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle me-1"></i>
+                <span th:text="${successMessage}">Guardado correctamente.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-lg-5">
+                    <div class="card academy-form-card">
+                        <div class="card-header bg-white border-0 pb-0">
+                            <h2 class="h6 mb-1" th:text="${isCourseEdit} ? 'Editar curso' : 'Nuevo curso'">Nuevo curso</h2>
+                            <p class="small text-muted mb-0">
+                                Completa la información base. Las lecciones y alumnos se agregarán en las siguientes fases.
+                            </p>
+                        </div>
+                        <div class="card-body">
+                            <form th:action="@{/admin/academy/courses/save}" method="post" th:object="${courseForm}">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <input type="hidden" th:field="*{id}"/>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Título del curso</label>
+                                    <input type="text" class="form-control" th:field="*{title}" required
+                                           placeholder="Ej: Ventas por WhatsApp para negocios locales">
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Slug público</label>
+                                        <input type="text" class="form-control" th:field="*{slug}"
+                                               placeholder="Se genera automático">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Categoría</label>
+                                        <input type="text" class="form-control" th:field="*{category}" list="academyCategories"
+                                               placeholder="Negocios, Sistemas, Contabilidad">
+                                        <datalist id="academyCategories">
+                                            <option th:each="category : ${courseCategories}" th:value="${category}"></option>
+                                        </datalist>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mt-0">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Instructor</label>
+                                        <input type="text" class="form-control" th:field="*{instructor}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Duración</label>
+                                        <input type="text" class="form-control" th:field="*{durationLabel}" placeholder="4 semanas, 8 horas, etc.">
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mt-0">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Nivel</label>
+                                        <select class="form-select" th:field="*{level}">
+                                            <option th:each="level : ${courseLevels}" th:value="${level}" th:text="${level.label}">General</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Estado</label>
+                                        <select class="form-select" th:field="*{status}">
+                                            <option th:each="status : ${courseStatuses}" th:value="${status}" th:text="${status.label}">Borrador</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mt-0">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Precio referencial</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">S/</span>
+                                            <input type="number" min="0" step="0.01" class="form-control" th:field="*{price}" placeholder="0.00">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 d-flex align-items-end gap-3">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" th:field="*{featured}">
+                                            <label class="form-check-label">Destacado</label>
+                                        </div>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" th:field="*{active}">
+                                            <label class="form-check-label">Activo</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3">
+                                    <label class="form-label">Descripción corta</label>
+                                    <textarea class="form-control" th:field="*{shortDescription}" rows="2" maxlength="500"></textarea>
+                                </div>
+
+                                <div class="mt-3">
+                                    <label class="form-label">Descripción completa</label>
+                                    <textarea class="form-control" th:field="*{longDescription}" rows="5"
+                                              placeholder="Explica para quién es, qué aprenderá y qué incluye."></textarea>
+                                </div>
+
+                                <div class="mt-3">
+                                    <label class="form-label">URL de portada</label>
+                                    <input type="url" class="form-control" th:field="*{coverImageUrl}" placeholder="https://... o /uploads/...">
+                                </div>
+
+                                <div class="mt-3">
+                                    <label class="form-label">URL video promocional</label>
+                                    <input type="url" class="form-control" th:field="*{promoVideoUrl}" placeholder="YouTube, Vimeo, Drive, etc.">
+                                </div>
+
+                                <div class="mt-3">
+                                    <label class="form-label">Mensaje WhatsApp</label>
+                                    <textarea class="form-control" th:field="*{whatsappMessage}" rows="2"></textarea>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center mt-4">
+                                    <a class="btn btn-outline-secondary" th:href="@{/admin/academy/courses}">
+                                        Limpiar
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-save"></i> Guardar curso
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <div class="card academy-list-card">
+                        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h2 class="h6 mb-0">Cursos registrados</h2>
+                                <p class="small text-muted mb-0">Publica solo los cursos listos para mostrarse en el catálogo.</p>
+                            </div>
+                            <span class="badge bg-primary-subtle text-primary">
+                                <span th:text="${#lists.size(courses)}">0</span> cursos
+                            </span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Curso</th>
+                                        <th>Estado</th>
+                                        <th>Precio</th>
+                                        <th class="text-end">Acciones</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="course : ${courses}">
+                                        <td>
+                                            <div class="d-flex align-items-center gap-3">
+                                                <img th:if="${course.coverImageUrl != null and !#strings.isEmpty(course.coverImageUrl)}"
+                                                     th:src="${course.coverImageUrl}" th:alt="${course.title}" class="academy-course-thumb">
+                                                <span th:unless="${course.coverImageUrl != null and !#strings.isEmpty(course.coverImageUrl)}"
+                                                      class="academy-course-placeholder">
+                                                    <i class="bi bi-mortarboard"></i>
+                                                </span>
+                                                <div>
+                                                    <div class="fw-semibold" th:text="${course.title}">Curso demo</div>
+                                                    <div class="small text-muted">
+                                                        <span th:text="${course.category}">Categoría</span>
+                                                        · <span th:text="${course.instructor}">Instructor</span>
+                                                        · <span th:text="${course.durationLabel}">Duración</span>
+                                                    </div>
+                                                    <div class="small text-muted" th:text="${course.slug}">slug</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge"
+                                                  th:classappend="${course.status.name() == 'PUBLISHED'} ? ' bg-success' : (${course.status.name() == 'ARCHIVED'} ? ' bg-secondary' : ' bg-warning text-dark')"
+                                                  th:text="${course.statusLabel}">Borrador</span>
+                                            <span class="badge bg-info-subtle text-info" th:if="${course.featured}">Destacado</span>
+                                        </td>
+                                        <td>
+                                            <span th:if="${course.hasPrice()}">S/ <span th:text="${#numbers.formatDecimal(course.price, 1, 'COMMA', 2, 'POINT')}">0.00</span></span>
+                                            <span th:unless="${course.hasPrice()}" class="text-muted">Gratis / consultar</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="btn-group academy-actions" role="group">
+                                                <a class="btn btn-outline-primary btn-sm" th:href="@{|/admin/academy/courses?id=${course.id}|}" title="Editar">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                                <a class="btn btn-outline-secondary btn-sm" th:href="@{|/academy/course/${course.slug}|}" target="_blank" title="Ver público">
+                                                    <i class="bi bi-box-arrow-up-right"></i>
+                                                </a>
+                                                <form th:if="${course.status.name() != 'PUBLISHED'}" th:action="@{|/admin/academy/courses/${course.id}/publish|}" method="post" class="d-inline">
+                                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                    <button type="submit" class="btn btn-outline-success btn-sm" title="Publicar">
+                                                        <i class="bi bi-check2-circle"></i>
+                                                    </button>
+                                                </form>
+                                                <form th:if="${course.status.name() == 'PUBLISHED'}" th:action="@{|/admin/academy/courses/${course.id}/draft|}" method="post" class="d-inline">
+                                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                    <button type="submit" class="btn btn-outline-warning btn-sm" title="Volver a borrador">
+                                                        <i class="bi bi-eye-slash"></i>
+                                                    </button>
+                                                </form>
+                                                <form th:action="@{|/admin/academy/courses/${course.id}/featured|}" method="post" class="d-inline">
+                                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                    <button type="submit" class="btn btn-outline-info btn-sm" title="Destacar / quitar destacado">
+                                                        <i class="bi" th:classappend="${course.featured} ? ' bi-star-fill' : ' bi-star'"></i>
+                                                    </button>
+                                                </form>
+                                                <form th:action="@{|/admin/academy/courses/${course.id}/archive|}" method="post" class="d-inline delete-form-single">
+                                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Archivar">
+                                                        <i class="bi bi-archive"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr th:if="${#lists.isEmpty(courses)}">
+                                        <td colspan="4" class="text-center text-muted py-5">
+                                            <i class="bi bi-mortarboard fs-2 d-block mb-2"></i>
+                                            Aún no hay cursos registrados.
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.ecoAdmin && window.ecoAdmin.registerSingleDelete) {
+            window.ecoAdmin.registerSingleDelete('.delete-form-single', '¿Archivar este curso?');
+        }
+    });
+</script>
+</body>
+</html>

@@ -96,8 +96,8 @@ public class DeliveryImportService {
     }
 
     @Transactional
-    public DeliveryImportStop updateStopStatus(Long stopId, DeliveryImportStopStatus status, String observation) {
-        DeliveryImportStop stop = stopRepository.findById(stopId).orElseThrow(() -> new IllegalArgumentException("Parada no encontrada: " + stopId));
+    public DeliveryImportStop updateStopStatus(Long batchId, Long stopId, DeliveryImportStopStatus status, String observation) {
+        DeliveryImportStop stop = findStopForWrite(batchId, stopId);
         if (status == null) {
             throw new IllegalArgumentException("Debe seleccionar un estado.");
         }
@@ -109,8 +109,8 @@ public class DeliveryImportService {
     }
 
     @Transactional
-    public DeliveryImportStop linkOrCreateClient(Long stopId, boolean createIfMissing, boolean updateExisting) {
-        DeliveryImportStop stop = findStopForWrite(stopId);
+    public DeliveryImportStop linkOrCreateClient(Long batchId, Long stopId, boolean createIfMissing, boolean updateExisting) {
+        DeliveryImportStop stop = findStopForWrite(batchId, stopId);
         Client client = resolveOrCreateClient(stop, createIfMissing, updateExisting);
         if (client == null) {
             throw new IllegalArgumentException("No se encontró cliente existente. Active la opción de crear cliente nuevo.");
@@ -138,8 +138,8 @@ public class DeliveryImportService {
     }
 
     @Transactional
-    public DeliveryImportStop createOrderFromStop(Long stopId, OrderStatus requestedStatus) {
-        DeliveryImportStop stop = findStopForWrite(stopId);
+    public DeliveryImportStop createOrderFromStop(Long batchId, Long stopId, OrderStatus requestedStatus) {
+        DeliveryImportStop stop = findStopForWrite(batchId, stopId);
         if (stop.getSaleOrder() != null) {
             return stop;
         }
@@ -184,17 +184,17 @@ public class DeliveryImportService {
             if (stop.getSaleOrder() != null) {
                 continue;
             }
-            createOrderFromStop(stop.getId(), requestedStatus);
+            createOrderFromStop(batchId, stop.getId(), requestedStatus);
             created++;
         }
         return created;
     }
 
     @Transactional
-    public DeliveryImportStop registerPaymentForStop(Long stopId, BigDecimal amount, String paymentMethod, String paymentReference) {
-        DeliveryImportStop stop = findStopForWrite(stopId);
+    public DeliveryImportStop registerPaymentForStop(Long batchId, Long stopId, BigDecimal amount, String paymentMethod, String paymentReference) {
+        DeliveryImportStop stop = findStopForWrite(batchId, stopId);
         if (stop.getSaleOrder() == null) {
-            stop = createOrderFromStop(stopId, OrderStatus.CREDIT);
+            stop = createOrderFromStop(batchId, stopId, OrderStatus.CREDIT);
         }
 
         SaleOrder order = saleOrderRepository.findById(stop.getSaleOrder().getId())
@@ -301,9 +301,14 @@ public class DeliveryImportService {
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
-    private DeliveryImportStop findStopForWrite(Long stopId) {
-        return stopRepository.findById(stopId)
+    private DeliveryImportStop findStopForWrite(Long batchId, Long stopId) {
+        DeliveryImportStop stop = stopRepository.findById(stopId)
                 .orElseThrow(() -> new IllegalArgumentException("Parada no encontrada: " + stopId));
+        if (batchId == null || stop.getBatch() == null || stop.getBatch().getId() == null
+                || !stop.getBatch().getId().equals(batchId)) {
+            throw new IllegalArgumentException("La parada no pertenece a la ruta importada seleccionada.");
+        }
+        return stop;
     }
 
     private Client resolveOrCreateClient(DeliveryImportStop stop, boolean createIfMissing, boolean updateExisting) {

@@ -67,6 +67,21 @@ public class PlatformBusinessClient {
     @Column(name = "demo_data_enabled")
     private boolean demoDataEnabled;
 
+    @Column(name = "runtime_profile", length = 120)
+    private String runtimeProfile;
+
+    @Column(name = "runtime_port")
+    private Integer runtimePort;
+
+    @Column(name = "public_url", length = 500)
+    private String publicUrl;
+
+    @Column(name = "runtime_status", length = 50)
+    private String runtimeStatus = "PENDING";
+
+    @Column(name = "last_runtime_generated_at")
+    private LocalDateTime lastRuntimeGeneratedAt;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 
@@ -226,6 +241,47 @@ public class PlatformBusinessClient {
 
     public void setPublicSlug(String publicSlug) {
         this.publicSlug = publicSlug;
+    }
+
+
+    public String getRuntimeProfile() {
+        return runtimeProfile;
+    }
+
+    public void setRuntimeProfile(String runtimeProfile) {
+        this.runtimeProfile = runtimeProfile;
+    }
+
+    public Integer getRuntimePort() {
+        return runtimePort;
+    }
+
+    public void setRuntimePort(Integer runtimePort) {
+        this.runtimePort = runtimePort;
+    }
+
+    public String getPublicUrl() {
+        return publicUrl;
+    }
+
+    public void setPublicUrl(String publicUrl) {
+        this.publicUrl = publicUrl;
+    }
+
+    public String getRuntimeStatus() {
+        return runtimeStatus;
+    }
+
+    public void setRuntimeStatus(String runtimeStatus) {
+        this.runtimeStatus = runtimeStatus;
+    }
+
+    public LocalDateTime getLastRuntimeGeneratedAt() {
+        return lastRuntimeGeneratedAt;
+    }
+
+    public void setLastRuntimeGeneratedAt(LocalDateTime lastRuntimeGeneratedAt) {
+        this.lastRuntimeGeneratedAt = lastRuntimeGeneratedAt;
     }
 
     public boolean isDemoDataEnabled() {

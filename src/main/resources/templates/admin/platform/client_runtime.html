@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Perfil de ejecución')"></head>
+
+<body class="bg-light">
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex justify-content-between align-items-center mb-3 gap-3 flex-wrap">
+                <div>
+                    <h1 class="h4 mb-1">Perfil de ejecución del negocio</h1>
+                    <p class="text-muted small mb-0">
+                        <span th:text="${client.businessName}">Negocio</span>
+                        <span> · base </span>
+                        <code th:text="${client.databaseName}">base</code>
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap justify-content-end">
+                    <a th:href="@{|/admin/platform/clients/${client.id}/provisioning|}" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-database-gear"></i>
+                        Aprovisionamiento
+                    </a>
+                    <a th:href="@{|/admin/platform/clients/${client.id}|}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i>
+                        Volver al negocio
+                    </a>
+                    <a th:href="@{/admin/platform/clients}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-list-ul"></i>
+                        Negocios
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <span th:text="${successMessage}">Guardado.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+            <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                <span th:text="${errorMessage}">Error.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="alert shadow-sm" th:classappend="${runtime.statusAlertClass()}">
+                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                    <div>
+                        <div class="fw-semibold">
+                            <i class="bi bi-hdd-network me-1"></i>
+                            <span th:text="${runtime.statusTitle()}">Estado</span>
+                            <span class="badge text-bg-secondary ms-2" th:text="${client.runtimeStatus ?: 'PENDING'}">PENDING</span>
+                        </div>
+                        <div class="small mt-1" th:text="${runtime.statusDescription()}">Descripción</div>
+                    </div>
+                    <a th:href="${runtime.publicUrl()}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success" th:if="${runtime.runtimeConfigured()}">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                        Abrir negocio
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white fw-semibold">Configuración de ejecución</div>
+                        <div class="card-body">
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/runtime|}">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold" for="runtimeProfile">Perfil Spring</label>
+                                    <input id="runtimeProfile" name="runtimeProfile" class="form-control" th:value="${runtime.runtimeProfile()}"/>
+                                    <div class="form-text">Se usará como application-{perfil}.properties.</div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold" for="runtimePort">Puerto local</label>
+                                    <input id="runtimePort" name="runtimePort" type="number" min="1024" max="65535" class="form-control" th:value="${runtime.runtimePort()}"/>
+                                    <div class="form-text">Ejemplo: 8082, 8083, 8084.</div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold" for="publicUrl">URL pública/local</label>
+                                    <input id="publicUrl" name="publicUrl" class="form-control" th:value="${runtime.publicUrl()}"/>
+                                    <div class="form-text">Se usa para el botón Abrir negocio.</div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="bi bi-save me-1"></i>
+                                    Guardar perfil de ejecución
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white fw-semibold">Archivos generados</div>
+                        <div class="card-body d-grid gap-2">
+                            <a class="btn btn-outline-primary" th:href="@{|/admin/platform/clients/${client.id}/runtime/application.properties|}">
+                                <i class="bi bi-download me-1"></i>
+                                Descargar <span th:text="${runtime.applicationFileName()}">application.properties</span>
+                            </a>
+                            <a class="btn btn-outline-primary" th:href="@{|/admin/platform/clients/${client.id}/runtime/run-script.sh|}">
+                                <i class="bi bi-download me-1"></i>
+                                Descargar <span th:text="${runtime.runScriptFileName()}">run.sh</span>
+                            </a>
+                            <button type="button" class="btn btn-outline-secondary" data-copy-target="runtimeCommandsText">
+                                <i class="bi bi-clipboard-check me-1"></i>
+                                Copiar comandos
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" data-copy-target="applicationPropertiesText">
+                                <i class="bi bi-clipboard me-1"></i>
+                                Copiar properties
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" data-copy-target="runScriptText">
+                                <i class="bi bi-clipboard me-1"></i>
+                                Copiar script
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white fw-semibold">Resumen</div>
+                        <div class="card-body small">
+                            <dl class="row mb-0">
+                                <dt class="col-5">Negocio</dt><dd class="col-7" th:text="${client.businessName}">Negocio</dd>
+                                <dt class="col-5">Código</dt><dd class="col-7"><code th:text="${client.code}">codigo</code></dd>
+                                <dt class="col-5">Base</dt><dd class="col-7"><code th:text="${client.databaseName}">db</code></dd>
+                                <dt class="col-5">Estado BD</dt><dd class="col-7"><span class="badge text-bg-secondary" th:text="${client.databaseStatus}">READY</span></dd>
+                                <dt class="col-5">Estado</dt><dd class="col-7"><span class="badge text-bg-primary" th:text="${client.status}">ACTIVE</span></dd>
+                                <dt class="col-5">Perfil</dt><dd class="col-7"><code th:text="${runtime.runtimeProfile()}">profile</code></dd>
+                                <dt class="col-5">Puerto</dt><dd class="col-7" th:text="${runtime.runtimePort()}">8083</dd>
+                                <dt class="col-5">URL</dt><dd class="col-7"><a th:href="${runtime.publicUrl()}" target="_blank" rel="noopener" th:text="${runtime.publicUrl()}">url</a></dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <span>Comandos de ejecución</span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-copy-target="runtimeCommandsText">
+                                <i class="bi bi-clipboard me-1"></i>
+                                Copiar
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <p class="small text-muted">Ejecuta estos comandos luego de descargar los archivos generados.</p>
+                            <textarea id="runtimeCommandsText" class="visually-hidden" th:text="${runtime.runCommandsText()}">commands</textarea>
+                            <div class="bg-dark text-white rounded p-3 small overflow-auto">
+                                <div th:each="command : ${runtime.runCommands()}">
+                                    <code class="text-white" th:text="${command}">comando</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <span>application profile</span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-copy-target="applicationPropertiesText">
+                                <i class="bi bi-clipboard me-1"></i>
+                                Copiar
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <textarea id="applicationPropertiesText" class="form-control font-monospace small" rows="18" readonly th:text="${runtime.applicationProperties()}">properties</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                    <span>Script de ejecución</span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-copy-target="runScriptText">
+                        <i class="bi bi-clipboard me-1"></i>
+                        Copiar
+                    </button>
+                </div>
+                <div class="card-body">
+                    <textarea id="runScriptText" class="form-control font-monospace small" rows="8" readonly th:text="${runtime.runScript()}">script</textarea>
+                </div>
+            </div>
+        </main>
+
+        <div th:replace="fragments/scripts_admin :: adminScripts"></div>
+        <script>
+            document.addEventListener('click', async function (event) {
+                const button = event.target.closest('[data-copy-target]');
+                if (!button) {
+                    return;
+                }
+                const target = document.getElementById(button.getAttribute('data-copy-target'));
+                if (!target) {
+                    return;
+                }
+                try {
+                    await navigator.clipboard.writeText(target.value || target.textContent || '');
+                    const original = button.innerHTML;
+                    button.innerHTML = '<i class="bi bi-check2 me-1"></i> Copiado';
+                    setTimeout(() => { button.innerHTML = original; }, 1400);
+                } catch (e) {
+                    target.select?.();
+                    document.execCommand('copy');
+                }
+            });
+        </script>
+    </div>
+</div>
+</body>
+</html>

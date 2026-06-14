@@ -19,6 +19,10 @@
                     </p>
                 </div>
                 <div class="d-flex gap-2 flex-wrap justify-content-end">
+                    <a th:href="@{|/admin/platform/clients/${client.id}/runtime|}" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-hdd-network"></i>
+                        Perfil ejecución
+                    </a>
                     <a th:href="@{|/admin/platform/clients/${client.id}|}" class="btn btn-sm btn-outline-secondary">
                         <i class="bi bi-arrow-left"></i>
                         Volver al negocio
@@ -39,7 +43,32 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
             </div>
 
-            <div class="alert alert-warning border-0 shadow-sm small">
+            <div class="alert border-0 shadow-sm small" th:classappend="${plan.statusAlertClass()}">
+                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                    <div>
+                        <div class="fw-semibold">
+                            <i class="bi bi-check-circle-fill me-1" th:if="${plan.ready()}"></i>
+                            <i class="bi bi-info-circle-fill me-1" th:unless="${plan.ready()}"></i>
+                            <span th:text="${plan.statusTitle()}">Estado</span>
+                            <span class="badge ms-2" th:classappend="${plan.statusBadgeClass()}" th:text="${client.databaseStatus}">BD</span>
+                        </div>
+                        <div th:text="${plan.statusDescription()}">Descripción del estado.</div>
+                        <div class="mt-1" th:text="${plan.warningMessage()}">Mensaje de seguridad.</div>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a class="btn btn-sm btn-outline-success" th:if="${plan.active()}" th:href="${plan.openBusinessUrl()}" target="_blank" rel="noopener">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>
+                            Abrir negocio
+                        </a>
+                        <button class="btn btn-sm btn-outline-secondary" type="button" th:unless="${plan.active()}" disabled>
+                            <i class="bi bi-box-arrow-up-right me-1"></i>
+                            Abrir negocio
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-warning border-0 shadow-sm small" th:unless="${plan.ready()}">
                 <strong>Modo seguro:</strong>
                 esta fase puede crear la base de datos vacía si el usuario MySQL tiene permisos.
                 La copia de estructura y la carga inicial se hacen con comandos/SQL manuales para no afectar la base actual.
@@ -64,7 +93,10 @@
 
                 <div class="col-12 col-xl-8">
                     <div class="card shadow-sm h-100">
-                        <div class="card-header bg-white fw-semibold">Plan de instalación</div>
+                        <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <span>Plan de instalación</span>
+                            <span class="badge" th:classappend="${plan.statusBadgeClass()}" th:text="${plan.ready() ? 'Instalación lista' : 'Instalación en proceso'}">Estado</span>
+                        </div>
                         <div class="card-body">
                             <div class="row g-2">
                                 <div class="col-12 col-md" th:each="step : ${plan.steps()}">
@@ -81,8 +113,11 @@
                                 </div>
                             </div>
 
-                            <div class="alert alert-info small mt-3 mb-0" th:text="${plan.warningMessage()}">
-                                Mensaje de seguridad.
+                            <div class="alert alert-info small mt-3 mb-0" th:unless="${plan.ready()}">
+                                Completa los pasos de izquierda a derecha. Cuando el negocio esté listo, las acciones principales quedarán desactivadas para evitar repetir el proceso por error.
+                            </div>
+                            <div class="alert alert-success small mt-3 mb-0" th:if="${plan.ready()}">
+                                <strong>Listo para demo:</strong> el negocio quedó marcado como activo. Puedes abrirlo o reiniciar el estado solo si necesitas volver a probar el flujo.
                             </div>
                         </div>
                     </div>
@@ -100,8 +135,11 @@
                                     <i class="bi bi-database-add me-1"></i>
                                     Crear base de datos vacía
                                 </button>
-                                <div class="form-text">
+                                <div class="form-text" th:if="${plan.canCreateDatabase()}">
                                     Ejecuta CREATE DATABASE IF NOT EXISTS. No borra ni modifica la base actual.
+                                </div>
+                                <div class="form-text text-success" th:unless="${plan.canCreateDatabase()}">
+                                    Base ya creada o validada. No necesitas repetir este paso.
                                 </div>
                             </form>
 
@@ -111,8 +149,11 @@
                                     <i class="bi bi-check2-square me-1"></i>
                                     Marcar estructura copiada
                                 </button>
-                                <div class="form-text">
+                                <div class="form-text" th:if="${plan.canMarkStructureReady()}">
                                     Úsalo después de ejecutar el comando mysql con estructura-base.sql.
+                                </div>
+                                <div class="form-text text-muted" th:unless="${plan.canMarkStructureReady()}">
+                                    Disponible solo después de crear la base vacía y antes de marcar estructura lista.
                                 </div>
                             </form>
 
@@ -122,10 +163,28 @@
                                     <i class="bi bi-rocket-takeoff me-1"></i>
                                     Marcar negocio activo
                                 </button>
-                                <div class="form-text">
+                                <div class="form-text" th:if="${plan.canMarkActive()}">
                                     Úsalo cuando la estructura y configuración inicial ya estén aplicadas.
                                 </div>
+                                <div class="form-text text-success" th:if="${plan.ready()}">
+                                    Negocio activo y listo. Esta acción ya no aplica.
+                                </div>
                             </form>
+
+                            <div class="d-grid gap-2 mb-3">
+                                <button type="button" class="btn btn-outline-secondary" data-copy-target="manualCommandsText">
+                                    <i class="bi bi-clipboard-check me-1"></i>
+                                    Copiar comandos
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#bootstrapSqlBox" aria-expanded="false" aria-controls="bootstrapSqlBox">
+                                    <i class="bi bi-filetype-sql me-1"></i>
+                                    Ver SQL bootstrap
+                                </button>
+                                <a class="btn btn-outline-secondary" th:href="@{|/admin/platform/clients/${client.id}/provisioning/bootstrap.sql|}">
+                                    <i class="bi bi-download me-1"></i>
+                                    Descargar SQL bootstrap
+                                </a>
+                            </div>
 
                             <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/reset|}" onsubmit="return confirm('Esto solo reinicia el estado en plataforma. No elimina base de datos. ¿Continuar?');">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -140,11 +199,18 @@
 
                 <div class="col-12 col-xl-7">
                     <div class="card shadow-sm h-100">
-                        <div class="card-header bg-white fw-semibold">Comandos manuales recomendados</div>
+                        <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <span>Comandos manuales recomendados</span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-copy-target="manualCommandsText">
+                                <i class="bi bi-clipboard me-1"></i>
+                                Copiar
+                            </button>
+                        </div>
                         <div class="card-body">
                             <p class="small text-muted">
                                 Ejecuta estos comandos desde Git Bash o terminal cuando quieras copiar la estructura actual hacia la nueva base.
                             </p>
+                            <textarea id="manualCommandsText" class="visually-hidden" th:text="${plan.manualCommandsText()}">comandos</textarea>
                             <div class="bg-dark text-white rounded p-3 small overflow-auto">
                                 <div th:each="command : ${plan.manualCommands()}">
                                     <code class="text-white" th:text="${command}">comando</code>
@@ -161,20 +227,46 @@
             <div class="row g-3 mb-4">
                 <div class="col-12 col-xl-5">
                     <div class="card shadow-sm h-100">
-                        <div class="card-header bg-white fw-semibold">SQL para crear base</div>
+                        <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <span>SQL para crear base</span>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-copy-target="createDatabaseSqlText">
+                                    <i class="bi bi-clipboard me-1"></i>
+                                    Copiar
+                                </button>
+                                <a class="btn btn-sm btn-outline-secondary" th:href="@{|/admin/platform/clients/${client.id}/provisioning/create-database.sql|}">
+                                    <i class="bi bi-download me-1"></i>
+                                    Descargar
+                                </a>
+                            </div>
+                        </div>
                         <div class="card-body">
-                            <textarea class="form-control font-monospace small" rows="6" readonly th:text="${plan.createDatabaseSql()}">SQL</textarea>
+                            <textarea id="createDatabaseSqlText" class="form-control font-monospace small" rows="6" readonly th:text="${plan.createDatabaseSql()}">SQL</textarea>
                         </div>
                     </div>
                 </div>
 
                 <div class="col-12 col-xl-7">
                     <div class="card shadow-sm h-100">
-                        <div class="card-header bg-white fw-semibold">SQL de configuración inicial</div>
+                        <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <span>SQL de configuración inicial</span>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-copy-target="bootstrapSqlText">
+                                    <i class="bi bi-clipboard me-1"></i>
+                                    Copiar
+                                </button>
+                                <a class="btn btn-sm btn-outline-secondary" th:href="@{|/admin/platform/clients/${client.id}/provisioning/bootstrap.sql|}">
+                                    <i class="bi bi-download me-1"></i>
+                                    Descargar
+                                </a>
+                            </div>
+                        </div>
                         <div class="card-body">
-                            <textarea class="form-control font-monospace small" rows="18" readonly th:text="${plan.bootstrapSql()}">SQL</textarea>
+                            <div class="collapse show" id="bootstrapSqlBox">
+                                <textarea id="bootstrapSqlText" class="form-control font-monospace small" rows="18" readonly th:text="${plan.bootstrapSql()}">SQL</textarea>
+                            </div>
                             <div class="small text-muted mt-2">
-                                Guarda este contenido como <code th:text="${'bootstrap-' + client.databaseName + '.sql'}">bootstrap.sql</code>
+                                Guarda este contenido como <code th:text="${plan.bootstrapFileName()}">bootstrap.sql</code>
                                 y ejecútalo sobre la nueva base después de copiar la estructura.
                             </div>
                         </div>
@@ -193,7 +285,10 @@
             </div>
 
             <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white fw-semibold">Historial de aprovisionamiento</div>
+                <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                    <span>Historial de aprovisionamiento</span>
+                    <span class="small text-muted" th:text="${#lists.size(logs) + ' registros'}">0 registros</span>
+                </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-0">
@@ -227,6 +322,39 @@
         </main>
 
         <div th:replace="fragments/scripts_admin :: adminScripts"></div>
+        <script>
+            document.addEventListener('click', function (event) {
+                const button = event.target.closest('[data-copy-target]');
+                if (!button) {
+                    return;
+                }
+
+                const target = document.getElementById(button.dataset.copyTarget);
+                if (!target) {
+                    return;
+                }
+
+                const value = target.value || target.textContent || '';
+                if (!value.trim()) {
+                    return;
+                }
+
+                navigator.clipboard.writeText(value).then(function () {
+                    const original = button.innerHTML;
+                    button.innerHTML = '<i class="bi bi-check2 me-1"></i>Copiado';
+                    button.disabled = true;
+                    setTimeout(function () {
+                        button.innerHTML = original;
+                        button.disabled = false;
+                    }, 1500);
+                }).catch(function () {
+                    target.focus();
+                    if (typeof target.select === 'function') {
+                        target.select();
+                    }
+                });
+            });
+        </script>
     </div>
 </div>
 </body>

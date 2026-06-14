@@ -12,6 +12,18 @@ public record PlatformProvisioningPlan(
         boolean canCreateDatabase,
         boolean canMarkStructureReady,
         boolean canMarkActive,
-        String warningMessage
+        String warningMessage,
+        boolean databaseCreated,
+        boolean structureReady,
+        boolean active,
+        boolean ready,
+        String statusTitle,
+        String statusDescription,
+        String statusBadgeClass,
+        String statusAlertClass,
+        String bootstrapFileName,
+        String createDatabaseFileName,
+        String manualCommandsText,
+        String openBusinessUrl
 ) {
 }

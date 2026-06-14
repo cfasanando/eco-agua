@@ -46,6 +46,11 @@ public class PlatformProvisioningService {
         boolean databaseCreated = DATABASE_CREATED_STATUSES.contains(databaseStatus);
         boolean structureReady = "STRUCTURE_READY".equals(databaseStatus) || "READY".equals(databaseStatus) || "CREATED".equals(databaseStatus);
         boolean active = "ACTIVE".equalsIgnoreCase(safe(client.getStatus())) || "READY".equals(databaseStatus) || "CREATED".equals(databaseStatus);
+        boolean ready = active && structureReady;
+        String databaseName = normalizedDatabaseName(client.getDatabaseName());
+        String bootstrapFileName = "bootstrap-" + databaseName + ".sql";
+        String createDatabaseFileName = "create-database-" + databaseName + ".sql";
+        List<String> commands = manualCommands(client);
 
         List<PlatformProvisioningStep> steps = new ArrayList<>();
         steps.add(step(1, "Configuración del negocio", !activeModuleKeys.isEmpty(),
@@ -65,11 +70,23 @@ public class PlatformProvisioningService {
                 activeModuleKeys,
                 createDatabaseSql(client),
                 bootstrapSql(client, activeModuleKeys),
-                manualCommands(client),
+                commands,
                 !databaseCreated,
                 databaseCreated && !structureReady,
                 structureReady && !active,
-                warningFor(client)
+                warningFor(client, ready),
+                databaseCreated,
+                structureReady,
+                active,
+                ready,
+                statusTitle(databaseCreated, structureReady, active, ready),
+                statusDescription(databaseCreated, structureReady, active, ready),
+                ready ? "text-bg-success" : databaseCreated ? "text-bg-warning" : "text-bg-secondary",
+                ready ? "alert-success" : databaseCreated ? "alert-warning" : "alert-info",
+                bootstrapFileName,
+                createDatabaseFileName,
+                String.join(System.lineSeparator(), commands),
+                openBusinessUrl(client)
         );
     }
 
@@ -229,7 +246,10 @@ public class PlatformProvisioningService {
         logRepository.save(log);
     }
 
-    private String warningFor(PlatformBusinessClient client) {
+    private String warningFor(PlatformBusinessClient client, boolean ready) {
+        if (ready) {
+            return "Este negocio ya está listo. No es necesario repetir los pasos de aprovisionamiento, salvo que quieras reiniciar el flujo de pruebas.";
+        }
         if (client.getDatabaseName() == null || client.getDatabaseName().isBlank()) {
             return "Este negocio no tiene nombre de base de datos configurado.";
         }
@@ -237,6 +257,47 @@ public class PlatformProvisioningService {
             return "Este negocio no tiene módulos activos. Revisa la configuración antes de aprovisionar.";
         }
         return "El aprovisionamiento crea una base vacía. La estructura completa se copia con el comando manual sugerido para evitar romper el sistema actual.";
+    }
+
+    private String statusTitle(boolean databaseCreated, boolean structureReady, boolean active, boolean ready) {
+        if (ready) {
+            return "Negocio listo";
+        }
+        if (structureReady && !active) {
+            return "Falta activar el negocio";
+        }
+        if (databaseCreated) {
+            return "Base creada, falta copiar estructura";
+        }
+        return "Pendiente de aprovisionamiento";
+    }
+
+    private String statusDescription(boolean databaseCreated, boolean structureReady, boolean active, boolean ready) {
+        if (ready) {
+            return "La base, estructura y configuración inicial fueron marcadas como listas para demo o pruebas internas.";
+        }
+        if (structureReady && !active) {
+            return "La estructura ya fue marcada como copiada. Aplica el SQL bootstrap y luego activa el negocio.";
+        }
+        if (databaseCreated) {
+            return "La base vacía ya existe. Copia la estructura del sistema base y marca el paso como completado.";
+        }
+        return "Revisa los datos del negocio, crea la base vacía y continúa con los comandos manuales.";
+    }
+
+    private String openBusinessUrl(PlatformBusinessClient client) {
+        String publicUrl = valueOrEmpty(client.getPublicUrl()).trim();
+        if (!publicUrl.isBlank()) {
+            return publicUrl;
+        }
+        if (client.getRuntimePort() != null && client.getRuntimePort() > 0) {
+            return "http://localhost:" + client.getRuntimePort();
+        }
+        String slug = valueOrEmpty(client.getPublicSlug());
+        if (!slug.isBlank()) {
+            return "/?client=" + slug;
+        }
+        return "/";
     }
 
     private String normalizedDatabaseName(String value) {

@@ -1,5 +1,9 @@
 package com.ecoamazonas.eco_agua.platform;
 
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,11 +23,14 @@ public class PlatformAdminController {
 
     private final PlatformManagementService platformManagementService;
     private final PlatformProvisioningService platformProvisioningService;
+    private final PlatformRuntimeService platformRuntimeService;
 
     public PlatformAdminController(PlatformManagementService platformManagementService,
-                                   PlatformProvisioningService platformProvisioningService) {
+                                   PlatformProvisioningService platformProvisioningService,
+                                   PlatformRuntimeService platformRuntimeService) {
         this.platformManagementService = platformManagementService;
         this.platformProvisioningService = platformProvisioningService;
+        this.platformRuntimeService = platformRuntimeService;
     }
 
     @GetMapping({"", "/clients"})
@@ -123,6 +130,56 @@ public class PlatformAdminController {
         return "redirect:/admin/platform/clients/" + id + "/provisioning";
     }
 
+
+    @GetMapping("/clients/{id}/provisioning/create-database.sql")
+    public ResponseEntity<String> downloadCreateDatabaseSql(@PathVariable Long id) {
+        PlatformProvisioningPlan plan = platformProvisioningService.buildPlan(id);
+        return downloadableSql(plan.createDatabaseFileName(), plan.createDatabaseSql());
+    }
+
+    @GetMapping("/clients/{id}/provisioning/bootstrap.sql")
+    public ResponseEntity<String> downloadBootstrapSql(@PathVariable Long id) {
+        PlatformProvisioningPlan plan = platformProvisioningService.buildPlan(id);
+        return downloadableSql(plan.bootstrapFileName(), plan.bootstrapSql());
+    }
+
+
+    @GetMapping("/clients/{id}/runtime")
+    public String clientRuntime(@PathVariable Long id, Model model) {
+        PlatformRuntimePlan runtime = platformRuntimeService.buildPlan(id);
+        model.addAttribute("activePage", "platform_clients");
+        model.addAttribute("client", runtime.client());
+        model.addAttribute("runtime", runtime);
+        return "admin/platform/client_runtime";
+    }
+
+    @PostMapping("/clients/{id}/runtime")
+    public String saveClientRuntime(@PathVariable Long id,
+                                    @RequestParam(value = "runtimeProfile", required = false) String runtimeProfile,
+                                    @RequestParam(value = "runtimePort", required = false) Integer runtimePort,
+                                    @RequestParam(value = "publicUrl", required = false) String publicUrl,
+                                    RedirectAttributes redirectAttributes) {
+        try {
+            platformRuntimeService.saveRuntimeSettings(id, runtimeProfile, runtimePort, publicUrl);
+            redirectAttributes.addFlashAttribute("successMessage", "Perfil de ejecución guardado correctamente.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/platform/clients/" + id + "/runtime";
+    }
+
+    @GetMapping("/clients/{id}/runtime/application.properties")
+    public ResponseEntity<String> downloadRuntimeApplication(@PathVariable Long id) {
+        PlatformRuntimePlan runtime = platformRuntimeService.buildPlan(id);
+        return downloadableText(runtime.applicationFileName(), runtime.applicationProperties(), "text/plain");
+    }
+
+    @GetMapping("/clients/{id}/runtime/run-script.sh")
+    public ResponseEntity<String> downloadRuntimeScript(@PathVariable Long id) {
+        PlatformRuntimePlan runtime = platformRuntimeService.buildPlan(id);
+        return downloadableText(runtime.runScriptFileName(), runtime.runScript(), "text/x-shellscript");
+    }
+
     @GetMapping("/templates")
     public String templates(Model model) {
         model.addAttribute("activePage", "platform_templates");
@@ -138,6 +195,19 @@ public class PlatformAdminController {
         return "admin/platform/modules";
     }
 
+
+    private ResponseEntity<String> downloadableSql(String filename, String content) {
+        return downloadableText(filename, content, MediaType.TEXT_PLAIN_VALUE);
+    }
+
+    private ResponseEntity<String> downloadableText(String filename, String content, String contentType) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(contentType));
+        headers.setContentDisposition(ContentDisposition.attachment().filename(filename).build());
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(content);
+    }
     private void addClientFormAttributes(Model model, PlatformClientForm form, Set<String> selectedModuleKeys) {
         model.addAttribute("activePage", "platform_clients");
         model.addAttribute("form", form);

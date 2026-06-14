@@ -111,8 +111,7 @@ public class PlatformRuntimeService {
     private List<String> runCommands(String profile, int port) {
         return List.of(
                 "bash scripts/run-client.sh " + profile + " " + port,
-                "bash " + runtimeClientsDirectory + "/" + profile + "/run.sh",
-                "java -jar target/eco-agua-0.0.1-SNAPSHOT.jar --spring.config.additional-location=file:" + runtimeClientsDirectory + "/" + profile + "/application.properties --server.port=" + port
+                "bash " + runtimeClientsDirectory + "/" + profile + "/run.sh"
         );
     }
 
@@ -125,10 +124,23 @@ public class PlatformRuntimeService {
                 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
                 CONFIG_FILE="$SCRIPT_DIR/application.properties"
 
+                if [[ ! -f "$CONFIG_FILE" ]]; then
+                  echo "[ERROR] Runtime config not found: $CONFIG_FILE"
+                  exit 1
+                fi
+
+                if command -v cygpath >/dev/null 2>&1; then
+                  CONFIG_PATH="$(cygpath -m "$CONFIG_FILE")"
+                else
+                  CONFIG_PATH="$CONFIG_FILE"
+                fi
+
                 cd "$PROJECT_DIR"
 
-                mvn spring-boot:run \\
-                  -Dspring-boot.run.arguments="--spring.config.additional-location=file:$CONFIG_FILE --server.port=%d"
+                echo "[INFO] Starting client runtime from: $CONFIG_PATH"
+
+                mvn spring-boot:run \
+                  -Dspring-boot.run.arguments="--spring.config.additional-location=file:$CONFIG_PATH --server.port=%d"
                 """.formatted(port).stripLeading();
     }
 

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Instancias de clientes')"></head>
+
+<body class="bg-light">
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex justify-content-between align-items-center mb-3 gap-3 flex-wrap">
+                <div>
+                    <h1 class="h4 mb-1">Instancias / clientes instalados</h1>
+                    <p class="text-muted small mb-0">
+                        Revisa qué negocios están listos, cuáles tienen runtime generado y cuáles están corriendo en su puerto local.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap justify-content-end">
+                    <a th:href="@{/admin/platform/instances}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrow-clockwise"></i>
+                        Actualizar estado
+                    </a>
+                    <a th:href="@{/admin/platform/clients}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-list-ul"></i>
+                        Negocios
+                    </a>
+                    <a th:href="@{/admin/platform/clients/new}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-circle"></i>
+                        Nuevo negocio
+                    </a>
+                </div>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small">
+                Esta pantalla no inicia ni detiene servidores. Solo verifica si la URL local responde. Para levantar una instancia, copia el comando de ejecución en una terminal Git Bash.
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-lg-2">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Negocios</div>
+                        <div class="h3 mb-0" th:text="${summary.totalClients()}">0</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Listos</div>
+                        <div class="h3 mb-0" th:text="${summary.readyClients()}">0</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">En línea</div>
+                        <div class="h3 mb-0" th:text="${summary.runningInstances()}">0</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Detenidos</div>
+                        <div class="h3 mb-0" th:text="${summary.stoppedReadyInstances()}">0</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Por instalar</div>
+                        <div class="h3 mb-0" th:text="${summary.pendingProvisioning()}">0</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Sin runtime</div>
+                        <div class="h3 mb-0" th:text="${summary.missingRuntimeFiles()}">0</div>
+                    </div></div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12" th:each="item : ${instances}">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                            <div>
+                                <div class="fw-semibold" th:text="${item.client().businessName}">Negocio</div>
+                                <div class="small text-muted">
+                                    <code th:text="${item.client().code}">codigo</code>
+                                    <span class="mx-1">·</span>
+                                    <span th:text="${item.client().businessType}">Rubro</span>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                                <span class="badge" th:classappend="${item.healthBadgeClass()}" th:text="${item.healthStatus()}">Estado</span>
+                                <a th:href="@{|/admin/platform/clients/${item.client().id}/provisioning|}" class="btn btn-sm btn-outline-success">
+                                    <i class="bi bi-database-gear"></i>
+                                    Aprovisionamiento
+                                </a>
+                                <a th:href="@{|/admin/platform/clients/${item.client().id}/runtime|}" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-hdd-network"></i>
+                                    Perfil
+                                </a>
+                                <a th:href="${item.localUrl()}" target="_blank" class="btn btn-sm btn-outline-primary" th:classappend="${!item.running() ? ' disabled' : ''}">
+                                    <i class="bi bi-box-arrow-up-right"></i>
+                                    Abrir
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert small mb-3" th:classappend="${item.healthAlertClass()}">
+                                <strong th:text="${item.healthStatus()}">Estado</strong>:
+                                <span th:text="${item.healthDescription()}">Descripción del estado.</span>
+                            </div>
+
+                            <div class="row g-3 align-items-stretch">
+                                <div class="col-12 col-xl-4">
+                                    <div class="border rounded p-3 h-100 bg-white">
+                                        <div class="fw-semibold mb-2">Estado del negocio</div>
+                                        <dl class="row small mb-0">
+                                            <dt class="col-5">Negocio</dt>
+                                            <dd class="col-7"><span class="badge text-bg-primary" th:text="${item.businessStatus()}">ACTIVE</span></dd>
+                                            <dt class="col-5">Base</dt>
+                                            <dd class="col-7"><span class="badge text-bg-secondary" th:text="${item.databaseStatus()}">READY</span></dd>
+                                            <dt class="col-5">Runtime</dt>
+                                            <dd class="col-7"><span class="badge text-bg-light text-dark" th:text="${item.runtimeStatus()}">PENDING</span></dd>
+                                            <dt class="col-5">Perfil</dt>
+                                            <dd class="col-7"><code th:text="${item.runtimeProfile()}">perfil</code></dd>
+                                            <dt class="col-5">Puerto</dt>
+                                            <dd class="col-7" th:text="${item.runtimePort()}">8083</dd>
+                                            <dt class="col-5">Última generación</dt>
+                                            <dd class="col-7" th:text="${item.lastRuntimeGeneratedAt() != null ? item.lastRuntimeGeneratedAt() : 'Pendiente'}">Pendiente</dd>
+                                        </dl>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-xl-4">
+                                    <div class="border rounded p-3 h-100 bg-white">
+                                        <div class="fw-semibold mb-2">Archivos runtime</div>
+                                        <div class="small mb-2">
+                                            <i class="bi" th:classappend="${item.configFileExists() ? ' bi-check-circle-fill text-success' : ' bi-x-circle-fill text-danger'}"></i>
+                                            <span>application.properties</span>
+                                        </div>
+                                        <div class="small mb-2">
+                                            <i class="bi" th:classappend="${item.runScriptExists() ? ' bi-check-circle-fill text-success' : ' bi-x-circle-fill text-danger'}"></i>
+                                            <span>run.sh</span>
+                                        </div>
+                                        <div class="small text-muted mt-2">Carpeta:</div>
+                                        <code class="small d-block text-break" th:text="${item.runtimeFolder()}">runtime-clients/cliente</code>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-xl-4">
+                                    <div class="border rounded p-3 h-100 bg-white">
+                                        <div class="fw-semibold mb-2">Ejecución</div>
+                                        <div class="small text-muted">URL local:</div>
+                                        <a th:href="${item.localUrl()}" target="_blank" th:text="${item.localUrl()}">http://localhost:8083</a>
+                                        <div class="small text-muted mt-2">Comando:</div>
+                                        <pre class="bg-dark text-white rounded p-2 small mb-0"><code th:text="${item.runCommand()}">bash scripts/run-client.sh perfil 8083</code></pre>
+                                        <div class="small text-muted mt-2" th:if="${!item.running() and item.runtimeFilesGenerated()}">
+                                            Ejecuta este comando en otra terminal y luego presiona “Actualizar estado”.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12" th:if="${#lists.isEmpty(instances)}">
+                    <div class="card shadow-sm">
+                        <div class="card-body text-center text-muted py-5">
+                            Todavía no hay negocios creados. Crea un negocio desde una plantilla para verlo aquí.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div th:replace="fragments/scripts_admin :: adminScripts"></div>
+    </div>
+</div>
+</body>
+</html>

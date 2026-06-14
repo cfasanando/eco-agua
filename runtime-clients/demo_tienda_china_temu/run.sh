@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/application.properties"
 
-if [ ! -f "$CONFIG_FILE" ]; then
+if [[ ! -f "$CONFIG_FILE" ]]; then
   echo "[ERROR] Runtime config not found: $CONFIG_FILE"
   exit 1
 fi
@@ -16,9 +16,8 @@ else
   CONFIG_PATH="$CONFIG_FILE"
 fi
 
-cd "$ROOT_DIR"
+cd "$PROJECT_DIR"
 
-echo "[INFO] Starting client from:"
-echo "$CONFIG_PATH"
+echo "[INFO] Starting client runtime from: $CONFIG_PATH"
 
-mvn spring-boot:run -Dspring-boot.run.arguments="--spring.config.additional-location=file:$CONFIG_PATH"
+mvn spring-boot:run   -Dspring-boot.run.arguments="--spring.config.additional-location=file:$CONFIG_PATH --server.port=8083"

@@ -5,33 +5,48 @@ PROFILE="${1:-}"
 PORT="${2:-}"
 
 if [[ -z "$PROFILE" ]]; then
-  echo "Usage: bash scripts/run-client.sh <profile> [port]"
-  echo "Example: bash scripts/run-client.sh tienda_china_express 8083"
+  echo "Usage: bash scripts/run-client.sh <client-profile> [port]"
+  echo "Example: bash scripts/run-client.sh demo_tienda_china_temu 8083"
   exit 1
 fi
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-CONFIG_FILE="$ROOT_DIR/runtime-clients/$PROFILE/application.properties"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CLIENT_DIR="$ROOT_DIR/runtime-clients/$PROFILE"
+CONFIG_FILE="$CLIENT_DIR/application.properties"
 
-if [[ -f "$CONFIG_FILE" ]]; then
-  echo "Using external runtime config: $CONFIG_FILE"
-  if [[ -n "$PORT" ]]; then
-    mvn spring-boot:run \
-      -Dspring-boot.run.arguments="--spring.config.additional-location=file:$CONFIG_FILE --server.port=$PORT"
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  echo "[ERROR] Runtime config not found:"
+  echo "$CONFIG_FILE"
+  echo ""
+  echo "Generate runtime files from:"
+  echo "/admin/platform/clients/{id}/provisioning"
+  echo ""
+  echo "Available runtime clients:"
+  if [[ -d "$ROOT_DIR/runtime-clients" ]]; then
+    find "$ROOT_DIR/runtime-clients" -mindepth 1 -maxdepth 1 -type d -printf '  - %f\n' 2>/dev/null || ls -1 "$ROOT_DIR/runtime-clients"
   else
-    mvn spring-boot:run \
-      -Dspring-boot.run.arguments="--spring.config.additional-location=file:$CONFIG_FILE"
+    echo "  none"
   fi
-  exit 0
+  exit 1
 fi
 
-echo "External runtime config not found: $CONFIG_FILE"
-echo "Falling back to Spring profile: $PROFILE"
-
-if [[ -n "$PORT" ]]; then
-  mvn spring-boot:run \
-    -Dspring-boot.run.profiles="$PROFILE" \
-    -Dspring-boot.run.arguments="--server.port=$PORT"
+if command -v cygpath >/dev/null 2>&1; then
+  CONFIG_PATH="$(cygpath -m "$CONFIG_FILE")"
 else
-  mvn spring-boot:run -Dspring-boot.run.profiles="$PROFILE"
+  CONFIG_PATH="$CONFIG_FILE"
 fi
+
+SPRING_ARGS="--spring.config.additional-location=file:${CONFIG_PATH}"
+if [[ -n "$PORT" ]]; then
+  SPRING_ARGS="$SPRING_ARGS --server.port=$PORT"
+fi
+
+cd "$ROOT_DIR"
+
+echo "[INFO] Starting client profile: $PROFILE"
+echo "[INFO] Config: $CONFIG_PATH"
+if [[ -n "$PORT" ]]; then
+  echo "[INFO] Port override: $PORT"
+fi
+
+mvn spring-boot:run -Dspring-boot.run.arguments="$SPRING_ARGS"

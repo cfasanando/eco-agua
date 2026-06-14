@@ -24,13 +24,16 @@ public class PlatformAdminController {
     private final PlatformManagementService platformManagementService;
     private final PlatformProvisioningService platformProvisioningService;
     private final PlatformRuntimeService platformRuntimeService;
+    private final PlatformInstanceMonitorService platformInstanceMonitorService;
 
     public PlatformAdminController(PlatformManagementService platformManagementService,
                                    PlatformProvisioningService platformProvisioningService,
-                                   PlatformRuntimeService platformRuntimeService) {
+                                   PlatformRuntimeService platformRuntimeService,
+                                   PlatformInstanceMonitorService platformInstanceMonitorService) {
         this.platformManagementService = platformManagementService;
         this.platformProvisioningService = platformProvisioningService;
         this.platformRuntimeService = platformRuntimeService;
+        this.platformInstanceMonitorService = platformInstanceMonitorService;
     }
 
     @GetMapping({"", "/clients"})
@@ -103,8 +106,8 @@ public class PlatformAdminController {
         try {
             platformProvisioningService.createDatabase(id);
             redirectAttributes.addFlashAttribute("successMessage", "Base de datos creada o validada correctamente.");
-        } catch (IllegalArgumentException ex) {
-            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", safeFlashMessage(ex));
         }
         return "redirect:/admin/platform/clients/" + id + "/provisioning";
     }
@@ -115,8 +118,8 @@ public class PlatformAdminController {
         try {
             platformProvisioningService.copyStructureAutomatically(id);
             redirectAttributes.addFlashAttribute("successMessage", "Estructura copiada automáticamente en la base del negocio.");
-        } catch (IllegalArgumentException ex) {
-            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", safeFlashMessage(ex));
         }
         return "redirect:/admin/platform/clients/" + id + "/provisioning";
     }
@@ -126,8 +129,8 @@ public class PlatformAdminController {
         try {
             platformProvisioningService.applyBootstrapAutomatically(id);
             redirectAttributes.addFlashAttribute("successMessage", "Configuración inicial aplicada automáticamente.");
-        } catch (IllegalArgumentException ex) {
-            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", safeFlashMessage(ex));
         }
         return "redirect:/admin/platform/clients/" + id + "/provisioning";
     }
@@ -137,8 +140,8 @@ public class PlatformAdminController {
         try {
             platformProvisioningService.generateRuntimeFiles(id);
             redirectAttributes.addFlashAttribute("successMessage", "Archivos runtime generados correctamente en runtime-clients.");
-        } catch (IllegalArgumentException ex) {
-            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", safeFlashMessage(ex));
         }
         return "redirect:/admin/platform/clients/" + id + "/provisioning";
     }
@@ -196,8 +199,8 @@ public class PlatformAdminController {
         try {
             platformRuntimeService.saveRuntimeSettings(id, runtimeProfile, runtimePort, publicUrl);
             redirectAttributes.addFlashAttribute("successMessage", "Perfil de ejecución guardado correctamente.");
-        } catch (IllegalArgumentException ex) {
-            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", safeFlashMessage(ex));
         }
         return "redirect:/admin/platform/clients/" + id + "/runtime";
     }
@@ -212,6 +215,15 @@ public class PlatformAdminController {
     public ResponseEntity<String> downloadRuntimeScript(@PathVariable Long id) {
         PlatformRuntimePlan runtime = platformRuntimeService.buildPlan(id);
         return downloadableText(runtime.runScriptFileName(), runtime.runScript(), "text/x-shellscript");
+    }
+
+
+    @GetMapping("/instances")
+    public String instances(Model model) {
+        model.addAttribute("activePage", "platform_instances");
+        model.addAttribute("summary", platformInstanceMonitorService.buildSummary());
+        model.addAttribute("instances", platformInstanceMonitorService.listInstances());
+        return "admin/platform/instances";
     }
 
     @GetMapping("/templates")
@@ -242,6 +254,20 @@ public class PlatformAdminController {
                 .headers(headers)
                 .body(content);
     }
+
+    private String safeFlashMessage(RuntimeException ex) {
+        String message = ex.getMessage();
+        if (message == null || message.isBlank()) {
+            message = "No se pudo completar la acción solicitada. Revisa el log de la aplicación.";
+        }
+        Throwable cause = ex.getCause();
+        if (cause != null && cause.getMessage() != null && !cause.getMessage().isBlank()) {
+            message = message + " Detalle: " + cause.getMessage();
+        }
+        message = message.replace("\n", " ").replace("\r", " ").trim();
+        return message.length() > 600 ? message.substring(0, 600) + "..." : message;
+    }
+
     private void addClientFormAttributes(Model model, PlatformClientForm form, Set<String> selectedModuleKeys) {
         model.addAttribute("activePage", "platform_clients");
         model.addAttribute("form", form);

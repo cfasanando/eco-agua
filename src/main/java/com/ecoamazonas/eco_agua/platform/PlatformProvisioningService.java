@@ -105,7 +105,7 @@ public class PlatformProvisioningService {
                 structureReady && !bootstrapApplied,
                 databaseCreated && !structureReady,
                 bootstrapApplied && !active,
-                bootstrapApplied && active && !runtimeFilesGenerated,
+                bootstrapApplied && active,
                 warningFor(client, ready),
                 databaseCreated,
                 structureReady,
@@ -172,6 +172,8 @@ public class PlatformProvisioningService {
             }
             jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS=1");
             client.setDatabaseStatus("STRUCTURE_READY");
+            client.setRuntimeStatus("PENDING");
+            client.setLastRuntimeGeneratedAt(null);
             if (!"ACTIVE".equalsIgnoreCase(safe(client.getStatus()))) {
                 client.setStatus("PROVISIONING");
             }
@@ -209,6 +211,8 @@ public class PlatformProvisioningService {
             // to the platform/source database before saving JPA entities and provisioning logs.
             useDatabase(sourceDatabaseName);
             client.setDatabaseStatus("BOOTSTRAP_APPLIED");
+            client.setRuntimeStatus("PENDING");
+            client.setLastRuntimeGeneratedAt(null);
             if (!"ACTIVE".equalsIgnoreCase(safe(client.getStatus()))) {
                 client.setStatus("PROVISIONING");
             }
@@ -287,6 +291,8 @@ public class PlatformProvisioningService {
         PlatformBusinessClient client = getClient(clientId);
         client.setDatabaseStatus("PENDING_STRUCTURE");
         client.setStatus("CONFIGURED");
+        client.setRuntimeStatus("PENDING");
+        client.setLastRuntimeGeneratedAt(null);
         clientRepository.save(client);
         saveLog(client, "RESET_PROVISIONING", "SUCCESS", "Estado de aprovisionamiento reiniciado sin eliminar base de datos.", null);
     }

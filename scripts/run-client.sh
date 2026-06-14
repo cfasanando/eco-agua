@@ -10,6 +10,24 @@ if [[ -z "$PROFILE" ]]; then
   exit 1
 fi
 
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+CONFIG_FILE="$ROOT_DIR/runtime-clients/$PROFILE/application.properties"
+
+if [[ -f "$CONFIG_FILE" ]]; then
+  echo "Using external runtime config: $CONFIG_FILE"
+  if [[ -n "$PORT" ]]; then
+    mvn spring-boot:run \
+      -Dspring-boot.run.arguments="--spring.config.additional-location=file:$CONFIG_FILE --server.port=$PORT"
+  else
+    mvn spring-boot:run \
+      -Dspring-boot.run.arguments="--spring.config.additional-location=file:$CONFIG_FILE"
+  fi
+  exit 0
+fi
+
+echo "External runtime config not found: $CONFIG_FILE"
+echo "Falling back to Spring profile: $PROFILE"
+
 if [[ -n "$PORT" ]]; then
   mvn spring-boot:run \
     -Dspring-boot.run.profiles="$PROFILE" \

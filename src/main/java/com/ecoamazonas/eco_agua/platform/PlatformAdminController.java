@@ -109,6 +109,40 @@ public class PlatformAdminController {
         return "redirect:/admin/platform/clients/" + id + "/provisioning";
     }
 
+
+    @PostMapping("/clients/{id}/provisioning/copy-structure-auto")
+    public String copyClientStructureAutomatically(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            platformProvisioningService.copyStructureAutomatically(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Estructura copiada automáticamente en la base del negocio.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/platform/clients/" + id + "/provisioning";
+    }
+
+    @PostMapping("/clients/{id}/provisioning/apply-bootstrap-auto")
+    public String applyClientBootstrapAutomatically(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            platformProvisioningService.applyBootstrapAutomatically(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Configuración inicial aplicada automáticamente.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/platform/clients/" + id + "/provisioning";
+    }
+
+    @PostMapping("/clients/{id}/provisioning/generate-runtime-files")
+    public String generateClientRuntimeFiles(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            platformProvisioningService.generateRuntimeFiles(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Archivos runtime generados correctamente en runtime-clients.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/platform/clients/" + id + "/provisioning";
+    }
+
     @PostMapping("/clients/{id}/provisioning/mark-structure-ready")
     public String markStructureReady(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         platformProvisioningService.markStructureReady(id);

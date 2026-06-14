@@ -69,9 +69,8 @@
             </div>
 
             <div class="alert alert-warning border-0 shadow-sm small" th:unless="${plan.ready()}">
-                <strong>Modo seguro:</strong>
-                esta fase puede crear la base de datos vacía si el usuario MySQL tiene permisos.
-                La copia de estructura y la carga inicial se hacen con comandos/SQL manuales para no afectar la base actual.
+                <strong>Instalación guiada:</strong>
+                ahora puedes completar el aprovisionamiento desde botones de la plataforma. Los comandos y SQL manuales quedan como respaldo si MySQL no permite algún paso automático.
             </div>
 
             <div class="row g-3 mb-4">
@@ -127,33 +126,47 @@
             <div class="row g-3 mb-4">
                 <div class="col-12 col-xl-5">
                     <div class="card shadow-sm h-100">
-                        <div class="card-header bg-white fw-semibold">Acciones seguras</div>
+                        <div class="card-header bg-white fw-semibold">Instalación automática por pasos</div>
                         <div class="card-body">
                             <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/create-database|}" class="mb-3">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button type="submit" class="btn btn-primary w-100" th:disabled="${!plan.canCreateDatabase()}">
                                     <i class="bi bi-database-add me-1"></i>
-                                    Crear base de datos vacía
+                                    1. Crear base de datos
                                 </button>
                                 <div class="form-text" th:if="${plan.canCreateDatabase()}">
                                     Ejecuta CREATE DATABASE IF NOT EXISTS. No borra ni modifica la base actual.
                                 </div>
                                 <div class="form-text text-success" th:unless="${plan.canCreateDatabase()}">
-                                    Base ya creada o validada. No necesitas repetir este paso.
+                                    Base ya creada o validada.
                                 </div>
                             </form>
 
-                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/mark-structure-ready|}" class="mb-3">
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/copy-structure-auto|}" class="mb-3">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                <button type="submit" class="btn btn-outline-primary w-100" th:disabled="${!plan.canMarkStructureReady()}">
-                                    <i class="bi bi-check2-square me-1"></i>
-                                    Marcar estructura copiada
+                                <button type="submit" class="btn btn-outline-primary w-100" th:disabled="${!plan.canCopyStructureAutomatically()}" onclick="return confirm('Se copiará la estructura de tablas desde la base modelo hacia la base del cliente. ¿Continuar?');">
+                                    <i class="bi bi-diagram-3 me-1"></i>
+                                    2. Copiar estructura automáticamente
                                 </button>
-                                <div class="form-text" th:if="${plan.canMarkStructureReady()}">
-                                    Úsalo después de ejecutar el comando mysql con estructura-base.sql.
+                                <div class="form-text" th:if="${plan.canCopyStructureAutomatically()}">
+                                    Copia las tablas del sistema base hacia la base del cliente usando SHOW CREATE TABLE.
                                 </div>
-                                <div class="form-text text-muted" th:unless="${plan.canMarkStructureReady()}">
-                                    Disponible solo después de crear la base vacía y antes de marcar estructura lista.
+                                <div class="form-text text-muted" th:unless="${plan.canCopyStructureAutomatically()}">
+                                    Disponible después de crear la base y antes de marcar la estructura como lista.
+                                </div>
+                            </form>
+
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/apply-bootstrap-auto|}" class="mb-3">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button type="submit" class="btn btn-outline-info w-100" th:disabled="${!plan.canApplyBootstrapAutomatically()}" onclick="return confirm('Se aplicará la configuración inicial del negocio en su base de datos. ¿Continuar?');">
+                                    <i class="bi bi-filetype-sql me-1"></i>
+                                    3. Aplicar configuración inicial
+                                </button>
+                                <div class="form-text" th:if="${plan.canApplyBootstrapAutomatically()}">
+                                    Inserta branding, WhatsApp, textos públicos y módulos activos.
+                                </div>
+                                <div class="form-text text-muted" th:unless="${plan.canApplyBootstrapAutomatically()}">
+                                    Disponible cuando la estructura ya existe y antes de aplicar bootstrap.
                                 </div>
                             </form>
 
@@ -161,20 +174,41 @@
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button type="submit" class="btn btn-success w-100" th:disabled="${!plan.canMarkActive()}">
                                     <i class="bi bi-rocket-takeoff me-1"></i>
-                                    Marcar negocio activo
+                                    4. Activar negocio
                                 </button>
                                 <div class="form-text" th:if="${plan.canMarkActive()}">
-                                    Úsalo cuando la estructura y configuración inicial ya estén aplicadas.
+                                    Úsalo cuando el bootstrap ya esté aplicado correctamente.
                                 </div>
                                 <div class="form-text text-success" th:if="${plan.ready()}">
-                                    Negocio activo y listo. Esta acción ya no aplica.
+                                    Negocio activo y listo.
                                 </div>
                             </form>
+
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/generate-runtime-files|}" class="mb-3">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button type="submit" class="btn btn-outline-success w-100" th:disabled="${!plan.canGenerateRuntimeFiles()}">
+                                    <i class="bi bi-folder-plus me-1"></i>
+                                    5. Generar archivos runtime
+                                </button>
+                                <div class="form-text" th:if="${plan.canGenerateRuntimeFiles()}">
+                                    Crea application.properties, run.sh y SQL de respaldo en <code th:text="${plan.runtimeFolder()}">runtime-clients</code>.
+                                </div>
+                                <div class="form-text text-success" th:if="${plan.ready() and client.runtimeStatus == 'FILES_GENERATED'}">
+                                    Archivos runtime generados en <code th:text="${plan.runtimeFolder()}">runtime-clients</code>.
+                                </div>
+                            </form>
+
+                            <div class="alert alert-light border small" th:if="${client.runtimeStatus == 'FILES_GENERATED'}">
+                                <div class="fw-semibold mb-1">Archivos generados</div>
+                                <div>Carpeta: <code th:text="${plan.runtimeFolder()}">runtime-clients/demo</code></div>
+                                <div>Config: <code th:text="${plan.runtimeApplicationPath()}">application.properties</code></div>
+                                <div>Script: <code th:text="${plan.runtimeRunScriptPath()}">run.sh</code></div>
+                            </div>
 
                             <div class="d-grid gap-2 mb-3">
                                 <button type="button" class="btn btn-outline-secondary" data-copy-target="manualCommandsText">
                                     <i class="bi bi-clipboard-check me-1"></i>
-                                    Copiar comandos
+                                    Copiar comandos de respaldo
                                 </button>
                                 <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#bootstrapSqlBox" aria-expanded="false" aria-controls="bootstrapSqlBox">
                                     <i class="bi bi-filetype-sql me-1"></i>
@@ -185,6 +219,17 @@
                                     Descargar SQL bootstrap
                                 </a>
                             </div>
+
+                            <details class="mb-3">
+                                <summary class="small text-muted">Respaldo manual</summary>
+                                <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/mark-structure-ready|}" class="mt-2 mb-2">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-primary w-100" th:disabled="${!plan.canMarkStructureReady()}">
+                                        <i class="bi bi-check2-square me-1"></i>
+                                        Marcar estructura copiada manualmente
+                                    </button>
+                                </form>
+                            </details>
 
                             <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/reset|}" onsubmit="return confirm('Esto solo reinicia el estado en plataforma. No elimina base de datos. ¿Continuar?');">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

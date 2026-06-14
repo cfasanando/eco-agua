@@ -1,5 +1,6 @@
 package com.ecoamazonas.eco_agua.platform;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,11 +15,20 @@ public class PlatformRuntimeService {
 
     private final PlatformBusinessClientRepository clientRepository;
     private final PlatformClientModuleRepository clientModuleRepository;
+    private final String datasourceUsername;
+    private final String datasourcePassword;
+    private final String runtimeClientsDirectory;
 
     public PlatformRuntimeService(PlatformBusinessClientRepository clientRepository,
-                                  PlatformClientModuleRepository clientModuleRepository) {
+                                  PlatformClientModuleRepository clientModuleRepository,
+                                  @Value("${spring.datasource.username:root}") String datasourceUsername,
+                                  @Value("${spring.datasource.password:}") String datasourcePassword,
+                                  @Value("${ecoagua.platform.runtime-clients-dir:runtime-clients}") String runtimeClientsDirectory) {
         this.clientRepository = clientRepository;
         this.clientModuleRepository = clientModuleRepository;
+        this.datasourceUsername = datasourceUsername;
+        this.datasourcePassword = datasourcePassword;
+        this.runtimeClientsDirectory = runtimeClientsDirectory;
     }
 
     public PlatformRuntimePlan buildPlan(Long clientId) {
@@ -100,20 +110,26 @@ public class PlatformRuntimeService {
 
     private List<String> runCommands(String profile, int port) {
         return List.of(
-                "cp \"$HOME/Downloads/application-" + profile + ".properties\" src/main/resources/application-" + profile + ".properties",
-                "cp \"$HOME/Downloads/run-" + profile + ".sh\" scripts/run-" + profile + ".sh",
-                "chmod +x scripts/run-" + profile + ".sh",
-                "bash scripts/run-client.sh " + profile + " " + port
+                "bash scripts/run-client.sh " + profile + " " + port,
+                "bash " + runtimeClientsDirectory + "/" + profile + "/run.sh",
+                "java -jar target/eco-agua-0.0.1-SNAPSHOT.jar --spring.config.additional-location=file:" + runtimeClientsDirectory + "/" + profile + "/application.properties --server.port=" + port
         );
     }
 
     private String runScript(String profile, int port) {
-        return "#!/usr/bin/env bash\n"
-                + "set -euo pipefail\n\n"
-                + "cd \"$(dirname \"$0\")/..\"\n\n"
-                + "mvn spring-boot:run \\\n"
-                + "  -Dspring-boot.run.profiles=\"" + profile + "\" \\\n"
-                + "  -Dspring-boot.run.arguments=\"--server.port=" + port + "\"\n";
+        return """
+                #!/usr/bin/env bash
+                set -euo pipefail
+
+                SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+                PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+                CONFIG_FILE="$SCRIPT_DIR/application.properties"
+
+                cd "$PROJECT_DIR"
+
+                mvn spring-boot:run \\
+                  -Dspring-boot.run.arguments="--spring.config.additional-location=file:$CONFIG_FILE --server.port=%d"
+                """.formatted(port).stripLeading();
     }
 
     private String applicationProperties(PlatformBusinessClient client, String profile, int port, String publicUrl) {
@@ -127,11 +143,11 @@ public class PlatformRuntimeService {
 
         StringBuilder out = new StringBuilder();
         out.append("# Runtime profile generated from Super Admin for ").append(businessName).append("\n");
-        out.append("# Copy this file to src/main/resources/application-").append(profile).append(".properties\n\n");
+        out.append("# Stored outside src/main/resources to avoid touching source code.\n\n");
         out.append("server.port=").append(port).append("\n");
         out.append("spring.datasource.url=jdbc:mysql://localhost:3306/").append(databaseName).append("?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Lima\n");
-        out.append("spring.datasource.username=root\n");
-        out.append("spring.datasource.password=root\n");
+        out.append("spring.datasource.username=").append(escapeProperty(datasourceUsername)).append("\n");
+        out.append("spring.datasource.password=").append(escapeProperty(datasourcePassword)).append("\n");
         out.append("spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver\n\n");
         out.append("spring.jpa.hibernate.ddl-auto=none\n");
         out.append("spring.jpa.show-sql=true\n");

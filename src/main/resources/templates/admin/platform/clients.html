@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Clientes de plataforma')"></head>
+
+<body class="bg-light">
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex justify-content-between align-items-center mb-3 gap-3 flex-wrap">
+                <div>
+                    <h1 class="h4 mb-1">Clientes / negocios de la plataforma</h1>
+                    <p class="text-muted small mb-0">
+                        Registra negocios por rubro, plantilla y módulos activos. En esta fase solo se prepara la configuración.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap justify-content-end">
+                    <a th:href="@{/admin/platform/templates}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-layers"></i>
+                        Plantillas
+                    </a>
+                    <a th:href="@{/admin/platform/modules}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-grid-3x3-gap"></i>
+                        Módulos
+                    </a>
+                    <a th:href="@{/admin/platform/clients/new}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-circle"></i>
+                        Nuevo negocio
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <span th:text="${successMessage}">Operación correcta.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-lg-2">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Negocios</div>
+                        <div class="h3 mb-0" th:text="${summary.totalClients()}">0</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Borradores</div>
+                        <div class="h3 mb-0" th:text="${summary.draftClients()}">0</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Configurados</div>
+                        <div class="h3 mb-0" th:text="${summary.configuredClients()}">0</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">BD pendientes</div>
+                        <div class="h3 mb-0" th:text="${summary.pendingDatabases()}">0</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Plantillas</div>
+                        <div class="h3 mb-0" th:text="${summary.activeTemplates()}">0</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Módulos</div>
+                        <div class="h3 mb-0" th:text="${summary.activeModules()}">0</div>
+                    </div></div>
+                </div>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small">
+                Fase Plataforma 1 no crea bases de datos reales todavía. Deja preparado el negocio, su plantilla y módulos para la Fase Plataforma 2.
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Negocio</th>
+                                <th>Plantilla</th>
+                                <th>Base prevista</th>
+                                <th>Estado</th>
+                                <th>Contacto</th>
+                                <th class="text-end">Acciones</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="client : ${clients}">
+                                <td>
+                                    <div class="fw-semibold" th:text="${client.businessName}">Negocio</div>
+                                    <div class="small text-muted"><code th:text="${client.code}">codigo</code></div>
+                                    <div class="small text-muted" th:text="${client.city}">Ciudad</div>
+                                </td>
+                                <td>
+                                    <span th:if="${client.template != null}" th:text="${client.template.name}">Plantilla</span>
+                                    <span th:if="${client.template == null}" class="text-muted">Sin plantilla</span>
+                                    <div class="small text-muted" th:text="${client.businessType}">Rubro</div>
+                                </td>
+                                <td>
+                                    <code th:text="${client.databaseName}">db</code>
+                                    <div>
+                                        <span class="badge text-bg-warning" th:if="${client.databaseStatus != 'CREATED'}" th:text="${client.databaseStatus}">PENDING</span>
+                                        <span class="badge text-bg-success" th:if="${client.databaseStatus == 'CREATED'}">CREATED</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge text-bg-secondary" th:if="${client.status == 'DRAFT'}">Borrador</span>
+                                    <span class="badge text-bg-primary" th:if="${client.status == 'CONFIGURED'}">Configurado</span>
+                                    <span class="badge text-bg-success" th:if="${client.status == 'ACTIVE'}">Activo</span>
+                                    <span class="badge text-bg-light text-dark" th:if="${client.status != 'DRAFT' and client.status != 'CONFIGURED' and client.status != 'ACTIVE'}" th:text="${client.status}">Estado</span>
+                                </td>
+                                <td>
+                                    <div th:text="${client.ownerName}">Responsable</div>
+                                    <div class="small text-muted" th:text="${client.contactPhone}">Teléfono</div>
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Acciones del negocio">
+                                        <a th:href="@{|/admin/platform/clients/${client.id}|}" class="btn btn-outline-primary" title="Ver configuración">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a th:href="@{|/admin/platform/clients/${client.id}/provisioning|}" class="btn btn-outline-success" title="Aprovisionamiento">
+                                            <i class="bi bi-database-gear"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(clients)}">
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    Todavía no hay negocios registrados. Crea el primer negocio desde una plantilla.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div th:replace="fragments/scripts_admin :: adminScripts"></div>
+    </div>
+</div>
+</body>
+</html>

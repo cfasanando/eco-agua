@@ -20,6 +20,7 @@ public class SecurityConfig {
 
     private static final int REMEMBER_ME_VALIDITY_SECONDS = 60 * 60 * 24 * 30;
 
+    private static final String ROLE_SUPER_ADMIN = "ROLE_SUPER_ADMIN";
     private static final String ROLE_OWNER = "ROLE_OWNER";
     private static final String ROLE_MANAGEMENT = "ROLE_MANAGEMENT";
     private static final String ROLE_MARKETING = "ROLE_MARKETING";
@@ -39,13 +40,13 @@ public class SecurityConfig {
     private static final String LEGACY_OPERARIO = "OPERARIO";
 
     private static final String[] ADMINISTRATORS = authorities(
-            ROLE_OWNER,
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
             LEGACY_ADMIN_PRINC,
             LEGACY_ADMIN
     );
 
     private static final String[] DASHBOARD_VIEW = authorities(
-            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_SALES, ROLE_FINANCE,
+            ROLE_SUPER_ADMIN, ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_SALES, ROLE_FINANCE,
             ROLE_LOGISTICS, ROLE_PRODUCTION, ROLE_HR, ROLE_READONLY,
             LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_ADMIN_CONT, LEGACY_ADMIN_MKT,
             LEGACY_ADMIN_RRHH, LEGACY_SUPERVISOR, LEGACY_OPERARIO,
@@ -287,9 +288,21 @@ public class SecurityConfig {
     );
 
     private static final String[] PLATFORM_ADMIN = authorities(
-            ROLE_OWNER,
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
             LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
             "admin_config"
+    );
+
+    private static final String[] PLATFORM_MANAGER_VIEW = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER, ROLE_MANAGEMENT,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            "ver_plataforma", "administra_plataforma", "admin_config"
+    );
+
+    private static final String[] PLATFORM_MANAGER_WRITE = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            "administra_plataforma", "admin_config"
     );
 
     private final DatabaseUserDetailsService userDetailsService;
@@ -378,6 +391,8 @@ public class SecurityConfig {
                 .requestMatchers("/admin/personnel", "/admin/personnel/**", "/admin/job-positions/**").hasAnyAuthority(HR_VIEW)
                 .requestMatchers("/admin/users/**").hasAnyAuthority(USERS_ADMIN)
                 .requestMatchers("/admin/roles-permissions/**").hasAnyAuthority(ROLES_ADMIN)
+                .requestMatchers(HttpMethod.POST, "/admin/platform/**").hasAnyAuthority(PLATFORM_MANAGER_WRITE)
+                .requestMatchers("/admin/platform/**").hasAnyAuthority(PLATFORM_MANAGER_VIEW)
                 .requestMatchers("/admin/system-modules/**", "/admin/dashboard-widgets/**").hasAnyAuthority(PLATFORM_ADMIN)
                 .requestMatchers("/admin/platform-settings/**").hasAnyAuthority(PLATFORM_ADMIN)
 

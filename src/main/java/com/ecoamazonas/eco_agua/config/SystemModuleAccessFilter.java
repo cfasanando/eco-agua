@@ -58,6 +58,7 @@ public class SystemModuleAccessFilter extends OncePerRequestFilter {
             ModuleRoute.prefix("/dashboard/business-overview", "business_overview"),
             ModuleRoute.prefix("/dashboard/monthly-followup", "monthly_followup"),
             ModuleRoute.prefix("/dashboard/commercial-daily", "commercial_daily"),
+            ModuleRoute.prefix("/admin/platform", "platform_settings"),
             ModuleRoute.prefix("/admin/system-modules", "platform_settings")
     );
 

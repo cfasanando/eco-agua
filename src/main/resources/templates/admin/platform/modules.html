@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Catálogo de módulos de plataforma')"></head>
+
+<body class="bg-light">
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex justify-content-between align-items-center mb-3 gap-3 flex-wrap">
+                <div>
+                    <h1 class="h4 mb-1">Catálogo de módulos de plataforma</h1>
+                    <p class="text-muted small mb-0">Módulos que pueden combinarse para crear negocios por rubro.</p>
+                </div>
+                <a th:href="@{/admin/platform/templates}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-layers"></i>
+                    Ver plantillas
+                </a>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small">
+                Este catálogo es conceptual para creación de negocios. La activación real por base de datos del cliente se hará en la Fase Plataforma 2.
+            </div>
+
+            <div class="accordion shadow-sm" id="platformModulesAccordion">
+                <div class="accordion-item" th:each="entry, stat : ${groupedModules.entrySet()}">
+                    <h2 class="accordion-header" th:id="${'platform-module-heading-' + stat.index}">
+                        <button class="accordion-button" th:classappend="${stat.index > 0 ? ' collapsed' : ''}" type="button" data-bs-toggle="collapse"
+                                th:attr="data-bs-target=${'#platform-module-collapse-' + stat.index},aria-expanded=${stat.index == 0 ? 'true' : 'false'},aria-controls=${'platform-module-collapse-' + stat.index}">
+                            <span class="fw-semibold" th:text="${entry.key}">Área</span>
+                            <span class="badge text-bg-light ms-2" th:text="${#lists.size(entry.value) + ' módulos'}">0 módulos</span>
+                        </button>
+                    </h2>
+                    <div th:id="${'platform-module-collapse-' + stat.index}" class="accordion-collapse collapse" th:classappend="${stat.index == 0 ? ' show' : ''}" data-bs-parent="#platformModulesAccordion">
+                        <div class="accordion-body bg-white p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Módulo</th>
+                                        <th>Variable</th>
+                                        <th>Estado</th>
+                                        <th>Descripción</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="module : ${entry.value}">
+                                        <td class="fw-semibold" th:text="${module.name}">Módulo</td>
+                                        <td><code th:text="${module.moduleKey}">module</code></td>
+                                        <td>
+                                            <span class="badge text-bg-success" th:if="${module.active}">Activo</span>
+                                            <span class="badge text-bg-light text-dark" th:if="${module.configurable}">Configurable</span>
+                                            <span class="badge text-bg-secondary" th:if="${module.defaultEnabled}">Por defecto</span>
+                                        </td>
+                                        <td class="small text-muted" th:text="${module.description}">Descripción</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div th:replace="fragments/scripts_admin :: adminScripts"></div>
+    </div>
+</div>
+</body>
+</html>

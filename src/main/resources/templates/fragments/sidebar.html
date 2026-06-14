@@ -102,6 +102,59 @@
       </a>
     </th:block>
 
+    <th:block th:if="${modulePlatformSettingsEnabled}" sec:authorize="hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_OWNER','ADMIN_PRINC','ADMIN','ver_plataforma','administra_plataforma','admin_config')">
+      <div class="menu-section-title">Plataforma / Super Admin</div>
+
+      <div
+        class="menu-group"
+        th:with="isPlatformActive=${activePage == 'platform_clients'
+          or activePage == 'platform_templates'
+          or activePage == 'platform_modules'}"
+      >
+        <input
+          type="checkbox"
+          id="menu-platform-toggle"
+          class="menu-toggle"
+          th:checked="${isPlatformActive}"
+        >
+
+        <label class="menu-link has-children" for="menu-platform-toggle">
+          <span class="icon"><i class="bi bi-globe-americas"></i></span>
+          <span>Administración global</span>
+          <span class="caret"><i class="bi bi-chevron-right"></i></span>
+        </label>
+
+        <div class="submenu-container">
+          <a
+            th:href="@{/admin/platform/clients}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'platform_clients' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-building-gear"></i></span>
+            <span>Negocios / clientes</span>
+          </a>
+
+          <a
+            th:href="@{/admin/platform/templates}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'platform_templates' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-layers"></i></span>
+            <span>Plantillas de rubro</span>
+          </a>
+
+          <a
+            th:href="@{/admin/platform/modules}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'platform_modules' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-grid-3x3-gap"></i></span>
+            <span>Catálogo de módulos</span>
+          </a>
+        </div>
+      </div>
+    </th:block>
+
     <th:block th:if="${moduleOperationSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_PRODUCTION','ROLE_READONLY','ver_delivery','administra_delivery','ver_recompras','administra_recompras')">
       <div class="menu-section-title">Operación diaria</div>
 

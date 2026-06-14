@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Aprovisionamiento de negocio')"></head>
+
+<body class="bg-light">
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex justify-content-between align-items-center mb-3 gap-3 flex-wrap">
+                <div>
+                    <h1 class="h4 mb-1">Aprovisionamiento de negocio</h1>
+                    <p class="text-muted small mb-0">
+                        <span th:text="${client.businessName}">Negocio</span>
+                        · base prevista <code th:text="${client.databaseName}">db</code>
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap justify-content-end">
+                    <a th:href="@{|/admin/platform/clients/${client.id}|}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i>
+                        Volver al negocio
+                    </a>
+                    <a th:href="@{/admin/platform/clients}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-list-ul"></i>
+                        Negocios
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <span th:text="${successMessage}">Operación correcta.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+            <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                <span th:text="${errorMessage}">Error.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="alert alert-warning border-0 shadow-sm small">
+                <strong>Modo seguro:</strong>
+                esta fase puede crear la base de datos vacía si el usuario MySQL tiene permisos.
+                La copia de estructura y la carga inicial se hacen con comandos/SQL manuales para no afectar la base actual.
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white fw-semibold">Negocio</div>
+                        <div class="card-body small">
+                            <dl class="row mb-0">
+                                <dt class="col-5">Código</dt><dd class="col-7"><code th:text="${client.code}">codigo</code></dd>
+                                <dt class="col-5">Plantilla</dt><dd class="col-7" th:text="${client.template != null ? client.template.name : 'Sin plantilla'}">Plantilla</dd>
+                                <dt class="col-5">Rubro</dt><dd class="col-7" th:text="${client.businessType}">Rubro</dd>
+                                <dt class="col-5">Estado</dt><dd class="col-7"><span class="badge text-bg-primary" th:text="${client.status}">Estado</span></dd>
+                                <dt class="col-5">Estado BD</dt><dd class="col-7"><span class="badge text-bg-secondary" th:text="${client.databaseStatus}">BD</span></dd>
+                                <dt class="col-5">Demo</dt><dd class="col-7" th:text="${client.demoDataEnabled ? 'Sí' : 'No'}">No</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-8">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white fw-semibold">Plan de instalación</div>
+                        <div class="card-body">
+                            <div class="row g-2">
+                                <div class="col-12 col-md" th:each="step : ${plan.steps()}">
+                                    <div class="border rounded p-3 h-100 bg-white">
+                                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                            <div class="fw-semibold">
+                                                <span th:text="${step.number()}">1</span>.
+                                                <span th:text="${step.title()}">Paso</span>
+                                            </div>
+                                            <span class="badge" th:classappend="${step.badgeClass()}" th:text="${step.status()}">Estado</span>
+                                        </div>
+                                        <div class="small text-muted" th:text="${step.description()}">Descripción</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info small mt-3 mb-0" th:text="${plan.warningMessage()}">
+                                Mensaje de seguridad.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white fw-semibold">Acciones seguras</div>
+                        <div class="card-body">
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/create-database|}" class="mb-3">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button type="submit" class="btn btn-primary w-100" th:disabled="${!plan.canCreateDatabase()}">
+                                    <i class="bi bi-database-add me-1"></i>
+                                    Crear base de datos vacía
+                                </button>
+                                <div class="form-text">
+                                    Ejecuta CREATE DATABASE IF NOT EXISTS. No borra ni modifica la base actual.
+                                </div>
+                            </form>
+
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/mark-structure-ready|}" class="mb-3">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button type="submit" class="btn btn-outline-primary w-100" th:disabled="${!plan.canMarkStructureReady()}">
+                                    <i class="bi bi-check2-square me-1"></i>
+                                    Marcar estructura copiada
+                                </button>
+                                <div class="form-text">
+                                    Úsalo después de ejecutar el comando mysql con estructura-base.sql.
+                                </div>
+                            </form>
+
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/mark-active|}" class="mb-3">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button type="submit" class="btn btn-success w-100" th:disabled="${!plan.canMarkActive()}">
+                                    <i class="bi bi-rocket-takeoff me-1"></i>
+                                    Marcar negocio activo
+                                </button>
+                                <div class="form-text">
+                                    Úsalo cuando la estructura y configuración inicial ya estén aplicadas.
+                                </div>
+                            </form>
+
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/reset|}" onsubmit="return confirm('Esto solo reinicia el estado en plataforma. No elimina base de datos. ¿Continuar?');">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button type="submit" class="btn btn-outline-danger w-100">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i>
+                                    Reiniciar estado
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white fw-semibold">Comandos manuales recomendados</div>
+                        <div class="card-body">
+                            <p class="small text-muted">
+                                Ejecuta estos comandos desde Git Bash o terminal cuando quieras copiar la estructura actual hacia la nueva base.
+                            </p>
+                            <div class="bg-dark text-white rounded p-3 small overflow-auto">
+                                <div th:each="command : ${plan.manualCommands()}">
+                                    <code class="text-white" th:text="${command}">comando</code>
+                                </div>
+                            </div>
+                            <div class="small text-muted mt-2">
+                                Si tu base actual no se llama igual, cambia el nombre de origen en el primer comando.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white fw-semibold">SQL para crear base</div>
+                        <div class="card-body">
+                            <textarea class="form-control font-monospace small" rows="6" readonly th:text="${plan.createDatabaseSql()}">SQL</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-white fw-semibold">SQL de configuración inicial</div>
+                        <div class="card-body">
+                            <textarea class="form-control font-monospace small" rows="18" readonly th:text="${plan.bootstrapSql()}">SQL</textarea>
+                            <div class="small text-muted mt-2">
+                                Guarda este contenido como <code th:text="${'bootstrap-' + client.databaseName + '.sql'}">bootstrap.sql</code>
+                                y ejecútalo sobre la nueva base después de copiar la estructura.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-semibold">Módulos activos a instalar</div>
+                <div class="card-body">
+                    <div class="d-flex gap-2 flex-wrap">
+                        <span class="badge text-bg-light text-dark border" th:each="moduleKey : ${plan.activeModuleKeys()}" th:text="${moduleKey}">module</span>
+                        <span class="text-muted small" th:if="${#lists.isEmpty(plan.activeModuleKeys())}">No hay módulos activos.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white fw-semibold">Historial de aprovisionamiento</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Acción</th>
+                                <th>Estado</th>
+                                <th>Detalle</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="log : ${logs}">
+                                <td class="small text-muted" th:text="${#temporals.format(log.createdAt, 'dd/MM/yyyy HH:mm')}">fecha</td>
+                                <td><code th:text="${log.action}">ACTION</code></td>
+                                <td>
+                                    <span class="badge text-bg-success" th:if="${log.status == 'SUCCESS'}">SUCCESS</span>
+                                    <span class="badge text-bg-danger" th:if="${log.status == 'ERROR'}">ERROR</span>
+                                    <span class="badge text-bg-secondary" th:if="${log.status != 'SUCCESS' and log.status != 'ERROR'}" th:text="${log.status}">STATUS</span>
+                                </td>
+                                <td class="small" th:text="${log.details}">Detalle</td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(logs)}">
+                                <td colspan="4" class="text-center text-muted py-4">Todavía no hay acciones registradas.</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div th:replace="fragments/scripts_admin :: adminScripts"></div>
+    </div>
+</div>
+</body>
+</html>

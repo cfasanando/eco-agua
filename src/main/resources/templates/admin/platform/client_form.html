@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Nuevo negocio')"></head>
+
+<body class="bg-light">
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex justify-content-between align-items-center mb-3 gap-3 flex-wrap">
+                <div>
+                    <h1 class="h4 mb-1">Crear nuevo negocio</h1>
+                    <p class="text-muted small mb-0">Selecciona plantilla, datos básicos y módulos iniciales. La base de datos se aprovisionará en la siguiente fase.</p>
+                </div>
+                <a th:href="@{/admin/platform/clients}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i>
+                    Volver
+                </a>
+            </div>
+
+            <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                <span th:text="${errorMessage}">Error</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <form method="post" th:action="@{/admin/platform/clients}">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                <div class="row g-3">
+                    <div class="col-12 col-xl-7">
+                        <div class="card shadow-sm mb-3">
+                            <div class="card-header bg-white fw-semibold">Datos del negocio</div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label">Nombre comercial *</label>
+                                        <input name="businessName" class="form-control" th:value="${form.businessName}" required placeholder="Restaurante El Buen Sabor"/>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label">Código interno</label>
+                                        <input name="code" class="form-control" th:value="${form.code}" placeholder="restaurante-buen-sabor"/>
+                                        <div class="form-text">Si lo dejas vacío se generará desde el nombre.</div>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label">Razón social</label>
+                                        <input name="legalName" class="form-control" th:value="${form.legalName}"/>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label">Plantilla de rubro</label>
+                                        <select name="templateId" class="form-select" onchange="if(this.value){window.location.href='/admin/platform/clients/new?templateId=' + this.value;}">
+                                            <option value="">Seleccionar plantilla...</option>
+                                            <option th:each="template : ${templates}"
+                                                    th:value="${template.id}"
+                                                    th:selected="${form.templateId == template.id}"
+                                                    th:text="${template.name}">Plantilla</option>
+                                        </select>
+                                        <div class="form-text">Al cambiar plantilla se precargan rubro y módulos recomendados.</div>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label">Rubro</label>
+                                        <input name="businessType" class="form-control" th:value="${form.businessType}" placeholder="Restaurante, academia, courier..."/>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label">Base de datos prevista</label>
+                                        <input name="databaseName" class="form-control" th:value="${form.databaseName}" placeholder="restaurante_buen_sabor"/>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label">Responsable</label>
+                                        <input name="ownerName" class="form-control" th:value="${form.ownerName}"/>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label">Teléfono</label>
+                                        <input name="contactPhone" class="form-control" th:value="${form.contactPhone}"/>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label">Email</label>
+                                        <input name="contactEmail" type="email" class="form-control" th:value="${form.contactEmail}"/>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label">WhatsApp comercial</label>
+                                        <input name="whatsapp" class="form-control" th:value="${form.whatsapp}" placeholder="+51928527493"/>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label">Ciudad</label>
+                                        <input name="city" class="form-control" th:value="${form.city}"/>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label">Moneda</label>
+                                        <input name="currency" class="form-control" th:value="${form.currency}"/>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label">Color principal</label>
+                                        <input name="primaryColor" class="form-control" th:value="${form.primaryColor}" placeholder="#0d6efd"/>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label">Logo URL</label>
+                                        <input name="logoUrl" class="form-control" th:value="${form.logoUrl}"/>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label">Slug público</label>
+                                        <input name="publicSlug" class="form-control" th:value="${form.publicSlug}" placeholder="restaurante-buen-sabor"/>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Notas</label>
+                                        <textarea name="notes" class="form-control" rows="3" th:text="${form.notes}"></textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="demoDataEnabled" name="demoDataEnabled" th:checked="${form.demoDataEnabled}">
+                                            <label class="form-check-label" for="demoDataEnabled">Preparar datos demo cuando se implemente el aprovisionamiento</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-xl-5">
+                        <div class="card shadow-sm mb-3">
+                            <div class="card-header bg-white fw-semibold">Módulos iniciales</div>
+                            <div class="card-body">
+                                <p class="text-muted small">Selecciona los módulos que tendrá este negocio. Puedes ajustar esta lista después desde el detalle.</p>
+
+                                <div class="accordion" id="platformClientModulesAccordion">
+                                    <div class="accordion-item" th:each="entry, stat : ${groupedModules.entrySet()}">
+                                        <h2 class="accordion-header" th:id="${'client-module-heading-' + stat.index}">
+                                            <button class="accordion-button" th:classappend="${stat.index > 0 ? ' collapsed' : ''}" type="button" data-bs-toggle="collapse"
+                                                    th:attr="data-bs-target=${'#client-module-collapse-' + stat.index},aria-expanded=${stat.index == 0 ? 'true' : 'false'},aria-controls=${'client-module-collapse-' + stat.index}">
+                                                <span th:text="${entry.key}">Área</span>
+                                            </button>
+                                        </h2>
+                                        <div th:id="${'client-module-collapse-' + stat.index}" class="accordion-collapse collapse" th:classappend="${stat.index == 0 ? ' show' : ''}" data-bs-parent="#platformClientModulesAccordion">
+                                            <div class="accordion-body">
+                                                <div class="form-check mb-2" th:each="module : ${entry.value}">
+                                                    <input class="form-check-input" type="checkbox" name="selectedModules" th:id="${'module-' + module.moduleKey}" th:value="${module.moduleKey}" th:checked="${#lists.contains(selectedModuleKeys, module.moduleKey)}"/>
+                                                    <label class="form-check-label" th:for="${'module-' + module.moduleKey}">
+                                                        <span class="fw-semibold" th:text="${module.name}">Módulo</span>
+                                                        <span class="badge text-bg-light ms-1" th:text="${module.moduleKey}">key</span>
+                                                        <span class="d-block small text-muted" th:text="${module.description}">Descripción</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-3 mb-4">
+                    <a th:href="@{/admin/platform/clients}" class="btn btn-outline-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-1"></i>
+                        Crear negocio
+                    </button>
+                </div>
+            </form>
+        </main>
+
+        <div th:replace="fragments/scripts_admin :: adminScripts"></div>
+    </div>
+</div>
+</body>
+</html>

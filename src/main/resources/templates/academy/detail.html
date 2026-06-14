@@ -87,9 +87,14 @@
                                 <strong class="fs-4" th:if="${course.hasPrice()}">S/ <span th:text="${#numbers.formatDecimal(course.price, 1, 'COMMA', 2, 'POINT')}">0.00</span></strong>
                                 <strong class="fs-4 text-success" th:unless="${course.hasPrice()}">Gratis / consultar</strong>
                             </div>
-                            <a class="btn btn-success btn-lg ms-sm-auto" th:href="'https://wa.me/' + ${whatsappNumber} + '?text=' + ${encodedCourseWhatsappMessage}" target="_blank">
-                                <i class="bi bi-whatsapp"></i> <span th:text="${academyWhatsappCta}">Solicitar información</span>
-                            </a>
+                            <div class="ms-sm-auto d-flex flex-wrap gap-2">
+                                <a class="btn btn-outline-primary btn-lg" th:href="@{|/academy/course/${course.slug}/learn|}" th:if="${previewLessonCount > 0}">
+                                    <i class="bi bi-play-circle"></i> Clase gratis
+                                </a>
+                                <a class="btn btn-success btn-lg" th:href="'https://wa.me/' + ${whatsappNumber} + '?text=' + ${encodedCourseWhatsappMessage}" target="_blank">
+                                    <i class="bi bi-whatsapp"></i> <span th:text="${academyWhatsappCta}">Solicitar información</span>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -115,6 +120,67 @@
                         </div>
                     </div>
                 </article>
+
+                <section class="card border-0 shadow-sm rounded-4 mt-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                            <div>
+                                <h2 class="h5 mb-1">Temario del curso</h2>
+                                <p class="small text-muted mb-0">
+                                    <span th:text="${publishedLessonCount}">0</span> lecciones publicadas
+                                    · <span th:text="${previewLessonCount}">0</span> clase(s) gratuitas de vista previa
+                                </p>
+                            </div>
+                            <a class="btn btn-outline-primary btn-sm" th:href="@{|/academy/course/${course.slug}/learn|}" th:if="${previewLessonCount > 0}">
+                                <i class="bi bi-play-circle"></i> Ver clase gratuita
+                            </a>
+                        </div>
+
+                        <div class="accordion" id="courseCurriculum" th:if="${!#lists.isEmpty(curriculum)}">
+                            <div class="accordion-item" th:each="view, iter : ${curriculum}">
+                                <h3 class="accordion-header" th:id="${'heading-' + iter.index}">
+                                    <button class="accordion-button" th:classappend="${iter.index > 0} ? ' collapsed' : ''" type="button"
+                                            data-bs-toggle="collapse" th:data-bs-target="${'#collapse-' + iter.index}"
+                                            th:aria-expanded="${iter.index == 0}" th:aria-controls="${'collapse-' + iter.index}">
+                                        <span class="fw-semibold" th:text="${view.module.title}">Unidad</span>
+                                        <span class="badge bg-primary-subtle text-primary ms-2" th:text="${view.lessonCount + ' lección(es)'}">0 lecciones</span>
+                                    </button>
+                                </h3>
+                                <div th:id="${'collapse-' + iter.index}" class="accordion-collapse collapse"
+                                     th:classappend="${iter.index == 0} ? ' show' : ''"
+                                     th:aria-labelledby="${'heading-' + iter.index}" data-bs-parent="#courseCurriculum">
+                                    <div class="accordion-body">
+                                        <p class="small text-muted" th:if="${view.module.description != null and !#strings.isEmpty(view.module.description)}" th:text="${view.module.description}">Descripción</p>
+                                        <div class="list-group list-group-flush">
+                                            <div class="list-group-item px-0 d-flex justify-content-between align-items-start gap-3" th:each="lesson : ${view.lessons}">
+                                                <div>
+                                                    <div class="fw-semibold">
+                                                        <i class="bi bi-play-circle text-primary me-1" th:if="${lesson.lessonType.name() == 'VIDEO'}"></i>
+                                                        <i class="bi bi-file-text text-primary me-1" th:if="${lesson.lessonType.name() == 'TEXT'}"></i>
+                                                        <i class="bi bi-paperclip text-primary me-1" th:if="${lesson.lessonType.name() == 'MATERIAL'}"></i>
+                                                        <i class="bi bi-link-45deg text-primary me-1" th:if="${lesson.lessonType.name() == 'LINK'}"></i>
+                                                        <span th:text="${lesson.title}">Lección</span>
+                                                    </div>
+                                                    <div class="small text-muted" th:if="${lesson.description != null and !#strings.isEmpty(lesson.description)}" th:text="${lesson.description}">Descripción</div>
+                                                </div>
+                                                <div class="text-end small text-muted">
+                                                    <span th:text="${lesson.durationLabel}">10 min</span>
+                                                    <span class="badge bg-success-subtle text-success ms-1" th:if="${lesson.preview}">Gratis</span>
+                                                    <span class="badge bg-secondary-subtle text-secondary ms-1" th:unless="${lesson.preview}">Inscripción</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div th:if="${#lists.isEmpty(curriculum)}" class="text-center text-muted py-4 bg-light rounded-3">
+                            <i class="bi bi-list-task fs-2 d-block mb-2"></i>
+                            El temario se publicará pronto.
+                        </div>
+                    </div>
+                </section>
             </div>
             <div class="col-lg-4">
                 <aside class="card border-0 shadow-sm rounded-4 mb-4">

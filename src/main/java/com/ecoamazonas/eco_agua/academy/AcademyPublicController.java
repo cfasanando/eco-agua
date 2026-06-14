@@ -17,6 +17,7 @@ import java.util.List;
 public class AcademyPublicController {
 
     private final AcademyCourseService courseService;
+    private final AcademyCourseContentService contentService;
     private final PlatformSettingService platformSettingService;
     private final BusinessProperties businessProperties;
 
@@ -24,9 +25,11 @@ public class AcademyPublicController {
     private String defaultWhatsappNumber;
 
     public AcademyPublicController(AcademyCourseService courseService,
+                                   AcademyCourseContentService contentService,
                                    PlatformSettingService platformSettingService,
                                    BusinessProperties businessProperties) {
         this.courseService = courseService;
+        this.contentService = contentService;
         this.platformSettingService = platformSettingService;
         this.businessProperties = businessProperties;
     }
@@ -73,12 +76,44 @@ public class AcademyPublicController {
                 "article");
 
         model.addAttribute("course", course);
+        model.addAttribute("curriculum", contentService.findPublishedModuleViews(course));
+        model.addAttribute("publishedLessonCount", contentService.countPublishedLessons(course));
+        model.addAttribute("previewLessonCount", contentService.countPreviewLessons(course));
         model.addAttribute("relatedCourses", courseService.findPublishedForCatalog(null, course.getCategory()).stream()
                 .filter(item -> !item.getId().equals(course.getId()))
                 .limit(3)
                 .toList());
         model.addAttribute("encodedCourseWhatsappMessage", URLEncoder.encode(courseService.buildWhatsappMessage(course), StandardCharsets.UTF_8));
         return "academy/detail";
+    }
+
+
+
+    @GetMapping("/academy/course/{slug}/learn")
+    public String courseLearn(@PathVariable String slug,
+                              @RequestParam(value = "lesson", required = false) Long lessonId,
+                              Model model) {
+        AcademyCourse course = courseService.findPublishedBySlug(slug);
+        if (course == null) {
+            return "redirect:/academy";
+        }
+
+        addPublicLayoutSettings(model);
+        addAcademySettings(model);
+        addPublicSeo(model,
+                "Clase gratuita - " + course.getTitle() + " - " + setting("platform.name", businessProperties.getName()),
+                course.getShortDescription(),
+                course.getPublicPath() + "/learn",
+                course.getCoverImageUrl(),
+                "article");
+
+        model.addAttribute("course", course);
+        model.addAttribute("curriculum", contentService.findPublishedModuleViews(course));
+        model.addAttribute("selectedLesson", contentService.findPublicPreviewLesson(course, lessonId));
+        model.addAttribute("publishedLessonCount", contentService.countPublishedLessons(course));
+        model.addAttribute("previewLessonCount", contentService.countPreviewLessons(course));
+        model.addAttribute("encodedCourseWhatsappMessage", URLEncoder.encode(courseService.buildWhatsappMessage(course), StandardCharsets.UTF_8));
+        return "academy/learn";
     }
 
     private void addPublicLayoutSettings(Model model) {

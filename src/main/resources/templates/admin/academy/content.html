@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="fragments/head_admin :: adminHead('Academia / Contenido')"></th:block>
+    <style>
+        .academy-content-hero {
+            border-radius: 20px;
+            background: linear-gradient(135deg, #1d4ed8, #0f766e);
+            color: #ffffff;
+            padding: 1.25rem;
+            box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18);
+        }
+        .academy-content-card {
+            border: 0;
+            border-radius: 18px;
+            box-shadow: 0 2px 12px rgba(15, 23, 42, 0.08);
+        }
+        .academy-module-block {
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            background: #ffffff;
+            overflow: hidden;
+        }
+        .academy-module-header {
+            background: #f8fafc;
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .academy-lesson-row {
+            padding: .85rem 1rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .academy-lesson-row:last-child {
+            border-bottom: 0;
+        }
+        .academy-content-actions .btn {
+            width: 32px;
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+<div class="app-layout" th:with="activePage='academy_courses'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+
+        <main class="content-wrapper">
+            <div class="academy-content-hero mb-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                    <div>
+                        <div class="small text-white-50 mb-1">Academia digital / Contenido</div>
+                        <h1 class="h4 mb-1" th:text="${course.title}">Curso</h1>
+                        <p class="mb-0 text-white-75">
+                            Organiza el temario por unidades, lecciones, videos, materiales y clases gratuitas de vista previa.
+                        </p>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-light btn-sm" th:href="@{/admin/academy/courses}">
+                            <i class="bi bi-arrow-left"></i> Volver a cursos
+                        </a>
+                        <a class="btn btn-outline-light btn-sm" th:href="@{|/academy/course/${course.slug}|}" target="_blank">
+                            <i class="bi bi-box-arrow-up-right"></i> Ver público
+                        </a>
+                        <a class="btn btn-outline-light btn-sm" th:href="@{|/academy/course/${course.slug}/learn|}" target="_blank">
+                            <i class="bi bi-play-circle"></i> Vista de clase
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${successMessage != null}" class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle me-1"></i>
+                <span th:text="${successMessage}">Guardado correctamente.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="card academy-content-card mb-4">
+                        <div class="card-header bg-white border-0 pb-0">
+                            <h2 class="h6 mb-1" th:text="${isModuleEdit} ? 'Editar unidad' : 'Nueva unidad'">Nueva unidad</h2>
+                            <p class="small text-muted mb-0">Agrupa lecciones por tema, semana o módulo.</p>
+                        </div>
+                        <div class="card-body">
+                            <form th:action="@{|/admin/academy/courses/${course.id}/content/modules/save|}" method="post" th:object="${moduleForm}">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <input type="hidden" th:field="*{id}"/>
+                                <div class="mb-3">
+                                    <label class="form-label">Título de la unidad</label>
+                                    <input type="text" class="form-control" th:field="*{title}" required placeholder="Ej: Semana 1 - Fundamentos">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Descripción</label>
+                                    <textarea class="form-control" th:field="*{description}" rows="3" placeholder="Breve resumen de la unidad."></textarea>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <label class="form-label">Orden</label>
+                                        <input type="number" class="form-control" min="1" th:field="*{displayOrder}">
+                                    </div>
+                                    <div class="col-6 d-flex align-items-end">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" th:field="*{active}">
+                                            <label class="form-check-label">Activa</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-4">
+                                    <a class="btn btn-outline-secondary" th:href="@{|/admin/academy/courses/${course.id}/content|}">Limpiar</a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-save"></i> Guardar unidad
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card academy-content-card">
+                        <div class="card-header bg-white border-0 pb-0">
+                            <h2 class="h6 mb-1" th:text="${isLessonEdit} ? 'Editar lección' : 'Nueva lección'">Nueva lección</h2>
+                            <p class="small text-muted mb-0">Puedes usar video por URL, texto, material o enlace externo.</p>
+                        </div>
+                        <div class="card-body">
+                            <form th:action="@{|/admin/academy/courses/${course.id}/content/lessons/save|}" method="post" th:object="${lessonForm}">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <input type="hidden" th:field="*{id}"/>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Unidad</label>
+                                    <select class="form-select" name="moduleId" required th:disabled="${#lists.isEmpty(moduleViews)}">
+                                        <option value="">Seleccionar unidad</option>
+                                        <option th:each="view : ${moduleViews}"
+                                                th:value="${view.module.id}"
+                                                th:selected="${selectedModuleForLesson != null and selectedModuleForLesson == view.module.id}"
+                                                th:text="${view.module.displayOrder + '. ' + view.module.title}">Unidad</option>
+                                    </select>
+                                    <div class="form-text" th:if="${#lists.isEmpty(moduleViews)}">Primero crea una unidad.</div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Título de la lección</label>
+                                    <input type="text" class="form-control" th:field="*{title}" required placeholder="Ej: Cómo organizar tu primer reparto">
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Tipo</label>
+                                        <select class="form-select" th:field="*{lessonType}">
+                                            <option th:each="type : ${lessonTypes}" th:value="${type}" th:text="${type.label}">Video</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Estado</label>
+                                        <select class="form-select" th:field="*{status}">
+                                            <option th:each="status : ${lessonStatuses}" th:value="${status}" th:text="${status.label}">Borrador</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mt-0">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Duración</label>
+                                        <input type="text" class="form-control" th:field="*{durationLabel}" placeholder="10 min">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Orden</label>
+                                        <input type="number" class="form-control" min="1" th:field="*{displayOrder}">
+                                    </div>
+                                </div>
+
+                                <div class="mt-3">
+                                    <label class="form-label">Descripción breve</label>
+                                    <textarea class="form-control" th:field="*{description}" rows="2" maxlength="500"></textarea>
+                                </div>
+
+                                <div class="mt-3">
+                                    <label class="form-label">URL del video</label>
+                                    <input type="url" class="form-control" th:field="*{videoUrl}" placeholder="YouTube, Vimeo, Drive, etc.">
+                                </div>
+
+                                <div class="mt-3">
+                                    <label class="form-label">URL de material o enlace</label>
+                                    <input type="url" class="form-control" th:field="*{materialUrl}" placeholder="PDF, documento, hoja de cálculo, enlace externo">
+                                </div>
+
+                                <div class="mt-3">
+                                    <label class="form-label">Contenido de la clase</label>
+                                    <textarea class="form-control" th:field="*{contentText}" rows="5" placeholder="Resumen, pasos, explicación o guion de clase."></textarea>
+                                </div>
+
+                                <div class="d-flex flex-wrap gap-3 mt-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" th:field="*{preview}">
+                                        <label class="form-check-label">Vista previa gratuita</label>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" th:field="*{active}">
+                                        <label class="form-check-label">Activa</label>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center mt-4">
+                                    <a class="btn btn-outline-secondary" th:href="@{|/admin/academy/courses/${course.id}/content|}">Limpiar</a>
+                                    <button type="submit" class="btn btn-primary" th:disabled="${#lists.isEmpty(moduleViews)}">
+                                        <i class="bi bi-save"></i> Guardar lección
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <div class="card academy-content-card">
+                        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h2 class="h6 mb-0">Temario del curso</h2>
+                                <p class="small text-muted mb-0">Las unidades activas y lecciones publicadas aparecen en el catálogo público.</p>
+                            </div>
+                            <span class="badge bg-primary-subtle text-primary">
+                                <span th:text="${#lists.size(moduleViews)}">0</span> unidades
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex flex-column gap-3" th:if="${!#lists.isEmpty(moduleViews)}">
+                                <section class="academy-module-block" th:each="view : ${moduleViews}">
+                                    <div class="academy-module-header">
+                                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                                            <div>
+                                                <div class="small text-muted">Unidad <span th:text="${view.module.displayOrder}">1</span></div>
+                                                <h3 class="h6 mb-1" th:text="${view.module.title}">Unidad</h3>
+                                                <p class="small text-muted mb-0" th:if="${view.module.description != null and !#strings.isEmpty(view.module.description)}" th:text="${view.module.description}">Descripción</p>
+                                            </div>
+                                            <div class="d-flex align-items-center gap-2 academy-content-actions">
+                                                <span class="badge" th:classappend="${view.module.active} ? ' bg-success' : ' bg-secondary'" th:text="${view.module.active} ? 'Activa' : 'Inactiva'">Activa</span>
+                                                <a class="btn btn-outline-primary btn-sm" th:href="@{|/admin/academy/courses/${course.id}/content?moduleId=${view.module.id}|}" title="Editar unidad">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                                <a class="btn btn-outline-success btn-sm" th:href="@{|/admin/academy/courses/${course.id}/content?moduleForLessonId=${view.module.id}|}" title="Nueva lección en esta unidad">
+                                                    <i class="bi bi-plus-lg"></i>
+                                                </a>
+                                                <form th:action="@{|/admin/academy/courses/${course.id}/content/modules/${view.module.id}/archive|}" method="post" class="d-inline delete-form-single">
+                                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Desactivar unidad">
+                                                        <i class="bi bi-archive"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div th:if="${!#lists.isEmpty(view.lessons)}">
+                                        <div class="academy-lesson-row" th:each="lesson : ${view.lessons}">
+                                            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                                                <div>
+                                                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                                        <span class="badge bg-light text-dark border" th:text="${lesson.displayOrder}">1</span>
+                                                        <strong th:text="${lesson.title}">Lección</strong>
+                                                        <span class="badge bg-info-subtle text-info" th:text="${lesson.typeLabel}">Video</span>
+                                                        <span class="badge bg-warning-subtle text-warning-emphasis" th:if="${lesson.preview}">Preview</span>
+                                                        <span class="badge" th:classappend="${lesson.status.name() == 'PUBLISHED'} ? ' bg-success' : (${lesson.status.name() == 'ARCHIVED'} ? ' bg-secondary' : ' bg-warning text-dark')" th:text="${lesson.statusLabel}">Borrador</span>
+                                                    </div>
+                                                    <div class="small text-muted">
+                                                        <i class="bi bi-clock"></i> <span th:text="${lesson.durationLabel}">Duración</span>
+                                                        <span th:if="${lesson.description != null and !#strings.isEmpty(lesson.description)}"> · <span th:text="${lesson.description}">Descripción</span></span>
+                                                    </div>
+                                                </div>
+                                                <div class="btn-group academy-content-actions" role="group">
+                                                    <a class="btn btn-outline-primary btn-sm" th:href="@{|/admin/academy/courses/${course.id}/content?lessonId=${lesson.id}|}" title="Editar lección">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                    <form th:action="@{|/admin/academy/courses/${course.id}/content/lessons/${lesson.id}/preview|}" method="post" class="d-inline">
+                                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                        <button type="submit" class="btn btn-outline-info btn-sm" title="Activar / quitar preview">
+                                                            <i class="bi" th:classappend="${lesson.preview} ? ' bi-eye-fill' : ' bi-eye'"></i>
+                                                        </button>
+                                                    </form>
+                                                    <form th:if="${lesson.status.name() != 'PUBLISHED'}" th:action="@{|/admin/academy/courses/${course.id}/content/lessons/${lesson.id}/publish|}" method="post" class="d-inline">
+                                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                        <button type="submit" class="btn btn-outline-success btn-sm" title="Publicar">
+                                                            <i class="bi bi-check2-circle"></i>
+                                                        </button>
+                                                    </form>
+                                                    <form th:if="${lesson.status.name() == 'PUBLISHED'}" th:action="@{|/admin/academy/courses/${course.id}/content/lessons/${lesson.id}/draft|}" method="post" class="d-inline">
+                                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                        <button type="submit" class="btn btn-outline-warning btn-sm" title="Volver a borrador">
+                                                            <i class="bi bi-eye-slash"></i>
+                                                        </button>
+                                                    </form>
+                                                    <form th:action="@{|/admin/academy/courses/${course.id}/content/lessons/${lesson.id}/archive|}" method="post" class="d-inline delete-form-single">
+                                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm" title="Archivar">
+                                                            <i class="bi bi-archive"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="text-center text-muted py-4" th:if="${#lists.isEmpty(view.lessons)}">
+                                        <i class="bi bi-play-circle fs-4 d-block mb-2"></i>
+                                        Esta unidad todavía no tiene lecciones.
+                                    </div>
+                                </section>
+                            </div>
+                            <div th:if="${#lists.isEmpty(moduleViews)}" class="text-center text-muted py-5">
+                                <i class="bi bi-list-task fs-1 d-block mb-2"></i>
+                                Primero crea una unidad para empezar a agregar lecciones.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+<script th:inline="javascript">
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.ecoAdmin && window.ecoAdmin.registerSingleDelete) {
+            window.ecoAdmin.registerSingleDelete('.delete-form-single', '¿Archivar o desactivar este elemento del curso?');
+        }
+    });
+</script>
+</body>
+</html>

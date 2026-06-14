@@ -1,5 +1,14 @@
 package com.ecoamazonas.eco_agua.delivery;
 
+import com.ecoamazonas.eco_agua.client.Client;
+import com.ecoamazonas.eco_agua.client.ClientRepository;
+import com.ecoamazonas.eco_agua.client.DocumentType;
+import com.ecoamazonas.eco_agua.order.OrderStatus;
+import com.ecoamazonas.eco_agua.order.ReceivableService;
+import com.ecoamazonas.eco_agua.order.SaleOrder;
+import com.ecoamazonas.eco_agua.order.SaleOrderPayment;
+import com.ecoamazonas.eco_agua.order.SaleOrderRepository;
+import com.ecoamazonas.eco_agua.order.SalesChannel;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -14,16 +23,29 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class DeliveryImportService {
 
     private final DeliveryImportBatchRepository batchRepository;
     private final DeliveryImportStopRepository stopRepository;
+    private final ClientRepository clientRepository;
+    private final SaleOrderRepository saleOrderRepository;
+    private final ReceivableService receivableService;
 
-    public DeliveryImportService(DeliveryImportBatchRepository batchRepository, DeliveryImportStopRepository stopRepository) {
+    public DeliveryImportService(
+            DeliveryImportBatchRepository batchRepository,
+            DeliveryImportStopRepository stopRepository,
+            ClientRepository clientRepository,
+            SaleOrderRepository saleOrderRepository,
+            ReceivableService receivableService
+    ) {
         this.batchRepository = batchRepository;
         this.stopRepository = stopRepository;
+        this.clientRepository = clientRepository;
+        this.saleOrderRepository = saleOrderRepository;
+        this.receivableService = receivableService;
     }
 
     @Transactional(readOnly = true)
@@ -82,7 +104,149 @@ public class DeliveryImportService {
         stop.setStatus(status);
         stop.setStatusObservation(clean(observation));
         stop.setUpdatedAt(LocalDateTime.now());
+        syncLinkedOrderDeliveryStatus(stop);
         return stopRepository.save(stop);
+    }
+
+    @Transactional
+    public DeliveryImportStop linkOrCreateClient(Long stopId, boolean createIfMissing, boolean updateExisting) {
+        DeliveryImportStop stop = findStopForWrite(stopId);
+        Client client = resolveOrCreateClient(stop, createIfMissing, updateExisting);
+        if (client == null) {
+            throw new IllegalArgumentException("No se encontró cliente existente. Active la opción de crear cliente nuevo.");
+        }
+        stop.setClient(client);
+        markIntegrated(stop, "Cliente vinculado: " + client.getName());
+        return stopRepository.save(stop);
+    }
+
+    @Transactional
+    public int linkOrCreateClientsForBatch(Long batchId, boolean createIfMissing, boolean updateExisting) {
+        List<DeliveryImportStop> stops = findStops(batchId);
+        int updated = 0;
+        for (DeliveryImportStop stop : stops) {
+            Client client = resolveOrCreateClient(stop, createIfMissing, updateExisting);
+            if (client == null) {
+                continue;
+            }
+            stop.setClient(client);
+            markIntegrated(stop, "Cliente vinculado desde integración masiva.");
+            stopRepository.save(stop);
+            updated++;
+        }
+        return updated;
+    }
+
+    @Transactional
+    public DeliveryImportStop createOrderFromStop(Long stopId, OrderStatus requestedStatus) {
+        DeliveryImportStop stop = findStopForWrite(stopId);
+        if (stop.getSaleOrder() != null) {
+            return stop;
+        }
+
+        Client client = stop.getClient();
+        if (client == null) {
+            client = resolveOrCreateClient(stop, true, true);
+            stop.setClient(client);
+        }
+
+        LocalDate routeDate = stop.getBatch() != null && stop.getBatch().getRouteDate() != null
+                ? stop.getBatch().getRouteDate()
+                : LocalDate.now();
+
+        SaleOrder order = new SaleOrder();
+        order.setClient(client);
+        order.setOrderDate(routeDate);
+        order.setOrderNumber((int) (saleOrderRepository.countByOrderDate(routeDate) + 1));
+        order.setSalesChannel(SalesChannel.OTHER);
+        order.setStatus(resolveOrderStatus(requestedStatus, stop.getAmount()));
+        order.setDeliveryPerson(stop.getBatch() != null ? clean(stop.getBatch().getDeliveryPerson()) : null);
+        order.setDeliveryOrderIndex(stop.getRouteOrderIndex());
+        order.setDeliveryStatus(mapDeliveryStatus(stop.getStatus()));
+        order.setTotalAmount(safeAmount(stop.getAmount()));
+        order.setComment(buildOrderComment(stop));
+        order.setDeliveryObservation(buildDeliveryObservation(stop));
+        if (stop.getStatus() == DeliveryImportStopStatus.DELIVERED) {
+            order.setDeliveredAt(LocalDateTime.now());
+        }
+
+        SaleOrder savedOrder = saleOrderRepository.save(order);
+        stop.setSaleOrder(savedOrder);
+        markIntegrated(stop, "Pedido creado desde parada importada.");
+        return stopRepository.save(stop);
+    }
+
+    @Transactional
+    public int createOrdersForBatch(Long batchId, OrderStatus requestedStatus) {
+        List<DeliveryImportStop> stops = findStops(batchId);
+        int created = 0;
+        for (DeliveryImportStop stop : stops) {
+            if (stop.getSaleOrder() != null) {
+                continue;
+            }
+            createOrderFromStop(stop.getId(), requestedStatus);
+            created++;
+        }
+        return created;
+    }
+
+    @Transactional
+    public DeliveryImportStop registerPaymentForStop(Long stopId, BigDecimal amount, String paymentMethod, String paymentReference) {
+        DeliveryImportStop stop = findStopForWrite(stopId);
+        if (stop.getSaleOrder() == null) {
+            stop = createOrderFromStop(stopId, OrderStatus.CREDIT);
+        }
+
+        SaleOrder order = saleOrderRepository.findById(stop.getSaleOrder().getId())
+                .orElseThrow(() -> new IllegalArgumentException("Pedido vinculado no encontrado."));
+
+        if (order.getStatus() == OrderStatus.REQUESTED || order.getStatus() == OrderStatus.QUOTED) {
+            order.setStatus(OrderStatus.CREDIT);
+            saleOrderRepository.save(order);
+        }
+
+        BigDecimal amountToRegister = amount != null ? amount : stop.getAmount();
+        if (amountToRegister == null || amountToRegister.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Debe ingresar un monto mayor a cero.");
+        }
+
+        SaleOrderPayment payment = receivableService.registerPayment(
+                order.getId(),
+                LocalDate.now(),
+                amountToRegister.setScale(2, RoundingMode.HALF_UP),
+                clean(paymentMethod),
+                clean(paymentReference),
+                "Cobro registrado desde ruta importada #" + (stop.getBatch() != null ? stop.getBatch().getId() : "")
+        );
+
+        stop.setStatus(DeliveryImportStopStatus.DELIVERED);
+        stop.setStatusObservation("Cobrado " + payment.getPaymentMethod() + " S/ " + payment.getAmount());
+        markIntegrated(stop, "Cobro vinculado al pedido #" + order.getId());
+        return stopRepository.save(stop);
+    }
+
+    public List<String> findPaymentMethods() {
+        return List.of("EFECTIVO", "YAPE", "PLIN", "TRANSFERENCIA", "OTRO");
+    }
+
+    public long countClientLinkedStops(List<DeliveryImportStop> stops) {
+        return stops == null ? 0 : stops.stream().filter(DeliveryImportStop::isClientLinked).count();
+    }
+
+    public long countOrderLinkedStops(List<DeliveryImportStop> stops) {
+        return stops == null ? 0 : stops.stream().filter(DeliveryImportStop::isOrderLinked).count();
+    }
+
+    public BigDecimal calculateLinkedOrderAmount(List<DeliveryImportStop> stops) {
+        if (stops == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return stops.stream()
+                .filter(DeliveryImportStop::isOrderLinked)
+                .map(DeliveryImportStop::getAmount)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     public String buildOpenStreetMapRouteUrl(List<DeliveryImportStop> stops) {
@@ -135,6 +299,171 @@ public class DeliveryImportService {
                 .filter(amount -> amount != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private DeliveryImportStop findStopForWrite(Long stopId) {
+        return stopRepository.findById(stopId)
+                .orElseThrow(() -> new IllegalArgumentException("Parada no encontrada: " + stopId));
+    }
+
+    private Client resolveOrCreateClient(DeliveryImportStop stop, boolean createIfMissing, boolean updateExisting) {
+        Optional<Client> existing = findBestClientMatch(stop);
+        if (existing.isPresent()) {
+            Client client = existing.get();
+            if (updateExisting) {
+                updateClientFromStop(client, stop);
+                client = clientRepository.save(client);
+            }
+            return client;
+        }
+
+        if (!createIfMissing) {
+            return null;
+        }
+
+        Client client = new Client();
+        client.setName(requiredClientName(stop));
+        client.setDocType(DocumentType.NONE);
+        client.setDocNumber("S/N");
+        client.setActive(true);
+        updateClientFromStop(client, stop);
+        return clientRepository.save(client);
+    }
+
+    private Optional<Client> findBestClientMatch(DeliveryImportStop stop) {
+        List<Client> clients = clientRepository.findByActiveTrueOrderByNameAsc();
+        String stopPhone = normalizePhone(stop.getPhone());
+        String stopName = normalizeText(stop.getClientName());
+        String stopAddress = normalizeText(stop.getAddress());
+
+        if (stopPhone != null) {
+            Optional<Client> byPhone = clients.stream()
+                    .filter(client -> stopPhone.equals(normalizePhone(client.getPhone())))
+                    .findFirst();
+            if (byPhone.isPresent()) {
+                return byPhone;
+            }
+        }
+
+        if (stopName != null) {
+            Optional<Client> byName = clients.stream()
+                    .filter(client -> stopName.equals(normalizeText(client.getName())))
+                    .findFirst();
+            if (byName.isPresent()) {
+                return byName;
+            }
+        }
+
+        if (stopName != null && stopAddress != null) {
+            return clients.stream()
+                    .filter(client -> stopName.equals(normalizeText(client.getName())))
+                    .filter(client -> stopAddress.equals(normalizeText(client.getAddress())))
+                    .findFirst();
+        }
+
+        return Optional.empty();
+    }
+
+    private void updateClientFromStop(Client client, DeliveryImportStop stop) {
+        if (client == null || stop == null) {
+            return;
+        }
+        String clientName = clean(stop.getClientName());
+        if (client.getName() == null || client.getName().isBlank()) {
+            client.setName(clientName);
+        }
+        if (clean(stop.getPhone()) != null) {
+            client.setPhone(clean(stop.getPhone()));
+        }
+        if (clean(stop.getAddress()) != null) {
+            client.setAddress(clean(stop.getAddress()));
+        }
+        if (clean(stop.getReference()) != null) {
+            client.setReference(clean(stop.getReference()));
+        }
+        if (stop.getLatitude() != null && stop.getLongitude() != null) {
+            client.setLatitude(stop.getLatitude());
+            client.setLongitude(stop.getLongitude());
+        }
+    }
+
+    private OrderStatus resolveOrderStatus(OrderStatus requestedStatus, BigDecimal amount) {
+        if (requestedStatus != null && requestedStatus != OrderStatus.QUOTED && requestedStatus != OrderStatus.CANCELED) {
+            return requestedStatus;
+        }
+        return amount != null && amount.compareTo(BigDecimal.ZERO) > 0 ? OrderStatus.CREDIT : OrderStatus.REQUESTED;
+    }
+
+    private DeliveryStatus mapDeliveryStatus(DeliveryImportStopStatus status) {
+        if (status == null) {
+            return DeliveryStatus.PENDING;
+        }
+        return switch (status) {
+            case IN_ROUTE -> DeliveryStatus.IN_ROUTE;
+            case DELIVERED -> DeliveryStatus.DELIVERED;
+            case NOT_DELIVERED -> DeliveryStatus.NOT_DELIVERED;
+            case RESCHEDULED -> DeliveryStatus.RESCHEDULED;
+            case PENDING -> DeliveryStatus.PENDING;
+        };
+    }
+
+    private void syncLinkedOrderDeliveryStatus(DeliveryImportStop stop) {
+        if (stop == null || stop.getSaleOrder() == null || stop.getSaleOrder().getId() == null) {
+            return;
+        }
+        SaleOrder order = saleOrderRepository.findById(stop.getSaleOrder().getId()).orElse(null);
+        if (order == null) {
+            return;
+        }
+        order.setDeliveryStatus(mapDeliveryStatus(stop.getStatus()));
+        order.setDeliveryObservation(clean(stop.getStatusObservation()));
+        if (stop.getStatus() == DeliveryImportStopStatus.DELIVERED && order.getDeliveredAt() == null) {
+            order.setDeliveredAt(LocalDateTime.now());
+        }
+        saleOrderRepository.save(order);
+    }
+
+    private void markIntegrated(DeliveryImportStop stop, String observation) {
+        stop.setIntegratedAt(LocalDateTime.now());
+        stop.setUpdatedAt(LocalDateTime.now());
+        stop.setIntegrationObservation(clean(observation));
+    }
+
+    private String requiredClientName(DeliveryImportStop stop) {
+        String name = clean(stop != null ? stop.getClientName() : null);
+        if (name == null) {
+            throw new IllegalArgumentException("La parada no tiene nombre de cliente.");
+        }
+        return name;
+    }
+
+    private BigDecimal safeAmount(BigDecimal amount) {
+        return amount != null ? amount.setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private String buildOrderComment(DeliveryImportStop stop) {
+        StringBuilder builder = new StringBuilder("Pedido generado desde ruta importada");
+        if (stop.getBatch() != null && stop.getBatch().getId() != null) {
+            builder.append(" #").append(stop.getBatch().getId());
+        }
+        if (clean(stop.getObservation()) != null) {
+            builder.append(". ").append(clean(stop.getObservation()));
+        }
+        return builder.toString();
+    }
+
+    private String buildDeliveryObservation(DeliveryImportStop stop) {
+        StringBuilder builder = new StringBuilder();
+        if (clean(stop.getReference()) != null) {
+            builder.append("Referencia: ").append(clean(stop.getReference()));
+        }
+        if (clean(stop.getStatusObservation()) != null) {
+            if (!builder.isEmpty()) {
+                builder.append(". ");
+            }
+            builder.append(clean(stop.getStatusObservation()));
+        }
+        return builder.isEmpty() ? null : builder.toString();
     }
 
     private List<DeliveryImportStop> parseCsv(MultipartFile file) {
@@ -253,6 +582,29 @@ public class DeliveryImportService {
                 * Math.sin(dLng / 2D) * Math.sin(dLng / 2D);
         double c = 2D * Math.atan2(Math.sqrt(a), Math.sqrt(1D - a));
         return earthRadiusKm * c;
+    }
+
+    private String normalizePhone(String rawPhone) {
+        if (rawPhone == null || rawPhone.isBlank()) {
+            return null;
+        }
+        String digits = rawPhone.replaceAll("\\D", "");
+        return digits.isBlank() ? null : digits;
+    }
+
+    private String normalizeText(String value) {
+        String cleaned = clean(value);
+        if (cleaned == null) {
+            return null;
+        }
+        return cleaned.toLowerCase()
+                .replace("á", "a")
+                .replace("é", "e")
+                .replace("í", "i")
+                .replace("ó", "o")
+                .replace("ú", "u")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private String clean(String value) {

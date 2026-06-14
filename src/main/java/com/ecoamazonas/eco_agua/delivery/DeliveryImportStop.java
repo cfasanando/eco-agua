@@ -1,5 +1,7 @@
 package com.ecoamazonas.eco_agua.delivery;
 
+import com.ecoamazonas.eco_agua.client.Client;
+import com.ecoamazonas.eco_agua.order.SaleOrder;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -53,6 +55,20 @@ public class DeliveryImportStop {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "client_id")
+    private Client client;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sale_order_id")
+    private SaleOrder saleOrder;
+
+    @Column(name = "integrated_at")
+    private LocalDateTime integratedAt;
+
+    @Column(name = "integration_observation", length = 500)
+    private String integrationObservation;
 
     public Long getId() {
         return id;
@@ -160,6 +176,80 @@ public class DeliveryImportStop {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Client getClient() {
+        return client;
+    }
+
+    public void setClient(Client client) {
+        this.client = client;
+    }
+
+    public SaleOrder getSaleOrder() {
+        return saleOrder;
+    }
+
+    public void setSaleOrder(SaleOrder saleOrder) {
+        this.saleOrder = saleOrder;
+    }
+
+    public LocalDateTime getIntegratedAt() {
+        return integratedAt;
+    }
+
+    public void setIntegratedAt(LocalDateTime integratedAt) {
+        this.integratedAt = integratedAt;
+    }
+
+    public String getIntegrationObservation() {
+        return integrationObservation;
+    }
+
+    public void setIntegrationObservation(String integrationObservation) {
+        this.integrationObservation = integrationObservation;
+    }
+
+    @Transient
+    public Long getClientId() {
+        return client != null ? client.getId() : null;
+    }
+
+    @Transient
+    public Long getSaleOrderId() {
+        return saleOrder != null ? saleOrder.getId() : null;
+    }
+
+    @Transient
+    public boolean isClientLinked() {
+        return getClientId() != null;
+    }
+
+    @Transient
+    public boolean isOrderLinked() {
+        return getSaleOrderId() != null;
+    }
+
+    @Transient
+    public String getIntegrationLabel() {
+        if (isOrderLinked()) {
+            return "Pedido vinculado";
+        }
+        if (isClientLinked()) {
+            return "Cliente vinculado";
+        }
+        return "Pendiente";
+    }
+
+    @Transient
+    public String getIntegrationBadgeClass() {
+        if (isOrderLinked()) {
+            return "text-bg-success";
+        }
+        if (isClientLinked()) {
+            return "text-bg-primary";
+        }
+        return "text-bg-secondary";
     }
 
     @Transient

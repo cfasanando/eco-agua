@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Panel de reparto - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='delivery_dashboard'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Panel de control de reparto</h1>
+                    <div class="text-muted small" th:text="${#temporals.format(today, 'dd/MM/yyyy')}">Fecha</div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-secondary btn-sm" th:href="@{/delivery(date=${today}, deliveryPerson=${selectedDeliveryPerson})}">
+                        <i class="bi bi-truck me-1"></i> Reparto diario
+                    </a>
+                    <a class="btn btn-outline-info btn-sm" th:href="@{/delivery/map(date=${today}, deliveryPerson=${selectedDeliveryPerson})}">
+                        <i class="bi bi-map me-1"></i> Mapa
+                    </a>
+                    <a class="btn btn-outline-primary btn-sm" th:href="@{/delivery/routes(date=${today}, deliveryPerson=${selectedDeliveryPerson})}">
+                        <i class="bi bi-signpost-split me-1"></i> Rutas
+                    </a>
+                    <a class="btn btn-outline-dark btn-sm" th:href="@{/delivery/mobile(date=${today}, deliveryPerson=${selectedDeliveryPerson})}">
+                        <i class="bi bi-phone me-1"></i> Modo repartidor
+                    </a>
+                    <a class="btn btn-outline-primary btn-sm" th:if="${openStreetMapRouteUrl != null}" target="_blank" th:href="${openStreetMapRouteUrl}">
+                        <i class="bi bi-signpost-split me-1"></i> Ruta OSM
+                    </a>
+                </div>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small mb-3">
+                <strong>Control operativo:</strong>
+                revisa avance de entregas, cobranza en ruta, incidencias, responsables, zonas y actividad reciente del día.
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light"><strong>Filtros del panel</strong></div>
+                <div class="card-body">
+                    <form class="row g-2 align-items-end" th:action="@{/delivery/dashboard}" method="get">
+                        <div class="col-md-3">
+                            <label class="form-label">Fecha</label>
+                            <input type="date" class="form-control" name="date" th:value="${today}">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Responsable de entrega</label>
+                            <select class="form-select" name="deliveryPerson">
+                                <option value="">Todos</option>
+                                <option th:each="employee : ${deliveryEmployees}"
+                                        th:value="${employee.firstName + ' ' + employee.lastName}"
+                                        th:selected="${selectedDeliveryPerson != null and selectedDeliveryPerson == (employee.firstName + ' ' + employee.lastName)}"
+                                        th:text="${employee.firstName + ' ' + employee.lastName}">Responsable</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 d-grid">
+                            <button type="submit" class="btn btn-primary">Buscar</button>
+                        </div>
+                        <div class="col-md-2 d-grid">
+                            <a class="btn btn-outline-secondary" th:href="@{/delivery/dashboard}">Limpiar</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Pedidos</div>
+                            <div class="fs-4 fw-bold" th:text="${snapshot.totalOrders}">0</div>
+                            <div class="small text-muted" th:text="|'S/ ' + ${#numbers.formatDecimal(snapshot.totalAmount, 1, 2)}|">S/ 0.00</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-success-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Entregados</div>
+                            <div class="fs-4 fw-bold text-success" th:text="${snapshot.deliveredCount}">0</div>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar bg-success" th:style="|width:${snapshot.deliveredProgressPercent}%|"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-primary-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">En ruta</div>
+                            <div class="fs-4 fw-bold text-primary" th:text="${snapshot.inRouteCount}">0</div>
+                            <div class="small text-muted">Abiertos: <span th:text="${snapshot.openCount}">0</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-danger-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Incidencias</div>
+                            <div class="fs-4 fw-bold text-danger" th:text="${snapshot.issueCount}">0</div>
+                            <div class="small text-muted">No entregado / reprogramado</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-warning-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Cobrado en ruta</div>
+                            <div class="fs-4 fw-bold text-warning" th:text="|'S/ ' + ${#numbers.formatDecimal(snapshot.collectedInRouteAmount, 1, 2)}|">S/ 0.00</div>
+                            <div class="small text-muted">Pendiente: <span th:text="|'S/ ' + ${#numbers.formatDecimal(snapshot.pendingAmount, 1, 2)}|">S/ 0.00</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-xl-2">
+                    <div class="card shadow-sm h-100 border-info-subtle">
+                        <div class="card-body">
+                            <div class="text-muted small">Con ubicación</div>
+                            <div class="fs-4 fw-bold text-info"><span th:text="${snapshot.locatedCount}">0</span>/<span th:text="${snapshot.totalOrders}">0</span></div>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar bg-info" th:style="|width:${snapshot.locatedProgressPercent}%|"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <strong>Mapa gerencial del día</strong>
+                            <span class="small text-muted">Pedidos con ubicación guardada</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div id="deliveryDashboardMap" style="height: 520px;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <strong>Resumen de ruta</strong>
+                            <span class="badge text-bg-primary" th:text="|${snapshot.routeSummary.totalStops} parada(s)|">0 paradas</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <div class="border rounded p-2 h-100">
+                                        <div class="small text-muted">Distancia aprox.</div>
+                                        <div class="fw-bold text-primary"><span th:text="${#numbers.formatDecimal(snapshot.routeSummary.estimatedDistanceKm, 1, 2)}">0.00</span> km</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="border rounded p-2 h-100">
+                                        <div class="small text-muted">Tiempo estimado</div>
+                                        <div class="fw-bold text-info" th:text="${snapshot.routeSummary.estimatedTimeLabel}">-</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div th:if="${snapshot.missingLocationCount > 0}" class="alert alert-warning small">
+                                Hay <strong th:text="${snapshot.missingLocationCount}">0</strong> pedido(s) sin ubicación.
+                                Conviene completar latitud/longitud en la ficha del cliente.
+                            </div>
+
+                            <div class="list-group list-group-flush" th:if="${!#lists.isEmpty(snapshot.routeRows)}">
+                                <a th:each="row, iter : ${snapshot.routeRows}"
+                                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-2"
+                                   th:href="@{|/delivery/orders/${row.orderId}|}">
+                                    <div>
+                                        <div class="fw-semibold"><span class="badge text-bg-secondary me-1" th:text="${iter.index + 1}">1</span> <span th:text="${row.clientName}">Cliente</span></div>
+                                        <div class="small text-muted" th:text="${row.addressSummary}">Dirección</div>
+                                    </div>
+                                    <span class="badge" th:classappend="${row.deliveryStatusBadgeClass}" th:text="${row.deliveryStatusLabel}">Estado</span>
+                                </a>
+                            </div>
+                            <div th:if="${#lists.isEmpty(snapshot.routeRows)}" class="text-center text-muted p-4">
+                                No hay paradas con ubicación para construir ruta.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Rendimiento por responsable</strong></div>
+                        <div class="card-body">
+                            <div th:if="${#lists.isEmpty(snapshot.personRows)}" class="text-muted text-center p-4">Sin responsables asignados.</div>
+                            <div class="table-responsive" th:if="${!#lists.isEmpty(snapshot.personRows)}">
+                                <table class="table table-sm align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Responsable</th>
+                                        <th class="text-end">Pedidos</th>
+                                        <th class="text-end">Entregados</th>
+                                        <th class="text-end">Incidencias</th>
+                                        <th class="text-end">Cobrado</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="person : ${snapshot.personRows}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${person.name}">Responsable</div>
+                                            <div class="progress mt-1" style="height: 5px;">
+                                                <div class="progress-bar bg-success" th:style="|width:${person.deliveredProgressPercent}%|"></div>
+                                            </div>
+                                        </td>
+                                        <td class="text-end" th:text="${person.totalOrders}">0</td>
+                                        <td class="text-end text-success" th:text="${person.deliveredCount}">0</td>
+                                        <td class="text-end text-danger" th:text="${person.issueCount}">0</td>
+                                        <td class="text-end" th:text="|'S/ ' + ${#numbers.formatDecimal(person.collectedInRouteAmount, 1, 2)}|">S/ 0.00</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Resumen por zona</strong></div>
+                        <div class="card-body">
+                            <div th:if="${#lists.isEmpty(snapshot.zoneRows)}" class="text-muted text-center p-4">Sin zonas asignadas.</div>
+                            <div class="table-responsive" th:if="${!#lists.isEmpty(snapshot.zoneRows)}">
+                                <table class="table table-sm align-middle">
+                                    <thead class="table-light">
+                                    <tr>
+                                        <th>Zona</th>
+                                        <th class="text-end">Pedidos</th>
+                                        <th class="text-end">Entregados</th>
+                                        <th class="text-end">Incidencias</th>
+                                        <th class="text-end">Monto</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="zone : ${snapshot.zoneRows}">
+                                        <td>
+                                            <div class="fw-semibold" th:text="${zone.name}">Zona</div>
+                                            <div class="progress mt-1" style="height: 5px;">
+                                                <div class="progress-bar bg-success" th:style="|width:${zone.deliveredProgressPercent}%|"></div>
+                                            </div>
+                                        </td>
+                                        <td class="text-end" th:text="${zone.totalOrders}">0</td>
+                                        <td class="text-end text-success" th:text="${zone.deliveredCount}">0</td>
+                                        <td class="text-end text-danger" th:text="${zone.issueCount}">0</td>
+                                        <td class="text-end" th:text="|'S/ ' + ${#numbers.formatDecimal(zone.totalAmount, 1, 2)}|">S/ 0.00</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Incidencias y reprogramaciones</strong></div>
+                        <div class="card-body">
+                            <div th:if="${#lists.isEmpty(snapshot.issueRows)}" class="text-muted text-center p-4">No hay incidencias registradas para esta fecha.</div>
+                            <div class="list-group list-group-flush" th:if="${!#lists.isEmpty(snapshot.issueRows)}">
+                                <a th:each="row : ${snapshot.issueRows}" class="list-group-item list-group-item-action" th:href="@{|/delivery/orders/${row.orderId}|}">
+                                    <div class="d-flex justify-content-between gap-2">
+                                        <div>
+                                            <div class="fw-semibold" th:text="${row.clientName}">Cliente</div>
+                                            <div class="small text-muted" th:text="${row.addressSummary}">Dirección</div>
+                                        </div>
+                                        <span class="badge align-self-start" th:classappend="${row.deliveryStatusBadgeClass}" th:text="${row.deliveryStatusLabel}">Estado</span>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Actividad reciente</strong></div>
+                        <div class="card-body">
+                            <div th:if="${#lists.isEmpty(snapshot.recentActivities)}" class="text-muted text-center p-4">Todavía no hay actividad registrada hoy.</div>
+                            <div class="list-group list-group-flush" th:if="${!#lists.isEmpty(snapshot.recentActivities)}">
+                                <a th:each="event : ${snapshot.recentActivities}" class="list-group-item list-group-item-action" th:href="@{|/delivery/orders/${event.orderId}|}">
+                                    <div class="d-flex justify-content-between gap-2">
+                                        <div>
+                                            <div class="fw-semibold">
+                                                <span th:text="${event.clientName}">Cliente</span>
+                                                <span class="text-muted" th:if="${event.orderNumber != null}" th:text="|#${event.orderNumber}|">#0</span>
+                                            </div>
+                                            <div class="small text-muted">
+                                                <span th:text="${#temporals.format(event.eventDate, 'HH:mm')}">00:00</span>
+                                                <span th:if="${event.deliveryPerson != null and !#strings.isEmpty(event.deliveryPerson)}" th:text="|' · ' + ${event.deliveryPerson}"> · Responsable</span>
+                                            </div>
+                                            <div class="small" th:if="${event.observation != null and !#strings.isEmpty(event.observation)}" th:text="${event.observation}">Observación</div>
+                                            <div class="small text-danger" th:if="${event.incidentReason != null and !#strings.isEmpty(event.incidentReason)}" th:text="${event.incidentReason}">Motivo</div>
+                                            <div class="small text-success" th:if="${event.hasPaymentInfo()}">
+                                                Cobro: S/ <span th:text="${#numbers.formatDecimal(event.paymentAmount, 1, 2)}">0.00</span>
+                                                <span th:if="${event.paymentMethod != null and !#strings.isEmpty(event.paymentMethod)}" th:text="|' · ' + ${event.paymentMethod}|"> · Método</span>
+                                            </div>
+                                        </div>
+                                        <span class="badge align-self-start" th:classappend="${event.badgeClass}" th:text="${event.eventTypeLabel}">Evento</span>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+<link rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        const mapEl = document.getElementById('deliveryDashboardMap');
+        if (!mapEl || typeof L === 'undefined') {
+            return;
+        }
+
+        const defaultCenter = [-3.743673, -73.251632];
+        const map = L.map('deliveryDashboardMap').setView(defaultCenter, 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        const markerGroup = L.featureGroup().addTo(map);
+        const routePoints = [];
+
+        function statusClass(status) {
+            if (status === 'DELIVERED') {
+                return 'delivery-dashboard-marker delivery-dashboard-marker-delivered';
+            }
+            if (status === 'IN_ROUTE') {
+                return 'delivery-dashboard-marker delivery-dashboard-marker-route';
+            }
+            if (status === 'NOT_DELIVERED' || status === 'CANCELED') {
+                return 'delivery-dashboard-marker delivery-dashboard-marker-failed';
+            }
+            if (status === 'RESCHEDULED') {
+                return 'delivery-dashboard-marker delivery-dashboard-marker-rescheduled';
+            }
+            return 'delivery-dashboard-marker delivery-dashboard-marker-pending';
+        }
+
+        document.querySelectorAll('.delivery-dashboard-stop').forEach(function (item, index) {
+            const lat = parseFloat(item.dataset.lat);
+            const lng = parseFloat(item.dataset.lng);
+            if (Number.isNaN(lat) || Number.isNaN(lng)) {
+                return;
+            }
+
+            const point = [lat, lng];
+            routePoints.push(point);
+
+            const icon = L.divIcon({
+                className: statusClass(item.dataset.status),
+                html: '<span>' + (index + 1) + '</span>',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+
+            const popup = '<div style="min-width:220px">'
+                + '<strong>' + (item.dataset.title || 'Pedido') + '</strong>'
+                + '<div class="small text-muted mb-1">' + (item.dataset.label || '') + '</div>'
+                + '<div class="small mb-2">' + (item.dataset.address || '-') + '</div>'
+                + '<a class="btn btn-sm btn-outline-secondary me-1" href="' + item.dataset.detail + '">Detalle</a>'
+                + '<a class="btn btn-sm btn-outline-info" target="_blank" href="' + item.dataset.osm + '">OSM</a>'
+                + '</div>';
+
+            L.marker(point, {icon: icon}).bindPopup(popup).addTo(markerGroup);
+        });
+
+        if (routePoints.length > 1) {
+            L.polyline(routePoints, {weight: 4, opacity: 0.65}).addTo(markerGroup);
+        }
+
+        if (routePoints.length > 0) {
+            map.fitBounds(markerGroup.getBounds().pad(0.2));
+        }
+    });
+</script>
+<style>
+    .delivery-dashboard-marker {
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,.35);
+        font-size: .8rem;
+        font-weight: 700;
+        color: #fff;
+    }
+    .delivery-dashboard-marker span { line-height: 1; }
+    .delivery-dashboard-marker-pending { background: #f59f00; }
+    .delivery-dashboard-marker-route { background: #0d6efd; }
+    .delivery-dashboard-marker-delivered { background: #198754; }
+    .delivery-dashboard-marker-failed { background: #dc3545; }
+    .delivery-dashboard-marker-rescheduled { background: #0dcaf0; color: #052c33; }
+</style>
+
+<div class="d-none">
+    <div th:each="row, iter : ${snapshot.locatedRows}"
+         class="delivery-dashboard-stop"
+         th:data-lat="${row.latitude}"
+         th:data-lng="${row.longitude}"
+         th:data-status="${row.deliveryStatus}"
+         th:data-title="${row.clientName}"
+         th:data-label="${'Pedido #' + (row.orderNumber != null ? row.orderNumber : row.orderId) + ' · ' + row.deliveryStatusLabel}"
+         th:data-address="${row.addressSummary}"
+         th:data-detail="@{|/delivery/orders/${row.orderId}|}"
+         th:data-osm="${row.openStreetMapUrl}"></div>
+</div>
+</body>
+</html>

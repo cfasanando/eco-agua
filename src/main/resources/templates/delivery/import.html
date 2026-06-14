@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Importar ruta - Eco Agua')"></head>
+<body>
+<div class="app-layout" th:with="activePage='delivery_import'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                <div>
+                    <h1 class="h5 mb-1">Importar ruta</h1>
+                    <div class="text-muted small">Carga paradas desde CSV para courier, reparto externo o pedidos masivos.</div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-secondary btn-sm" th:href="@{/delivery/dashboard}"><i class="bi bi-speedometer2 me-1"></i> Panel</a>
+                    <a class="btn btn-outline-primary btn-sm" th:href="@{/delivery/routes}"><i class="bi bi-signpost-split me-1"></i> Rutas del día</a>
+                    <a class="btn btn-outline-dark btn-sm" th:href="@{/delivery/mobile}"><i class="bi bi-phone me-1"></i> Modo repartidor</a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}">OK</div>
+            <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}">Error</div>
+
+            <div class="alert alert-info border-0 shadow-sm small">
+                <strong>Formato CSV:</strong>
+                cliente, teléfono, dirección, referencia, monto, observación, latitud, longitud.
+                Puedes usar coma o punto y coma. La primera fila puede ser encabezado.
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Nueva importación</strong></div>
+                        <div class="card-body">
+                            <form th:action="@{/delivery/import}" method="post" enctype="multipart/form-data" class="vstack gap-3">
+                                <div>
+                                    <label class="form-label">Título de la ruta</label>
+                                    <input type="text" name="title" class="form-control" placeholder="Ruta marketplace / reparto mañana">
+                                </div>
+                                <div>
+                                    <label class="form-label">Fecha de reparto</label>
+                                    <input type="date" name="routeDate" class="form-control" th:value="${today}">
+                                </div>
+                                <div>
+                                    <label class="form-label">Responsable</label>
+                                    <input type="text" name="deliveryPerson" class="form-control" placeholder="Nombre del repartidor">
+                                </div>
+                                <div>
+                                    <label class="form-label">Archivo CSV</label>
+                                    <input type="file" name="file" class="form-control" accept=".csv,text/csv" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-upload me-1"></i> Importar ruta
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header bg-light"><strong>Ejemplo de archivo</strong></div>
+                        <div class="card-body">
+                            <pre class="bg-light border rounded p-3 small mb-3">cliente;telefono;direccion;referencia;monto;observacion;latitud;longitud
+Cliente Demo;999888777;Jr. Amazonas 123;Casa azul;12.50;Cobrar con Yape;-3.7437000;-73.2516000
+Bodega Anita;988777666;Av. Participación 456;Frente al colegio;20.00;Entregar 2 paquetes;-3.7510000;-73.2460000</pre>
+                            <div class="small text-muted">
+                                Las coordenadas son opcionales. Si faltan, la parada aparece en la hoja de ruta pero no en el mapa.
+                                Luego puedes corregir la dirección en cliente o volver a importar con coordenadas.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mt-3">
+                <div class="card-header bg-light"><strong>Importaciones recientes</strong></div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Ruta</th>
+                            <th>Responsable</th>
+                            <th class="text-end">Paradas</th>
+                            <th class="text-end">Con mapa</th>
+                            <th>Archivo</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="batch : ${batches}">
+                            <td th:text="${#temporals.format(batch.routeDate, 'dd/MM/yyyy')}">Fecha</td>
+                            <td>
+                                <div class="fw-semibold" th:text="${batch.title}">Ruta</div>
+                                <div class="text-muted small" th:text="${#temporals.format(batch.createdAt, 'dd/MM/yyyy HH:mm')}">Creado</div>
+                            </td>
+                            <td th:text="${batch.deliveryPerson ?: '-'}">Responsable</td>
+                            <td class="text-end" th:text="${batch.totalStops}">0</td>
+                            <td class="text-end" th:text="${batch.locatedStops + ' / ' + batch.missingLocationStops}">0 / 0</td>
+                            <td class="small text-muted" th:text="${batch.sourceFilename ?: '-'}">archivo.csv</td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-primary" th:href="@{/delivery/import/{id}(id=${batch.id})}" title="Abrir hoja de ruta">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(batches)}">
+                            <td colspan="7" class="text-center text-muted py-4">Aún no hay rutas importadas.</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<th:block th:replace="fragments/scripts_admin :: adminScripts"></th:block>
+</body>
+</html>

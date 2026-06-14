@@ -135,6 +135,17 @@ public class PlatformAdminController {
         return "redirect:/admin/platform/clients/" + id + "/provisioning";
     }
 
+    @PostMapping("/clients/{id}/provisioning/load-demo-data")
+    public String loadClientDemoDataAutomatically(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            platformProvisioningService.loadTemplateDemoDataAutomatically(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Datos demo de la plantilla cargados correctamente.");
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", safeFlashMessage(ex));
+        }
+        return "redirect:/admin/platform/clients/" + id + "/provisioning";
+    }
+
     @PostMapping("/clients/{id}/provisioning/generate-runtime-files")
     public String generateClientRuntimeFiles(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         try {
@@ -178,6 +189,12 @@ public class PlatformAdminController {
     public ResponseEntity<String> downloadBootstrapSql(@PathVariable Long id) {
         PlatformProvisioningPlan plan = platformProvisioningService.buildPlan(id);
         return downloadableSql(plan.bootstrapFileName(), plan.bootstrapSql());
+    }
+
+    @GetMapping("/clients/{id}/provisioning/demo-data.sql")
+    public ResponseEntity<String> downloadDemoDataSql(@PathVariable Long id) {
+        PlatformProvisioningPlan plan = platformProvisioningService.buildPlan(id);
+        return downloadableSql(plan.demoDataFileName(), plan.demoDataSql());
     }
 
 

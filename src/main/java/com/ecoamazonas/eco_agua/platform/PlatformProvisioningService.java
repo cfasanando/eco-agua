@@ -24,13 +24,16 @@ import java.util.regex.Pattern;
 public class PlatformProvisioningService {
 
     private static final Set<String> DATABASE_CREATED_STATUSES = Set.of(
-            "DATABASE_CREATED", "STRUCTURE_READY", "BOOTSTRAP_APPLIED", "READY", "CREATED"
+            "DATABASE_CREATED", "STRUCTURE_READY", "BOOTSTRAP_APPLIED", "DEMO_DATA_LOADED", "READY", "CREATED"
     );
     private static final Set<String> STRUCTURE_READY_STATUSES = Set.of(
-            "STRUCTURE_READY", "BOOTSTRAP_APPLIED", "READY", "CREATED"
+            "STRUCTURE_READY", "BOOTSTRAP_APPLIED", "DEMO_DATA_LOADED", "READY", "CREATED"
     );
     private static final Set<String> BOOTSTRAP_READY_STATUSES = Set.of(
-            "BOOTSTRAP_APPLIED", "READY", "CREATED"
+            "BOOTSTRAP_APPLIED", "DEMO_DATA_LOADED", "READY", "CREATED"
+    );
+    private static final Set<String> DEMO_DATA_READY_STATUSES = Set.of(
+            "DEMO_DATA_LOADED", "READY", "CREATED"
     );
     private static final Pattern CREATE_TABLE_PATTERN = Pattern.compile("(?is)^CREATE\\s+TABLE\\s+`([^`]+)`");
 
@@ -68,10 +71,14 @@ public class PlatformProvisioningService {
         boolean databaseCreated = DATABASE_CREATED_STATUSES.contains(databaseStatus);
         boolean structureReady = STRUCTURE_READY_STATUSES.contains(databaseStatus);
         boolean bootstrapApplied = BOOTSTRAP_READY_STATUSES.contains(databaseStatus);
+        boolean demoDataRequested = client.isDemoDataEnabled();
+        boolean demoDataLoaded = DEMO_DATA_READY_STATUSES.contains(databaseStatus);
+        boolean demoDataReady = !demoDataRequested || demoDataLoaded;
         boolean active = "ACTIVE".equalsIgnoreCase(safe(client.getStatus())) || "READY".equals(databaseStatus) || "CREATED".equals(databaseStatus);
-        boolean ready = active && bootstrapApplied;
+        boolean ready = active && bootstrapApplied && demoDataReady;
         String databaseName = normalizedDatabaseName(client.getDatabaseName());
         String bootstrapFileName = "bootstrap-" + databaseName + ".sql";
+        String demoDataFileName = "demo-data-" + databaseName + ".sql";
         String createDatabaseFileName = "create-database-" + databaseName + ".sql";
         String runtimeProfile = normalizeRuntimeProfile(defaultValue(client.getRuntimeProfile(), client.getCode()));
         Path runtimeFolderPath = runtimeFolder(runtimeProfile);
@@ -90,7 +97,9 @@ public class PlatformProvisioningService {
                 "Copia automáticamente la estructura de tablas desde la base modelo."));
         steps.add(step(4, "Aplicar configuración inicial", bootstrapApplied,
                 "Ejecuta el bootstrap generado para branding, módulos y datos básicos."));
-        steps.add(step(5, "Generar runtime y activar", ready,
+        steps.add(step(5, "Cargar datos demo", demoDataReady,
+                demoDataRequested ? "Inserta productos, clientes, marketing y operación inicial según la plantilla." : "Omitido: este negocio fue creado sin datos demo."));
+        steps.add(step(6, "Generar runtime y activar", ready,
                 "Genera archivos runtime y marca el negocio listo para demo."));
 
         return new PlatformProvisioningPlan(
@@ -104,25 +113,30 @@ public class PlatformProvisioningService {
                 databaseCreated && !structureReady,
                 structureReady && !bootstrapApplied,
                 databaseCreated && !structureReady,
-                bootstrapApplied && !active,
-                bootstrapApplied && active,
+                bootstrapApplied && demoDataRequested && !demoDataLoaded,
+                bootstrapApplied && demoDataReady && !active,
+                bootstrapApplied && demoDataReady && active,
                 warningFor(client, ready),
                 databaseCreated,
                 structureReady,
                 bootstrapApplied,
+                demoDataRequested,
+                demoDataLoaded,
                 active,
                 ready,
-                statusTitle(databaseCreated, structureReady, bootstrapApplied, active, ready),
-                statusDescription(databaseCreated, structureReady, bootstrapApplied, active, ready, runtimeFilesGenerated),
-                ready ? "text-bg-success" : bootstrapApplied ? "text-bg-info" : databaseCreated ? "text-bg-warning" : "text-bg-secondary",
-                ready ? "alert-success" : bootstrapApplied ? "alert-info" : databaseCreated ? "alert-warning" : "alert-info",
+                statusTitle(databaseCreated, structureReady, bootstrapApplied, demoDataRequested, demoDataLoaded, active, ready),
+                statusDescription(databaseCreated, structureReady, bootstrapApplied, demoDataRequested, demoDataLoaded, active, ready, runtimeFilesGenerated),
+                ready ? "text-bg-success" : demoDataRequested && bootstrapApplied && !demoDataLoaded ? "text-bg-warning" : bootstrapApplied ? "text-bg-info" : databaseCreated ? "text-bg-warning" : "text-bg-secondary",
+                ready ? "alert-success" : demoDataRequested && bootstrapApplied && !demoDataLoaded ? "alert-warning" : bootstrapApplied ? "alert-info" : databaseCreated ? "alert-warning" : "alert-info",
                 bootstrapFileName,
+                demoDataFileName,
                 createDatabaseFileName,
                 String.join(System.lineSeparator(), commands),
                 openBusinessUrl(client),
                 runtimeFolderPath.toString(),
                 applicationPath,
-                runScriptPath
+                runScriptPath,
+                templateDemoDataSql(client, activeModuleKeys)
         );
     }
 
@@ -233,6 +247,52 @@ public class PlatformProvisioningService {
         }
     }
 
+
+    @Transactional
+    public void loadTemplateDemoDataAutomatically(Long clientId) {
+        PlatformBusinessClient client = getClient(clientId);
+        if (!client.isDemoDataEnabled()) {
+            throw new IllegalArgumentException("Este negocio fue creado sin datos demo habilitados.");
+        }
+
+        String databaseStatus = safe(client.getDatabaseStatus()).toUpperCase(Locale.ROOT);
+        if (!BOOTSTRAP_READY_STATUSES.contains(databaseStatus) && !DEMO_DATA_READY_STATUSES.contains(databaseStatus)) {
+            throw new IllegalArgumentException("Primero aplica la configuración inicial antes de cargar datos demo.");
+        }
+
+        List<String> activeModuleKeys = activeModuleKeys(clientId);
+        String demoSql = templateDemoDataSql(client, activeModuleKeys);
+        List<String> statements = splitSqlStatements(demoSql);
+        if (statements.isEmpty()) {
+            throw new IllegalArgumentException("No se generó SQL demo para esta plantilla.");
+        }
+
+        try {
+            for (String statement : statements) {
+                jdbcTemplate.execute(statement);
+            }
+            useDatabase(sourceDatabaseName);
+            client.setDatabaseStatus("DEMO_DATA_LOADED");
+            client.setRuntimeStatus("PENDING");
+            client.setLastRuntimeGeneratedAt(null);
+            if (!"ACTIVE".equalsIgnoreCase(safe(client.getStatus()))) {
+                client.setStatus("PROVISIONING");
+            }
+            clientRepository.save(client);
+            saveLog(client, "LOAD_TEMPLATE_DEMO_DATA", "SUCCESS",
+                    "Datos demo cargados para plantilla " + templateCode(client) + " en " + normalizedDatabaseName(client.getDatabaseName()) + ". Sentencias: " + statements.size(),
+                    demoSql);
+        } catch (Exception ex) {
+            try {
+                useDatabase(sourceDatabaseName);
+            } catch (Exception ignored) {
+                // Keep original error as the relevant failure reason.
+            }
+            saveLog(client, "LOAD_TEMPLATE_DEMO_DATA", "ERROR", cleanError(ex.getMessage()), demoSql);
+            throw new IllegalArgumentException("No se pudieron cargar los datos demo. Revisa que la estructura base y el bootstrap existan en la base destino.");
+        }
+    }
+
     @Transactional
     public void generateRuntimeFiles(Long clientId) {
         PlatformBusinessClient client = getClient(clientId);
@@ -251,6 +311,7 @@ public class PlatformProvisioningService {
             writeFile(folder.resolve("run.sh"), runtime.runScript());
             writeFile(folder.resolve(provisioningPlan.createDatabaseFileName()), provisioningPlan.createDatabaseSql());
             writeFile(folder.resolve(provisioningPlan.bootstrapFileName()), provisioningPlan.bootstrapSql());
+            writeFile(folder.resolve(provisioningPlan.demoDataFileName()), provisioningPlan.demoDataSql());
             writeFile(folder.resolve("README.txt"), runtimeReadme(runtime, provisioningPlan));
             markExecutable(folder.resolve("run.sh"));
 
@@ -325,6 +386,7 @@ public class PlatformProvisioningService {
                 "mysqldump -u root -p --no-data --routines --triggers " + sourceDatabaseName + " > estructura-base.sql",
                 "mysql -u root -p " + db + " < estructura-base.sql",
                 "mysql -u root -p " + db + " < bootstrap-" + db + ".sql",
+                "mysql -u root -p " + db + " < demo-data-" + db + ".sql",
                 "bash runtime-clients/" + normalizeRuntimeProfile(defaultValue(client.getRuntimeProfile(), client.getCode())) + "/run.sh"
         );
     }
@@ -379,6 +441,256 @@ public class PlatformProvisioningService {
         }
 
         return sql.toString();
+    }
+
+
+    private String templateDemoDataSql(PlatformBusinessClient client, List<String> activeModuleKeys) {
+        String db = normalizedDatabaseName(client.getDatabaseName());
+        String template = templateCode(client);
+        StringBuilder sql = new StringBuilder();
+        sql.append("-- Datos demo generados desde Super Admin para: ").append(sqlComment(client.getBusinessName())).append("\n");
+        sql.append("-- Plantilla detectada: ").append(sqlComment(template)).append("\n");
+        sql.append("-- Ejecutar después del bootstrap inicial.\n\n");
+        sql.append("USE `").append(db).append("`;\n\n");
+        sql.append("SET @demo_now = NOW();\n\n");
+
+        appendCommonDemoSettings(sql, client);
+
+        if (template.contains("restaurant") || template.contains("restaurante")) {
+            appendRestaurantDemoData(sql);
+        } else if (template.contains("temu") || template.contains("ecommerce") || template.contains("tienda") || template.contains("e_commerce")) {
+            appendTemuDemoData(sql);
+        } else if (template.contains("academy") || template.contains("academia") || template.contains("curso")) {
+            appendAcademyDemoData(sql);
+        } else if (template.contains("courier") || template.contains("rutapack") || template.contains("ruta")) {
+            appendCourierDemoData(sql);
+        } else if (template.contains("selva") || template.contains("catalog")) {
+            appendSelvaDemoData(sql);
+        } else {
+            appendAguaEcoDemoData(sql);
+        }
+
+        sql.append("\n-- Marca interna para auditoría del aprovisionamiento demo.\n");
+        appendSetting(sql, "platform.demo.loaded", "true", "boolean", "platform", "Indica que los datos demo de plantilla fueron cargados");
+        appendSetting(sql, "platform.demo.template", template, "string", "platform", "Plantilla usada para cargar datos demo");
+        return sql.toString();
+    }
+
+    private void appendCommonDemoSettings(StringBuilder sql, PlatformBusinessClient client) {
+        String type = templateCode(client);
+        if (type.contains("restaurant") || type.contains("restaurante")) {
+            appendSetting(sql, "public.hero.badge1", "Carta digital", "string", "public_site", "Beneficio público demo");
+            appendSetting(sql, "public.hero.badge2", "Pedidos para llevar", "string", "public_site", "Beneficio público demo");
+            appendSetting(sql, "public.hero.badge3", "Delivery coordinado", "string", "public_site", "Beneficio público demo");
+        } else if (type.contains("temu") || type.contains("ecommerce") || type.contains("tienda")) {
+            appendSetting(sql, "public.hero.badge1", "Catálogo con filtros", "string", "public_site", "Beneficio público demo");
+            appendSetting(sql, "public.hero.badge2", "Promos por WhatsApp", "string", "public_site", "Beneficio público demo");
+            appendSetting(sql, "public.hero.badge3", "Entrega coordinada", "string", "public_site", "Beneficio público demo");
+        } else if (type.contains("academy") || type.contains("academia")) {
+            appendSetting(sql, "public.hero.badge1", "Cursos online", "string", "public_site", "Beneficio público demo");
+            appendSetting(sql, "public.hero.badge2", "Certificados", "string", "public_site", "Beneficio público demo");
+            appendSetting(sql, "public.hero.badge3", "Lecciones guiadas", "string", "public_site", "Beneficio público demo");
+        }
+    }
+
+    private void appendTemuDemoData(StringBuilder sql) {
+        appendProducts(sql, List.of(
+                productRow("Mini licuadora portátil USB", "Producto compacto para jugos, batidos y uso diario. Ideal para catálogo tipo Temu.", "/img/catalog/temu-mini-licuadora.jpg", "49.90", true, "35", "5"),
+                productRow("Audífonos Bluetooth económicos", "Audífonos inalámbricos para llamadas, música y ventas por WhatsApp.", "/img/catalog/temu-audifonos.jpg", "39.90", true, "60", "10"),
+                productRow("Organizador plegable multiuso", "Organizador liviano para cocina, dormitorio o escritorio.", "/img/catalog/temu-organizador.jpg", "24.90", false, "80", "15"),
+                productRow("Luz LED recargable para escritorio", "Lámpara LED portátil con carga USB para estudio y trabajo.", "/img/catalog/temu-luz-led.jpg", "29.90", false, "45", "8")
+        ));
+        appendClients(sql, List.of(
+                clientRow("Cliente WhatsApp Norte", "70000001", "Av. La Marina 1200", "Pregunta por combos y delivery", "+51911111111", "-3.7438000", "-73.2516000"),
+                clientRow("Cliente Compras por Mayor", "70000002", "Jr. Próspero 455", "Busca productos económicos por docena", "+51922222222", "-3.7499000", "-73.2442000"),
+                clientRow("Cliente Catálogo Online", "70000003", "Belén zona comercial", "Consulta disponibilidad antes de pagar", "+51933333333", "-3.7608000", "-73.2474000")
+        ));
+        appendDeliveryZones(sql);
+        appendMarketing(sql,
+                "Semana de productos virales",
+                "Mostrar 5 productos económicos con video corto y CTA WhatsApp.",
+                "¿Buscas algo útil, bonito y barato? Consulta disponibilidad por WhatsApp.",
+                "Consulta disponibilidad");
+    }
+
+    private void appendRestaurantDemoData(StringBuilder sql) {
+        appendProducts(sql, List.of(
+                productRow("Juane amazónico especial", "Plato típico con arroz, presa y sazón regional. Ideal para carta digital.", "/img/catalog/restaurant-juane.jpg", "18.00", true, "30", "5"),
+                productRow("Tacacho con cecina", "Plato fuerte regional para salón, delivery y promociones.", "/img/catalog/restaurant-tacacho.jpg", "25.00", true, "25", "5"),
+                productRow("Refresco de camu camu", "Bebida natural amazónica para acompañar el menú.", "/img/catalog/restaurant-camu-camu.jpg", "7.00", false, "50", "10"),
+                productRow("Combo familiar amazónico", "Combo de platos regionales para compartir y vender por WhatsApp.", "/img/catalog/restaurant-combo.jpg", "69.00", true, "12", "3")
+        ));
+        appendClients(sql, List.of(
+                clientRow("Mesa demo 01", "71000001", "Salón principal", "Cliente para prueba de comanda", "+51944444444", "-3.7487000", "-73.2479000"),
+                clientRow("Delivery Oficina Centro", "71000002", "Calle Putumayo 640", "Pedido para almuerzo", "+51955555555", "-3.7468000", "-73.2439000"),
+                clientRow("Cliente frecuente familiar", "71000003", "Av. Quiñones 1800", "Compra combos fines de semana", "+51966666666", "-3.7670000", "-73.2825000")
+        ));
+        appendDeliveryZones(sql);
+        appendMarketing(sql,
+                "Menú del día y combos familiares",
+                "Publicar plato del día a las 10:30 a. m. y reforzar combos por WhatsApp.",
+                "Hoy cocina regional lista para llevar. Reserva tu plato por WhatsApp.",
+                "Pedir menú de hoy");
+    }
+
+    private void appendAcademyDemoData(StringBuilder sql) {
+        sql.append("INSERT INTO academy_course (`title`, `slug`, `category`, `instructor`, `short_description`, `long_description`, `cover_image_url`, `duration_label`, `price`, `featured`, `active`, `status`, `level`, `whatsapp_message`, `created_at`, `updated_at`, `published_at`)\n")
+                .append("SELECT 'Curso demo: ventas por WhatsApp', 'curso-demo-ventas-whatsapp', 'Ventas', 'Equipo comercial', 'Aprende a convertir consultas en pedidos.', 'Curso demo generado para presentar la Academia del negocio.', '/img/academy/course-whatsapp.jpg', '2 horas', 49.00, true, true, 'PUBLISHED', 'BEGINNER', 'Hola, deseo información del curso demo de ventas por WhatsApp', @demo_now, @demo_now, @demo_now\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM academy_course WHERE slug = 'curso-demo-ventas-whatsapp');\n")
+                .append("SET @academy_course_id = (SELECT id FROM academy_course WHERE slug = 'curso-demo-ventas-whatsapp' LIMIT 1);\n")
+                .append("INSERT INTO academy_course_module (`course_id`, `title`, `description`, `display_order`, `active`, `created_at`, `updated_at`)\n")
+                .append("SELECT @academy_course_id, 'Módulo 1: atención y cierre', 'Flujo de atención, objeciones y cierre por WhatsApp.', 1, true, @demo_now, @demo_now\n")
+                .append("WHERE @academy_course_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM academy_course_module WHERE course_id = @academy_course_id AND title = 'Módulo 1: atención y cierre');\n")
+                .append("SET @academy_module_id = (SELECT id FROM academy_course_module WHERE course_id = @academy_course_id AND title = 'Módulo 1: atención y cierre' LIMIT 1);\n")
+                .append("INSERT INTO academy_lesson (`course_id`, `module_id`, `title`, `description`, `lesson_type`, `content_text`, `duration_label`, `display_order`, `preview`, `active`, `status`, `created_at`, `updated_at`)\n")
+                .append("SELECT @academy_course_id, @academy_module_id, 'Lección demo: primer mensaje efectivo', 'Guía para responder consultas sin perder ventas.', 'TEXT', 'Plantilla: saludo + disponibilidad + beneficio + cierre por WhatsApp.', '15 min', 1, true, true, 'PUBLISHED', @demo_now, @demo_now\n")
+                .append("WHERE @academy_course_id IS NOT NULL AND @academy_module_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM academy_lesson WHERE course_id = @academy_course_id AND title = 'Lección demo: primer mensaje efectivo');\n\n");
+        appendClients(sql, List.of(
+                clientRow("Alumno demo WhatsApp", "72000001", "Online", "Interesado en cursos cortos", "+51977777777", "-3.7481000", "-73.2448000")
+        ));
+        appendMarketing(sql,
+                "Lanzamiento de curso demo",
+                "Promocionar curso corto para emprendedores con certificado.",
+                "Aprende en poco tiempo y aplica hoy mismo en tu negocio.",
+                "Solicitar inscripción");
+    }
+
+    private void appendCourierDemoData(StringBuilder sql) {
+        appendClients(sql, List.of(
+                clientRow("Cliente Ruta Centro", "73000001", "Plaza 28 de Julio", "Entrega con evidencia", "+51988811111", "-3.7462000", "-73.2456000"),
+                clientRow("Cliente Ruta Belén", "73000002", "Mercado de Belén", "Cobrar contra entrega", "+51988822222", "-3.7604000", "-73.2476000"),
+                clientRow("Cliente Ruta San Juan", "73000003", "Av. Participación", "Reprogramar si no responde", "+51988833333", "-3.7800000", "-73.3010000")
+        ));
+        appendDeliveryZones(sql);
+        appendDeliveryImportDemo(sql, "Ruta demo courier", "Repartidor demo", List.of(
+                stopRow(1, "Cliente Ruta Centro", "+51988811111", "Plaza 28 de Julio", "Punto de referencia: esquina principal", "12.00", "-3.7462000", "-73.2456000"),
+                stopRow(2, "Cliente Ruta Belén", "+51988822222", "Mercado de Belén", "Ingreso por zona comercial", "18.00", "-3.7604000", "-73.2476000"),
+                stopRow(3, "Cliente Ruta San Juan", "+51988833333", "Av. Participación", "Confirmar antes de salir", "20.00", "-3.7800000", "-73.3010000")
+        ));
+    }
+
+    private void appendSelvaDemoData(StringBuilder sql) {
+        appendProducts(sql, List.of(
+                productRow("Paiche seco seleccionado", "Producto amazónico para platos regionales y venta por encargo.", "/img/catalog/selva-paiche.jpg", "35.00", true, "20", "4"),
+                productRow("Hoja de bijao para juanes", "Hojas listas para preparación tradicional según disponibilidad.", "/img/catalog/selva-bijao.jpg", "8.00", true, "80", "20"),
+                productRow("Camu camu congelado", "Fruta amazónica para refrescos, jugos y negocio gastronómico.", "/img/catalog/selva-camu-camu.jpg", "15.00", false, "45", "10")
+        ));
+        appendClients(sql, List.of(
+                clientRow("Restaurante amazónico demo", "74000001", "Centro de Iquitos", "Compra productos regionales por semana", "+51999911111", "-3.7486000", "-73.2455000"),
+                clientRow("Cliente familiar demo", "74000002", "San Juan", "Consulta disponibilidad de bijao", "+51999922222", "-3.7770000", "-73.2850000")
+        ));
+        appendMarketing(sql,
+                "Campaña sabores de la selva",
+                "Contenido con origen, preparación y usos de productos amazónicos.",
+                "Productos amazónicos seleccionados para tu mesa o negocio.",
+                "Consultar disponibilidad");
+    }
+
+    private void appendAguaEcoDemoData(StringBuilder sql) {
+        appendProducts(sql, List.of(
+                productRow("Bidón de agua 20 L", "Agua purificada para hogar, empresa y restaurante.", "/img/productos/bidon-20l.png", "3.00", true, "120", "20"),
+                productRow("Pack oficina semanal", "Plan de agua para oficinas con reparto coordinado.", "/img/productos/pack-oficina.png", "25.00", true, "30", "5")
+        ));
+        appendClients(sql, List.of(
+                clientRow("Familia demo Los Delfines", "75000001", "Los Delfines, Iquitos", "Compra semanal", "+51900011111", "-3.7457000", "-73.2608000"),
+                clientRow("Restaurante demo centro", "75000002", "Centro de Iquitos", "Precio restaurante", "+51900022222", "-3.7480000", "-73.2440000")
+        ));
+        appendDeliveryZones(sql);
+        appendMarketing(sql,
+                "Recompra semanal de bidones",
+                "Recordar a clientes frecuentes sus pedidos de agua purificada.",
+                "¿Necesitas agua para hoy? Coordinamos tu entrega por WhatsApp.",
+                "Pedir agua");
+    }
+
+    private record ProductSeed(String name, String description, String imagePath, String price, boolean featured, String stock, String minimumStock) {}
+    private record ClientSeed(String name, String docNumber, String address, String reference, String phone, String latitude, String longitude) {}
+    private record StopSeed(int order, String clientName, String phone, String address, String reference, String amount, String latitude, String longitude) {}
+
+    private ProductSeed productRow(String name, String description, String imagePath, String price, boolean featured, String stock, String minimumStock) {
+        return new ProductSeed(name, description, imagePath, price, featured, stock, minimumStock);
+    }
+
+    private ClientSeed clientRow(String name, String docNumber, String address, String reference, String phone, String latitude, String longitude) {
+        return new ClientSeed(name, docNumber, address, reference, phone, latitude, longitude);
+    }
+
+    private StopSeed stopRow(int order, String clientName, String phone, String address, String reference, String amount, String latitude, String longitude) {
+        return new StopSeed(order, clientName, phone, address, reference, amount, latitude, longitude);
+    }
+
+    private void appendProducts(StringBuilder sql, List<ProductSeed> products) {
+        sql.append("-- Productos demo.\n");
+        for (ProductSeed product : products) {
+            sql.append("INSERT INTO product (`name`, `description`, `image_path`, `price`, `active`, `featured`, `stock`, `minimum_stock`)\n")
+                    .append("SELECT '").append(sql(product.name())).append("', '").append(sql(product.description())).append("', '").append(sql(product.imagePath())).append("', ")
+                    .append(product.price()).append(", true, ").append(product.featured()).append(", ").append(product.stock()).append(", ").append(product.minimumStock()).append("\n")
+                    .append("WHERE NOT EXISTS (SELECT 1 FROM product WHERE `name` = '").append(sql(product.name())).append("');\n");
+        }
+        sql.append("\n");
+    }
+
+    private void appendClients(StringBuilder sql, List<ClientSeed> clients) {
+        sql.append("-- Clientes demo.\n");
+        for (ClientSeed client : clients) {
+            sql.append("INSERT INTO client (`name`, `doc_type`, `doc_number`, `address`, `reference`, `phone`, `active`, `registration_date`, `latitude`, `longitude`)\n")
+                    .append("SELECT '").append(sql(client.name())).append("', 'DNI', '").append(sql(client.docNumber())).append("', '")
+                    .append(sql(client.address())).append("', '").append(sql(client.reference())).append("', '").append(sql(client.phone())).append("', true, @demo_now, ")
+                    .append(client.latitude()).append(", ").append(client.longitude()).append("\n")
+                    .append("WHERE NOT EXISTS (SELECT 1 FROM client WHERE `doc_number` = '").append(sql(client.docNumber())).append("');\n");
+        }
+        sql.append("\n");
+    }
+
+    private void appendDeliveryZones(StringBuilder sql) {
+        sql.append("-- Zonas demo de entrega.\n")
+                .append("INSERT INTO delivery_zone (`name`, `latitude`, `longitude`, `radius_meters`, `note`, `created_at`, `updated_at`)\n")
+                .append("SELECT 'Centro Iquitos', -3.7481000, -73.2448000, 2500, 'Zona demo para entregas céntricas', @demo_now, @demo_now\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM delivery_zone WHERE `name` = 'Centro Iquitos');\n")
+                .append("INSERT INTO delivery_zone (`name`, `latitude`, `longitude`, `radius_meters`, `note`, `created_at`, `updated_at`)\n")
+                .append("SELECT 'San Juan / Aeropuerto', -3.7840000, -73.3080000, 3500, 'Zona demo para entregas extendidas', @demo_now, @demo_now\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM delivery_zone WHERE `name` = 'San Juan / Aeropuerto');\n\n");
+    }
+
+    private void appendMarketing(StringBuilder sql, String campaign, String objective, String hook, String callToAction) {
+        sql.append("-- Marketing demo.\n")
+                .append("INSERT INTO marketing_campaign_calendar (`name`, `type`, `status`, `start_date`, `end_date`, `channel`, `target_segment`, `objective`, `main_message`, `next_action`, `observations`, `created_at`, `updated_at`)\n")
+                .append("SELECT '").append(sql(campaign)).append("', 'WHATSAPP', 'PLANNED', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY), 'WhatsApp / Redes sociales', 'Clientes potenciales', '")
+                .append(sql(objective)).append("', '").append(sql(hook)).append("', '").append(sql(callToAction)).append("', 'Dato demo generado por plantilla.', @demo_now, @demo_now\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM marketing_campaign_calendar WHERE `name` = '").append(sql(campaign)).append("');\n")
+                .append("INSERT INTO marketing_content_idea (`title`, `channel`, `content_type`, `status`, `priority`, `suggested_date`, `target_segment`, `hook`, `main_message`, `call_to_action`, `next_action`, `observations`, `created_at`, `updated_at`)\n")
+                .append("SELECT 'Idea demo: ").append(sql(campaign)).append("', 'WHATSAPP', 'SHORT_VIDEO', 'NEW', 'HIGH', CURDATE(), 'Clientes potenciales', '")
+                .append(sql(hook)).append("', '").append(sql(objective)).append("', '").append(sql(callToAction)).append("', 'Crear pieza visual y publicar.', 'Dato demo generado por plantilla.', @demo_now, @demo_now\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM marketing_content_idea WHERE `title` = 'Idea demo: ").append(sql(campaign)).append("');\n\n");
+    }
+
+    private void appendDeliveryImportDemo(StringBuilder sql, String title, String person, List<StopSeed> stops) {
+        sql.append("-- Ruta importada demo.\n")
+                .append("INSERT INTO delivery_import_batch (`route_date`, `title`, `source_filename`, `delivery_person`, `total_stops`, `located_stops`, `missing_location_stops`, `created_at`)\n")
+                .append("SELECT CURDATE(), '").append(sql(title)).append("', 'demo-template.csv', '").append(sql(person)).append("', ").append(stops.size()).append(", ").append(stops.size()).append(", 0, @demo_now\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM delivery_import_batch WHERE `title` = '").append(sql(title)).append("' AND `route_date` = CURDATE());\n")
+                .append("SET @demo_batch_id = (SELECT id FROM delivery_import_batch WHERE `title` = '").append(sql(title)).append("' AND `route_date` = CURDATE() LIMIT 1);\n");
+        for (StopSeed stop : stops) {
+            sql.append("INSERT INTO delivery_import_stop (`batch_id`, `route_order_index`, `client_name`, `phone`, `address`, `reference`, `amount`, `observation`, `latitude`, `longitude`, `status`, `updated_at`)\n")
+                    .append("SELECT @demo_batch_id, ").append(stop.order()).append(", '").append(sql(stop.clientName())).append("', '").append(sql(stop.phone())).append("', '")
+                    .append(sql(stop.address())).append("', '").append(sql(stop.reference())).append("', ").append(stop.amount()).append(", 'Parada demo generada por plantilla', ")
+                    .append(stop.latitude()).append(", ").append(stop.longitude()).append(", 'PENDING', @demo_now\n")
+                    .append("WHERE @demo_batch_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM delivery_import_stop WHERE batch_id = @demo_batch_id AND route_order_index = ").append(stop.order()).append(");\n");
+        }
+        sql.append("\n");
+    }
+
+    private String templateCode(PlatformBusinessClient client) {
+        StringBuilder key = new StringBuilder();
+        if (client.getTemplate() != null) {
+            key.append(valueOrEmpty(client.getTemplate().getCode())).append(' ')
+                    .append(valueOrEmpty(client.getTemplate().getName())).append(' ')
+                    .append(valueOrEmpty(client.getTemplate().getBusinessType())).append(' ');
+        }
+        key.append(valueOrEmpty(client.getBusinessType())).append(' ')
+                .append(valueOrEmpty(client.getCode())).append(' ')
+                .append(valueOrEmpty(client.getBusinessName()));
+        return key.toString().toLowerCase(Locale.ROOT);
     }
 
     private void appendSetting(StringBuilder sql, String variable, String value, String type, String category, String description) {
@@ -474,7 +786,8 @@ public class PlatformProvisioningService {
                 + "- application.properties" + System.lineSeparator()
                 + "- run.sh" + System.lineSeparator()
                 + "- " + plan.createDatabaseFileName() + System.lineSeparator()
-                + "- " + plan.bootstrapFileName() + System.lineSeparator();
+                + "- " + plan.bootstrapFileName() + System.lineSeparator()
+                + "- " + plan.demoDataFileName() + System.lineSeparator();
     }
 
     private void writeFile(Path path, String content) throws IOException {
@@ -530,9 +843,12 @@ public class PlatformProvisioningService {
         return "Ahora puedes ejecutar la instalación por pasos desde la plataforma. Los SQL manuales quedan como respaldo.";
     }
 
-    private String statusTitle(boolean databaseCreated, boolean structureReady, boolean bootstrapApplied, boolean active, boolean ready) {
+    private String statusTitle(boolean databaseCreated, boolean structureReady, boolean bootstrapApplied, boolean demoDataRequested, boolean demoDataLoaded, boolean active, boolean ready) {
         if (ready) {
             return "Negocio listo";
+        }
+        if (bootstrapApplied && demoDataRequested && !demoDataLoaded) {
+            return "Configuración aplicada, faltan datos demo";
         }
         if (bootstrapApplied && !active) {
             return "Configuración aplicada, falta activar";
@@ -546,12 +862,15 @@ public class PlatformProvisioningService {
         return "Pendiente de aprovisionamiento";
     }
 
-    private String statusDescription(boolean databaseCreated, boolean structureReady, boolean bootstrapApplied, boolean active, boolean ready, boolean runtimeFilesGenerated) {
+    private String statusDescription(boolean databaseCreated, boolean structureReady, boolean bootstrapApplied, boolean demoDataRequested, boolean demoDataLoaded, boolean active, boolean ready, boolean runtimeFilesGenerated) {
         if (ready && runtimeFilesGenerated) {
-            return "La base, estructura, configuración inicial y archivos runtime están listos para ejecutar el negocio.";
+            return "La base, estructura, configuración inicial, datos demo y archivos runtime están listos para ejecutar el negocio.";
         }
         if (ready) {
-            return "La base, estructura y configuración inicial fueron marcadas como listas. Genera los archivos runtime para levantar la instancia.";
+            return "La base, estructura, configuración inicial y datos demo fueron marcados como listos. Genera los archivos runtime para levantar la instancia.";
+        }
+        if (bootstrapApplied && demoDataRequested && !demoDataLoaded) {
+            return "La configuración inicial ya fue aplicada. Ahora carga datos demo según la plantilla del negocio.";
         }
         if (bootstrapApplied && !active) {
             return "La configuración inicial ya fue aplicada. Ahora activa el negocio para demo o pruebas internas.";

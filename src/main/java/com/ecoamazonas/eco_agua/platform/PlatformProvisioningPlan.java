@@ -13,12 +13,15 @@ public record PlatformProvisioningPlan(
         boolean canCopyStructureAutomatically,
         boolean canApplyBootstrapAutomatically,
         boolean canMarkStructureReady,
+        boolean canLoadDemoDataAutomatically,
         boolean canMarkActive,
         boolean canGenerateRuntimeFiles,
         String warningMessage,
         boolean databaseCreated,
         boolean structureReady,
         boolean bootstrapApplied,
+        boolean demoDataRequested,
+        boolean demoDataLoaded,
         boolean active,
         boolean ready,
         String statusTitle,
@@ -26,11 +29,13 @@ public record PlatformProvisioningPlan(
         String statusBadgeClass,
         String statusAlertClass,
         String bootstrapFileName,
+        String demoDataFileName,
         String createDatabaseFileName,
         String manualCommandsText,
         String openBusinessUrl,
         String runtimeFolder,
         String runtimeApplicationPath,
-        String runtimeRunScriptPath
+        String runtimeRunScriptPath,
+        String demoDataSql
 ) {
 }

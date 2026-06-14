@@ -132,8 +132,11 @@
                                 <strong>Paso pendiente:</strong> la estructura ya está copiada. Ahora debes presionar
                                 <strong>3. Aplicar configuración inicial</strong>.
                             </div>
+                            <div class="alert alert-warning small" th:if="${plan.canLoadDemoDataAutomatically()}">
+                                <strong>Paso pendiente:</strong> el bootstrap ya está aplicado. Ahora carga los datos demo de la plantilla.
+                            </div>
                             <div class="alert alert-success small" th:if="${plan.canGenerateRuntimeFiles()}">
-                                <strong>Último paso:</strong> el negocio ya puede activarse/regenerar archivos runtime.
+                                <strong>Último paso:</strong> el negocio ya puede regenerar archivos runtime.
                             </div>
                             <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/create-database|}" class="mb-3">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -177,11 +180,28 @@
                                 </div>
                             </form>
 
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/load-demo-data|}" class="mb-3">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button type="submit" class="btn w-100" th:classappend="${plan.canLoadDemoDataAutomatically()} ? ' btn-warning fw-semibold' : ' btn-outline-secondary'" th:disabled="${!plan.canLoadDemoDataAutomatically()}" onclick="return confirm('Se cargarán datos demo según la plantilla del negocio. ¿Continuar?');">
+                                    <i class="bi bi-stars me-1"></i>
+                                    4. Cargar datos demo de plantilla
+                                </button>
+                                <div class="form-text text-warning fw-semibold" th:if="${plan.canLoadDemoDataAutomatically()}">
+                                    Inserta productos, clientes, marketing, rutas o cursos demo según el rubro.
+                                </div>
+                                <div class="form-text text-success" th:if="${plan.demoDataLoaded()}">
+                                    Datos demo cargados correctamente.
+                                </div>
+                                <div class="form-text text-muted" th:if="${!plan.demoDataRequested()}">
+                                    Este negocio fue creado sin datos demo; puedes continuar con la activación.
+                                </div>
+                            </form>
+
                             <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/mark-active|}" class="mb-3">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button type="submit" class="btn w-100" th:classappend="${plan.canMarkActive()} ? ' btn-success fw-semibold' : ' btn-outline-secondary'" th:disabled="${!plan.canMarkActive()}">
                                     <i class="bi bi-rocket-takeoff me-1"></i>
-                                    4. Activar negocio
+                                    5. Activar negocio
                                 </button>
                                 <div class="form-text" th:if="${plan.canMarkActive()}">
                                     Úsalo cuando el bootstrap ya esté aplicado correctamente.
@@ -195,7 +215,7 @@
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button type="submit" class="btn w-100" th:classappend="${plan.canGenerateRuntimeFiles()} ? ' btn-success fw-semibold' : ' btn-outline-secondary'" th:disabled="${!plan.canGenerateRuntimeFiles()}">
                                     <i class="bi bi-folder-plus me-1"></i>
-                                    5. Generar / regenerar archivos runtime
+                                    6. Generar / regenerar archivos runtime
                                 </button>
                                 <div class="form-text" th:if="${plan.canGenerateRuntimeFiles()}">
                                     Crea o reemplaza application.properties, run.sh y SQL de respaldo en <code th:text="${plan.runtimeFolder()}">runtime-clients</code>.
@@ -224,6 +244,14 @@
                                 <a class="btn btn-outline-secondary" th:href="@{|/admin/platform/clients/${client.id}/provisioning/bootstrap.sql|}">
                                     <i class="bi bi-download me-1"></i>
                                     Descargar SQL bootstrap
+                                </a>
+                                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#demoDataSqlBox" aria-expanded="false" aria-controls="demoDataSqlBox">
+                                    <i class="bi bi-stars me-1"></i>
+                                    Ver SQL demo
+                                </button>
+                                <a class="btn btn-outline-secondary" th:href="@{|/admin/platform/clients/${client.id}/provisioning/demo-data.sql|}">
+                                    <i class="bi bi-download me-1"></i>
+                                    Descargar SQL demo
                                 </a>
                             </div>
 
@@ -322,6 +350,31 @@
                                 y ejecútalo sobre la nueva base después de copiar la estructura.
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4" th:if="${plan.demoDataRequested()}">
+                <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                    <span>SQL de datos demo por plantilla</span>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-copy-target="demoDataSqlText">
+                            <i class="bi bi-clipboard me-1"></i>
+                            Copiar
+                        </button>
+                        <a class="btn btn-sm btn-outline-secondary" th:href="@{|/admin/platform/clients/${client.id}/provisioning/demo-data.sql|}">
+                            <i class="bi bi-download me-1"></i>
+                            Descargar
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="collapse" id="demoDataSqlBox">
+                        <textarea id="demoDataSqlText" class="form-control font-monospace small" rows="16" readonly th:text="${plan.demoDataSql()}">SQL demo</textarea>
+                    </div>
+                    <div class="small text-muted mt-2">
+                        Este SQL se ejecuta automáticamente con el botón <strong>4. Cargar datos demo de plantilla</strong>.
+                        Se deja visible como respaldo y para auditoría.
                     </div>
                 </div>
             </div>

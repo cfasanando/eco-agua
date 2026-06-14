@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="fragments/head_admin :: adminHead('Academia / Detalle interesado')"></th:block>
+    <style>
+        .academy-hero { border-radius:20px; background:linear-gradient(135deg,#4f46e5,#0f766e); color:#fff; padding:1.25rem; box-shadow:0 8px 28px rgba(15,23,42,.18); }
+        .academy-card { border:0; border-radius:18px; box-shadow:0 2px 12px rgba(15,23,42,.08); }
+        .lead-phone { font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    </style>
+</head>
+<body>
+<div class="app-layout" th:with="activePage='academy_leads'">
+    <aside th:replace="fragments/sidebar :: sidebar"></aside>
+    <div class="main-content">
+        <header th:replace="fragments/topbar :: topbar"></header>
+        <main class="content-wrapper">
+            <div class="academy-hero mb-4">
+                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                    <div>
+                        <div class="small text-white-50 mb-1">Academia digital</div>
+                        <h1 class="h4 mb-1" th:text="${lead.fullName}">Interesado</h1>
+                        <p class="mb-0 text-white-75">Detalle comercial de solicitud, contacto y conversión a inscripción.</p>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a class="btn btn-light btn-sm" th:href="@{/admin/academy/leads}"><i class="bi bi-arrow-left"></i> Interesados</a>
+                        <a class="btn btn-outline-light btn-sm" th:href="@{|/academy/course/${lead.courseSlug}|}" target="_blank"><i class="bi bi-globe"></i> Ver curso</a>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}">Mensaje</div>
+            <div th:if="${warningMessage}" class="alert alert-warning" th:text="${warningMessage}">Mensaje</div>
+
+            <div class="row g-4">
+                <div class="col-lg-5">
+                    <section class="card academy-card mb-4">
+                        <div class="card-body p-4">
+                            <h2 class="h6 mb-3">Datos del interesado</h2>
+                            <dl class="row small mb-0">
+                                <dt class="col-4">Nombre</dt><dd class="col-8 fw-semibold" th:text="${lead.fullName}">Nombre</dd>
+                                <dt class="col-4">Teléfono</dt><dd class="col-8 lead-phone" th:text="${lead.phone}">999</dd>
+                                <dt class="col-4">Correo</dt><dd class="col-8" th:text="${lead.email != null and !#strings.isEmpty(lead.email) ? lead.email : '-'}">correo</dd>
+                                <dt class="col-4">Origen</dt><dd class="col-8" th:text="${lead.sourceLabel}">Catálogo</dd>
+                                <dt class="col-4">Estado</dt><dd class="col-8"><span class="badge bg-primary" th:text="${lead.statusLabel}">Nuevo</span></dd>
+                                <dt class="col-4">Fecha</dt><dd class="col-8" th:text="${lead.createdAt != null ? #temporals.format(lead.createdAt, 'dd/MM/yyyy HH:mm') : '-'}">Fecha</dd>
+                            </dl>
+                            <div class="d-flex gap-2 mt-4 flex-wrap">
+                                <a th:if="${lead.hasPhone()}" class="btn btn-success" target="_blank" th:href="${whatsappUrl}"><i class="bi bi-whatsapp"></i> WhatsApp</a>
+                                <a class="btn btn-outline-primary" th:href="@{|/academy/course/${lead.courseSlug}|}" target="_blank"><i class="bi bi-mortarboard"></i> Curso</a>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card academy-card">
+                        <div class="card-body p-4">
+                            <h2 class="h6 mb-3">Mensaje enviado</h2>
+                            <p class="text-muted mb-0" style="white-space:pre-line;" th:text="${publicMessage != null and !#strings.isEmpty(publicMessage) ? publicMessage : 'Sin mensaje adicional.'}">Mensaje</p>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="col-lg-7">
+                    <section class="card academy-card mb-4">
+                        <div class="card-header bg-white border-0">
+                            <h2 class="h6 mb-0">Seguimiento comercial</h2>
+                            <p class="small text-muted mb-0">Actualiza estado y notas internas.</p>
+                        </div>
+                        <div class="card-body p-4">
+                            <form th:action="@{|/admin/academy/leads/${lead.id}/status|}" method="post" class="row g-3">
+                                <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <div class="col-md-5">
+                                    <label class="form-label">Estado</label>
+                                    <select name="status" class="form-select">
+                                        <option th:each="status : ${statuses}" th:value="${status.value}" th:text="${status.label}" th:selected="${status.value == lead.statusValue}">Nuevo</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Notas internas</label>
+                                    <textarea name="notes" class="form-control" rows="4" th:text="${internalNotes}"></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <button class="btn btn-primary" type="submit"><i class="bi bi-save"></i> Guardar seguimiento</button>
+                                </div>
+                            </form>
+                        </div>
+                    </section>
+
+                    <section class="card academy-card">
+                        <div class="card-header bg-white border-0">
+                            <h2 class="h6 mb-0">Convertir a alumno inscrito</h2>
+                            <p class="small text-muted mb-0">Selecciona un usuario existente y el curso para crear o actualizar la inscripción.</p>
+                        </div>
+                        <div class="card-body p-4">
+                            <div th:if="${lead.converted}" class="alert alert-success">
+                                <i class="bi bi-check-circle"></i>
+                                Este interesado ya fue convertido.
+                                <span th:if="${lead.studentUsername != null and !#strings.isEmpty(lead.studentUsername)}">Alumno: <strong th:text="${lead.studentUsername}">usuario</strong>.</span>
+                            </div>
+                            <form th:action="@{|/admin/academy/leads/${lead.id}/convert|}" method="post" class="row g-3">
+                                <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <div class="col-md-6">
+                                    <label class="form-label">Usuario / alumno</label>
+                                    <select name="studentId" class="form-select" required>
+                                        <option value="">Seleccionar usuario</option>
+                                        <option th:each="student : ${students}" th:value="${student.id}" th:text="${student.username}">usuario</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Curso</label>
+                                    <select name="courseId" class="form-select" required>
+                                        <option th:each="course : ${courses}" th:value="${course.id}" th:text="${course.title}" th:selected="${course.id == lead.courseId}">Curso</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Nota para inscripción</label>
+                                    <textarea name="notes" class="form-control" rows="3" placeholder="Ej: pago confirmado, beca, inscripción demo..."></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <button class="btn btn-success" type="submit"><i class="bi bi-person-check"></i> Convertir e inscribir</button>
+                                    <a class="btn btn-outline-secondary" th:href="@{/admin/academy/enrollments}">Ver inscripciones</a>
+                                </div>
+                            </form>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<script th:src="@{https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js}"></script>
+</body>
+</html>

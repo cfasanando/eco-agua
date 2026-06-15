@@ -79,6 +79,27 @@ public class PlatformBusinessClient {
     @Column(name = "runtime_status", length = 50)
     private String runtimeStatus = "PENDING";
 
+    @Column(name = "management_mode", length = 50)
+    private String managementMode = "DEMO";
+
+    @Column(name = "monitor_visible")
+    private boolean monitorVisible = true;
+
+    @Column(name = "protected_instance")
+    private boolean protectedInstance;
+
+    @Column(name = "runtime_command", length = 500)
+    private String runtimeCommand;
+
+    @Column(name = "last_health_status", length = 50)
+    private String lastHealthStatus;
+
+    @Column(name = "last_health_checked_at")
+    private LocalDateTime lastHealthCheckedAt;
+
+    @Column(name = "last_health_message", length = 500)
+    private String lastHealthMessage;
+
     @Column(name = "last_runtime_generated_at")
     private LocalDateTime lastRuntimeGeneratedAt;
 
@@ -274,6 +295,62 @@ public class PlatformBusinessClient {
 
     public void setRuntimeStatus(String runtimeStatus) {
         this.runtimeStatus = runtimeStatus;
+    }
+
+    public String getManagementMode() {
+        return managementMode;
+    }
+
+    public void setManagementMode(String managementMode) {
+        this.managementMode = managementMode;
+    }
+
+    public boolean isMonitorVisible() {
+        return monitorVisible;
+    }
+
+    public void setMonitorVisible(boolean monitorVisible) {
+        this.monitorVisible = monitorVisible;
+    }
+
+    public boolean isProtectedInstance() {
+        return protectedInstance;
+    }
+
+    public void setProtectedInstance(boolean protectedInstance) {
+        this.protectedInstance = protectedInstance;
+    }
+
+    public String getRuntimeCommand() {
+        return runtimeCommand;
+    }
+
+    public void setRuntimeCommand(String runtimeCommand) {
+        this.runtimeCommand = runtimeCommand;
+    }
+
+    public String getLastHealthStatus() {
+        return lastHealthStatus;
+    }
+
+    public void setLastHealthStatus(String lastHealthStatus) {
+        this.lastHealthStatus = lastHealthStatus;
+    }
+
+    public LocalDateTime getLastHealthCheckedAt() {
+        return lastHealthCheckedAt;
+    }
+
+    public void setLastHealthCheckedAt(LocalDateTime lastHealthCheckedAt) {
+        this.lastHealthCheckedAt = lastHealthCheckedAt;
+    }
+
+    public String getLastHealthMessage() {
+        return lastHealthMessage;
+    }
+
+    public void setLastHealthMessage(String lastHealthMessage) {
+        this.lastHealthMessage = lastHealthMessage;
     }
 
     public LocalDateTime getLastRuntimeGeneratedAt() {

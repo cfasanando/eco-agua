@@ -14,13 +14,17 @@
                 <div>
                     <h1 class="h4 mb-1">Instancias / clientes instalados</h1>
                     <p class="text-muted small mb-0">
-                        Revisa qué negocios están listos, cuáles tienen runtime generado y cuáles están corriendo en su puerto local.
+                        Monitor comercial para ver Eco Agua, Productos de la Selva y demos nuevas sin mezclar ni reinstalar bases protegidas.
                     </p>
                 </div>
                 <div class="d-flex gap-2 flex-wrap justify-content-end">
-                    <a th:href="@{/admin/platform/instances}" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-arrow-clockwise"></i>
-                        Actualizar estado
+                    <a th:href="@{/admin/platform/instances}" class="btn btn-sm" th:classappend="${!includeHidden} ? ' btn-primary' : ' btn-outline-primary'">
+                        <i class="bi bi-eye"></i>
+                        Activas
+                    </a>
+                    <a th:href="@{/admin/platform/instances(show='all')}" class="btn btn-sm" th:classappend="${includeHidden} ? ' btn-primary' : ' btn-outline-primary'">
+                        <i class="bi bi-eye-slash"></i>
+                        Todas
                     </a>
                     <a th:href="@{/admin/platform/clients}" class="btn btn-sm btn-outline-secondary">
                         <i class="bi bi-list-ul"></i>
@@ -34,20 +38,26 @@
             </div>
 
             <div class="alert alert-info border-0 shadow-sm small">
-                Esta pantalla no inicia ni detiene servidores. Solo verifica si la URL local responde. Para levantar una instancia, copia el comando de ejecución en una terminal Git Bash.
+                Las instancias <strong>protegidas</strong> representan sistemas existentes con data útil. No se reinstalan desde aprovisionamiento: solo se monitorean, se abren y se levantan con su comando habitual.
             </div>
 
             <div class="row g-3 mb-4">
                 <div class="col-6 col-lg-2">
                     <div class="card border-0 shadow-sm h-100"><div class="card-body">
-                        <div class="small text-muted">Negocios</div>
-                        <div class="h3 mb-0" th:text="${summary.totalClients()}">0</div>
+                        <div class="small text-muted">Visibles</div>
+                        <div class="h3 mb-0" th:text="${summary.visibleClients()}">0</div>
                     </div></div>
                 </div>
                 <div class="col-6 col-lg-2">
                     <div class="card border-0 shadow-sm h-100"><div class="card-body">
-                        <div class="small text-muted">Listos</div>
-                        <div class="h3 mb-0" th:text="${summary.readyClients()}">0</div>
+                        <div class="small text-muted">Protegidas</div>
+                        <div class="h3 mb-0" th:text="${summary.protectedClients()}">0</div>
+                    </div></div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Demos</div>
+                        <div class="h3 mb-0" th:text="${summary.demoClients()}">0</div>
                     </div></div>
                 </div>
                 <div class="col-6 col-lg-2">
@@ -58,30 +68,28 @@
                 </div>
                 <div class="col-6 col-lg-2">
                     <div class="card border-0 shadow-sm h-100"><div class="card-body">
-                        <div class="small text-muted">Detenidos</div>
+                        <div class="small text-muted">Detenidas</div>
                         <div class="h3 mb-0" th:text="${summary.stoppedReadyInstances()}">0</div>
                     </div></div>
                 </div>
                 <div class="col-6 col-lg-2">
                     <div class="card border-0 shadow-sm h-100"><div class="card-body">
-                        <div class="small text-muted">Por instalar</div>
-                        <div class="h3 mb-0" th:text="${summary.pendingProvisioning()}">0</div>
-                    </div></div>
-                </div>
-                <div class="col-6 col-lg-2">
-                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
-                        <div class="small text-muted">Sin runtime</div>
-                        <div class="h3 mb-0" th:text="${summary.missingRuntimeFiles()}">0</div>
+                        <div class="small text-muted">Ocultas</div>
+                        <div class="h3 mb-0" th:text="${summary.hiddenClients()}">0</div>
                     </div></div>
                 </div>
             </div>
 
             <div class="row g-3">
                 <div class="col-12" th:each="item : ${instances}">
-                    <div class="card shadow-sm h-100">
+                    <div class="card shadow-sm h-100" th:classappend="${item.protectedInstance()} ? ' border-primary' : (${item.hiddenFromDefaultMonitor()} ? ' opacity-75' : '')">
                         <div class="card-header bg-white d-flex justify-content-between align-items-start gap-3 flex-wrap">
                             <div>
-                                <div class="fw-semibold" th:text="${item.client().businessName}">Negocio</div>
+                                <div class="d-flex gap-2 align-items-center flex-wrap">
+                                    <div class="fw-semibold" th:text="${item.client().businessName}">Negocio</div>
+                                    <span class="badge" th:classappend="${item.managementModeBadgeClass()}" th:text="${item.managementModeLabel()}">Modo</span>
+                                    <span class="badge text-bg-secondary" th:if="${item.hiddenFromDefaultMonitor()}">Oculto</span>
+                                </div>
                                 <div class="small text-muted">
                                     <code th:text="${item.client().code}">codigo</code>
                                     <span class="mx-1">·</span>
@@ -90,9 +98,9 @@
                             </div>
                             <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
                                 <span class="badge" th:classappend="${item.healthBadgeClass()}" th:text="${item.healthStatus()}">Estado</span>
-                                <a th:href="@{|/admin/platform/clients/${item.client().id}/provisioning|}" class="btn btn-sm btn-outline-success">
-                                    <i class="bi bi-database-gear"></i>
-                                    Aprovisionamiento
+                                <a th:href="@{|/admin/platform/clients/${item.client().id}/provisioning|}" class="btn btn-sm" th:classappend="${item.protectedInstance()} ? ' btn-outline-secondary' : ' btn-outline-success'">
+                                    <i class="bi" th:classappend="${item.protectedInstance()} ? ' bi-shield-lock' : ' bi-database-gear'"></i>
+                                    <span th:text="${item.protectedInstance()} ? 'Protegido' : 'Aprovisionamiento'">Aprovisionamiento</span>
                                 </a>
                                 <a th:href="@{|/admin/platform/clients/${item.client().id}/runtime|}" class="btn btn-sm btn-outline-secondary">
                                     <i class="bi bi-hdd-network"></i>
@@ -115,6 +123,8 @@
                                     <div class="border rounded p-3 h-100 bg-white">
                                         <div class="fw-semibold mb-2">Estado del negocio</div>
                                         <dl class="row small mb-0">
+                                            <dt class="col-5">Gestión</dt>
+                                            <dd class="col-7"><span class="badge" th:classappend="${item.managementModeBadgeClass()}" th:text="${item.managementModeLabel()}">Modo</span></dd>
                                             <dt class="col-5">Negocio</dt>
                                             <dd class="col-7"><span class="badge text-bg-primary" th:text="${item.businessStatus()}">ACTIVE</span></dd>
                                             <dt class="col-5">Base</dt>
@@ -125,24 +135,26 @@
                                             <dd class="col-7"><code th:text="${item.runtimeProfile()}">perfil</code></dd>
                                             <dt class="col-5">Puerto</dt>
                                             <dd class="col-7" th:text="${item.runtimePort()}">8083</dd>
-                                            <dt class="col-5">Última generación</dt>
-                                            <dd class="col-7" th:text="${item.lastRuntimeGeneratedAt() != null ? item.lastRuntimeGeneratedAt() : 'Pendiente'}">Pendiente</dd>
                                         </dl>
                                     </div>
                                 </div>
 
                                 <div class="col-12 col-xl-4">
                                     <div class="border rounded p-3 h-100 bg-white">
-                                        <div class="fw-semibold mb-2">Archivos runtime</div>
-                                        <div class="small mb-2">
+                                        <div class="fw-semibold mb-2" th:text="${item.protectedInstance()} ? 'Modo protegido' : 'Archivos runtime'">Archivos runtime</div>
+                                        <div class="small mb-2" th:if="${item.protectedInstance()}">
+                                            <i class="bi bi-shield-lock-fill text-primary"></i>
+                                            Instancia existente: no requiere runtime generado por la plataforma.
+                                        </div>
+                                        <div class="small mb-2" th:unless="${item.protectedInstance()}">
                                             <i class="bi" th:classappend="${item.configFileExists() ? ' bi-check-circle-fill text-success' : ' bi-x-circle-fill text-danger'}"></i>
                                             <span>application.properties</span>
                                         </div>
-                                        <div class="small mb-2">
+                                        <div class="small mb-2" th:unless="${item.protectedInstance()}">
                                             <i class="bi" th:classappend="${item.runScriptExists() ? ' bi-check-circle-fill text-success' : ' bi-x-circle-fill text-danger'}"></i>
                                             <span>run.sh</span>
                                         </div>
-                                        <div class="small text-muted mt-2">Carpeta:</div>
+                                        <div class="small text-muted mt-2">Referencia:</div>
                                         <code class="small d-block text-break" th:text="${item.runtimeFolder()}">runtime-clients/cliente</code>
                                     </div>
                                 </div>
@@ -154,7 +166,7 @@
                                         <a th:href="${item.localUrl()}" target="_blank" th:text="${item.localUrl()}">http://localhost:8083</a>
                                         <div class="small text-muted mt-2">Comando:</div>
                                         <pre class="bg-dark text-white rounded p-2 small mb-0"><code th:text="${item.runCommand()}">bash scripts/run-client.sh perfil 8083</code></pre>
-                                        <div class="small text-muted mt-2" th:if="${!item.running() and item.runtimeFilesGenerated()}">
+                                        <div class="small text-muted mt-2" th:if="${!item.running()}">
                                             Ejecuta este comando en otra terminal y luego presiona “Actualizar estado”.
                                         </div>
                                     </div>
@@ -167,7 +179,7 @@
                 <div class="col-12" th:if="${#lists.isEmpty(instances)}">
                     <div class="card shadow-sm">
                         <div class="card-body text-center text-muted py-5">
-                            Todavía no hay negocios creados. Crea un negocio desde una plantilla para verlo aquí.
+                            Todavía no hay negocios visibles. Usa “Todas” para ver instancias ocultas o crea el primer negocio desde una plantilla.
                         </div>
                     </div>
                 </div>

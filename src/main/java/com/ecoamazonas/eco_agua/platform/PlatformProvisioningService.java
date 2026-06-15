@@ -146,6 +146,7 @@ public class PlatformProvisioningService {
 
     public void createDatabase(Long clientId) {
         PlatformBusinessClient client = getClient(clientId);
+        ensureProvisioningAllowed(client);
         String databaseName = normalizedDatabaseName(client.getDatabaseName());
         String sql = createDatabaseSql(databaseName);
 
@@ -167,6 +168,7 @@ public class PlatformProvisioningService {
     @Transactional
     public void copyStructureAutomatically(Long clientId) {
         PlatformBusinessClient client = getClient(clientId);
+        ensureProvisioningAllowed(client);
         String targetDatabase = normalizedDatabaseName(client.getDatabaseName());
         String sourceDatabase = normalizedDatabaseName(sourceDatabaseName);
         if (sourceDatabase.equals(targetDatabase)) {
@@ -209,6 +211,7 @@ public class PlatformProvisioningService {
     @Transactional
     public void applyBootstrapAutomatically(Long clientId) {
         PlatformBusinessClient client = getClient(clientId);
+        ensureProvisioningAllowed(client);
         List<String> activeModuleKeys = activeModuleKeys(clientId);
         String bootstrapSql = bootstrapSql(client, activeModuleKeys);
         List<String> statements = splitSqlStatements(bootstrapSql);
@@ -251,6 +254,7 @@ public class PlatformProvisioningService {
     @Transactional
     public void loadTemplateDemoDataAutomatically(Long clientId) {
         PlatformBusinessClient client = getClient(clientId);
+        ensureProvisioningAllowed(client);
         if (!client.isDemoDataEnabled()) {
             throw new IllegalArgumentException("Este negocio fue creado sin datos demo habilitados.");
         }
@@ -296,6 +300,7 @@ public class PlatformProvisioningService {
     @Transactional
     public void generateRuntimeFiles(Long clientId) {
         PlatformBusinessClient client = getClient(clientId);
+        ensureProvisioningAllowed(client);
         String profile = normalizeRuntimeProfile(defaultValue(client.getRuntimeProfile(), client.getCode()));
         int port = client.getRuntimePort() == null || client.getRuntimePort() <= 0 ? suggestedPort(client) : client.getRuntimePort();
         String publicUrl = defaultValue(client.getPublicUrl(), "http://localhost:" + port);
@@ -330,6 +335,7 @@ public class PlatformProvisioningService {
     @Transactional
     public void markStructureReady(Long clientId) {
         PlatformBusinessClient client = getClient(clientId);
+        ensureProvisioningAllowed(client);
         client.setDatabaseStatus("STRUCTURE_READY");
         if (!"ACTIVE".equalsIgnoreCase(safe(client.getStatus()))) {
             client.setStatus("PROVISIONING");
@@ -341,6 +347,7 @@ public class PlatformProvisioningService {
     @Transactional
     public void markActive(Long clientId) {
         PlatformBusinessClient client = getClient(clientId);
+        ensureProvisioningAllowed(client);
         client.setDatabaseStatus("READY");
         client.setStatus("ACTIVE");
         clientRepository.save(client);
@@ -350,12 +357,19 @@ public class PlatformProvisioningService {
     @Transactional
     public void resetProvisioning(Long clientId) {
         PlatformBusinessClient client = getClient(clientId);
+        ensureProvisioningAllowed(client);
         client.setDatabaseStatus("PENDING_STRUCTURE");
         client.setStatus("CONFIGURED");
         client.setRuntimeStatus("PENDING");
         client.setLastRuntimeGeneratedAt(null);
         clientRepository.save(client);
         saveLog(client, "RESET_PROVISIONING", "SUCCESS", "Estado de aprovisionamiento reiniciado sin eliminar base de datos.", null);
+    }
+
+    private void ensureProvisioningAllowed(PlatformBusinessClient client) {
+        if (client.isProtectedInstance() || "PROTECTED".equalsIgnoreCase(safe(client.getManagementMode()))) {
+            throw new IllegalArgumentException("Esta instancia está protegida. No se permite reiniciar, copiar estructura ni cargar datos demo desde el aprovisionamiento.");
+        }
     }
 
     private PlatformBusinessClient getClient(Long clientId) {

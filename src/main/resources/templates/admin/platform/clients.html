@@ -95,6 +95,7 @@
                                 <th>Plantilla</th>
                                 <th>Base prevista</th>
                                 <th>Estado</th>
+                                <th>Gestión</th>
                                 <th>Contacto</th>
                                 <th class="text-end">Acciones</th>
                             </tr>
@@ -125,6 +126,12 @@
                                     <span class="badge text-bg-light text-dark" th:if="${client.status != 'DRAFT' and client.status != 'CONFIGURED' and client.status != 'ACTIVE'}" th:text="${client.status}">Estado</span>
                                 </td>
                                 <td>
+                                    <span class="badge text-bg-primary" th:if="${client.protectedInstance}">Protegido</span>
+                                    <span class="badge text-bg-info" th:if="${!client.protectedInstance and client.monitorVisible}">Demo</span>
+                                    <span class="badge text-bg-secondary" th:if="${!client.monitorVisible}">Oculto</span>
+                                    <div class="small text-muted" th:text="${client.managementMode}">DEMO</div>
+                                </td>
+                                <td>
                                     <div th:text="${client.ownerName}">Responsable</div>
                                     <div class="small text-muted" th:text="${client.contactPhone}">Teléfono</div>
                                 </td>
@@ -133,8 +140,8 @@
                                         <a th:href="@{|/admin/platform/clients/${client.id}|}" class="btn btn-outline-primary" title="Ver configuración">
                                             <i class="bi bi-eye"></i>
                                         </a>
-                                        <a th:href="@{|/admin/platform/clients/${client.id}/provisioning|}" class="btn btn-outline-success" title="Aprovisionamiento">
-                                            <i class="bi bi-database-gear"></i>
+                                        <a th:href="@{|/admin/platform/clients/${client.id}/provisioning|}" class="btn" th:classappend="${client.protectedInstance} ? ' btn-outline-secondary' : ' btn-outline-success'" th:title="${client.protectedInstance} ? 'Instancia protegida' : 'Aprovisionamiento'">
+                                            <i class="bi" th:classappend="${client.protectedInstance} ? ' bi-shield-lock' : ' bi-database-gear'"></i>
                                         </a>
                                         <a th:href="@{|/admin/platform/clients/${client.id}/runtime|}" class="btn btn-outline-secondary" title="Perfil de ejecución">
                                             <i class="bi bi-hdd-network"></i>
@@ -146,7 +153,7 @@
                                 </td>
                             </tr>
                             <tr th:if="${#lists.isEmpty(clients)}">
-                                <td colspan="6" class="text-center text-muted py-4">
+                                <td colspan="7" class="text-center text-muted py-4">
                                     Todavía no hay negocios registrados. Crea el primer negocio desde una plantilla.
                                 </td>
                             </tr>

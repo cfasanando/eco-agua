@@ -236,10 +236,13 @@ public class PlatformAdminController {
 
 
     @GetMapping("/instances")
-    public String instances(Model model) {
+    public String instances(@RequestParam(value = "show", required = false) String show,
+                            Model model) {
+        boolean includeHidden = "all".equalsIgnoreCase(show);
         model.addAttribute("activePage", "platform_instances");
         model.addAttribute("summary", platformInstanceMonitorService.buildSummary());
-        model.addAttribute("instances", platformInstanceMonitorService.listInstances());
+        model.addAttribute("instances", platformInstanceMonitorService.listInstances(includeHidden));
+        model.addAttribute("includeHidden", includeHidden);
         return "admin/platform/instances";
     }
 

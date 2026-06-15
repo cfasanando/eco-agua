@@ -29,26 +29,47 @@ public class PlatformInstanceMonitorService {
     }
 
     public List<PlatformInstanceMonitorItem> listInstances() {
-        return clientRepository.findAllByOrderByCreatedAtDescIdDesc().stream()
+        return listInstances(false);
+    }
+
+    public List<PlatformInstanceMonitorItem> listInstances(boolean includeHidden) {
+        List<PlatformBusinessClient> clients = includeHidden
+                ? clientRepository.findAllByOrderByCreatedAtDescIdDesc()
+                : clientRepository.findByMonitorVisibleTrueOrderByCreatedAtDescIdDesc();
+        return clients.stream()
                 .map(this::buildItem)
                 .toList();
     }
 
     public PlatformInstanceMonitorSummary buildSummary() {
-        List<PlatformInstanceMonitorItem> items = listInstances();
-        long readyClients = items.stream().filter(item -> item.databaseReady() && item.businessActive()).count();
-        long runningInstances = items.stream().filter(PlatformInstanceMonitorItem::running).count();
-        long stoppedReadyInstances = items.stream()
+        List<PlatformInstanceMonitorItem> allItems = clientRepository.findAllByOrderByCreatedAtDescIdDesc().stream()
+                .map(this::buildItem)
+                .toList();
+        List<PlatformInstanceMonitorItem> visibleItems = allItems.stream()
+                .filter(PlatformInstanceMonitorItem::monitorVisible)
+                .toList();
+        long protectedClients = visibleItems.stream().filter(PlatformInstanceMonitorItem::protectedInstance).count();
+        long demoClients = visibleItems.stream()
+                .filter(item -> "DEMO".equalsIgnoreCase(item.managementMode()))
+                .count();
+        long hiddenClients = allItems.stream().filter(item -> !item.monitorVisible()).count();
+        long readyClients = visibleItems.stream().filter(item -> item.databaseReady() && item.businessActive()).count();
+        long runningInstances = visibleItems.stream().filter(PlatformInstanceMonitorItem::running).count();
+        long stoppedReadyInstances = visibleItems.stream()
                 .filter(item -> item.databaseReady() && item.businessActive() && item.runtimeFilesGenerated() && !item.running())
                 .count();
-        long pendingProvisioning = items.stream()
+        long pendingProvisioning = visibleItems.stream()
                 .filter(item -> !item.databaseReady() || !item.businessActive())
                 .count();
-        long missingRuntimeFiles = items.stream()
-                .filter(item -> item.databaseReady() && item.businessActive() && !item.runtimeFilesGenerated())
+        long missingRuntimeFiles = visibleItems.stream()
+                .filter(item -> item.runtimeFilesRequired() && item.databaseReady() && item.businessActive() && !item.runtimeFilesGenerated())
                 .count();
         return new PlatformInstanceMonitorSummary(
-                items.size(),
+                allItems.size(),
+                visibleItems.size(),
+                protectedClients,
+                demoClients,
+                hiddenClients,
                 readyClients,
                 runningInstances,
                 stoppedReadyInstances,
@@ -60,22 +81,27 @@ public class PlatformInstanceMonitorService {
     private PlatformInstanceMonitorItem buildItem(PlatformBusinessClient client) {
         String profile = normalizeProfile(defaultValue(client.getRuntimeProfile(), client.getCode()));
         int port = runtimePort(client);
-        String localUrl = "http://localhost:" + port;
+        String localUrl = defaultValue(client.getPublicUrl(), "http://localhost:" + port);
         String publicUrl = defaultValue(client.getPublicUrl(), localUrl);
         String databaseStatus = defaultValue(client.getDatabaseStatus(), "PENDING_STRUCTURE").toUpperCase(Locale.ROOT);
         String businessStatus = defaultValue(client.getStatus(), "DRAFT").toUpperCase(Locale.ROOT);
         String runtimeStatus = defaultValue(client.getRuntimeStatus(), "PENDING").toUpperCase(Locale.ROOT);
-        boolean databaseReady = "READY".equals(databaseStatus);
-        boolean businessActive = "ACTIVE".equals(businessStatus);
+        String managementMode = defaultValue(client.getManagementMode(), client.isProtectedInstance() ? "PROTECTED" : "DEMO").toUpperCase(Locale.ROOT);
+        boolean protectedInstance = client.isProtectedInstance() || "PROTECTED".equals(managementMode);
+        boolean monitorVisible = client.isMonitorVisible();
+        boolean hiddenFromDefaultMonitor = !monitorVisible;
+        boolean databaseReady = "READY".equals(databaseStatus) || "CREATED".equals(databaseStatus) || protectedInstance;
+        boolean businessActive = "ACTIVE".equals(businessStatus) || protectedInstance;
         boolean runtimeConfigured = client.getRuntimeProfile() != null && !client.getRuntimeProfile().isBlank()
                 && client.getRuntimePort() != null;
 
         Path runtimeFolderPath = Path.of(runtimeClientsDirectory, profile).toAbsolutePath().normalize();
         Path configPath = runtimeFolderPath.resolve("application.properties");
         Path runScriptPath = runtimeFolderPath.resolve("run.sh");
-        boolean configFileExists = Files.isRegularFile(configPath);
-        boolean runScriptExists = Files.isRegularFile(runScriptPath);
-        boolean runtimeFilesGenerated = configFileExists && runScriptExists;
+        boolean runtimeFilesRequired = !protectedInstance;
+        boolean configFileExists = protectedInstance || Files.isRegularFile(configPath);
+        boolean runScriptExists = protectedInstance || Files.isRegularFile(runScriptPath);
+        boolean runtimeFilesGenerated = !runtimeFilesRequired || (configFileExists && runScriptExists);
         boolean running = databaseReady && businessActive && runtimeFilesGenerated && isReachable(localUrl);
 
         String healthStatus;
@@ -83,7 +109,12 @@ public class PlatformInstanceMonitorService {
         String healthAlertClass;
         String healthDescription;
 
-        if (!databaseReady) {
+        if (!monitorVisible) {
+            healthStatus = "OCULTO";
+            healthBadgeClass = "text-bg-secondary";
+            healthAlertClass = "alert-secondary";
+            healthDescription = "Esta instancia está registrada, pero no se muestra en el monitor principal de demos.";
+        } else if (!databaseReady) {
             healthStatus = "PENDIENTE";
             healthBadgeClass = "text-bg-warning";
             healthAlertClass = "alert-warning";
@@ -99,16 +130,22 @@ public class PlatformInstanceMonitorService {
             healthAlertClass = "alert-secondary";
             healthDescription = "Falta generar los archivos runtime para levantar esta instancia.";
         } else if (running) {
-            healthStatus = "EN LÍNEA";
+            healthStatus = protectedInstance ? "PROTEGIDO EN LÍNEA" : "EN LÍNEA";
             healthBadgeClass = "text-bg-success";
             healthAlertClass = "alert-success";
-            healthDescription = "La URL local respondió correctamente. Puedes abrir el negocio.";
+            healthDescription = protectedInstance
+                    ? "Instancia existente protegida. La URL respondió correctamente y no se debe reinstalar desde el aprovisionamiento."
+                    : "La URL local respondió correctamente. Puedes abrir el negocio.";
         } else {
-            healthStatus = "DETENIDO";
+            healthStatus = protectedInstance ? "PROTEGIDO DETENIDO" : "DETENIDO";
             healthBadgeClass = "text-bg-danger";
             healthAlertClass = "alert-danger";
-            healthDescription = "La instalación está lista, pero el servidor del cliente no está levantado en su puerto.";
+            healthDescription = protectedInstance
+                    ? "Instancia existente protegida registrada, pero su URL local no respondió. Levántala con su comando habitual."
+                    : "La instalación está lista, pero el servidor del cliente no está levantado en su puerto.";
         }
+
+        String runCommand = defaultValue(client.getRuntimeCommand(), "bash scripts/run-client.sh " + profile + " " + port);
 
         return new PlatformInstanceMonitorItem(
                 client,
@@ -119,19 +156,26 @@ public class PlatformInstanceMonitorService {
                 databaseStatus,
                 businessStatus,
                 runtimeStatus,
+                managementMode,
+                managementModeLabel(managementMode, protectedInstance),
+                managementModeBadgeClass(managementMode, protectedInstance),
+                protectedInstance,
+                monitorVisible,
+                hiddenFromDefaultMonitor,
                 databaseReady,
                 businessActive,
                 runtimeConfigured,
                 runtimeFilesGenerated,
                 configFileExists,
                 runScriptExists,
+                runtimeFilesRequired,
                 running,
                 healthStatus,
                 healthBadgeClass,
                 healthAlertClass,
                 healthDescription,
-                "bash scripts/run-client.sh " + profile + " " + port,
-                runtimeFolderPath.toString(),
+                runCommand,
+                protectedInstance ? "Instancia existente / protegida" : runtimeFolderPath.toString(),
                 client.getLastRuntimeGeneratedAt(),
                 LocalDateTime.now()
         );
@@ -167,6 +211,32 @@ public class PlatformInstanceMonitorService {
                 .replaceAll("_+", "_")
                 .replaceAll("^_|_$", "");
         return normalized.isBlank() ? "cliente_demo" : normalized;
+    }
+
+    private String managementModeLabel(String managementMode, boolean protectedInstance) {
+        if (protectedInstance || "PROTECTED".equalsIgnoreCase(managementMode)) {
+            return "Protegido";
+        }
+        if ("HIDDEN".equalsIgnoreCase(managementMode)) {
+            return "Oculto";
+        }
+        if ("PAUSED".equalsIgnoreCase(managementMode)) {
+            return "Pausado";
+        }
+        if ("EXISTING".equalsIgnoreCase(managementMode)) {
+            return "Existente";
+        }
+        return "Demo";
+    }
+
+    private String managementModeBadgeClass(String managementMode, boolean protectedInstance) {
+        if (protectedInstance || "PROTECTED".equalsIgnoreCase(managementMode)) {
+            return "text-bg-primary";
+        }
+        if ("HIDDEN".equalsIgnoreCase(managementMode) || "PAUSED".equalsIgnoreCase(managementMode)) {
+            return "text-bg-secondary";
+        }
+        return "text-bg-info";
     }
 
     private String defaultValue(String value, String fallback) {

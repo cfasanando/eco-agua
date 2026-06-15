@@ -9,6 +9,8 @@ public interface PlatformBusinessClientRepository extends JpaRepository<Platform
 
     List<PlatformBusinessClient> findAllByOrderByCreatedAtDescIdDesc();
 
+    List<PlatformBusinessClient> findByMonitorVisibleTrueOrderByCreatedAtDescIdDesc();
+
     Optional<PlatformBusinessClient> findByCode(String code);
 
     boolean existsByCode(String code);

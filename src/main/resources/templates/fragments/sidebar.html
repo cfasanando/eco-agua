@@ -165,7 +165,7 @@
       </div>
     </th:block>
 
-    <th:block th:if="${moduleOperationSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_PRODUCTION','ROLE_READONLY','ver_delivery','administra_delivery','ver_recompras','administra_recompras')">
+    <th:block th:if="${moduleOperationSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_PRODUCTION','ROLE_READONLY','ver_delivery','administra_delivery','ver_recompras','administra_recompras','ver_restaurante','administra_restaurante')">
       <div class="menu-section-title">Operación diaria</div>
 
       <div
@@ -365,6 +365,73 @@
           </th:block>
         </div>
       </div>
+
+      <th:block th:if="${moduleRestaurantEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_SALES','ROLE_LOGISTICS','ROLE_READONLY','ver_restaurante','administra_restaurante')">
+        <div
+          class="menu-group"
+          th:with="isRestaurantActive=${activePage == 'restaurant_dashboard'
+            or activePage == 'restaurant_tables'
+            or activePage == 'restaurant_orders_new'
+            or activePage == 'restaurant_kitchen'}"
+        >
+          <input
+            type="checkbox"
+            id="menu-restaurant-toggle"
+            class="menu-toggle"
+            th:checked="${isRestaurantActive}"
+          >
+
+          <label class="menu-link has-children" for="menu-restaurant-toggle">
+            <span class="icon"><i class="bi bi-shop"></i></span>
+            <span>Restaurante</span>
+            <span class="caret"><i class="bi bi-chevron-right"></i></span>
+          </label>
+
+          <div class="submenu-container">
+            <a
+              th:href="@{/admin/restaurant/dashboard}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'restaurant_dashboard' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-speedometer2"></i></span>
+              <span>Panel restaurante</span>
+            </a>
+            <a
+              th:href="@{/admin/restaurant/tables}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'restaurant_tables' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-grid-3x3-gap"></i></span>
+              <span>Mesas y salón</span>
+            </a>
+            <a
+              th:href="@{/admin/restaurant/orders/new}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'restaurant_orders_new' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-receipt"></i></span>
+              <span>Nueva comanda</span>
+            </a>
+            <a
+              th:href="@{/admin/restaurant/kitchen}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'restaurant_kitchen' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-fire"></i></span>
+              <span>Cocina</span>
+            </a>
+            <a
+              th:href="@{/restaurant/menu}"
+              target="_blank"
+              class="menu-link submenu"
+            >
+              <span class="icon"><i class="bi bi-qr-code"></i></span>
+              <span>Carta pública</span>
+            </a>
+          </div>
+        </div>
+      </th:block>
+
 
       <th:block th:if="${moduleIncomeEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE')">
         <div

@@ -227,6 +227,18 @@ public class SecurityConfig {
             "administra_academia"
     );
 
+    private static final String[] RESTAURANT_VIEW = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_SALES, ROLE_LOGISTICS, ROLE_READONLY,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR, LEGACY_OPERARIO,
+            "ver_restaurante", "administra_restaurante"
+    );
+
+    private static final String[] RESTAURANT_WRITE = authorities(
+            ROLE_OWNER, ROLE_SALES, ROLE_LOGISTICS,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR, LEGACY_OPERARIO,
+            "administra_restaurante"
+    );
+
     private static final String[] PRODUCTION_VIEW = authorities(
             ROLE_OWNER, ROLE_MANAGEMENT, ROLE_PRODUCTION, ROLE_READONLY,
             LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
@@ -322,6 +334,7 @@ public class SecurityConfig {
                 .requestMatchers("/", "/portal", "/catalogo", "/catalogo/**", "/order/whatsapp", "/robots.txt", "/sitemap.xml").permitAll()
                 .requestMatchers("/blog", "/blog/**").permitAll()
                 .requestMatchers("/academy", "/academy/**").permitAll()
+                .requestMatchers("/restaurant", "/restaurant/**").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/img/**", "/uploads/**", "/webjars/**").permitAll()
                 .requestMatchers("/login", "/error").permitAll()
                 .requestMatchers(HttpMethod.GET, "/logout").permitAll()
@@ -383,6 +396,9 @@ public class SecurityConfig {
                 .requestMatchers("/my-courses/**").hasAnyAuthority(ACADEMY_VIEW)
                 .requestMatchers(HttpMethod.POST, "/admin/academy/**").hasAnyAuthority(ACADEMY_WRITE)
                 .requestMatchers("/admin/academy/**").hasAnyAuthority(ACADEMY_VIEW)
+
+                .requestMatchers(HttpMethod.POST, "/admin/restaurant/**").hasAnyAuthority(RESTAURANT_WRITE)
+                .requestMatchers("/admin/restaurant/**").hasAnyAuthority(RESTAURANT_VIEW)
 
                 .requestMatchers(HttpMethod.POST, "/admin/promotions/**", "/marketing/admin/**", "/admin/blog/**").hasAnyAuthority(MARKETING_WRITE)
                 .requestMatchers("/admin/promotions/**", "/marketing/admin/**", "/admin/blog/**").hasAnyAuthority(MARKETING_VIEW)

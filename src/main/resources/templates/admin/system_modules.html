@@ -68,6 +68,52 @@
                 No necesitas editar archivos <code>.properties</code> para cambiar lo visible de cada cliente.
             </div>
 
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-center">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="badge text-bg-warning">Nuevo rubro</span>
+                            <h2 class="h6 mb-0">Restaurante / carta, mesas y cocina</h2>
+                        </div>
+                        <p class="text-muted small mb-2">
+                            Instala las tablas necesarias y activa el módulo Restaurante para la base de datos actual.
+                            Úsalo cuando quieras probar carta digital, comandas y pantalla de cocina en esta instancia.
+                        </p>
+                        <div class="d-flex flex-wrap gap-2 small">
+                            <span class="badge" th:classappend="${restaurantInstalled} ? ' text-bg-success' : ' text-bg-secondary'"
+                                  th:text="${restaurantInstalled} ? 'Tablas instaladas' : 'Tablas pendientes'">Tablas pendientes</span>
+                            <span class="badge" th:classappend="${restaurantEnabled} ? ' text-bg-success' : ' text-bg-secondary'"
+                                  th:text="${restaurantEnabled} ? 'Módulo activo' : 'Módulo inactivo'">Módulo inactivo</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                        <form method="post" th:action="@{/admin/system-modules/restaurant/install}"
+                              th:if="${!restaurantInstalled or !restaurantEnabled}">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <input type="hidden" name="demoData" value="true"/>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-shop me-1"></i>
+                                <span th:text="${restaurantInstalled} ? 'Activar Restaurante' : 'Instalar y activar Restaurante'">Instalar y activar Restaurante</span>
+                            </button>
+                        </form>
+
+                        <form method="post" th:action="@{/admin/system-modules/restaurant/disable}"
+                              th:if="${restaurantInstalled and restaurantEnabled}">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button type="submit" class="btn btn-outline-danger">
+                                <i class="bi bi-pause-circle me-1"></i>
+                                Desactivar Restaurante
+                            </button>
+                        </form>
+
+                        <a th:if="${restaurantInstalled and restaurantEnabled}" th:href="@{/admin/restaurant/dashboard}" class="btn btn-outline-secondary">
+                            Abrir restaurante
+                        </a>
+                    </div>
+                </div>
+            </div>
+
             <form method="post" th:action="@{/admin/system-modules}">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 

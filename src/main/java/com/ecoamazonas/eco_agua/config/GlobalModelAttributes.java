@@ -193,6 +193,7 @@ public class GlobalModelAttributes {
         boolean moduleMarketing = flag(moduleFlags, "marketing");
         boolean moduleBlog = flag(moduleFlags, "blog");
         boolean moduleAcademy = flag(moduleFlags, "academy");
+        boolean moduleRestaurant = flag(moduleFlags, "restaurant");
         boolean moduleTestimonials = flag(moduleFlags, "testimonials");
         boolean modulePublicSite = flag(moduleFlags, "public_site");
         boolean modulePublicCatalog = flag(moduleFlags, "public_catalog");
@@ -206,7 +207,8 @@ public class GlobalModelAttributes {
         boolean moduleInventorySection = moduleInventory && (moduleProducts || moduleCategories || moduleWarehouse || moduleSupplies || moduleContainers || moduleProduction);
         boolean moduleFinanceSection = moduleFinance && (moduleAccounting || moduleCashflow || moduleBreakEven || modulePriceSimulator);
         boolean moduleSystemSection = moduleHr || moduleUsers || moduleRolesPermissions || modulePlatformSettings;
-        boolean moduleOperationSection = moduleCommercialSection || moduleIncome || moduleExpenses || moduleInventorySection;
+        boolean moduleRestaurantSection = moduleRestaurant;
+        boolean moduleOperationSection = moduleCommercialSection || moduleRestaurantSection || moduleIncome || moduleExpenses || moduleInventorySection;
 
         model.addAttribute("clientFeatures", clientFeatureProperties);
         model.addAttribute("systemModules", moduleFlags);
@@ -239,6 +241,7 @@ public class GlobalModelAttributes {
         model.addAttribute("moduleMarketingEnabled", moduleMarketing);
         model.addAttribute("moduleBlogEnabled", moduleBlog);
         model.addAttribute("moduleAcademyEnabled", moduleAcademy);
+        model.addAttribute("moduleRestaurantEnabled", moduleRestaurant);
         model.addAttribute("moduleTestimonialsEnabled", moduleTestimonials);
         model.addAttribute("modulePublicSiteEnabled", modulePublicSite);
         model.addAttribute("modulePublicCatalogEnabled", modulePublicCatalog);
@@ -250,6 +253,7 @@ public class GlobalModelAttributes {
         model.addAttribute("moduleCommercialSectionEnabled", moduleCommercialSection);
         model.addAttribute("moduleInventorySectionEnabled", moduleInventorySection);
         model.addAttribute("moduleFinanceSectionEnabled", moduleFinanceSection);
+        model.addAttribute("moduleRestaurantSectionEnabled", moduleRestaurantSection);
         model.addAttribute("moduleSystemSectionEnabled", moduleSystemSection);
         model.addAttribute("moduleOperationSectionEnabled", moduleOperationSection);
 
@@ -261,6 +265,7 @@ public class GlobalModelAttributes {
         model.addAttribute("featureMarketing", moduleMarketing);
         model.addAttribute("featureBlog", moduleBlog);
         model.addAttribute("featureAcademy", moduleAcademy);
+        model.addAttribute("featureRestaurant", moduleRestaurant);
         model.addAttribute("featureTestimonials", moduleTestimonials);
         model.addAttribute("featurePublicCatalog", modulePublicCatalog);
         model.addAttribute("featureSupplies", moduleSupplies);

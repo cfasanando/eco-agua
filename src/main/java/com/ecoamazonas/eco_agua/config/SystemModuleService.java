@@ -136,6 +136,7 @@ public class SystemModuleService {
             case "marketing" -> clientFeatureProperties.isMarketing();
             case "blog" -> clientFeatureProperties.isBlog();
             case "academy" -> true;
+            case "restaurant" -> false;
             case "testimonials" -> clientFeatureProperties.isTestimonials();
             case "public_catalog" -> clientFeatureProperties.isPublicCatalog();
             case "supplies" -> clientFeatureProperties.isSupplies();
@@ -167,6 +168,7 @@ public class SystemModuleService {
             case "Finanzas y contabilidad" -> "Income, expenses, accounting, cashflow and pricing analysis.";
             case "Inventario y operación" -> "Products, categories, warehouse, supplies, containers and production.";
             case "Marketing y portal público" -> "Campaigns, blog, testimonials, public portal and public catalog.";
+            case "Operación restaurante" -> "Carta digital, mesas, comandas y cocina para negocios de comida.";
             case "Sistema y RRHH" -> "Internal users, roles, permissions, staff and platform configuration.";
             default -> "Configurable system modules.";
         };
@@ -203,6 +205,8 @@ public class SystemModuleService {
         modules.add(new ModuleDefinition("supplies", "Inventario y operación", "Insumos", "Supplies and supply stock control.", false, false, false));
         modules.add(new ModuleDefinition("containers", "Inventario y operación", "Envases retornables", "Returnable containers module.", false, false, false));
         modules.add(new ModuleDefinition("production", "Inventario y operación", "Producción / planta", "Production and plant module.", false, false, false));
+
+        modules.add(new ModuleDefinition("restaurant", "Operación restaurante", "Restaurante / carta y comandas", "Carta digital, mesas, comandas y pantalla de cocina.", false, false, false));
 
         modules.add(new ModuleDefinition("marketing", "Marketing y portal público", "Marketing / campañas", "Marketing campaign management.", true, false, false));
         modules.add(new ModuleDefinition("blog", "Marketing y portal público", "Blog / consejos", "Blog and public content management.", true, false, false));

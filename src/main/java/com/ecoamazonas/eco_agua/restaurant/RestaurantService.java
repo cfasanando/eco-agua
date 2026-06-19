@@ -9,9 +9,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
@@ -44,6 +46,111 @@ public class RestaurantService {
         int readyOrders = count("SELECT COUNT(*) FROM restaurant_order WHERE status = 'READY'");
         BigDecimal todaySales = amount("SELECT COALESCE(SUM(subtotal),0) FROM restaurant_order WHERE DATE(created_at) = CURDATE() AND status = 'PAID'");
         return new RestaurantDashboardSummary(totalTables, freeTables, occupiedTables, reservedTables, activeOrders, kitchenPendingOrders, readyOrders, todaySales);
+    }
+
+
+    public RestaurantCashSummary cashSummary(LocalDate businessDate) {
+        LocalDate targetDate = businessDate == null ? LocalDate.now() : businessDate;
+        int paidOrders = count("""
+                SELECT COUNT(*)
+                FROM restaurant_order
+                WHERE status = 'PAID'
+                  AND DATE(COALESCE(paid_at, updated_at, created_at)) = ?
+                """, targetDate);
+        BigDecimal paidTotal = amount("""
+                SELECT COALESCE(SUM(subtotal), 0)
+                FROM restaurant_order
+                WHERE status = 'PAID'
+                  AND DATE(COALESCE(paid_at, updated_at, created_at)) = ?
+                """, targetDate);
+        BigDecimal cashTotal = paymentTotal(targetDate, "CASH");
+        BigDecimal cardTotal = paymentTotal(targetDate, "CARD");
+        BigDecimal yapeTotal = paymentTotal(targetDate, "YAPE");
+        BigDecimal plinTotal = paymentTotal(targetDate, "PLIN");
+        BigDecimal transferTotal = paymentTotal(targetDate, "TRANSFER");
+        BigDecimal otherTotal = amount("""
+                SELECT COALESCE(SUM(subtotal), 0)
+                FROM restaurant_order
+                WHERE status = 'PAID'
+                  AND DATE(COALESCE(paid_at, updated_at, created_at)) = ?
+                  AND COALESCE(payment_method, 'OTHER') NOT IN ('CASH','CARD','YAPE','PLIN','TRANSFER')
+                """, targetDate);
+        int openOrders = count("SELECT COUNT(*) FROM restaurant_order WHERE status IN ('NEW','IN_KITCHEN','READY','SERVED')");
+        BigDecimal openTotal = amount("SELECT COALESCE(SUM(subtotal), 0) FROM restaurant_order WHERE status IN ('NEW','IN_KITCHEN','READY','SERVED')");
+        int cancelledOrders = count("""
+                SELECT COUNT(*)
+                FROM restaurant_order
+                WHERE status = 'CANCELLED'
+                  AND DATE(COALESCE(updated_at, created_at)) = ?
+                """, targetDate);
+        BigDecimal averageTicket = paidOrders == 0
+                ? BigDecimal.ZERO
+                : paidTotal.divide(BigDecimal.valueOf(paidOrders), 2, RoundingMode.HALF_UP);
+
+        return new RestaurantCashSummary(
+                targetDate,
+                paidOrders,
+                paidTotal,
+                cashTotal,
+                cardTotal,
+                yapeTotal,
+                plinTotal,
+                transferTotal,
+                otherTotal,
+                openOrders,
+                openTotal,
+                cancelledOrders,
+                averageTicket
+        );
+    }
+
+    public List<RestaurantPaymentBreakdownRow> paymentBreakdown(LocalDate businessDate) {
+        LocalDate targetDate = businessDate == null ? LocalDate.now() : businessDate;
+        return jdbcTemplate.query("""
+                SELECT COALESCE(payment_method, 'OTHER') AS payment_method,
+                       COUNT(*) AS order_count,
+                       COALESCE(SUM(subtotal), 0) AS total_amount
+                FROM restaurant_order
+                WHERE status = 'PAID'
+                  AND DATE(COALESCE(paid_at, updated_at, created_at)) = ?
+                GROUP BY COALESCE(payment_method, 'OTHER')
+                ORDER BY FIELD(COALESCE(payment_method, 'OTHER'), 'CASH', 'YAPE', 'PLIN', 'CARD', 'TRANSFER', 'OTHER'), payment_method
+                """, (rs, rowNum) -> new RestaurantPaymentBreakdownRow(
+                rs.getString("payment_method"),
+                rs.getInt("order_count"),
+                rs.getBigDecimal("total_amount")
+        ), targetDate);
+    }
+
+    public List<RestaurantCashOrderRow> paidOrdersForDate(LocalDate businessDate) {
+        LocalDate targetDate = businessDate == null ? LocalDate.now() : businessDate;
+        return jdbcTemplate.query("""
+                SELECT o.id, o.order_code, o.service_type, o.table_id, t.name AS table_name,
+                       o.customer_name, o.customer_phone, o.status, o.subtotal, o.payment_method,
+                       o.created_at, o.paid_at, COALESCE(COUNT(i.id), 0) AS item_count
+                FROM restaurant_order o
+                LEFT JOIN restaurant_table t ON t.id = o.table_id
+                LEFT JOIN restaurant_order_item i ON i.order_id = o.id
+                WHERE o.status = 'PAID'
+                  AND DATE(COALESCE(o.paid_at, o.updated_at, o.created_at)) = ?
+                GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone,
+                         o.status, o.subtotal, o.payment_method, o.created_at, o.paid_at
+                ORDER BY COALESCE(o.paid_at, o.updated_at, o.created_at) DESC, o.id DESC
+                """, cashOrderMapper(), targetDate);
+    }
+
+    public List<RestaurantOrderRow> openOrdersForCash() {
+        return jdbcTemplate.query("""
+                SELECT o.id, o.order_code, o.service_type, o.table_id, t.name AS table_name,
+                       o.customer_name, o.customer_phone, o.status, o.subtotal, o.notes, o.created_at,
+                       COALESCE(COUNT(i.id), 0) AS item_count
+                FROM restaurant_order o
+                LEFT JOIN restaurant_table t ON t.id = o.table_id
+                LEFT JOIN restaurant_order_item i ON i.order_id = o.id
+                WHERE o.status IN ('NEW','IN_KITCHEN','READY','SERVED')
+                GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.notes, o.created_at
+                ORDER BY o.created_at ASC
+                """, orderMapper());
     }
 
     public List<RestaurantMenuItemRow> menuItems() {
@@ -483,14 +590,25 @@ public class RestaurantService {
         return value != null && value > 0;
     }
 
-    private int count(String sql) {
-        Integer value = jdbcTemplate.queryForObject(sql, Integer.class);
+
+    private int count(String sql, Object... args) {
+        Integer value = jdbcTemplate.queryForObject(sql, Integer.class, args);
         return value == null ? 0 : value;
     }
 
-    private BigDecimal amount(String sql) {
-        BigDecimal value = jdbcTemplate.queryForObject(sql, BigDecimal.class);
+    private BigDecimal amount(String sql, Object... args) {
+        BigDecimal value = jdbcTemplate.queryForObject(sql, BigDecimal.class, args);
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private BigDecimal paymentTotal(LocalDate businessDate, String paymentMethod) {
+        return amount("""
+                SELECT COALESCE(SUM(subtotal), 0)
+                FROM restaurant_order
+                WHERE status = 'PAID'
+                  AND DATE(COALESCE(paid_at, updated_at, created_at)) = ?
+                  AND COALESCE(payment_method, 'OTHER') = ?
+                """, businessDate, paymentMethod);
     }
 
     private String nextOrderCode() {
@@ -581,6 +699,25 @@ public class RestaurantService {
                 rs.getBigDecimal("unit_price"),
                 rs.getBigDecimal("line_total"),
                 rs.getString("kitchen_status")
+        );
+    }
+
+
+    private RowMapper<RestaurantCashOrderRow> cashOrderMapper() {
+        return (rs, rowNum) -> new RestaurantCashOrderRow(
+                rs.getLong("id"),
+                rs.getString("order_code"),
+                rs.getString("service_type"),
+                nullableLong(rs, "table_id"),
+                rs.getString("table_name"),
+                rs.getString("customer_name"),
+                rs.getString("customer_phone"),
+                rs.getString("status"),
+                rs.getBigDecimal("subtotal"),
+                rs.getString("payment_method"),
+                toLocalDateTime(rs.getTimestamp("created_at")),
+                toLocalDateTime(rs.getTimestamp("paid_at")),
+                rs.getInt("item_count")
         );
     }
 

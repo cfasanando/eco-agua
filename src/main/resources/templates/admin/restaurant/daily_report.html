@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Reporte diario restaurante')"></head>
+<body class="bg-white">
+<main class="container my-4">
+    <div class="d-flex justify-content-between align-items-start mb-4 no-print gap-2 flex-wrap">
+        <div>
+            <h1 class="h4 mb-1">Reporte diario restaurante</h1>
+            <p class="text-muted small mb-0">Resumen imprimible de caja y comandas cobradas.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a th:href="@{/admin/restaurant/cash(date=${businessDate})}" class="btn btn-outline-secondary btn-sm">Volver a caja</a>
+            <button type="button" class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
+        </div>
+    </div>
+
+    <section class="border-bottom pb-3 mb-3">
+        <div class="d-flex justify-content-between align-items-start gap-3">
+            <div>
+                <h2 class="h5 mb-1">Caja del día</h2>
+                <div class="text-muted">Fecha: <strong th:text="${#temporals.format(businessDate, 'dd/MM/yyyy')}">fecha</strong></div>
+            </div>
+            <div class="text-end small text-muted">Generado: <span th:text="${#temporals.format(generatedAt, 'dd/MM/yyyy HH:mm')}">fecha</span></div>
+        </div>
+    </section>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3"><div class="border rounded p-3"><div class="small text-muted">Total cobrado</div><strong>S/ <span th:text="${#numbers.formatDecimal(summary.safePaidTotal(),1,2)}">0.00</span></strong></div></div>
+        <div class="col-6 col-md-3"><div class="border rounded p-3"><div class="small text-muted">Comandas pagadas</div><strong th:text="${summary.paidOrders()}">0</strong></div></div>
+        <div class="col-6 col-md-3"><div class="border rounded p-3"><div class="small text-muted">Ticket promedio</div><strong>S/ <span th:text="${#numbers.formatDecimal(summary.safeAverageTicket(),1,2)}">0.00</span></strong></div></div>
+        <div class="col-6 col-md-3"><div class="border rounded p-3"><div class="small text-muted">Abiertas por cobrar</div><strong th:text="${summary.openOrders()}">0</strong></div></div>
+    </div>
+
+    <h3 class="h6">Métodos de pago</h3>
+    <table class="table table-sm table-bordered align-middle mb-4">
+        <thead class="table-light"><tr><th>Método</th><th class="text-end">Comandas</th><th class="text-end">Total</th></tr></thead>
+        <tbody>
+        <tr th:each="row : ${paymentBreakdown}"><td th:text="${row.paymentLabel()}">Pago</td><td class="text-end" th:text="${row.orderCount()}">0</td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(row.safeTotalAmount(),1,2)}">0.00</span></td></tr>
+        <tr th:if="${paymentBreakdown.isEmpty()}"><td colspan="3" class="text-muted text-center">Sin pagos registrados.</td></tr>
+        </tbody>
+    </table>
+
+    <h3 class="h6">Comandas cobradas</h3>
+    <table class="table table-sm table-bordered align-middle">
+        <thead class="table-light"><tr><th>Código</th><th>Referencia</th><th>Pago</th><th>Hora</th><th class="text-end">Total</th></tr></thead>
+        <tbody>
+        <tr th:each="order : ${paidOrders}"><td th:text="${order.orderCode()}">CMD</td><td th:text="${order.serviceReference()}">Mesa</td><td th:text="${order.paymentLabel()}">Pago</td><td th:text="${order.paidAt() == null ? '-' : #temporals.format(order.paidAt(), 'HH:mm')}">hora</td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(order.safeSubtotal(),1,2)}">0.00</span></td></tr>
+        <tr th:if="${paidOrders.isEmpty()}"><td colspan="5" class="text-muted text-center">No hay comandas cobradas.</td></tr>
+        </tbody>
+    </table>
+
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            body { background: #fff !important; }
+            .container { max-width: 100% !important; margin: 0 !important; }
+        }
+    </style>
+</main>
+<div th:replace="fragments/scripts_admin :: adminScripts"></div>
+</body>
+</html>

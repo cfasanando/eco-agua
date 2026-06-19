@@ -3,6 +3,7 @@ package com.ecoamazonas.eco_agua.restaurant;
 import com.ecoamazonas.eco_agua.config.BusinessProperties;
 import com.ecoamazonas.eco_agua.config.PlatformSettingService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.net.URLEncoder;
+import java.time.LocalDate;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -90,6 +92,36 @@ public class RestaurantController {
         model.addAttribute("tables", restaurantService.tables());
         model.addAttribute("publicMenuBaseUrl", absoluteUrl(request, "/restaurant/menu"));
         return "admin/restaurant/table_qr_cards";
+    }
+
+
+    @GetMapping("/admin/restaurant/cash")
+    public String cash(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                       Model model) {
+        ensureRestaurantRuntimeReady();
+        LocalDate businessDate = date == null ? LocalDate.now() : date;
+        model.addAttribute("activePage", "restaurant_cash");
+        model.addAttribute("businessDate", businessDate);
+        model.addAttribute("summary", restaurantService.cashSummary(businessDate));
+        model.addAttribute("paymentBreakdown", restaurantService.paymentBreakdown(businessDate));
+        model.addAttribute("paidOrders", restaurantService.paidOrdersForDate(businessDate));
+        model.addAttribute("openOrders", restaurantService.openOrdersForCash());
+        return "admin/restaurant/cash";
+    }
+
+    @GetMapping("/admin/restaurant/reports/daily")
+    public String dailyReport(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                              Model model) {
+        ensureRestaurantRuntimeReady();
+        LocalDate businessDate = date == null ? LocalDate.now() : date;
+        model.addAttribute("activePage", "restaurant_cash");
+        model.addAttribute("businessDate", businessDate);
+        model.addAttribute("summary", restaurantService.cashSummary(businessDate));
+        model.addAttribute("paymentBreakdown", restaurantService.paymentBreakdown(businessDate));
+        model.addAttribute("paidOrders", restaurantService.paidOrdersForDate(businessDate));
+        model.addAttribute("openOrders", restaurantService.openOrdersForCash());
+        model.addAttribute("generatedAt", java.time.LocalDateTime.now());
+        return "admin/restaurant/daily_report";
     }
 
     @PostMapping("/admin/restaurant/tables/{id}/status")

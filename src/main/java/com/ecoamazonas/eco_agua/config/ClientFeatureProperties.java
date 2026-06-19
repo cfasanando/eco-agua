@@ -15,6 +15,7 @@ public class ClientFeatureProperties {
     private boolean blog = true;
     private boolean testimonials = true;
     private boolean publicCatalog = true;
+    private boolean restaurant = false;
     private boolean supplies = true;
     private boolean fixedCosts = true;
     private boolean breakEven = true;
@@ -82,6 +83,14 @@ public class ClientFeatureProperties {
 
     public void setPublicCatalog(boolean publicCatalog) {
         this.publicCatalog = publicCatalog;
+    }
+
+    public boolean isRestaurant() {
+        return restaurant;
+    }
+
+    public void setRestaurant(boolean restaurant) {
+        this.restaurant = restaurant;
     }
 
     public boolean isSupplies() {

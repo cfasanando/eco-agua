@@ -208,7 +208,7 @@ public class PlatformRuntimeService {
         out.append("ecoagua.business.production-label=Producción\n");
         out.append("ecoagua.business.reorder-label=Seguimiento\n\n");
         out.append("# Feature flags generated from active modules\n");
-        Map<String, Boolean> flags = featureFlags(client.getId());
+        Map<String, Boolean> flags = featureFlags(client);
         for (Map.Entry<String, Boolean> entry : flags.entrySet()) {
             out.append(entry.getKey()).append("=").append(entry.getValue()).append("\n");
         }
@@ -217,11 +217,12 @@ public class PlatformRuntimeService {
         return out.toString();
     }
 
-    private Map<String, Boolean> featureFlags(Long clientId) {
-        List<String> keys = clientModuleRepository.findClientModules(clientId).stream()
+    private Map<String, Boolean> featureFlags(PlatformBusinessClient client) {
+        List<String> keys = clientModuleRepository.findClientModules(client.getId()).stream()
                 .filter(PlatformClientModule::isEnabled)
                 .map(item -> item.getModule().getModuleKey())
                 .toList();
+        boolean restaurant = isRestaurantClient(client) || keys.contains("restaurant") || keys.contains("restaurant_tables") || keys.contains("restaurant_kitchen") || keys.contains("restaurant_menu_qr");
         Map<String, Boolean> flags = new LinkedHashMap<>();
         flags.put("ecoagua.features.containers", keys.contains("containers"));
         flags.put("ecoagua.features.delivery", keys.contains("delivery") || keys.contains("routes") || keys.contains("rutapack"));
@@ -230,12 +231,23 @@ public class PlatformRuntimeService {
         flags.put("ecoagua.features.marketing", keys.contains("marketing"));
         flags.put("ecoagua.features.blog", keys.contains("blog") || keys.contains("content"));
         flags.put("ecoagua.features.testimonials", keys.contains("testimonials"));
-        flags.put("ecoagua.features.public-catalog", keys.contains("public_catalog") || keys.contains("catalog") || keys.contains("ecommerce_filters") || keys.contains("qr_menu"));
+        flags.put("ecoagua.features.public-catalog", restaurant || keys.contains("public_catalog") || keys.contains("catalog") || keys.contains("ecommerce_filters") || keys.contains("qr_menu"));
+        flags.put("ecoagua.features.restaurant", restaurant);
         flags.put("ecoagua.features.supplies", keys.contains("supplies") || keys.contains("warehouse") || keys.contains("ingredients"));
         flags.put("ecoagua.features.fixed-costs", keys.contains("income") || keys.contains("finance") || keys.contains("accounting"));
         flags.put("ecoagua.features.break-even", keys.contains("income") || keys.contains("finance") || keys.contains("accounting"));
-        flags.put("ecoagua.features.price-simulator", keys.contains("sales") || keys.contains("products") || keys.contains("public_catalog"));
+        flags.put("ecoagua.features.price-simulator", restaurant || keys.contains("sales") || keys.contains("products") || keys.contains("public_catalog"));
         return flags;
+    }
+
+
+    private boolean isRestaurantClient(PlatformBusinessClient client) {
+        String type = valueOrEmpty(client.getBusinessType()).toLowerCase(Locale.ROOT);
+        String code = valueOrEmpty(client.getCode()).toLowerCase(Locale.ROOT);
+        String name = valueOrEmpty(client.getBusinessName()).toLowerCase(Locale.ROOT);
+        return type.contains("restaurante") || type.contains("restaurant")
+                || code.contains("restaurante") || code.contains("restaurant")
+                || name.contains("restaurante") || name.contains("restaurant");
     }
 
     private String statusTitle(boolean databaseReady, boolean active, boolean runtimeConfigured) {

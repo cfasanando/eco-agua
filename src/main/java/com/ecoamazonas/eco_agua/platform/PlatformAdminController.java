@@ -6,6 +6,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -92,7 +93,8 @@ public class PlatformAdminController {
     }
 
     @GetMapping("/clients/{id}/provisioning")
-    public String clientProvisioning(@PathVariable Long id, Model model) {
+    public String clientProvisioning(@PathVariable Long id, Model model, HttpServletResponse response) {
+        preventBrowserCache(response);
         PlatformProvisioningPlan plan = platformProvisioningService.buildPlan(id);
         model.addAttribute("activePage", "platform_clients");
         model.addAttribute("client", plan.client());
@@ -109,7 +111,7 @@ public class PlatformAdminController {
         } catch (RuntimeException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", safeFlashMessage(ex));
         }
-        return "redirect:/admin/platform/clients/" + id + "/provisioning";
+        return provisioningRedirect(id);
     }
 
 
@@ -121,7 +123,7 @@ public class PlatformAdminController {
         } catch (RuntimeException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", safeFlashMessage(ex));
         }
-        return "redirect:/admin/platform/clients/" + id + "/provisioning";
+        return provisioningRedirect(id);
     }
 
     @PostMapping("/clients/{id}/provisioning/apply-bootstrap-auto")
@@ -132,7 +134,7 @@ public class PlatformAdminController {
         } catch (RuntimeException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", safeFlashMessage(ex));
         }
-        return "redirect:/admin/platform/clients/" + id + "/provisioning";
+        return provisioningRedirect(id);
     }
 
     @PostMapping("/clients/{id}/provisioning/load-demo-data")
@@ -143,7 +145,7 @@ public class PlatformAdminController {
         } catch (RuntimeException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", safeFlashMessage(ex));
         }
-        return "redirect:/admin/platform/clients/" + id + "/provisioning";
+        return provisioningRedirect(id);
     }
 
     @PostMapping("/clients/{id}/provisioning/generate-runtime-files")
@@ -154,28 +156,28 @@ public class PlatformAdminController {
         } catch (RuntimeException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", safeFlashMessage(ex));
         }
-        return "redirect:/admin/platform/clients/" + id + "/provisioning";
+        return provisioningRedirect(id);
     }
 
     @PostMapping("/clients/{id}/provisioning/mark-structure-ready")
     public String markStructureReady(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         platformProvisioningService.markStructureReady(id);
         redirectAttributes.addFlashAttribute("successMessage", "Estructura marcada como lista. Ahora puedes aplicar el SQL de configuración inicial.");
-        return "redirect:/admin/platform/clients/" + id + "/provisioning";
+        return provisioningRedirect(id);
     }
 
     @PostMapping("/clients/{id}/provisioning/mark-active")
     public String markClientActive(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         platformProvisioningService.markActive(id);
         redirectAttributes.addFlashAttribute("successMessage", "Negocio marcado como activo para demo o pruebas internas.");
-        return "redirect:/admin/platform/clients/" + id + "/provisioning";
+        return provisioningRedirect(id);
     }
 
     @PostMapping("/clients/{id}/provisioning/reset")
     public String resetProvisioning(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         platformProvisioningService.resetProvisioning(id);
         redirectAttributes.addFlashAttribute("successMessage", "Estado de aprovisionamiento reiniciado. No se eliminó ninguna base de datos.");
-        return "redirect:/admin/platform/clients/" + id + "/provisioning";
+        return provisioningRedirect(id);
     }
 
 
@@ -261,6 +263,17 @@ public class PlatformAdminController {
         return "admin/platform/modules";
     }
 
+
+
+    private String provisioningRedirect(Long id) {
+        return "redirect:/admin/platform/clients/" + id + "/provisioning?_=" + System.currentTimeMillis() + "#provisioning-actions";
+    }
+
+    private void preventBrowserCache(HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+        response.setHeader("Pragma", "no-cache");
+        response.setDateHeader("Expires", 0);
+    }
 
     private ResponseEntity<String> downloadableSql(String filename, String content) {
         return downloadableText(filename, content, MediaType.TEXT_PLAIN_VALUE);

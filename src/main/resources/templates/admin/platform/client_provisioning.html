@@ -135,7 +135,7 @@
                 <div class="col-12 col-xl-5">
                     <div class="card shadow-sm h-100">
                         <div class="card-header bg-white fw-semibold">Instalación automática por pasos</div>
-                        <div class="card-body">
+                        <div class="card-body" id="provisioning-actions">
                             <div class="alert alert-secondary small" th:if="${client.protectedInstance}">
                                 Las acciones de instalación están bloqueadas para proteger la data existente. Usa esta pantalla solo como referencia técnica.
                             </div>
@@ -149,7 +149,7 @@
                             <div class="alert alert-success small" th:if="${!client.protectedInstance and plan.canGenerateRuntimeFiles()}">
                                 <strong>Último paso:</strong> el negocio ya puede regenerar archivos runtime.
                             </div>
-                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/create-database|}" class="mb-3">
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/create-database|}" class="mb-3" data-provisioning-form data-loading-text="Creando base de datos...">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button type="submit" class="btn btn-primary w-100" th:disabled="${client.protectedInstance or !plan.canCreateDatabase()}">
                                     <i class="bi bi-database-add me-1"></i>
@@ -163,7 +163,7 @@
                                 </div>
                             </form>
 
-                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/copy-structure-auto|}" class="mb-3">
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/copy-structure-auto|}" class="mb-3" data-provisioning-form data-loading-text="Copiando estructura...">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button type="submit" class="btn w-100" th:classappend="${plan.canCopyStructureAutomatically()} ? ' btn-primary fw-semibold' : ' btn-outline-secondary'" th:disabled="${client.protectedInstance or !plan.canCopyStructureAutomatically()}" onclick="return confirm('Se copiará la estructura de tablas desde la base modelo hacia la base del cliente. ¿Continuar?');">
                                     <i class="bi bi-diagram-3 me-1"></i>
@@ -177,7 +177,7 @@
                                 </div>
                             </form>
 
-                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/apply-bootstrap-auto|}" class="mb-3">
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/apply-bootstrap-auto|}" class="mb-3" data-provisioning-form data-loading-text="Aplicando configuración inicial...">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button type="submit" class="btn w-100" th:classappend="${plan.canApplyBootstrapAutomatically()} ? ' btn-info text-white fw-semibold' : ' btn-outline-secondary'" th:disabled="${client.protectedInstance or !plan.canApplyBootstrapAutomatically()}" onclick="return confirm('Se aplicará la configuración inicial del negocio en su base de datos. ¿Continuar?');">
                                     <i class="bi bi-filetype-sql me-1"></i>
@@ -191,7 +191,7 @@
                                 </div>
                             </form>
 
-                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/load-demo-data|}" class="mb-3">
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/load-demo-data|}" class="mb-3" data-provisioning-form data-loading-text="Cargando datos demo...">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button type="submit" class="btn w-100" th:classappend="${plan.canLoadDemoDataAutomatically()} ? ' btn-warning fw-semibold' : ' btn-outline-secondary'" th:disabled="${client.protectedInstance or !plan.canLoadDemoDataAutomatically()}" onclick="return confirm('Se cargarán datos demo según la plantilla del negocio. ¿Continuar?');">
                                     <i class="bi bi-stars me-1"></i>
@@ -208,7 +208,7 @@
                                 </div>
                             </form>
 
-                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/mark-active|}" class="mb-3">
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/mark-active|}" class="mb-3" data-provisioning-form data-loading-text="Activando negocio...">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button type="submit" class="btn w-100" th:classappend="${plan.canMarkActive()} ? ' btn-success fw-semibold' : ' btn-outline-secondary'" th:disabled="${client.protectedInstance or !plan.canMarkActive()}">
                                     <i class="bi bi-rocket-takeoff me-1"></i>
@@ -222,7 +222,7 @@
                                 </div>
                             </form>
 
-                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/generate-runtime-files|}" class="mb-3">
+                            <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/generate-runtime-files|}" class="mb-3" data-provisioning-form data-loading-text="Generando archivos runtime...">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                 <button type="submit" class="btn w-100" th:classappend="${plan.canGenerateRuntimeFiles()} ? ' btn-success fw-semibold' : ' btn-outline-secondary'" th:disabled="${client.protectedInstance or !plan.canGenerateRuntimeFiles()}">
                                     <i class="bi bi-folder-plus me-1"></i>
@@ -268,7 +268,7 @@
 
                             <details class="mb-3">
                                 <summary class="small text-muted">Respaldo manual</summary>
-                                <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/mark-structure-ready|}" class="mt-2 mb-2">
+                                <form method="post" th:action="@{|/admin/platform/clients/${client.id}/provisioning/mark-structure-ready|}" class="mt-2 mb-2" data-provisioning-form data-loading-text="Marcando estructura...">
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <button type="submit" class="btn btn-sm btn-outline-primary w-100" th:disabled="${!plan.canMarkStructureReady()}">
                                         <i class="bi bi-check2-square me-1"></i>
@@ -439,6 +439,24 @@
 
         <div th:replace="fragments/scripts_admin :: adminScripts"></div>
         <script>
+            document.addEventListener('submit', function (event) {
+                const form = event.target.closest('[data-provisioning-form]');
+                if (!form) {
+                    return;
+                }
+
+                const button = form.querySelector('button[type="submit"]');
+                if (!button || button.disabled) {
+                    return;
+                }
+
+                const loadingText = form.dataset.loadingText || 'Procesando...';
+                button.dataset.originalHtml = button.innerHTML;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>' + loadingText;
+                button.disabled = true;
+                button.classList.add('disabled');
+            }, true);
+
             document.addEventListener('click', function (event) {
                 const button = event.target.closest('[data-copy-target]');
                 if (!button) {

@@ -70,6 +70,26 @@ public class RestaurantService {
                 """, tableMapper());
     }
 
+    public List<RestaurantTableBoardRow> tableBoard() {
+        return jdbcTemplate.query("""
+                SELECT rt.id, rt.code, rt.name, rt.area, rt.seats, rt.status, rt.active, rt.notes,
+                       o.id AS order_id, o.order_code, o.status AS order_status, o.subtotal AS order_subtotal,
+                       o.customer_name, o.customer_phone, o.created_at AS order_created_at,
+                       CASE WHEN o.created_at IS NULL THEN NULL ELSE TIMESTAMPDIFF(MINUTE, o.created_at, NOW()) END AS order_minutes
+                FROM restaurant_table rt
+                LEFT JOIN restaurant_order o ON o.id = (
+                    SELECT ro.id
+                    FROM restaurant_order ro
+                    WHERE ro.table_id = rt.id
+                      AND ro.status IN ('NEW','IN_KITCHEN','READY','SERVED')
+                    ORDER BY ro.created_at DESC, ro.id DESC
+                    LIMIT 1
+                )
+                WHERE rt.active = true
+                ORDER BY rt.area ASC, rt.name ASC
+                """, tableBoardMapper());
+    }
+
     public List<RestaurantTableRow> availableTables() {
         return jdbcTemplate.query("""
                 SELECT id, code, name, area, seats, status, active, notes
@@ -265,6 +285,27 @@ public class RestaurantService {
         );
     }
 
+    private RowMapper<RestaurantTableBoardRow> tableBoardMapper() {
+        return (rs, rowNum) -> new RestaurantTableBoardRow(
+                rs.getLong("id"),
+                rs.getString("code"),
+                rs.getString("name"),
+                rs.getString("area"),
+                rs.getInt("seats"),
+                rs.getString("status"),
+                rs.getBoolean("active"),
+                rs.getString("notes"),
+                nullableLong(rs, "order_id"),
+                rs.getString("order_code"),
+                rs.getString("order_status"),
+                rs.getBigDecimal("order_subtotal"),
+                rs.getString("customer_name"),
+                rs.getString("customer_phone"),
+                toLocalDateTime(rs.getTimestamp("order_created_at")),
+                nullableInteger(rs, "order_minutes")
+        );
+    }
+
     private RowMapper<RestaurantTableRow> tableMapper() {
         return (rs, rowNum) -> new RestaurantTableRow(
                 rs.getLong("id"),
@@ -308,5 +349,15 @@ public class RestaurantService {
 
     private LocalDateTime toLocalDateTime(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toLocalDateTime();
+    }
+
+    private Long nullableLong(java.sql.ResultSet rs, String columnName) throws java.sql.SQLException {
+        long value = rs.getLong(columnName);
+        return rs.wasNull() ? null : value;
+    }
+
+    private Integer nullableInteger(java.sql.ResultSet rs, String columnName) throws java.sql.SQLException {
+        int value = rs.getInt(columnName);
+        return rs.wasNull() ? null : value;
     }
 }

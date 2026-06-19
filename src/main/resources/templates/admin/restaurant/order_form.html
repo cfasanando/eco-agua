@@ -31,7 +31,10 @@
                                 <label class="form-label">Mesa</label>
                                 <select name="tableId" class="form-select mb-3">
                                     <option value="">Sin mesa</option>
-                                    <option th:each="table : ${tables}" th:value="${table.id()}" th:text="|${table.name()} - ${table.statusLabel()}|">Mesa</option>
+                                    <option th:each="table : ${tables}"
+                                            th:value="${table.id()}"
+                                            th:selected="${selectedTableId != null and table.id().equals(selectedTableId)}"
+                                            th:text="|${table.name()} - ${table.statusLabel()}|">Mesa</option>
                                 </select>
 
                                 <label class="form-label">Cliente / referencia</label>
@@ -80,6 +83,6 @@
         </main>
     </div>
 </div>
-<div th:replace="fragments/scripts_admin :: scripts"></div>
+<div th:replace="fragments/scripts_admin :: adminScripts"></div>
 </body>
 </html>

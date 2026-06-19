@@ -54,6 +54,9 @@ public class SystemModuleService {
         if (isLocked(key)) {
             return true;
         }
+        if (isRuntimeForcedEnabled(key)) {
+            return true;
+        }
         return isEnabled(key, defaultValueFor(key));
     }
 
@@ -109,6 +112,13 @@ public class SystemModuleService {
         return parseBoolean(rawValue, defaultValue);
     }
 
+    private boolean isRuntimeForcedEnabled(String key) {
+        return switch (key) {
+            case "restaurant" -> clientFeatureProperties.isRestaurant();
+            default -> false;
+        };
+    }
+
     private boolean parseBoolean(String value, boolean defaultValue) {
         if (value == null || value.isBlank()) {
             return defaultValue;
@@ -136,7 +146,7 @@ public class SystemModuleService {
             case "marketing" -> clientFeatureProperties.isMarketing();
             case "blog" -> clientFeatureProperties.isBlog();
             case "academy" -> true;
-            case "restaurant" -> false;
+            case "restaurant" -> clientFeatureProperties.isRestaurant();
             case "testimonials" -> clientFeatureProperties.isTestimonials();
             case "public_catalog" -> clientFeatureProperties.isPublicCatalog();
             case "supplies" -> clientFeatureProperties.isSupplies();

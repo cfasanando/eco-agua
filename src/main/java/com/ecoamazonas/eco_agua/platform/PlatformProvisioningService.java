@@ -2,6 +2,7 @@ package com.ecoamazonas.eco_agua.platform;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +44,7 @@ public class PlatformProvisioningService {
     private final PlatformProvisioningLogRepository logRepository;
     private final PlatformRuntimeService runtimeService;
     private final JdbcTemplate jdbcTemplate;
+    private final PasswordEncoder passwordEncoder;
     private final String sourceDatabaseName;
     private final String runtimeClientsDirectory;
 
@@ -52,6 +54,7 @@ public class PlatformProvisioningService {
                                        PlatformProvisioningLogRepository logRepository,
                                        PlatformRuntimeService runtimeService,
                                        JdbcTemplate jdbcTemplate,
+                                       PasswordEncoder passwordEncoder,
                                        @Value("${ecoagua.platform.source-database:productos_selva_belen}") String sourceDatabaseName,
                                        @Value("${ecoagua.platform.runtime-clients-dir:runtime-clients}") String runtimeClientsDirectory) {
         this.clientRepository = clientRepository;
@@ -60,6 +63,7 @@ public class PlatformProvisioningService {
         this.logRepository = logRepository;
         this.runtimeService = runtimeService;
         this.jdbcTemplate = jdbcTemplate;
+        this.passwordEncoder = passwordEncoder;
         this.sourceDatabaseName = sourceDatabaseName;
         this.runtimeClientsDirectory = runtimeClientsDirectory;
     }
@@ -157,7 +161,7 @@ public class PlatformProvisioningService {
             if ("DRAFT".equalsIgnoreCase(safe(client.getStatus()))) {
                 client.setStatus("CONFIGURED");
             }
-            clientRepository.save(client);
+            clientRepository.saveAndFlush(client);
             saveLog(client, "CREATE_DATABASE", "SUCCESS", "Base de datos creada o ya existente: " + databaseName, sql);
         } catch (Exception ex) {
             saveLog(client, "CREATE_DATABASE", "ERROR", cleanError(ex.getMessage()), sql);
@@ -193,7 +197,7 @@ public class PlatformProvisioningService {
             if (!"ACTIVE".equalsIgnoreCase(safe(client.getStatus()))) {
                 client.setStatus("PROVISIONING");
             }
-            clientRepository.save(client);
+            clientRepository.saveAndFlush(client);
             saveLog(client, "COPY_STRUCTURE_AUTO", "SUCCESS",
                     "Estructura copiada automáticamente desde " + sourceDatabase + " hacia " + targetDatabase + ". Tablas: " + tables.size(),
                     "SHOW CREATE TABLE + CREATE TABLE IF NOT EXISTS");
@@ -233,7 +237,7 @@ public class PlatformProvisioningService {
             if (!"ACTIVE".equalsIgnoreCase(safe(client.getStatus()))) {
                 client.setStatus("PROVISIONING");
             }
-            clientRepository.save(client);
+            clientRepository.saveAndFlush(client);
             saveLog(client, "APPLY_BOOTSTRAP_AUTO", "SUCCESS",
                     "Configuración inicial aplicada automáticamente en " + normalizedDatabaseName(client.getDatabaseName()) + ". Sentencias: " + statements.size(),
                     bootstrapSql);
@@ -282,7 +286,7 @@ public class PlatformProvisioningService {
             if (!"ACTIVE".equalsIgnoreCase(safe(client.getStatus()))) {
                 client.setStatus("PROVISIONING");
             }
-            clientRepository.save(client);
+            clientRepository.saveAndFlush(client);
             saveLog(client, "LOAD_TEMPLATE_DEMO_DATA", "SUCCESS",
                     "Datos demo cargados para plantilla " + templateCode(client) + " en " + normalizedDatabaseName(client.getDatabaseName()) + ". Sentencias: " + statements.size(),
                     demoSql);
@@ -323,7 +327,7 @@ public class PlatformProvisioningService {
             PlatformBusinessClient updatedClient = getClient(clientId);
             updatedClient.setRuntimeStatus("FILES_GENERATED");
             updatedClient.setLastRuntimeGeneratedAt(java.time.LocalDateTime.now());
-            clientRepository.save(updatedClient);
+            clientRepository.saveAndFlush(updatedClient);
             saveLog(updatedClient, "GENERATE_RUNTIME_FILES", "SUCCESS",
                     "Archivos runtime generados en " + folder.toAbsolutePath().normalize(), null);
         } catch (IOException ex) {
@@ -340,7 +344,7 @@ public class PlatformProvisioningService {
         if (!"ACTIVE".equalsIgnoreCase(safe(client.getStatus()))) {
             client.setStatus("PROVISIONING");
         }
-        clientRepository.save(client);
+        clientRepository.saveAndFlush(client);
         saveLog(client, "MARK_STRUCTURE_READY", "SUCCESS", "La estructura fue marcada como copiada en la base del cliente.", null);
     }
 
@@ -350,7 +354,7 @@ public class PlatformProvisioningService {
         ensureProvisioningAllowed(client);
         client.setDatabaseStatus("READY");
         client.setStatus("ACTIVE");
-        clientRepository.save(client);
+        clientRepository.saveAndFlush(client);
         saveLog(client, "MARK_ACTIVE", "SUCCESS", "Negocio activado para demo o pruebas internas.", null);
     }
 
@@ -362,7 +366,7 @@ public class PlatformProvisioningService {
         client.setStatus("CONFIGURED");
         client.setRuntimeStatus("PENDING");
         client.setLastRuntimeGeneratedAt(null);
-        clientRepository.save(client);
+        clientRepository.saveAndFlush(client);
         saveLog(client, "RESET_PROVISIONING", "SUCCESS", "Estado de aprovisionamiento reiniciado sin eliminar base de datos.", null);
     }
 
@@ -382,6 +386,31 @@ public class PlatformProvisioningService {
                 .filter(PlatformClientModule::isEnabled)
                 .map(item -> item.getModule().getModuleKey())
                 .toList();
+    }
+
+
+
+    private Set<String> normalizedActiveKeysForClient(PlatformBusinessClient client, List<String> activeModuleKeys) {
+        Set<String> activeKeys = new LinkedHashSet<>(activeModuleKeys);
+        if (isRestaurantClient(client)) {
+            activeKeys.add("restaurant");
+            activeKeys.add("restaurant_tables");
+            activeKeys.add("restaurant_kitchen");
+            activeKeys.add("restaurant_menu_qr");
+            activeKeys.add("products");
+            activeKeys.add("public_catalog");
+            activeKeys.add("delivery");
+            activeKeys.add("income");
+            activeKeys.add("sales");
+            activeKeys.add("supplies");
+            activeKeys.add("marketing");
+        }
+        return activeKeys;
+    }
+
+    private boolean isRestaurantClient(PlatformBusinessClient client) {
+        String template = templateCode(client);
+        return template.contains("restaurant") || template.contains("restaurante");
     }
 
     private PlatformProvisioningStep step(int number, String title, boolean done, String description) {
@@ -415,7 +444,7 @@ public class PlatformProvisioningService {
 
     private String bootstrapSql(PlatformBusinessClient client, List<String> activeModuleKeys) {
         String db = normalizedDatabaseName(client.getDatabaseName());
-        Set<String> activeKeys = new LinkedHashSet<>(activeModuleKeys);
+        Set<String> activeKeys = normalizedActiveKeysForClient(client, activeModuleKeys);
         StringBuilder sql = new StringBuilder();
         sql.append("-- Bootstrap inicial generado desde Super Admin para: ").append(sqlComment(client.getBusinessName())).append("\n");
         sql.append("-- Ejecutar este script después de copiar la estructura base.\n\n");
@@ -442,10 +471,11 @@ public class PlatformProvisioningService {
                     "Módulo " + module.getName());
         }
 
-        sql.append("\n-- Usuario administrador inicial sugerido.\n");
-        sql.append("-- Recomendado: crear desde la pantalla Usuarios del sistema destino o copiar usuarios demo desde la base modelo.\n");
-        sql.append("-- Usuario sugerido: admin_demo / clave temporal: Demo12345\n");
-        sql.append("-- Luego cambiar la clave y asignar permisos según el rubro.\n\n");
+        if (isRestaurantClient(client)) {
+            appendRestaurantSchema(sql);
+        }
+
+        appendInitialAdminUser(sql);
 
         if (client.isDemoDataEnabled()) {
             sql.append("-- Datos demo: habilitados.\n");
@@ -540,6 +570,7 @@ public class PlatformProvisioningService {
                 clientRow("Cliente frecuente familiar", "71000003", "Av. Quiñones 1800", "Compra combos fines de semana", "+51966666666", "-3.7670000", "-73.2825000")
         ));
         appendDeliveryZones(sql);
+        appendRestaurantTablesAndSampleOrder(sql);
         appendMarketing(sql,
                 "Menú del día y combos familiares",
                 "Publicar plato del día a las 10:30 a. m. y reforzar combos por WhatsApp.",
@@ -615,6 +646,87 @@ public class PlatformProvisioningService {
                 "Recordar a clientes frecuentes sus pedidos de agua purificada.",
                 "¿Necesitas agua para hoy? Coordinamos tu entrega por WhatsApp.",
                 "Pedir agua");
+    }
+
+
+    private void appendRestaurantSchema(StringBuilder sql) {
+        sql.append("\n-- Estructura operativa del módulo Restaurante.\n")
+                .append("CREATE TABLE IF NOT EXISTS restaurant_table (\n")
+                .append("    id BIGINT NOT NULL AUTO_INCREMENT,\n")
+                .append("    code VARCHAR(50) NOT NULL,\n")
+                .append("    name VARCHAR(120) NOT NULL,\n")
+                .append("    area VARCHAR(120) NULL,\n")
+                .append("    seats INT NOT NULL DEFAULT 0,\n")
+                .append("    status VARCHAR(30) NOT NULL DEFAULT 'FREE',\n")
+                .append("    active TINYINT(1) NOT NULL DEFAULT 1,\n")
+                .append("    notes TEXT NULL,\n")
+                .append("    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n")
+                .append("    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n")
+                .append("    PRIMARY KEY (id),\n")
+                .append("    UNIQUE KEY uk_restaurant_table_code (code),\n")
+                .append("    KEY idx_restaurant_table_status (status),\n")
+                .append("    KEY idx_restaurant_table_area (area)\n")
+                .append(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n")
+                .append("CREATE TABLE IF NOT EXISTS restaurant_order (\n")
+                .append("    id BIGINT NOT NULL AUTO_INCREMENT,\n")
+                .append("    order_code VARCHAR(80) NOT NULL,\n")
+                .append("    service_type VARCHAR(30) NOT NULL DEFAULT 'DINE_IN',\n")
+                .append("    table_id BIGINT NULL,\n")
+                .append("    customer_name VARCHAR(180) NULL,\n")
+                .append("    customer_phone VARCHAR(40) NULL,\n")
+                .append("    status VARCHAR(30) NOT NULL DEFAULT 'NEW',\n")
+                .append("    subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,\n")
+                .append("    notes TEXT NULL,\n")
+                .append("    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n")
+                .append("    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n")
+                .append("    PRIMARY KEY (id),\n")
+                .append("    UNIQUE KEY uk_restaurant_order_code (order_code),\n")
+                .append("    KEY idx_restaurant_order_status (status),\n")
+                .append("    KEY idx_restaurant_order_created (created_at),\n")
+                .append("    KEY idx_restaurant_order_table (table_id),\n")
+                .append("    CONSTRAINT fk_restaurant_order_table FOREIGN KEY (table_id) REFERENCES restaurant_table(id) ON DELETE SET NULL\n")
+                .append(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n")
+                .append("CREATE TABLE IF NOT EXISTS restaurant_order_item (\n")
+                .append("    id BIGINT NOT NULL AUTO_INCREMENT,\n")
+                .append("    order_id BIGINT NOT NULL,\n")
+                .append("    product_id BIGINT NULL,\n")
+                .append("    product_name VARCHAR(200) NOT NULL,\n")
+                .append("    quantity INT NOT NULL DEFAULT 1,\n")
+                .append("    unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,\n")
+                .append("    line_total DECIMAL(10,2) NOT NULL DEFAULT 0.00,\n")
+                .append("    kitchen_status VARCHAR(30) NOT NULL DEFAULT 'PENDING',\n")
+                .append("    PRIMARY KEY (id),\n")
+                .append("    KEY idx_restaurant_order_item_order (order_id),\n")
+                .append("    KEY idx_restaurant_order_item_product (product_id),\n")
+                .append("    CONSTRAINT fk_restaurant_order_item_order FOREIGN KEY (order_id) REFERENCES restaurant_order(id) ON DELETE CASCADE\n")
+                .append(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n\n");
+    }
+
+    private void appendRestaurantTablesAndSampleOrder(StringBuilder sql) {
+        sql.append("-- Mesas demo para restaurante.\n")
+                .append("INSERT INTO restaurant_table (`code`, `name`, `area`, `seats`, `status`, `active`, `notes`)\n")
+                .append("SELECT 'MESA-01', 'Mesa 01', 'Salón principal', 4, 'FREE', true, 'Mesa demo cerca a caja'\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM restaurant_table WHERE code = 'MESA-01');\n")
+                .append("INSERT INTO restaurant_table (`code`, `name`, `area`, `seats`, `status`, `active`, `notes`)\n")
+                .append("SELECT 'MESA-02', 'Mesa 02', 'Salón principal', 4, 'OCCUPIED', true, 'Mesa demo con comanda activa'\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM restaurant_table WHERE code = 'MESA-02');\n")
+                .append("INSERT INTO restaurant_table (`code`, `name`, `area`, `seats`, `status`, `active`, `notes`)\n")
+                .append("SELECT 'MESA-03', 'Mesa 03', 'Terraza', 6, 'RESERVED', true, 'Reserva familiar de prueba'\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM restaurant_table WHERE code = 'MESA-03');\n")
+                .append("INSERT INTO restaurant_table (`code`, `name`, `area`, `seats`, `status`, `active`, `notes`)\n")
+                .append("SELECT 'MESA-04', 'Mesa 04', 'Salón principal', 2, 'FREE', true, 'Mesa demo para pareja'\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM restaurant_table WHERE code = 'MESA-04');\n")
+                .append("SET @restaurant_demo_table_id = (SELECT id FROM restaurant_table WHERE code = 'MESA-02' LIMIT 1);\n")
+                .append("SET @restaurant_demo_product_id = (SELECT id FROM product WHERE active = true ORDER BY featured DESC, id ASC LIMIT 1);\n")
+                .append("SET @restaurant_demo_product_name = (SELECT name FROM product WHERE id = @restaurant_demo_product_id LIMIT 1);\n")
+                .append("SET @restaurant_demo_product_price = (SELECT price FROM product WHERE id = @restaurant_demo_product_id LIMIT 1);\n")
+                .append("INSERT INTO restaurant_order (`order_code`, `service_type`, `table_id`, `customer_name`, `customer_phone`, `status`, `subtotal`, `notes`)\n")
+                .append("SELECT 'CMD-DEMO-001', 'DINE_IN', @restaurant_demo_table_id, 'Cliente demo salón', '+51966666666', 'IN_KITCHEN', COALESCE(@restaurant_demo_product_price, 18.00), 'Comanda demo para cocina'\n")
+                .append("WHERE @restaurant_demo_table_id IS NOT NULL AND @restaurant_demo_product_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM restaurant_order WHERE order_code = 'CMD-DEMO-001');\n")
+                .append("SET @restaurant_demo_order_id = (SELECT id FROM restaurant_order WHERE order_code = 'CMD-DEMO-001' LIMIT 1);\n")
+                .append("INSERT INTO restaurant_order_item (`order_id`, `product_id`, `product_name`, `quantity`, `unit_price`, `line_total`, `kitchen_status`)\n")
+                .append("SELECT @restaurant_demo_order_id, @restaurant_demo_product_id, COALESCE(@restaurant_demo_product_name, 'Plato demo'), 1, COALESCE(@restaurant_demo_product_price, 18.00), COALESCE(@restaurant_demo_product_price, 18.00), 'PENDING'\n")
+                .append("WHERE @restaurant_demo_order_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM restaurant_order_item WHERE order_id = @restaurant_demo_order_id);\n\n");
     }
 
     private record ProductSeed(String name, String description, String imagePath, String price, boolean featured, String stock, String minimumStock) {}
@@ -715,6 +827,36 @@ public class PlatformProvisioningService {
                 .append("'").append(sql(valueOrEmpty(category))).append("', ")
                 .append("'").append(sql(valueOrEmpty(description))).append("') ")
                 .append("ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), `type` = VALUES(`type`), `category` = VALUES(`category`), `description` = VALUES(`description`);\n");
+    }
+
+
+    private void appendInitialAdminUser(StringBuilder sql) {
+        String passwordHash = passwordEncoder.encode("Demo12345");
+
+        sql.append("\n-- Usuario administrador inicial de la instancia.\n")
+                .append("INSERT INTO `roles` (`variable`, `title`)\n")
+                .append("SELECT 'ROLE_OWNER', 'Propietario / Administrador'\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM `roles` WHERE `variable` = 'ROLE_OWNER');\n")
+                .append("INSERT INTO `roles` (`variable`, `title`)\n")
+                .append("SELECT 'ADMIN_PRINC', 'Administrador principal legacy'\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM `roles` WHERE `variable` = 'ADMIN_PRINC');\n")
+                .append("SET @initial_admin_password = '").append(sql(passwordHash)).append("';\n")
+                .append("INSERT INTO `user` (`username`, `password`, `active`, `rol`, `registration_date`)\n")
+                .append("SELECT 'admin_demo', @initial_admin_password, 1, 1, NOW()\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM `user` WHERE `username` = 'admin_demo');\n")
+                .append("UPDATE `user` SET `password` = @initial_admin_password, `active` = 1, `rol` = 1 WHERE `username` = 'admin_demo';\n")
+                .append("SET @initial_admin_user_id = (SELECT `id` FROM `user` WHERE `username` = 'admin_demo' LIMIT 1);\n")
+                .append("SET @initial_owner_role_id = (SELECT `id` FROM `roles` WHERE `variable` = 'ROLE_OWNER' LIMIT 1);\n")
+                .append("SET @initial_legacy_admin_role_id = (SELECT `id` FROM `roles` WHERE `variable` = 'ADMIN_PRINC' LIMIT 1);\n")
+                .append("INSERT INTO `user_roles` (`user_id`, `rol_id`)\n")
+                .append("SELECT @initial_admin_user_id, @initial_owner_role_id\n")
+                .append("WHERE @initial_admin_user_id IS NOT NULL AND @initial_owner_role_id IS NOT NULL\n")
+                .append("AND NOT EXISTS (SELECT 1 FROM `user_roles` WHERE `user_id` = @initial_admin_user_id AND `rol_id` = @initial_owner_role_id);\n")
+                .append("INSERT INTO `user_roles` (`user_id`, `rol_id`)\n")
+                .append("SELECT @initial_admin_user_id, @initial_legacy_admin_role_id\n")
+                .append("WHERE @initial_admin_user_id IS NOT NULL AND @initial_legacy_admin_role_id IS NOT NULL\n")
+                .append("AND NOT EXISTS (SELECT 1 FROM `user_roles` WHERE `user_id` = @initial_admin_user_id AND `rol_id` = @initial_legacy_admin_role_id);\n")
+                .append("-- Credenciales demo iniciales: admin_demo / Demo12345. Cambiar la clave después de validar la instancia.\n\n");
     }
 
     private List<String> listBaseTables(String databaseName) {
@@ -841,7 +983,7 @@ public class PlatformProvisioningService {
         log.setStatus(status);
         log.setDetails(details);
         log.setSqlSnippet(sqlSnippet);
-        logRepository.save(log);
+        logRepository.saveAndFlush(log);
     }
 
     private String warningFor(PlatformBusinessClient client, boolean ready) {

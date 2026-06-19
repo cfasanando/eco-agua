@@ -4,6 +4,7 @@
   xmlns:th="http://www.thymeleaf.org"
   xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
   th:fragment="sidebar"
+  th:with="restaurantRuntime=${businessType == 'restaurante'}"
 >
   <div class="sidebar-brand">
     <img class="sidebar-brand-logo"
@@ -35,7 +36,40 @@
   <div class="sidebar-nav">
     <div class="menu-section-title">Principal</div>
 
+    <th:block th:if="${moduleRestaurantEnabled and restaurantRuntime}">
+      <a
+        sec:authorize="hasAnyAuthority('ROLE_RESTAURANT_KITCHEN','restaurante_cocina')"
+        th:href="@{/admin/restaurant/kitchen}"
+        class="menu-link"
+        th:classappend="${activePage == 'restaurant_kitchen' ? ' active' : ''}"
+      >
+        <span class="icon"><i class="bi bi-house-door"></i></span>
+        <span>Inicio</span>
+      </a>
+
+      <a
+        sec:authorize="hasAnyAuthority('ROLE_RESTAURANT_CASHIER','restaurante_caja')"
+        th:href="@{/admin/restaurant/cash}"
+        class="menu-link"
+        th:classappend="${activePage == 'restaurant_cash' ? ' active' : ''}"
+      >
+        <span class="icon"><i class="bi bi-house-door"></i></span>
+        <span>Inicio</span>
+      </a>
+
+      <a
+        sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')"
+        th:href="@{/admin/restaurant/dashboard}"
+        class="menu-link"
+        th:classappend="${activePage == 'restaurant_dashboard' ? ' active' : ''}"
+      >
+        <span class="icon"><i class="bi bi-house-door"></i></span>
+        <span>Inicio</span>
+      </a>
+    </th:block>
+
     <a
+      th:unless="${moduleRestaurantEnabled and restaurantRuntime}"
       th:href="@{/home}"
       class="menu-link"
       th:classappend="${activePage == 'home' ? ' active' : ''}"
@@ -44,7 +78,106 @@
       <span>Inicio</span>
     </a>
 
-    <th:block th:if="${moduleBusinessOverviewEnabled or moduleMonthlyFollowupEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','ADMIN_RRHH','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_HR','ROLE_READONLY')">
+
+    <th:block th:if="${moduleRestaurantEnabled and restaurantRuntime}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')">
+      <div class="menu-section-title">Restaurante</div>
+
+      <div
+        class="menu-group"
+        th:with="isRestaurantActive=${activePage == 'restaurant_dashboard'
+          or activePage == 'restaurant_tables'
+          or activePage == 'restaurant_orders_new'
+          or activePage == 'restaurant_kitchen'
+          or activePage == 'restaurant_cash'}"
+      >
+        <input
+          type="checkbox"
+          id="menu-restaurant-runtime-toggle"
+          class="menu-toggle"
+          th:checked="${isRestaurantActive}"
+        >
+
+        <label class="menu-link has-children" for="menu-restaurant-runtime-toggle">
+          <span class="icon"><i class="bi bi-shop"></i></span>
+          <span>Restaurante</span>
+          <span class="caret"><i class="bi bi-chevron-right"></i></span>
+        </label>
+
+        <div class="submenu-container">
+          <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')"
+            th:href="@{/admin/restaurant/dashboard}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'restaurant_dashboard' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-speedometer2"></i></span>
+            <span>Panel restaurante</span>
+          </a>
+
+          <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')"
+            th:href="@{/admin/restaurant/tables}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'restaurant_tables' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-grid-3x3-gap"></i></span>
+            <span>Mesas y salón</span>
+          </a>
+
+          <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')"
+            th:href="@{/admin/restaurant/orders/new}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'restaurant_orders_new' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-receipt"></i></span>
+            <span>Nueva comanda</span>
+          </a>
+
+          <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina')"
+            th:href="@{/admin/restaurant/kitchen}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'restaurant_kitchen' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-fire"></i></span>
+            <span>Cocina</span>
+          </a>
+
+          <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_caja')"
+            th:href="@{/admin/restaurant/cash}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'restaurant_cash' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-cash-coin"></i></span>
+            <span>Caja diaria</span>
+          </a>
+
+          <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')"
+            th:href="@{/admin/restaurant/reports/daily}"
+            target="_blank"
+            class="menu-link submenu"
+          >
+            <span class="icon"><i class="bi bi-printer"></i></span>
+            <span>Reporte diario</span>
+          </a>
+
+          <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"
+            th:href="@{/restaurant/menu}"
+            target="_blank"
+            class="menu-link submenu"
+          >
+            <span class="icon"><i class="bi bi-qr-code"></i></span>
+            <span>Carta pública</span>
+          </a>
+        </div>
+      </div>
+    </th:block>
+
+    <th:block th:if="${!restaurantRuntime and (moduleBusinessOverviewEnabled or moduleMonthlyFollowupEnabled)}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','ADMIN_RRHH','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_HR','ROLE_READONLY')">
       <a
         th:if="${moduleBusinessOverviewEnabled}"
         sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_READONLY','ver_reportes','ver_finanzas')"
@@ -90,7 +223,7 @@
       </a>
     </th:block>
 
-    <th:block th:if="${featureAcademy}" sec:authorize="isAuthenticated()">
+    <th:block th:if="${!restaurantRuntime and featureAcademy}" sec:authorize="isAuthenticated()">
       <div class="menu-section-title">Aprendizaje</div>
       <a
         th:href="@{/my-courses}"
@@ -102,7 +235,7 @@
       </a>
     </th:block>
 
-    <th:block th:if="${modulePlatformSettingsEnabled}" sec:authorize="hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_OWNER','ADMIN_PRINC','ADMIN','ver_plataforma','administra_plataforma','admin_config')">
+    <th:block th:if="${!restaurantRuntime and modulePlatformSettingsEnabled}" sec:authorize="hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_OWNER','ADMIN_PRINC','ADMIN','ver_plataforma','administra_plataforma','admin_config')">
       <div class="menu-section-title">Plataforma / Super Admin</div>
 
       <div
@@ -165,7 +298,7 @@
       </div>
     </th:block>
 
-    <th:block th:if="${moduleOperationSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_PRODUCTION','ROLE_READONLY','ver_delivery','administra_delivery','ver_recompras','administra_recompras','ver_restaurante','administra_restaurante')">
+    <th:block th:if="${!restaurantRuntime and moduleOperationSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_PRODUCTION','ROLE_READONLY','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_delivery','administra_delivery','ver_recompras','administra_recompras','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')">
       <div class="menu-section-title">Operación diaria</div>
 
       <div
@@ -366,7 +499,7 @@
         </div>
       </div>
 
-      <th:block th:if="${moduleRestaurantEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','OPERARIO','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_SALES','ROLE_LOGISTICS','ROLE_READONLY','ver_restaurante','administra_restaurante')">
+      <th:block th:if="${moduleRestaurantEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')">
         <div
           class="menu-group"
           th:with="isRestaurantActive=${activePage == 'restaurant_dashboard'
@@ -390,6 +523,7 @@
 
           <div class="submenu-container">
             <a
+              sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')"
               th:href="@{/admin/restaurant/dashboard}"
               class="menu-link submenu"
               th:classappend="${activePage == 'restaurant_dashboard' ? ' active' : ''}"
@@ -398,6 +532,7 @@
               <span>Panel restaurante</span>
             </a>
             <a
+              sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')"
               th:href="@{/admin/restaurant/tables}"
               class="menu-link submenu"
               th:classappend="${activePage == 'restaurant_tables' ? ' active' : ''}"
@@ -406,6 +541,7 @@
               <span>Mesas y salón</span>
             </a>
             <a
+              sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')"
               th:href="@{/admin/restaurant/orders/new}"
               class="menu-link submenu"
               th:classappend="${activePage == 'restaurant_orders_new' ? ' active' : ''}"
@@ -414,6 +550,7 @@
               <span>Nueva comanda</span>
             </a>
             <a
+              sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina')"
               th:href="@{/admin/restaurant/kitchen}"
               class="menu-link submenu"
               th:classappend="${activePage == 'restaurant_kitchen' ? ' active' : ''}"
@@ -423,6 +560,7 @@
             </a>
 
             <a
+              sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_caja')"
               th:href="@{/admin/restaurant/cash}"
               class="menu-link submenu"
               th:classappend="${activePage == 'restaurant_cash' ? ' active' : ''}"
@@ -431,6 +569,7 @@
               <span>Caja diaria</span>
             </a>
             <a
+              sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"
               th:href="@{/restaurant/menu}"
               target="_blank"
               class="menu-link submenu"
@@ -1089,7 +1228,7 @@
       </th:block>
     </th:block>
 
-    <th:block th:if="${featureMarketingSection or featureAcademy}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_READONLY','ver_academia','administra_academia')">
+    <th:block th:if="${!restaurantRuntime and (featureMarketingSection or featureAcademy)}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_MKT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_MARKETING','ROLE_READONLY','ver_academia','administra_academia')">
       <div class="menu-section-title">Gestión de marca</div>
 
       <div
@@ -1297,7 +1436,7 @@
       </div>
     </th:block>
 
-    <th:block th:if="${moduleSystemSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_HR','ROLE_FINANCE')">
+    <th:block th:if="${!restaurantRuntime and moduleSystemSectionEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_RRHH','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_HR','ROLE_FINANCE')">
       <div class="menu-section-title">Sistema</div>
 
       <div

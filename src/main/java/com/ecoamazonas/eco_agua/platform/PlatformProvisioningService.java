@@ -471,11 +471,15 @@ public class PlatformProvisioningService {
                     "Módulo " + module.getName());
         }
 
-        if (isRestaurantClient(client)) {
+        boolean restaurantClient = isRestaurantClient(client);
+        if (restaurantClient) {
             appendRestaurantSchema(sql);
         }
 
         appendInitialAdminUser(sql);
+        if (restaurantClient) {
+            appendRestaurantOperationalUsers(sql);
+        }
 
         if (client.isDemoDataEnabled()) {
             sql.append("-- Datos demo: habilitados.\n");
@@ -857,6 +861,52 @@ public class PlatformProvisioningService {
                 .append("WHERE @initial_admin_user_id IS NOT NULL AND @initial_legacy_admin_role_id IS NOT NULL\n")
                 .append("AND NOT EXISTS (SELECT 1 FROM `user_roles` WHERE `user_id` = @initial_admin_user_id AND `rol_id` = @initial_legacy_admin_role_id);\n")
                 .append("-- Credenciales demo iniciales: admin_demo / Demo12345. Cambiar la clave después de validar la instancia.\n\n");
+    }
+
+
+    private void appendRestaurantOperationalUsers(StringBuilder sql) {
+        String passwordHash = passwordEncoder.encode("Demo12345");
+
+        sql.append("\n-- Demo operational users for restaurant.\n")
+                .append("SET @restaurant_demo_password = '").append(sql(passwordHash)).append("';\n")
+                .append("INSERT INTO `roles` (`variable`, `title`)\n")
+                .append("SELECT 'ROLE_RESTAURANT_WAITER', 'Mozo / Atención de salón'\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM `roles` WHERE `variable` = 'ROLE_RESTAURANT_WAITER');\n")
+                .append("INSERT INTO `roles` (`variable`, `title`)\n")
+                .append("SELECT 'ROLE_RESTAURANT_KITCHEN', 'Cocina / Preparación'\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM `roles` WHERE `variable` = 'ROLE_RESTAURANT_KITCHEN');\n")
+                .append("INSERT INTO `roles` (`variable`, `title`)\n")
+                .append("SELECT 'ROLE_RESTAURANT_CASHIER', 'Caja / Cobranza'\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM `roles` WHERE `variable` = 'ROLE_RESTAURANT_CASHIER');\n")
+                .append("INSERT INTO `user` (`username`, `password`, `active`, `rol`, `registration_date`)\n")
+                .append("SELECT 'mozo_demo', @restaurant_demo_password, 1, 2, NOW()\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM `user` WHERE `username` = 'mozo_demo');\n")
+                .append("INSERT INTO `user` (`username`, `password`, `active`, `rol`, `registration_date`)\n")
+                .append("SELECT 'cocina_demo', @restaurant_demo_password, 1, 2, NOW()\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM `user` WHERE `username` = 'cocina_demo');\n")
+                .append("INSERT INTO `user` (`username`, `password`, `active`, `rol`, `registration_date`)\n")
+                .append("SELECT 'caja_demo', @restaurant_demo_password, 1, 2, NOW()\n")
+                .append("WHERE NOT EXISTS (SELECT 1 FROM `user` WHERE `username` = 'caja_demo');\n")
+                .append("UPDATE `user` SET `password` = @restaurant_demo_password, `active` = 1 WHERE `username` IN ('mozo_demo','cocina_demo','caja_demo');\n")
+                .append("SET @restaurant_waiter_user_id = (SELECT `id` FROM `user` WHERE `username` = 'mozo_demo' LIMIT 1);\n")
+                .append("SET @restaurant_kitchen_user_id = (SELECT `id` FROM `user` WHERE `username` = 'cocina_demo' LIMIT 1);\n")
+                .append("SET @restaurant_cashier_user_id = (SELECT `id` FROM `user` WHERE `username` = 'caja_demo' LIMIT 1);\n")
+                .append("SET @restaurant_waiter_role_id = (SELECT `id` FROM `roles` WHERE `variable` = 'ROLE_RESTAURANT_WAITER' LIMIT 1);\n")
+                .append("SET @restaurant_kitchen_role_id = (SELECT `id` FROM `roles` WHERE `variable` = 'ROLE_RESTAURANT_KITCHEN' LIMIT 1);\n")
+                .append("SET @restaurant_cashier_role_id = (SELECT `id` FROM `roles` WHERE `variable` = 'ROLE_RESTAURANT_CASHIER' LIMIT 1);\n")
+                .append("INSERT INTO `user_roles` (`user_id`, `rol_id`)\n")
+                .append("SELECT @restaurant_waiter_user_id, @restaurant_waiter_role_id\n")
+                .append("WHERE @restaurant_waiter_user_id IS NOT NULL AND @restaurant_waiter_role_id IS NOT NULL\n")
+                .append("AND NOT EXISTS (SELECT 1 FROM `user_roles` WHERE `user_id` = @restaurant_waiter_user_id AND `rol_id` = @restaurant_waiter_role_id);\n")
+                .append("INSERT INTO `user_roles` (`user_id`, `rol_id`)\n")
+                .append("SELECT @restaurant_kitchen_user_id, @restaurant_kitchen_role_id\n")
+                .append("WHERE @restaurant_kitchen_user_id IS NOT NULL AND @restaurant_kitchen_role_id IS NOT NULL\n")
+                .append("AND NOT EXISTS (SELECT 1 FROM `user_roles` WHERE `user_id` = @restaurant_kitchen_user_id AND `rol_id` = @restaurant_kitchen_role_id);\n")
+                .append("INSERT INTO `user_roles` (`user_id`, `rol_id`)\n")
+                .append("SELECT @restaurant_cashier_user_id, @restaurant_cashier_role_id\n")
+                .append("WHERE @restaurant_cashier_user_id IS NOT NULL AND @restaurant_cashier_role_id IS NOT NULL\n")
+                .append("AND NOT EXISTS (SELECT 1 FROM `user_roles` WHERE `user_id` = @restaurant_cashier_user_id AND `rol_id` = @restaurant_cashier_role_id);\n")
+                .append("-- Demo operational credentials: mozo_demo, cocina_demo and caja_demo / Demo12345.\n\n");
     }
 
     private List<String> listBaseTables(String databaseName) {

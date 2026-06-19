@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="fragments/head_admin :: adminHead('Caja diaria')"></head>
 <body class="bg-light">
 <div class="d-flex" id="wrapper">
@@ -16,7 +16,7 @@
                     <a th:href="@{/admin/restaurant/reports/daily(date=${businessDate})}" target="_blank" class="btn btn-sm btn-outline-secondary">
                         <i class="bi bi-printer"></i> Reporte imprimible
                     </a>
-                    <a th:href="@{/admin/restaurant/dashboard}" class="btn btn-sm btn-outline-primary">
+                    <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')" th:href="@{/admin/restaurant/dashboard}" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-speedometer2"></i> Panel
                     </a>
                 </div>

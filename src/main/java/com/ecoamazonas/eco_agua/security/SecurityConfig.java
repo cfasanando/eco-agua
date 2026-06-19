@@ -1,6 +1,7 @@
 package com.ecoamazonas.eco_agua.security;
 
 import com.ecoamazonas.eco_agua.config.SystemModuleAccessFilter;
+import com.ecoamazonas.eco_agua.config.ClientFeatureProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -8,11 +9,16 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+
+import java.io.IOException;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Configuration
 @EnableWebSecurity
@@ -30,6 +36,9 @@ public class SecurityConfig {
     private static final String ROLE_PRODUCTION = "ROLE_PRODUCTION";
     private static final String ROLE_HR = "ROLE_HR";
     private static final String ROLE_READONLY = "ROLE_READONLY";
+    private static final String ROLE_RESTAURANT_WAITER = "ROLE_RESTAURANT_WAITER";
+    private static final String ROLE_RESTAURANT_KITCHEN = "ROLE_RESTAURANT_KITCHEN";
+    private static final String ROLE_RESTAURANT_CASHIER = "ROLE_RESTAURANT_CASHIER";
 
     private static final String LEGACY_ADMIN_PRINC = "ADMIN_PRINC";
     private static final String LEGACY_ADMIN = "ADMIN";
@@ -48,6 +57,7 @@ public class SecurityConfig {
     private static final String[] DASHBOARD_VIEW = authorities(
             ROLE_SUPER_ADMIN, ROLE_OWNER, ROLE_MANAGEMENT, ROLE_MARKETING, ROLE_SALES, ROLE_FINANCE,
             ROLE_LOGISTICS, ROLE_PRODUCTION, ROLE_HR, ROLE_READONLY,
+            ROLE_RESTAURANT_WAITER, ROLE_RESTAURANT_KITCHEN, ROLE_RESTAURANT_CASHIER,
             LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_ADMIN_CONT, LEGACY_ADMIN_MKT,
             LEGACY_ADMIN_RRHH, LEGACY_SUPERVISOR, LEGACY_OPERARIO,
             "ver_dashboard"
@@ -227,16 +237,77 @@ public class SecurityConfig {
             "administra_academia"
     );
 
+    private static final String[] RESTAURANT_ADMIN = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR,
+            "administra_restaurante"
+    );
+
+    private static final String[] RESTAURANT_DASHBOARD_VIEW = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_RESTAURANT_WAITER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR,
+            "ver_restaurante", "administra_restaurante", "restaurante_mozo"
+    );
+
+    private static final String[] RESTAURANT_TABLES_VIEW = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_RESTAURANT_WAITER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR,
+            "ver_restaurante", "administra_restaurante", "restaurante_mozo"
+    );
+
+    private static final String[] RESTAURANT_TABLES_WRITE = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_RESTAURANT_WAITER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR,
+            "administra_restaurante", "restaurante_mozo"
+    );
+
+    private static final String[] RESTAURANT_ORDER_VIEW = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_RESTAURANT_WAITER, ROLE_RESTAURANT_KITCHEN, ROLE_RESTAURANT_CASHIER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR,
+            "ver_restaurante", "administra_restaurante", "restaurante_mozo", "restaurante_cocina", "restaurante_caja"
+    );
+
+    private static final String[] RESTAURANT_ORDER_WRITE = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_RESTAURANT_WAITER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR,
+            "administra_restaurante", "restaurante_mozo"
+    );
+
+    private static final String[] RESTAURANT_KITCHEN_VIEW = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_RESTAURANT_WAITER, ROLE_RESTAURANT_KITCHEN,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR,
+            "ver_restaurante", "administra_restaurante", "restaurante_mozo", "restaurante_cocina"
+    );
+
+    private static final String[] RESTAURANT_KITCHEN_WRITE = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_RESTAURANT_KITCHEN,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR,
+            "administra_restaurante", "restaurante_cocina"
+    );
+
+    private static final String[] RESTAURANT_CASH_VIEW = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_RESTAURANT_CASHIER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_ADMIN_CONT,
+            "ver_restaurante", "administra_restaurante", "restaurante_caja"
+    );
+
+    private static final String[] RESTAURANT_CASH_WRITE = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_FINANCE, ROLE_RESTAURANT_CASHIER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_ADMIN_CONT,
+            "administra_restaurante", "restaurante_caja"
+    );
+
     private static final String[] RESTAURANT_VIEW = authorities(
             ROLE_OWNER, ROLE_MANAGEMENT, ROLE_SALES, ROLE_LOGISTICS, ROLE_READONLY,
+            ROLE_RESTAURANT_WAITER, ROLE_RESTAURANT_KITCHEN, ROLE_RESTAURANT_CASHIER,
             LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR, LEGACY_OPERARIO,
-            "ver_restaurante", "administra_restaurante"
+            "ver_restaurante", "administra_restaurante", "restaurante_mozo", "restaurante_cocina", "restaurante_caja"
     );
 
     private static final String[] RESTAURANT_WRITE = authorities(
-            ROLE_OWNER, ROLE_SALES, ROLE_LOGISTICS,
+            ROLE_OWNER, ROLE_SALES, ROLE_LOGISTICS, ROLE_RESTAURANT_WAITER, ROLE_RESTAURANT_KITCHEN, ROLE_RESTAURANT_CASHIER,
             LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR, LEGACY_OPERARIO,
-            "administra_restaurante"
+            "administra_restaurante", "restaurante_mozo", "restaurante_cocina", "restaurante_caja"
     );
 
     private static final String[] PRODUCTION_VIEW = authorities(
@@ -319,11 +390,14 @@ public class SecurityConfig {
 
     private final DatabaseUserDetailsService userDetailsService;
     private final SystemModuleAccessFilter systemModuleAccessFilter;
+    private final ClientFeatureProperties clientFeatureProperties;
 
     public SecurityConfig(DatabaseUserDetailsService userDetailsService,
-                          SystemModuleAccessFilter systemModuleAccessFilter) {
+                          SystemModuleAccessFilter systemModuleAccessFilter,
+                          ClientFeatureProperties clientFeatureProperties) {
         this.userDetailsService = userDetailsService;
         this.systemModuleAccessFilter = systemModuleAccessFilter;
+        this.clientFeatureProperties = clientFeatureProperties;
     }
 
     @Bean
@@ -397,6 +471,16 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/admin/academy/**").hasAnyAuthority(ACADEMY_WRITE)
                 .requestMatchers("/admin/academy/**").hasAnyAuthority(ACADEMY_VIEW)
 
+                .requestMatchers(HttpMethod.POST, "/admin/restaurant/orders/*/pay").hasAnyAuthority(RESTAURANT_CASH_WRITE)
+                .requestMatchers(HttpMethod.POST, "/admin/restaurant/orders/*/status").hasAnyAuthority(RESTAURANT_KITCHEN_WRITE)
+                .requestMatchers(HttpMethod.POST, "/admin/restaurant/orders/**").hasAnyAuthority(RESTAURANT_ORDER_WRITE)
+                .requestMatchers(HttpMethod.POST, "/admin/restaurant/tables/**").hasAnyAuthority(RESTAURANT_TABLES_WRITE)
+                .requestMatchers(HttpMethod.GET, "/admin/restaurant/cash", "/admin/restaurant/reports/daily").hasAnyAuthority(RESTAURANT_CASH_VIEW)
+                .requestMatchers(HttpMethod.GET, "/admin/restaurant/kitchen").hasAnyAuthority(RESTAURANT_KITCHEN_VIEW)
+                .requestMatchers(HttpMethod.GET, "/admin/restaurant/orders/new").hasAnyAuthority(RESTAURANT_ORDER_WRITE)
+                .requestMatchers(HttpMethod.GET, "/admin/restaurant/orders/**").hasAnyAuthority(RESTAURANT_ORDER_VIEW)
+                .requestMatchers(HttpMethod.GET, "/admin/restaurant/tables/**").hasAnyAuthority(RESTAURANT_TABLES_VIEW)
+                .requestMatchers(HttpMethod.GET, "/admin/restaurant", "/admin/restaurant/dashboard").hasAnyAuthority(RESTAURANT_DASHBOARD_VIEW)
                 .requestMatchers(HttpMethod.POST, "/admin/restaurant/**").hasAnyAuthority(RESTAURANT_WRITE)
                 .requestMatchers("/admin/restaurant/**").hasAnyAuthority(RESTAURANT_VIEW)
 
@@ -418,7 +502,7 @@ public class SecurityConfig {
             .formLogin(form -> form
                 .loginPage("/login")
                 .loginProcessingUrl("/login")
-                .defaultSuccessUrl("/home", true)
+                .successHandler(this::handleLoginSuccess)
                 .failureUrl("/login?error=true")
                 .permitAll()
             )
@@ -440,6 +524,52 @@ public class SecurityConfig {
             .userDetailsService(userDetailsService);
 
         return http.build();
+    }
+
+    private void handleLoginSuccess(jakarta.servlet.http.HttpServletRequest request,
+                                    jakarta.servlet.http.HttpServletResponse response,
+                                    Authentication authentication) throws IOException {
+        response.sendRedirect(loginSuccessUrl(authentication));
+    }
+
+    private String loginSuccessUrl(Authentication authentication) {
+        Set<String> authorities = new LinkedHashSet<>();
+        authentication.getAuthorities().forEach(authority -> authorities.add(authority.getAuthority()));
+
+        if (clientFeatureProperties.isRestaurant()) {
+            if (hasAnyAuthority(authorities, RESTAURANT_ADMIN)) {
+                return "/admin/restaurant/dashboard";
+            }
+            if (hasAnyAuthority(authorities, ROLE_RESTAURANT_KITCHEN, "restaurante_cocina")) {
+                return "/admin/restaurant/kitchen";
+            }
+            if (hasAnyAuthority(authorities, ROLE_RESTAURANT_CASHIER, "restaurante_caja")) {
+                return "/admin/restaurant/cash";
+            }
+            if (hasAnyAuthority(authorities, ROLE_RESTAURANT_WAITER, "restaurante_mozo")) {
+                return "/admin/restaurant/dashboard";
+            }
+        }
+
+        if (hasAnyAuthority(authorities, ROLE_RESTAURANT_KITCHEN, "restaurante_cocina")) {
+            return "/admin/restaurant/kitchen";
+        }
+        if (hasAnyAuthority(authorities, ROLE_RESTAURANT_CASHIER, "restaurante_caja")) {
+            return "/admin/restaurant/cash";
+        }
+        if (hasAnyAuthority(authorities, ROLE_RESTAURANT_WAITER, "restaurante_mozo")) {
+            return "/admin/restaurant/dashboard";
+        }
+        return "/home";
+    }
+
+    private boolean hasAnyAuthority(Set<String> userAuthorities, String... allowedAuthorities) {
+        for (String authority : allowedAuthorities) {
+            if (userAuthorities.contains(authority)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Bean

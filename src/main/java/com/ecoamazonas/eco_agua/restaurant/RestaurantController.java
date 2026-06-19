@@ -1,14 +1,18 @@
 package com.ecoamazonas.eco_agua.restaurant;
 
+import com.ecoamazonas.eco_agua.config.BusinessProperties;
+import com.ecoamazonas.eco_agua.config.PlatformSettingService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -17,20 +21,36 @@ public class RestaurantController {
 
     private final RestaurantService restaurantService;
     private final RestaurantModuleInstaller restaurantModuleInstaller;
+    private final PlatformSettingService platformSettingService;
+    private final BusinessProperties businessProperties;
 
     public RestaurantController(RestaurantService restaurantService,
-                                RestaurantModuleInstaller restaurantModuleInstaller) {
+                                RestaurantModuleInstaller restaurantModuleInstaller,
+                                PlatformSettingService platformSettingService,
+                                BusinessProperties businessProperties) {
         this.restaurantService = restaurantService;
         this.restaurantModuleInstaller = restaurantModuleInstaller;
+        this.platformSettingService = platformSettingService;
+        this.businessProperties = businessProperties;
     }
 
     @GetMapping({"/restaurant", "/restaurant/menu"})
-    public String publicMenu(Model model) {
+    public String publicMenu(@RequestParam(required = false) Long tableId,
+                             HttpServletRequest request,
+                             Model model) {
         ensureRestaurantRuntimeReady();
         List<RestaurantMenuItemRow> items = restaurantService.menuItems();
+        RestaurantPublicTableContext tableContext = restaurantService.publicTableContext(tableId);
+        String publicMenuUrl = absoluteUrl(request, tableContext == null ? "/restaurant/menu" : "/restaurant/menu?tableId=" + tableContext.id());
+
         model.addAttribute("menuItems", items);
+        model.addAttribute("menuGroups", restaurantService.menuGroups());
         model.addAttribute("featuredMenuItems", restaurantService.featuredMenuItems());
         model.addAttribute("menuItemCount", items.size());
+        model.addAttribute("tableContext", tableContext);
+        model.addAttribute("publicMenuUrl", publicMenuUrl);
+        model.addAttribute("attentionWhatsappLink", attentionWhatsappLink(tableContext, publicMenuUrl));
+        addPublicRestaurantAttributes(model, tableContext, publicMenuUrl);
         return "public/restaurant_menu";
     }
 
@@ -55,11 +75,21 @@ public class RestaurantController {
     }
 
     @GetMapping("/admin/restaurant/tables")
-    public String tables(Model model) {
+    public String tables(HttpServletRequest request, Model model) {
         ensureRestaurantRuntimeReady();
         model.addAttribute("activePage", "restaurant_tables");
         model.addAttribute("tables", restaurantService.tables());
+        model.addAttribute("publicMenuBaseUrl", absoluteUrl(request, "/restaurant/menu"));
         return "admin/restaurant/tables";
+    }
+
+    @GetMapping("/admin/restaurant/tables/qr-cards")
+    public String tableQrCards(HttpServletRequest request, Model model) {
+        ensureRestaurantRuntimeReady();
+        model.addAttribute("activePage", "restaurant_tables");
+        model.addAttribute("tables", restaurantService.tables());
+        model.addAttribute("publicMenuBaseUrl", absoluteUrl(request, "/restaurant/menu"));
+        return "admin/restaurant/table_qr_cards";
     }
 
     @PostMapping("/admin/restaurant/tables/{id}/status")
@@ -68,7 +98,7 @@ public class RestaurantController {
                                     RedirectAttributes redirectAttributes) {
         ensureRestaurantRuntimeReady();
         restaurantService.updateTableStatus(id, status);
-        redirectAttributes.addFlashAttribute("successMessage", "Estado de mesa actualizado.");
+        redirectAttributes.addFlashAttribute("successMessage", "Table status updated.");
         return "redirect:/admin/restaurant/tables";
     }
 
@@ -93,7 +123,7 @@ public class RestaurantController {
         try {
             ensureRestaurantRuntimeReady();
             Long orderId = restaurantService.createOrder(serviceType, tableId, customerName, customerPhone, notes, params);
-            redirectAttributes.addFlashAttribute("successMessage", "Comanda registrada y enviada a cocina.");
+            redirectAttributes.addFlashAttribute("successMessage", "Comanda registered and sent to kitchen.");
             return "redirect:/admin/restaurant/orders/" + orderId;
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
@@ -106,7 +136,7 @@ public class RestaurantController {
         ensureRestaurantRuntimeReady();
         RestaurantOrderRow order = restaurantService.order(id);
         if (order == null) {
-            redirectAttributes.addFlashAttribute("errorMessage", "La comanda solicitada no existe.");
+            redirectAttributes.addFlashAttribute("errorMessage", "The requested comanda does not exist.");
             return "redirect:/admin/restaurant/dashboard";
         }
 
@@ -130,7 +160,7 @@ public class RestaurantController {
         try {
             ensureRestaurantRuntimeReady();
             restaurantService.addItemsToOrder(id, params);
-            redirectAttributes.addFlashAttribute("successMessage", "Productos agregados a la comanda.");
+            redirectAttributes.addFlashAttribute("successMessage", "Products added to the comanda.");
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
         }
@@ -145,7 +175,7 @@ public class RestaurantController {
         try {
             ensureRestaurantRuntimeReady();
             restaurantService.updateItemQuantity(orderId, itemId, quantity);
-            redirectAttributes.addFlashAttribute("successMessage", "Cantidad actualizada.");
+            redirectAttributes.addFlashAttribute("successMessage", "Quantity updated.");
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
         }
@@ -159,7 +189,7 @@ public class RestaurantController {
         try {
             ensureRestaurantRuntimeReady();
             restaurantService.removeItem(orderId, itemId);
-            redirectAttributes.addFlashAttribute("successMessage", "Producto retirado de la comanda.");
+            redirectAttributes.addFlashAttribute("successMessage", "Product removed from the comanda.");
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
         }
@@ -184,7 +214,7 @@ public class RestaurantController {
         try {
             ensureRestaurantRuntimeReady();
             restaurantService.updateOrderStatus(id, status);
-            redirectAttributes.addFlashAttribute("successMessage", "Estado de comanda actualizado.");
+            redirectAttributes.addFlashAttribute("successMessage", "Comanda status updated.");
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
         }
@@ -201,7 +231,7 @@ public class RestaurantController {
         try {
             ensureRestaurantRuntimeReady();
             restaurantService.payOrder(id, paymentMethod);
-            redirectAttributes.addFlashAttribute("successMessage", "Comanda cobrada y mesa liberada.");
+            redirectAttributes.addFlashAttribute("successMessage", "Comanda paid and table released.");
             return "redirect:/admin/restaurant/dashboard";
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
@@ -215,7 +245,7 @@ public class RestaurantController {
         try {
             ensureRestaurantRuntimeReady();
             restaurantService.cancelOrder(id);
-            redirectAttributes.addFlashAttribute("successMessage", "Comanda anulada y mesa liberada.");
+            redirectAttributes.addFlashAttribute("successMessage", "Comanda cancelled and table released.");
             return "redirect:/admin/restaurant/dashboard";
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
@@ -225,5 +255,51 @@ public class RestaurantController {
 
     private void ensureRestaurantRuntimeReady() {
         restaurantModuleInstaller.installAndActivate(true);
+    }
+
+    private void addPublicRestaurantAttributes(Model model, RestaurantPublicTableContext tableContext, String publicMenuUrl) {
+        String platformName = setting("platform.name", businessProperties.getName());
+        String platformTagline = setting("platform.tagline", businessProperties.getTagline());
+        String platformLogo = setting("platform.logo", businessProperties.getLogo());
+        String whatsappNumber = setting("public.whatsapp.number", businessProperties.getWhatsappNumber());
+
+        model.addAttribute("businessName", platformName);
+        model.addAttribute("businessTagline", platformTagline);
+        model.addAttribute("platformLogo", platformLogo);
+        model.addAttribute("whatsappNumber", whatsappNumber);
+        model.addAttribute("topbarLocation", setting("public.topbar.location", "Iquitos"));
+        model.addAttribute("publicPrimaryColor", setting("public.theme.primary_color", "#dc3545"));
+        model.addAttribute("publicSecondaryColor", setting("public.theme.secondary_color", "#f97316"));
+        model.addAttribute("seoTitle", tableContext == null ? "Carta digital - " + platformName : "Carta digital " + tableContext.displayName() + " - " + platformName);
+        model.addAttribute("seoDescription", "Carta digital QR de " + platformName + ". Revisa platos, bebidas y solicita atención desde tu mesa.");
+        model.addAttribute("seoCanonicalUrl", publicMenuUrl);
+        model.addAttribute("seoOgType", "website");
+        model.addAttribute("seoOgImage", platformLogo);
+    }
+
+    private String attentionWhatsappLink(RestaurantPublicTableContext tableContext, String publicMenuUrl) {
+        String whatsappNumber = setting("public.whatsapp.number", businessProperties.getWhatsappNumber());
+        String tableLabel = tableContext == null ? "la carta digital" : tableContext.displayName();
+        String message = "Hola, estoy revisando " + tableLabel + " y deseo solicitar atención. Link: " + publicMenuUrl;
+        return "https://wa.me/" + whatsappNumber + "?text=" + URLEncoder.encode(message, StandardCharsets.UTF_8);
+    }
+
+    private String absoluteUrl(HttpServletRequest request, String path) {
+        String cleanPath = path == null || path.isBlank() ? "/" : path;
+        if (!cleanPath.startsWith("/")) {
+            cleanPath = "/" + cleanPath;
+        }
+        return request.getScheme() + "://" + request.getServerName() + portPart(request) + cleanPath;
+    }
+
+    private String portPart(HttpServletRequest request) {
+        int port = request.getServerPort();
+        boolean defaultHttp = "http".equalsIgnoreCase(request.getScheme()) && port == 80;
+        boolean defaultHttps = "https".equalsIgnoreCase(request.getScheme()) && port == 443;
+        return defaultHttp || defaultHttps ? "" : ":" + port;
+    }
+
+    private String setting(String variable, String defaultValue) {
+        return platformSettingService.get(variable, defaultValue);
     }
 }

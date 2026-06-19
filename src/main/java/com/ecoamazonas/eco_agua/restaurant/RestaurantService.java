@@ -47,22 +47,24 @@ public class RestaurantService {
     }
 
     public List<RestaurantMenuItemRow> menuItems() {
-        return jdbcTemplate.query("""
-                SELECT id, name, description, image_path, price, featured, stock
-                FROM product
-                WHERE active = true
-                ORDER BY featured DESC, name ASC
-                """, menuMapper());
+        return jdbcTemplate.query(menuItemsSql("p.active = true", "ORDER BY category_name ASC, p.featured DESC, p.name ASC", ""), menuMapper());
+    }
+
+    public List<RestaurantMenuGroupRow> menuGroups() {
+        Map<String, List<RestaurantMenuItemRow>> grouped = menuItems().stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        RestaurantMenuItemRow::categoryLabel,
+                        LinkedHashMap::new,
+                        java.util.stream.Collectors.toList()
+                ));
+
+        return grouped.entrySet().stream()
+                .map(entry -> new RestaurantMenuGroupRow(entry.getKey(), entry.getValue()))
+                .toList();
     }
 
     public List<RestaurantMenuItemRow> featuredMenuItems() {
-        return jdbcTemplate.query("""
-                SELECT id, name, description, image_path, price, featured, stock
-                FROM product
-                WHERE active = true AND featured = true
-                ORDER BY name ASC
-                LIMIT 8
-                """, menuMapper());
+        return jdbcTemplate.query(menuItemsSql("p.active = true AND p.featured = true", "ORDER BY category_name ASC, p.name ASC", "LIMIT 8"), menuMapper());
     }
 
     public List<RestaurantTableRow> tables() {
@@ -107,6 +109,29 @@ public class RestaurantService {
                   )
                 ORDER BY area ASC, name ASC
                 """, tableMapper());
+    }
+
+    public RestaurantPublicTableContext publicTableContext(Long tableId) {
+        if (tableId == null) {
+            return null;
+        }
+
+        try {
+            return jdbcTemplate.queryForObject("""
+                    SELECT id, code, name, area, seats, status
+                    FROM restaurant_table
+                    WHERE id = ? AND active = true
+                    """, (rs, rowNum) -> new RestaurantPublicTableContext(
+                    rs.getLong("id"),
+                    rs.getString("code"),
+                    rs.getString("name"),
+                    rs.getString("area"),
+                    rs.getInt("seats"),
+                    rs.getString("status")
+            ), tableId);
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
     }
 
     public RestaurantOrderRow order(Long orderId) {
@@ -431,6 +456,33 @@ public class RestaurantService {
         return quantities;
     }
 
+    private String menuItemsSql(String whereClause, String orderClause, String limitClause) {
+        boolean hasCategoryTable = tableExists("category");
+        String categoryColumns = hasCategoryTable
+                ? "p.category_id, COALESCE(c.name, 'Carta general') AS category_name"
+                : "NULL AS category_id, 'Carta general' AS category_name";
+        String categoryJoin = hasCategoryTable ? "LEFT JOIN category c ON c.id = p.category_id" : "";
+        return """
+                SELECT p.id, p.name, p.description, p.image_path, p.price, p.featured, p.stock,
+                       %s
+                FROM product p
+                %s
+                WHERE %s
+                %s
+                %s
+                """.formatted(categoryColumns, categoryJoin, whereClause, orderClause, limitClause);
+    }
+
+    private boolean tableExists(String tableName) {
+        Integer value = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                """, Integer.class, tableName);
+        return value != null && value > 0;
+    }
+
     private int count(String sql) {
         Integer value = jdbcTemplate.queryForObject(sql, Integer.class);
         return value == null ? 0 : value;
@@ -463,7 +515,9 @@ public class RestaurantService {
                 rs.getString("image_path"),
                 rs.getBigDecimal("price"),
                 rs.getBoolean("featured"),
-                rs.getBigDecimal("stock")
+                rs.getBigDecimal("stock"),
+                nullableLong(rs, "category_id"),
+                rs.getString("category_name")
         );
     }
 

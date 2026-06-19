@@ -7,19 +7,66 @@
     <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
         <div th:replace="fragments/topbar :: topbar"></div>
         <main class="container-fluid mt-4 flex-grow-1">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div><h1 class="h4 mb-1">Mesas y salón</h1><p class="text-muted small mb-0">Cambia estado de mesas para operación de salón.</p></div>
-                <a th:href="@{/admin/restaurant/orders/new}" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle"></i> Nueva comanda</a>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Mesas y salón</h1>
+                    <p class="text-muted small mb-0">Administra estados, links QR y acceso rápido a comandas por mesa.</p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a th:href="@{/admin/restaurant/tables/qr-cards}" class="btn btn-sm btn-outline-success" target="_blank">
+                        <i class="bi bi-qr-code"></i> Imprimir QR
+                    </a>
+                    <a th:href="@{/admin/restaurant/orders/new}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-circle"></i> Nueva comanda
+                    </a>
+                </div>
             </div>
-            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show"><span th:text="${successMessage}">OK</span><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show">
+                <span th:text="${successMessage}">OK</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small">
+                <i class="bi bi-info-circle me-1"></i>
+                Cada mesa tiene un link público propio. El cliente puede escanear el QR para abrir la carta identificando su mesa.
+            </div>
+
             <div class="row g-3">
                 <div class="col-md-6 col-xl-3" th:each="table : ${tables}">
                     <div class="card h-100 shadow-sm border-0">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div><h2 class="h5 mb-1" th:text="${table.name()}">Mesa 1</h2><div class="small text-muted" th:text="|${table.area()} · ${table.seats()} sillas|">Área</div></div>
+                                <div>
+                                    <h2 class="h5 mb-1" th:text="${table.name()}">Mesa 1</h2>
+                                    <div class="small text-muted" th:text="|${table.area()} · ${table.seats()} sillas|">Área</div>
+                                </div>
                                 <span class="badge" th:classappend="${table.statusBadge()}" th:text="${table.statusLabel()}">Libre</span>
                             </div>
+
+                            <div class="text-center my-3 p-3 rounded-3 bg-light">
+                                <img class="img-fluid rounded js-restaurant-qr"
+                                     style="max-width:150px;"
+                                     alt="QR de mesa"
+                                     th:attr="data-public-menu-link=@{/restaurant/menu(tableId=${table.id()})}">
+                            </div>
+
+                            <label class="form-label small text-muted mb-1">Link público de mesa</label>
+                            <div class="input-group input-group-sm mb-3">
+                                <input type="text" class="form-control js-restaurant-public-link" readonly
+                                       th:attr="data-public-menu-link=@{/restaurant/menu(tableId=${table.id()})}">
+                                <button type="button" class="btn btn-outline-secondary js-restaurant-copy-link">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+
+                            <div class="d-grid gap-2 mb-3">
+                                <a class="btn btn-sm btn-outline-success" target="_blank"
+                                   th:href="@{/restaurant/menu(tableId=${table.id()})}">
+                                    <i class="bi bi-box-arrow-up-right"></i> Ver carta de esta mesa
+                                </a>
+                            </div>
+
                             <p class="small text-muted" th:text="${table.notes() ?: 'Sin observaciones'}">Nota</p>
                             <form th:action="@{/admin/restaurant/tables/{id}/status(id=${table.id()})}" method="post" class="d-grid gap-2">
                                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
@@ -34,11 +81,14 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-12" th:if="${tables.isEmpty()}"><div class="alert alert-info">No hay mesas registradas. Ejecuta el SQL demo de restaurante.</div></div>
+                <div class="col-12" th:if="${tables.isEmpty()}">
+                    <div class="alert alert-info">No hay mesas registradas. Ejecuta el SQL demo de restaurante.</div>
+                </div>
             </div>
         </main>
     </div>
 </div>
 <div th:replace="fragments/scripts_admin :: adminScripts"></div>
+<script th:src="@{/js/restaurant-public-menu-qr.js}"></script>
 </body>
 </html>

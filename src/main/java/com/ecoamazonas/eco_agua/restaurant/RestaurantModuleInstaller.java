@@ -109,6 +109,8 @@ public class RestaurantModuleInstaller {
                     status VARCHAR(30) NOT NULL DEFAULT 'NEW',
                     subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
                     notes TEXT NULL,
+                    payment_method VARCHAR(30) NULL,
+                    paid_at DATETIME NULL,
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     PRIMARY KEY (id),
@@ -119,6 +121,8 @@ public class RestaurantModuleInstaller {
                     CONSTRAINT fk_restaurant_order_table FOREIGN KEY (table_id) REFERENCES restaurant_table(id) ON DELETE SET NULL
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+
+        ensureRestaurantOperationalColumns();
 
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_order_item (
@@ -136,6 +140,28 @@ public class RestaurantModuleInstaller {
                     CONSTRAINT fk_restaurant_order_item_order FOREIGN KEY (order_id) REFERENCES restaurant_order(id) ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+    }
+
+
+    private void ensureRestaurantOperationalColumns() {
+        if (!tableExists("restaurant_order")) {
+            return;
+        }
+        ensureColumn("restaurant_order", "payment_method", "ALTER TABLE restaurant_order ADD COLUMN payment_method VARCHAR(30) NULL AFTER notes");
+        ensureColumn("restaurant_order", "paid_at", "ALTER TABLE restaurant_order ADD COLUMN paid_at DATETIME NULL AFTER payment_method");
+    }
+
+    private void ensureColumn(String tableName, String columnName, String alterSql) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND column_name = ?
+                """, Integer.class, tableName, columnName);
+        if (count == null || count == 0) {
+            jdbcTemplate.execute(alterSql);
+        }
     }
 
 

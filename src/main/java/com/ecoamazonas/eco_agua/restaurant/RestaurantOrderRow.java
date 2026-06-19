@@ -7,6 +7,7 @@ public record RestaurantOrderRow(
         Long id,
         String orderCode,
         String serviceType,
+        Long tableId,
         String tableName,
         String customerName,
         String customerPhone,
@@ -47,7 +48,53 @@ public record RestaurantOrderRow(
         };
     }
 
-    private String safeStatus() {
+    public String serviceReference() {
+        if (tableName != null && !tableName.isBlank()) {
+            return tableName;
+        }
+        if (customerName != null && !customerName.isBlank()) {
+            return customerName;
+        }
+        return switch (safeServiceType()) {
+            case "TAKEAWAY" -> "Pedido para llevar";
+            case "DELIVERY" -> "Pedido delivery";
+            default -> "Sin mesa";
+        };
+    }
+
+    public boolean isClosed() {
+        return "PAID".equals(safeStatus()) || "CANCELLED".equals(safeStatus());
+    }
+
+    public boolean canEdit() {
+        return !isClosed();
+    }
+
+    public boolean canSendToKitchen() {
+        return "NEW".equals(safeStatus());
+    }
+
+    public boolean canMarkReady() {
+        return "NEW".equals(safeStatus()) || "IN_KITCHEN".equals(safeStatus());
+    }
+
+    public boolean canMarkServed() {
+        return "READY".equals(safeStatus());
+    }
+
+    public boolean canPay() {
+        return "SERVED".equals(safeStatus()) || "READY".equals(safeStatus()) || "IN_KITCHEN".equals(safeStatus());
+    }
+
+    public boolean canCancel() {
+        return !isClosed();
+    }
+
+    public BigDecimal safeSubtotal() {
+        return subtotal == null ? BigDecimal.ZERO : subtotal;
+    }
+
+    public String safeStatus() {
         return status == null ? "NEW" : status.toUpperCase();
     }
 

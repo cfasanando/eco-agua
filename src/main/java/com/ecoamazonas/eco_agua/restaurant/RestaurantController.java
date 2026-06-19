@@ -34,6 +34,11 @@ public class RestaurantController {
         return "public/restaurant_menu";
     }
 
+    @GetMapping("/admin/restaurant")
+    public String restaurantHome() {
+        return "redirect:/admin/restaurant/dashboard";
+    }
+
     @GetMapping("/admin/restaurant/dashboard")
     public String dashboard(Model model) {
         ensureRestaurantRuntimeReady();
@@ -88,12 +93,77 @@ public class RestaurantController {
         try {
             ensureRestaurantRuntimeReady();
             Long orderId = restaurantService.createOrder(serviceType, tableId, customerName, customerPhone, notes, params);
-            redirectAttributes.addFlashAttribute("successMessage", "Comanda registrada correctamente. ID interno: " + orderId);
-            return "redirect:/admin/restaurant/kitchen";
+            redirectAttributes.addFlashAttribute("successMessage", "Comanda registrada y enviada a cocina.");
+            return "redirect:/admin/restaurant/orders/" + orderId;
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
             return "redirect:/admin/restaurant/orders/new";
         }
+    }
+
+    @GetMapping("/admin/restaurant/orders/{id}")
+    public String orderDetail(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
+        ensureRestaurantRuntimeReady();
+        RestaurantOrderRow order = restaurantService.order(id);
+        if (order == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "La comanda solicitada no existe.");
+            return "redirect:/admin/restaurant/dashboard";
+        }
+
+        model.addAttribute("activePage", "restaurant_kitchen");
+        model.addAttribute("order", order);
+        model.addAttribute("items", restaurantService.orderItems(id));
+        model.addAttribute("menuItems", restaurantService.menuItems());
+        model.addAttribute("canEdit", order.canEdit());
+        model.addAttribute("canSendToKitchen", order.canSendToKitchen());
+        model.addAttribute("canMarkReady", order.canMarkReady());
+        model.addAttribute("canMarkServed", order.canMarkServed());
+        model.addAttribute("canPay", order.canPay());
+        model.addAttribute("canCancel", order.canCancel());
+        return "admin/restaurant/order_detail";
+    }
+
+    @PostMapping("/admin/restaurant/orders/{id}/items")
+    public String addItemsToOrder(@PathVariable Long id,
+                                  @RequestParam Map<String, String> params,
+                                  RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.addItemsToOrder(id, params);
+            redirectAttributes.addFlashAttribute("successMessage", "Productos agregados a la comanda.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/orders/" + id;
+    }
+
+    @PostMapping("/admin/restaurant/orders/{orderId}/items/{itemId}/quantity")
+    public String updateItemQuantity(@PathVariable Long orderId,
+                                     @PathVariable Long itemId,
+                                     @RequestParam(defaultValue = "1") int quantity,
+                                     RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.updateItemQuantity(orderId, itemId, quantity);
+            redirectAttributes.addFlashAttribute("successMessage", "Cantidad actualizada.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/orders/" + orderId;
+    }
+
+    @PostMapping("/admin/restaurant/orders/{orderId}/items/{itemId}/remove")
+    public String removeItem(@PathVariable Long orderId,
+                             @PathVariable Long itemId,
+                             RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.removeItem(orderId, itemId);
+            redirectAttributes.addFlashAttribute("successMessage", "Producto retirado de la comanda.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/orders/" + orderId;
     }
 
     @GetMapping("/admin/restaurant/kitchen")
@@ -111,13 +181,46 @@ public class RestaurantController {
                                     @RequestParam String status,
                                     @RequestParam(defaultValue = "/admin/restaurant/kitchen") String returnTo,
                                     RedirectAttributes redirectAttributes) {
-        ensureRestaurantRuntimeReady();
-        restaurantService.updateOrderStatus(id, status);
-        redirectAttributes.addFlashAttribute("successMessage", "Estado de comanda actualizado.");
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.updateOrderStatus(id, status);
+            redirectAttributes.addFlashAttribute("successMessage", "Estado de comanda actualizado.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
         if (returnTo.startsWith("/admin/restaurant")) {
             return "redirect:" + returnTo;
         }
         return "redirect:/admin/restaurant/kitchen";
+    }
+
+    @PostMapping("/admin/restaurant/orders/{id}/pay")
+    public String payOrder(@PathVariable Long id,
+                           @RequestParam(defaultValue = "CASH") String paymentMethod,
+                           RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.payOrder(id, paymentMethod);
+            redirectAttributes.addFlashAttribute("successMessage", "Comanda cobrada y mesa liberada.");
+            return "redirect:/admin/restaurant/dashboard";
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            return "redirect:/admin/restaurant/orders/" + id;
+        }
+    }
+
+    @PostMapping("/admin/restaurant/orders/{id}/cancel")
+    public String cancelOrder(@PathVariable Long id,
+                              RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.cancelOrder(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Comanda anulada y mesa liberada.");
+            return "redirect:/admin/restaurant/dashboard";
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            return "redirect:/admin/restaurant/orders/" + id;
+        }
     }
 
     private void ensureRestaurantRuntimeReady() {

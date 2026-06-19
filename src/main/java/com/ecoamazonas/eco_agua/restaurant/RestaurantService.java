@@ -1,5 +1,6 @@
 package com.ecoamazonas.eco_agua.restaurant;
 
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -24,6 +25,8 @@ public class RestaurantService {
     private static final List<String> VALID_TABLE_STATUSES = List.of("FREE", "OCCUPIED", "RESERVED", "DISABLED");
     private static final List<String> VALID_ORDER_STATUSES = List.of("NEW", "IN_KITCHEN", "READY", "SERVED", "PAID", "CANCELLED");
     private static final List<String> VALID_SERVICE_TYPES = List.of("DINE_IN", "TAKEAWAY", "DELIVERY");
+    private static final List<String> VALID_PAYMENT_METHODS = List.of("CASH", "CARD", "YAPE", "PLIN", "TRANSFER", "OTHER");
+    private static final List<String> CLOSED_ORDER_STATUSES = List.of("PAID", "CANCELLED");
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -39,7 +42,7 @@ public class RestaurantService {
         int activeOrders = count("SELECT COUNT(*) FROM restaurant_order WHERE status IN ('NEW','IN_KITCHEN','READY','SERVED')");
         int kitchenPendingOrders = count("SELECT COUNT(*) FROM restaurant_order WHERE status IN ('NEW','IN_KITCHEN')");
         int readyOrders = count("SELECT COUNT(*) FROM restaurant_order WHERE status = 'READY'");
-        BigDecimal todaySales = amount("SELECT COALESCE(SUM(subtotal),0) FROM restaurant_order WHERE DATE(created_at) = CURDATE() AND status <> 'CANCELLED'");
+        BigDecimal todaySales = amount("SELECT COALESCE(SUM(subtotal),0) FROM restaurant_order WHERE DATE(created_at) = CURDATE() AND status = 'PAID'");
         return new RestaurantDashboardSummary(totalTables, freeTables, occupiedTables, reservedTables, activeOrders, kitchenPendingOrders, readyOrders, todaySales);
     }
 
@@ -94,35 +97,59 @@ public class RestaurantService {
         return jdbcTemplate.query("""
                 SELECT id, code, name, area, seats, status, active, notes
                 FROM restaurant_table
-                WHERE active = true AND status IN ('FREE','RESERVED')
+                WHERE active = true
+                  AND status IN ('FREE','RESERVED')
+                  AND id NOT IN (
+                      SELECT table_id
+                      FROM restaurant_order
+                      WHERE table_id IS NOT NULL
+                        AND status IN ('NEW','IN_KITCHEN','READY','SERVED')
+                  )
                 ORDER BY area ASC, name ASC
                 """, tableMapper());
     }
 
+    public RestaurantOrderRow order(Long orderId) {
+        try {
+            return jdbcTemplate.queryForObject("""
+                    SELECT o.id, o.order_code, o.service_type, o.table_id, t.name AS table_name,
+                           o.customer_name, o.customer_phone, o.status, o.subtotal, o.notes, o.created_at,
+                           COALESCE(COUNT(i.id), 0) AS item_count
+                    FROM restaurant_order o
+                    LEFT JOIN restaurant_table t ON t.id = o.table_id
+                    LEFT JOIN restaurant_order_item i ON i.order_id = o.id
+                    WHERE o.id = ?
+                    GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.notes, o.created_at
+                    """, orderMapper(), orderId);
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
+    }
+
     public List<RestaurantOrderRow> activeOrders() {
         return jdbcTemplate.query("""
-                SELECT o.id, o.order_code, o.service_type, t.name AS table_name,
+                SELECT o.id, o.order_code, o.service_type, o.table_id, t.name AS table_name,
                        o.customer_name, o.customer_phone, o.status, o.subtotal, o.notes, o.created_at,
                        COALESCE(COUNT(i.id), 0) AS item_count
                 FROM restaurant_order o
                 LEFT JOIN restaurant_table t ON t.id = o.table_id
                 LEFT JOIN restaurant_order_item i ON i.order_id = o.id
                 WHERE o.status IN ('NEW','IN_KITCHEN','READY','SERVED')
-                GROUP BY o.id, o.order_code, o.service_type, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.notes, o.created_at
+                GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.notes, o.created_at
                 ORDER BY o.created_at DESC
                 """, orderMapper());
     }
 
     public List<RestaurantOrderRow> kitchenOrders() {
         return jdbcTemplate.query("""
-                SELECT o.id, o.order_code, o.service_type, t.name AS table_name,
+                SELECT o.id, o.order_code, o.service_type, o.table_id, t.name AS table_name,
                        o.customer_name, o.customer_phone, o.status, o.subtotal, o.notes, o.created_at,
                        COALESCE(COUNT(i.id), 0) AS item_count
                 FROM restaurant_order o
                 LEFT JOIN restaurant_table t ON t.id = o.table_id
                 LEFT JOIN restaurant_order_item i ON i.order_id = o.id
                 WHERE o.status IN ('NEW','IN_KITCHEN','READY')
-                GROUP BY o.id, o.order_code, o.service_type, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.notes, o.created_at
+                GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.notes, o.created_at
                 ORDER BY FIELD(o.status, 'READY', 'NEW', 'IN_KITCHEN'), o.created_at ASC
                 """, orderMapper());
     }
@@ -157,24 +184,26 @@ public class RestaurantService {
                             String notes,
                             Map<String, String> requestParams) {
         String cleanServiceType = normalize(serviceType, VALID_SERVICE_TYPES, "DINE_IN");
+        if ("DINE_IN".equals(cleanServiceType) && tableId == null) {
+            throw new IllegalArgumentException("Selecciona una mesa para atención en salón.");
+        }
+
         Map<Long, Integer> quantities = selectedQuantities(requestParams);
         if (quantities.isEmpty()) {
             throw new IllegalArgumentException("Agrega al menos un producto a la comanda.");
         }
 
-        List<RestaurantMenuItemRow> selectedItems = menuItems().stream()
-                .filter(item -> quantities.containsKey(item.id()))
-                .toList();
+        List<RestaurantMenuItemRow> selectedItems = selectedMenuItems(quantities);
         if (selectedItems.isEmpty()) {
             throw new IllegalArgumentException("Los productos seleccionados ya no están disponibles.");
         }
 
-        BigDecimal subtotal = BigDecimal.ZERO;
-        for (RestaurantMenuItemRow item : selectedItems) {
-            subtotal = subtotal.add(item.price().multiply(BigDecimal.valueOf(quantities.get(item.id()))));
+        Long finalTableId = "DINE_IN".equals(cleanServiceType) ? tableId : null;
+        if (finalTableId != null) {
+            assertTableAvailable(finalTableId);
         }
 
-        Long finalTableId = "DINE_IN".equals(cleanServiceType) ? tableId : null;
+        BigDecimal subtotal = subtotal(selectedItems, quantities);
         String orderCode = nextOrderCode();
         KeyHolder keyHolder = new GeneratedKeyHolder();
         BigDecimal finalSubtotal = subtotal;
@@ -199,15 +228,7 @@ public class RestaurantService {
         }, keyHolder);
 
         Long orderId = Objects.requireNonNull(keyHolder.getKey()).longValue();
-        for (RestaurantMenuItemRow item : selectedItems) {
-            int quantity = quantities.get(item.id());
-            BigDecimal lineTotal = item.price().multiply(BigDecimal.valueOf(quantity));
-            jdbcTemplate.update("""
-                    INSERT INTO restaurant_order_item
-                    (order_id, product_id, product_name, quantity, unit_price, line_total, kitchen_status)
-                    VALUES (?, ?, ?, ?, ?, ?, 'PENDING')
-                    """, orderId, item.id(), item.name(), quantity, item.price(), lineTotal);
-        }
+        insertOrderItems(orderId, selectedItems, quantities);
 
         if (finalTableId != null) {
             jdbcTemplate.update("UPDATE restaurant_table SET status = 'OCCUPIED', updated_at = NOW() WHERE id = ?", finalTableId);
@@ -217,17 +238,178 @@ public class RestaurantService {
     }
 
     @Transactional
+    public void addItemsToOrder(Long orderId, Map<String, String> requestParams) {
+        assertOrderEditable(orderId);
+        Map<Long, Integer> quantities = selectedQuantities(requestParams);
+        if (quantities.isEmpty()) {
+            throw new IllegalArgumentException("Selecciona al menos un producto para agregar.");
+        }
+
+        List<RestaurantMenuItemRow> selectedItems = selectedMenuItems(quantities);
+        if (selectedItems.isEmpty()) {
+            throw new IllegalArgumentException("Los productos seleccionados ya no están disponibles.");
+        }
+
+        insertOrderItems(orderId, selectedItems, quantities);
+        recalculateOrderTotal(orderId);
+        jdbcTemplate.update("UPDATE restaurant_order SET status = CASE WHEN status = 'NEW' THEN 'IN_KITCHEN' ELSE status END, updated_at = NOW() WHERE id = ?", orderId);
+    }
+
+    @Transactional
+    public void updateItemQuantity(Long orderId, Long itemId, int quantity) {
+        assertOrderEditable(orderId);
+        int cleanQuantity = Math.max(1, Math.min(quantity, 99));
+        int updated = jdbcTemplate.update("""
+                UPDATE restaurant_order_item
+                SET quantity = ?, line_total = unit_price * ?, kitchen_status = CASE WHEN kitchen_status = 'READY' THEN 'PENDING' ELSE kitchen_status END
+                WHERE id = ? AND order_id = ?
+                """, cleanQuantity, cleanQuantity, itemId, orderId);
+        if (updated == 0) {
+            throw new IllegalArgumentException("No se encontró el producto dentro de la comanda.");
+        }
+        recalculateOrderTotal(orderId);
+    }
+
+    @Transactional
+    public void removeItem(Long orderId, Long itemId) {
+        assertOrderEditable(orderId);
+        int deleted = jdbcTemplate.update("DELETE FROM restaurant_order_item WHERE id = ? AND order_id = ?", itemId, orderId);
+        if (deleted == 0) {
+            throw new IllegalArgumentException("No se encontró el producto dentro de la comanda.");
+        }
+        if (count("SELECT COUNT(*) FROM restaurant_order_item WHERE order_id = " + orderId) == 0) {
+            throw new IllegalArgumentException("La comanda debe mantener al menos un producto.");
+        }
+        recalculateOrderTotal(orderId);
+    }
+
+    @Transactional
     public void updateOrderStatus(Long orderId, String status) {
         String cleanStatus = normalize(status, VALID_ORDER_STATUSES, "IN_KITCHEN");
+        if ("PAID".equals(cleanStatus)) {
+            payOrder(orderId, "CASH");
+            return;
+        }
+        if ("CANCELLED".equals(cleanStatus)) {
+            cancelOrder(orderId);
+            return;
+        }
+
+        RestaurantOrderRow order = assertOrderExists(orderId);
+        if (order.isClosed()) {
+            throw new IllegalArgumentException("No se puede cambiar una comanda cerrada.");
+        }
+
         jdbcTemplate.update("UPDATE restaurant_order SET status = ?, updated_at = NOW() WHERE id = ?", cleanStatus, orderId);
         if ("READY".equals(cleanStatus)) {
             jdbcTemplate.update("UPDATE restaurant_order_item SET kitchen_status = 'READY' WHERE order_id = ?", orderId);
         }
-        if ("PAID".equals(cleanStatus) || "CANCELLED".equals(cleanStatus)) {
-            Long tableId = jdbcTemplate.query("SELECT table_id FROM restaurant_order WHERE id = ?", rs -> rs.next() ? rs.getLong(1) : null, orderId);
-            if (tableId != null && tableId > 0) {
-                jdbcTemplate.update("UPDATE restaurant_table SET status = 'FREE', updated_at = NOW() WHERE id = ?", tableId);
-            }
+        if ("IN_KITCHEN".equals(cleanStatus)) {
+            jdbcTemplate.update("UPDATE restaurant_order_item SET kitchen_status = 'PENDING' WHERE order_id = ? AND kitchen_status <> 'READY'", orderId);
+        }
+    }
+
+    @Transactional
+    public void payOrder(Long orderId, String paymentMethod) {
+        RestaurantOrderRow order = assertOrderExists(orderId);
+        if (order.isClosed()) {
+            throw new IllegalArgumentException("La comanda ya está cerrada.");
+        }
+        recalculateOrderTotal(orderId);
+        String cleanPaymentMethod = normalize(paymentMethod, VALID_PAYMENT_METHODS, "CASH");
+        jdbcTemplate.update("""
+                UPDATE restaurant_order
+                SET status = 'PAID', payment_method = ?, paid_at = NOW(), updated_at = NOW()
+                WHERE id = ?
+                """, cleanPaymentMethod, orderId);
+        releaseTableForOrder(orderId);
+    }
+
+    @Transactional
+    public void cancelOrder(Long orderId) {
+        RestaurantOrderRow order = assertOrderExists(orderId);
+        if ("PAID".equals(order.safeStatus())) {
+            throw new IllegalArgumentException("No se puede anular una comanda pagada desde esta pantalla.");
+        }
+        jdbcTemplate.update("UPDATE restaurant_order SET status = 'CANCELLED', updated_at = NOW() WHERE id = ?", orderId);
+        releaseTableForOrder(orderId);
+    }
+
+    private void insertOrderItems(Long orderId, List<RestaurantMenuItemRow> selectedItems, Map<Long, Integer> quantities) {
+        for (RestaurantMenuItemRow item : selectedItems) {
+            int quantity = quantities.get(item.id());
+            BigDecimal lineTotal = item.price().multiply(BigDecimal.valueOf(quantity));
+            jdbcTemplate.update("""
+                    INSERT INTO restaurant_order_item
+                    (order_id, product_id, product_name, quantity, unit_price, line_total, kitchen_status)
+                    VALUES (?, ?, ?, ?, ?, ?, 'PENDING')
+                    """, orderId, item.id(), item.name(), quantity, item.price(), lineTotal);
+        }
+    }
+
+    private List<RestaurantMenuItemRow> selectedMenuItems(Map<Long, Integer> quantities) {
+        return menuItems().stream()
+                .filter(item -> quantities.containsKey(item.id()))
+                .toList();
+    }
+
+    private BigDecimal subtotal(List<RestaurantMenuItemRow> selectedItems, Map<Long, Integer> quantities) {
+        BigDecimal subtotal = BigDecimal.ZERO;
+        for (RestaurantMenuItemRow item : selectedItems) {
+            subtotal = subtotal.add(item.price().multiply(BigDecimal.valueOf(quantities.get(item.id()))));
+        }
+        return subtotal;
+    }
+
+    private void recalculateOrderTotal(Long orderId) {
+        jdbcTemplate.update("""
+                UPDATE restaurant_order
+                SET subtotal = COALESCE((
+                    SELECT SUM(line_total)
+                    FROM restaurant_order_item
+                    WHERE order_id = ?
+                ), 0), updated_at = NOW()
+                WHERE id = ?
+                """, orderId, orderId);
+    }
+
+    private void releaseTableForOrder(Long orderId) {
+        Long tableId = jdbcTemplate.query("SELECT table_id FROM restaurant_order WHERE id = ?", rs -> rs.next() ? nullableLong(rs, "table_id") : null, orderId);
+        if (tableId != null && tableId > 0) {
+            jdbcTemplate.update("UPDATE restaurant_table SET status = 'FREE', updated_at = NOW() WHERE id = ?", tableId);
+        }
+    }
+
+    private void assertTableAvailable(Long tableId) {
+        String status = jdbcTemplate.query("SELECT status FROM restaurant_table WHERE id = ?", rs -> rs.next() ? rs.getString(1) : null, tableId);
+        if (status == null) {
+            throw new IllegalArgumentException("La mesa seleccionada no existe.");
+        }
+        if ("DISABLED".equalsIgnoreCase(status)) {
+            throw new IllegalArgumentException("La mesa seleccionada está fuera de servicio.");
+        }
+        Integer activeOrders = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM restaurant_order
+                WHERE table_id = ? AND status IN ('NEW','IN_KITCHEN','READY','SERVED')
+                """, Integer.class, tableId);
+        if (activeOrders != null && activeOrders > 0) {
+            throw new IllegalArgumentException("La mesa seleccionada ya tiene una comanda activa.");
+        }
+    }
+
+    private RestaurantOrderRow assertOrderExists(Long orderId) {
+        RestaurantOrderRow order = order(orderId);
+        if (order == null) {
+            throw new IllegalArgumentException("La comanda solicitada no existe.");
+        }
+        return order;
+    }
+
+    private void assertOrderEditable(Long orderId) {
+        RestaurantOrderRow order = assertOrderExists(orderId);
+        if (CLOSED_ORDER_STATUSES.contains(order.safeStatus())) {
+            throw new IllegalArgumentException("No se puede editar una comanda pagada o anulada.");
         }
     }
 
@@ -324,6 +506,7 @@ public class RestaurantService {
                 rs.getLong("id"),
                 rs.getString("order_code"),
                 rs.getString("service_type"),
+                nullableLong(rs, "table_id"),
                 rs.getString("table_name"),
                 rs.getString("customer_name"),
                 rs.getString("customer_phone"),

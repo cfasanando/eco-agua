@@ -153,17 +153,21 @@
                                                 </a>
 
                                                 <a th:if="${table.hasActiveOrder()}"
+                                                   th:href="@{/admin/restaurant/orders/{id}(id=${table.orderId()})}"
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-receipt"></i> Abrir comanda
+                                                </a>
+                                                <a th:if="${table.hasActiveOrder()}"
                                                    th:href="@{/admin/restaurant/kitchen}"
                                                    class="btn btn-sm btn-outline-danger">
                                                     <i class="bi bi-fire"></i> Ver en cocina
                                                 </a>
 
                                                 <form th:if="${table.hasActiveOrder()}"
-                                                      th:action="@{/admin/restaurant/orders/{id}/status(id=${table.orderId()})}"
+                                                      th:action="@{/admin/restaurant/orders/{id}/pay(id=${table.orderId()})}"
                                                       method="post" class="d-grid">
                                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                                    <input type="hidden" name="returnTo" value="/admin/restaurant/dashboard"/>
-                                                    <input type="hidden" name="status" value="PAID"/>
+                                                    <input type="hidden" name="paymentMethod" value="CASH"/>
                                                     <button class="btn btn-sm btn-success">
                                                         <i class="bi bi-cash-coin"></i> Cobrar / liberar mesa
                                                     </button>
@@ -261,15 +265,17 @@
                             <td>S/ <span th:text="${#numbers.formatDecimal(order.subtotal(),1,2)}">0.00</span></td>
                             <td><span class="badge" th:classappend="${order.statusBadge()}" th:text="${order.statusLabel()}">Estado</span></td>
                             <td class="text-end">
+                                <a th:href="@{/admin/restaurant/orders/{id}(id=${order.id()})}" class="btn btn-sm btn-outline-primary" title="Abrir comanda">
+                                    <i class="bi bi-receipt"></i>
+                                </a>
                                 <a th:href="@{/admin/restaurant/kitchen}" class="btn btn-sm btn-outline-danger" title="Ver en cocina">
                                     <i class="bi bi-fire"></i>
                                 </a>
-                                <form th:action="@{/admin/restaurant/orders/{id}/status(id=${order.id()})}" method="post" class="d-inline">
+                                <form th:action="@{/admin/restaurant/orders/{id}/pay(id=${order.id()})}" method="post" class="d-inline">
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                    <input type="hidden" name="returnTo" value="/admin/restaurant/dashboard"/>
-                                    <input type="hidden" name="status" value="PAID"/>
-                                    <button class="btn btn-sm btn-outline-success" title="Marcar pagada">
-                                        <i class="bi bi-check2-circle"></i>
+                                    <input type="hidden" name="paymentMethod" value="CASH"/>
+                                    <button class="btn btn-sm btn-outline-success" title="Cobrar en efectivo">
+                                        <i class="bi bi-cash-coin"></i>
                                     </button>
                                 </form>
                             </td>

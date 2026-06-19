@@ -47,6 +47,10 @@
                                 <textarea name="notes" class="form-control" rows="3" placeholder="Sin ají, llevar cubiertos, etc."></textarea>
                             </div>
                         </div>
+                        <div class="alert alert-light border d-flex justify-content-between align-items-center">
+                            <span class="text-muted">Total estimado</span>
+                            <strong>S/ <span id="order-total">0.00</span></strong>
+                        </div>
                         <button class="btn btn-primary w-100 btn-lg"><i class="bi bi-send-check"></i> Enviar a cocina</button>
                     </div>
 
@@ -67,7 +71,7 @@
                                                     <div class="small text-muted mb-2" th:text="${item.description()}">Descripción</div>
                                                     <div class="d-flex justify-content-between align-items-center gap-2">
                                                         <strong>S/ <span th:text="${#numbers.formatDecimal(item.price(),1,2)}">0.00</span></strong>
-                                                        <input type="number" min="0" max="99" value="0" class="form-control form-control-sm" style="max-width:90px;" th:name="${'qty_' + item.id()}" aria-label="Cantidad">
+                                                        <input type="number" min="0" max="99" value="0" class="form-control form-control-sm text-center js-qty" style="max-width:90px;" th:name="${'qty_' + item.id()}" th:attr="data-price=${item.price()}" aria-label="Cantidad">
                                                     </div>
                                                 </div>
                                             </div>
@@ -84,5 +88,21 @@
     </div>
 </div>
 <div th:replace="fragments/scripts_admin :: adminScripts"></div>
+<script>
+    document.querySelectorAll('.js-qty').forEach((input) => {
+        input.addEventListener('input', () => {
+            let total = 0;
+            document.querySelectorAll('.js-qty').forEach((qtyInput) => {
+                const qty = Number(qtyInput.value || 0);
+                const price = Number(qtyInput.dataset.price || 0);
+                total += qty * price;
+            });
+            const target = document.getElementById('order-total');
+            if (target) {
+                target.textContent = total.toFixed(2);
+            }
+        });
+    });
+</script>
 </body>
 </html>

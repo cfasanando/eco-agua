@@ -11,4 +11,15 @@ public record RestaurantOrderItemRow(
         BigDecimal lineTotal,
         String kitchenStatus
 ) {
+    public String kitchenStatusLabel() {
+        return switch (safeKitchenStatus()) {
+            case "READY" -> "Listo";
+            case "CANCELLED" -> "Anulado";
+            default -> "Pendiente";
+        };
+    }
+
+    private String safeKitchenStatus() {
+        return kitchenStatus == null ? "PENDING" : kitchenStatus.toUpperCase();
+    }
 }

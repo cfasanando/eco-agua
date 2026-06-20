@@ -11,7 +11,10 @@ public record RestaurantMenuItemRow(
         boolean featured,
         BigDecimal stock,
         Long categoryId,
-        String categoryName
+        String categoryName,
+        boolean restaurantVisible,
+        boolean restaurantAvailable,
+        int restaurantSortOrder
 ) {
     public String imageOrFallback() {
         return imagePath == null || imagePath.isBlank() ? "/img/logo3-transparente.png" : imagePath;
@@ -21,7 +24,15 @@ public record RestaurantMenuItemRow(
         return price == null ? BigDecimal.ZERO : price;
     }
 
+    public BigDecimal safeStock() {
+        return stock == null ? BigDecimal.ZERO : stock;
+    }
+
     public String categoryLabel() {
         return categoryName == null || categoryName.isBlank() ? "Carta general" : categoryName;
+    }
+
+    public boolean isAvailableForSale() {
+        return restaurantVisible && restaurantAvailable;
     }
 }

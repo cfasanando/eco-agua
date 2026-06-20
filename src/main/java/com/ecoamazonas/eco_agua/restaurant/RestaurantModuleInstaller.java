@@ -166,29 +166,41 @@ public class RestaurantModuleInstaller {
 
 
     private void ensureProductTableForRestaurant() {
-        if (tableExists("product")) {
-            return;
+        if (!tableExists("product")) {
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS product (
+                        id BIGINT NOT NULL AUTO_INCREMENT,
+                        name VARCHAR(200) NOT NULL,
+                        description TEXT NULL,
+                        image_path VARCHAR(255) NULL,
+                        category_id BIGINT NULL,
+                        price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                        active TINYINT(1) NOT NULL DEFAULT 1,
+                        featured TINYINT(1) NOT NULL DEFAULT 0,
+                        stock DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                        minimum_stock DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                        restaurant_visible TINYINT(1) NOT NULL DEFAULT 1,
+                        restaurant_available TINYINT(1) NOT NULL DEFAULT 1,
+                        restaurant_sort_order INT NOT NULL DEFAULT 0,
+                        PRIMARY KEY (id),
+                        KEY idx_product_active (active),
+                        KEY idx_product_featured (featured),
+                        KEY idx_product_category (category_id),
+                        KEY idx_product_name (name)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    """);
         }
 
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS product (
-                    id BIGINT NOT NULL AUTO_INCREMENT,
-                    name VARCHAR(200) NOT NULL,
-                    description TEXT NULL,
-                    image_path VARCHAR(255) NULL,
-                    category_id BIGINT NULL,
-                    price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-                    active TINYINT(1) NOT NULL DEFAULT 1,
-                    featured TINYINT(1) NOT NULL DEFAULT 0,
-                    stock DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-                    minimum_stock DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-                    PRIMARY KEY (id),
-                    KEY idx_product_active (active),
-                    KEY idx_product_featured (featured),
-                    KEY idx_product_category (category_id),
-                    KEY idx_product_name (name)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-                """);
+        ensureProductRestaurantColumns();
+    }
+
+    private void ensureProductRestaurantColumns() {
+        if (!tableExists("product")) {
+            return;
+        }
+        ensureColumn("product", "restaurant_visible", "ALTER TABLE product ADD COLUMN restaurant_visible TINYINT(1) NOT NULL DEFAULT 1 AFTER minimum_stock");
+        ensureColumn("product", "restaurant_available", "ALTER TABLE product ADD COLUMN restaurant_available TINYINT(1) NOT NULL DEFAULT 1 AFTER restaurant_visible");
+        ensureColumn("product", "restaurant_sort_order", "ALTER TABLE product ADD COLUMN restaurant_sort_order INT NOT NULL DEFAULT 0 AFTER restaurant_available");
     }
 
     private void ensureModuleCatalog() {
@@ -242,8 +254,8 @@ public class RestaurantModuleInstaller {
         }
 
         jdbcTemplate.update("""
-                INSERT INTO product (`name`, `description`, `image_path`, `price`, `active`, `featured`, `stock`, `minimum_stock`)
-                VALUES (?, ?, ?, ?, true, ?, ?, ?)
+                INSERT INTO product (`name`, `description`, `image_path`, `price`, `active`, `featured`, `stock`, `minimum_stock`, `restaurant_visible`, `restaurant_available`, `restaurant_sort_order`)
+                VALUES (?, ?, ?, ?, true, ?, ?, ?, true, true, 0)
                 """, name, description, imagePath, price, featured, stock, minimumStock);
     }
 

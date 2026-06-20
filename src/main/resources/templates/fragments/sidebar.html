@@ -86,6 +86,7 @@
         class="menu-group"
         th:with="isRestaurantActive=${activePage == 'restaurant_dashboard'
           or activePage == 'restaurant_tables'
+          or activePage == 'restaurant_menu_items'
           or activePage == 'restaurant_orders_new'
           or activePage == 'restaurant_kitchen'
           or activePage == 'restaurant_cash'}"
@@ -122,6 +123,16 @@
           >
             <span class="icon"><i class="bi bi-grid-3x3-gap"></i></span>
             <span>Mesas y salón</span>
+          </a>
+
+          <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','administra_restaurante')"
+            th:href="@{/admin/restaurant/menu-items}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'restaurant_menu_items' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-card-list"></i></span>
+            <span>Platos y carta</span>
           </a>
 
           <a
@@ -504,7 +515,8 @@
           class="menu-group"
           th:with="isRestaurantActive=${activePage == 'restaurant_dashboard'
             or activePage == 'restaurant_tables'
-            or activePage == 'restaurant_orders_new'
+            or activePage == 'restaurant_menu_items'
+          or activePage == 'restaurant_orders_new'
             or activePage == 'restaurant_kitchen'
             or activePage == 'restaurant_cash'}"
         >
@@ -539,6 +551,15 @@
             >
               <span class="icon"><i class="bi bi-grid-3x3-gap"></i></span>
               <span>Mesas y salón</span>
+            </a>
+            <a
+              sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','administra_restaurante')"
+              th:href="@{/admin/restaurant/menu-items}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'restaurant_menu_items' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-card-list"></i></span>
+              <span>Platos y carta</span>
             </a>
             <a
               sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')"

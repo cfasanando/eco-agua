@@ -261,6 +261,13 @@ public class SecurityConfig {
             "administra_restaurante", "restaurante_mozo"
     );
 
+
+    private static final String[] RESTAURANT_MENU_MANAGE = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR,
+            "administra_restaurante"
+    );
+
     private static final String[] RESTAURANT_ORDER_VIEW = authorities(
             ROLE_OWNER, ROLE_MANAGEMENT, ROLE_RESTAURANT_WAITER, ROLE_RESTAURANT_KITCHEN, ROLE_RESTAURANT_CASHIER,
             LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR,
@@ -471,6 +478,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/admin/academy/**").hasAnyAuthority(ACADEMY_WRITE)
                 .requestMatchers("/admin/academy/**").hasAnyAuthority(ACADEMY_VIEW)
 
+                .requestMatchers("/admin/restaurant/menu-items", "/admin/restaurant/menu-items/**").hasAnyAuthority(RESTAURANT_MENU_MANAGE)
                 .requestMatchers(HttpMethod.POST, "/admin/restaurant/orders/*/pay").hasAnyAuthority(RESTAURANT_CASH_WRITE)
                 .requestMatchers(HttpMethod.POST, "/admin/restaurant/orders/*/status").hasAnyAuthority(RESTAURANT_KITCHEN_WRITE)
                 .requestMatchers(HttpMethod.POST, "/admin/restaurant/orders/**").hasAnyAuthority(RESTAURANT_ORDER_WRITE)

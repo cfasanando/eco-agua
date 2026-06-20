@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.time.LocalDate;
 import java.nio.charset.StandardCharsets;
@@ -92,6 +93,137 @@ public class RestaurantController {
         model.addAttribute("tables", restaurantService.tables());
         model.addAttribute("publicMenuBaseUrl", absoluteUrl(request, "/restaurant/menu"));
         return "admin/restaurant/table_qr_cards";
+    }
+
+
+    @GetMapping("/admin/restaurant/menu-items")
+    public String menuItems(Model model) {
+        ensureRestaurantRuntimeReady();
+        model.addAttribute("activePage", "restaurant_menu_items");
+        model.addAttribute("items", restaurantService.menuItemsAdmin());
+        return "admin/restaurant/menu_items";
+    }
+
+    @GetMapping("/admin/restaurant/menu-items/new")
+    public String newMenuItem(Model model) {
+        ensureRestaurantRuntimeReady();
+        model.addAttribute("activePage", "restaurant_menu_items");
+        model.addAttribute("item", null);
+        model.addAttribute("categories", restaurantService.productCategories());
+        model.addAttribute("formAction", "/admin/restaurant/menu-items");
+        model.addAttribute("formTitle", "Nuevo plato");
+        return "admin/restaurant/menu_item_form";
+    }
+
+    @GetMapping("/admin/restaurant/menu-items/{id}/edit")
+    public String editMenuItem(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
+        ensureRestaurantRuntimeReady();
+        RestaurantMenuAdminRow item = restaurantService.menuItemAdmin(id);
+        if (item == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "El plato seleccionado no existe.");
+            return "redirect:/admin/restaurant/menu-items";
+        }
+        model.addAttribute("activePage", "restaurant_menu_items");
+        model.addAttribute("item", item);
+        model.addAttribute("categories", restaurantService.productCategories());
+        model.addAttribute("formAction", "/admin/restaurant/menu-items/" + id);
+        model.addAttribute("formTitle", "Editar plato");
+        return "admin/restaurant/menu_item_form";
+    }
+
+    @PostMapping("/admin/restaurant/menu-items")
+    public String createMenuItem(@RequestParam String name,
+                                 @RequestParam(required = false) String description,
+                                 @RequestParam(required = false) String imagePath,
+                                 @RequestParam(required = false) BigDecimal price,
+                                 @RequestParam(required = false) BigDecimal stock,
+                                 @RequestParam(required = false) BigDecimal minimumStock,
+                                 @RequestParam(required = false) Long categoryId,
+                                 @RequestParam(required = false) String newCategoryName,
+                                 @RequestParam(required = false) String active,
+                                 @RequestParam(required = false) String featured,
+                                 @RequestParam(required = false) String restaurantVisible,
+                                 @RequestParam(required = false) String restaurantAvailable,
+                                 @RequestParam(defaultValue = "0") int sortOrder,
+                                 RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.createMenuItem(
+                    name, description, imagePath, price, stock, minimumStock, categoryId, newCategoryName,
+                    isChecked(active), isChecked(featured), isChecked(restaurantVisible), isChecked(restaurantAvailable), sortOrder
+            );
+            redirectAttributes.addFlashAttribute("successMessage", "Plato creado correctamente.");
+            return "redirect:/admin/restaurant/menu-items";
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            return "redirect:/admin/restaurant/menu-items/new";
+        }
+    }
+
+    @PostMapping("/admin/restaurant/menu-items/{id}")
+    public String updateMenuItem(@PathVariable Long id,
+                                 @RequestParam String name,
+                                 @RequestParam(required = false) String description,
+                                 @RequestParam(required = false) String imagePath,
+                                 @RequestParam(required = false) BigDecimal price,
+                                 @RequestParam(required = false) BigDecimal stock,
+                                 @RequestParam(required = false) BigDecimal minimumStock,
+                                 @RequestParam(required = false) Long categoryId,
+                                 @RequestParam(required = false) String newCategoryName,
+                                 @RequestParam(required = false) String active,
+                                 @RequestParam(required = false) String featured,
+                                 @RequestParam(required = false) String restaurantVisible,
+                                 @RequestParam(required = false) String restaurantAvailable,
+                                 @RequestParam(defaultValue = "0") int sortOrder,
+                                 RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.updateMenuItem(
+                    id, name, description, imagePath, price, stock, minimumStock, categoryId, newCategoryName,
+                    isChecked(active), isChecked(featured), isChecked(restaurantVisible), isChecked(restaurantAvailable), sortOrder
+            );
+            redirectAttributes.addFlashAttribute("successMessage", "Plato actualizado correctamente.");
+            return "redirect:/admin/restaurant/menu-items";
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            return "redirect:/admin/restaurant/menu-items/" + id + "/edit";
+        }
+    }
+
+    @PostMapping("/admin/restaurant/menu-items/{id}/availability")
+    public String toggleMenuItemAvailability(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.toggleMenuItemAvailability(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Disponibilidad actualizada.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/menu-items";
+    }
+
+    @PostMapping("/admin/restaurant/menu-items/{id}/visibility")
+    public String toggleMenuItemVisibility(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.toggleMenuItemVisibility(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Visibilidad actualizada.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/menu-items";
+    }
+
+    @PostMapping("/admin/restaurant/menu-items/{id}/featured")
+    public String toggleMenuItemFeatured(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.toggleMenuItemFeatured(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Destacado actualizado.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/menu-items";
     }
 
 
@@ -329,6 +461,10 @@ public class RestaurantController {
         boolean defaultHttp = "http".equalsIgnoreCase(request.getScheme()) && port == 80;
         boolean defaultHttps = "https".equalsIgnoreCase(request.getScheme()) && port == 443;
         return defaultHttp || defaultHttps ? "" : ":" + port;
+    }
+
+    private boolean isChecked(String value) {
+        return value != null && ("on".equalsIgnoreCase(value) || "true".equalsIgnoreCase(value) || "1".equals(value));
     }
 
     private String setting(String variable, String defaultValue) {

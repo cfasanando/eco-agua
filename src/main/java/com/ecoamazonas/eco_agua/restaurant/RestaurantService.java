@@ -154,7 +154,38 @@ public class RestaurantService {
     }
 
     public List<RestaurantMenuItemRow> menuItems() {
-        return jdbcTemplate.query(menuItemsSql("p.active = true", "ORDER BY category_name ASC, p.featured DESC, p.name ASC", ""), menuMapper());
+        return jdbcTemplate.query(menuItemsSql(
+                "p.active = true AND p.restaurant_visible = true AND p.restaurant_available = true",
+                "ORDER BY category_name ASC, p.restaurant_sort_order ASC, p.featured DESC, p.name ASC",
+                ""), menuMapper());
+    }
+
+    public List<RestaurantMenuAdminRow> menuItemsAdmin() {
+        return jdbcTemplate.query(menuItemsAdminSql("", "ORDER BY category_name ASC, p.restaurant_sort_order ASC, p.name ASC"), menuAdminMapper());
+    }
+
+    public RestaurantMenuAdminRow menuItemAdmin(Long id) {
+        try {
+            return jdbcTemplate.queryForObject(menuItemsAdminSql("WHERE p.id = ?", ""), menuAdminMapper(), id);
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
+    }
+
+    public List<RestaurantMenuCategoryRow> productCategories() {
+        if (!tableExists("category")) {
+            return List.of();
+        }
+        return jdbcTemplate.query("""
+                SELECT id, name
+                FROM category
+                WHERE active = true
+                  AND type = 'PRODUCT'
+                ORDER BY name ASC
+                """, (rs, rowNum) -> new RestaurantMenuCategoryRow(
+                rs.getLong("id"),
+                rs.getString("name")
+        ));
     }
 
     public List<RestaurantMenuGroupRow> menuGroups() {
@@ -171,7 +202,123 @@ public class RestaurantService {
     }
 
     public List<RestaurantMenuItemRow> featuredMenuItems() {
-        return jdbcTemplate.query(menuItemsSql("p.active = true AND p.featured = true", "ORDER BY category_name ASC, p.name ASC", "LIMIT 8"), menuMapper());
+        return jdbcTemplate.query(menuItemsSql(
+                "p.active = true AND p.restaurant_visible = true AND p.restaurant_available = true AND p.featured = true",
+                "ORDER BY category_name ASC, p.restaurant_sort_order ASC, p.name ASC",
+                "LIMIT 8"), menuMapper());
+    }
+
+    @Transactional
+    public Long createMenuItem(String name,
+                               String description,
+                               String imagePath,
+                               BigDecimal price,
+                               BigDecimal stock,
+                               BigDecimal minimumStock,
+                               Long categoryId,
+                               String newCategoryName,
+                               boolean active,
+                               boolean featured,
+                               boolean restaurantVisible,
+                               boolean restaurantAvailable,
+                               int sortOrder) {
+        String cleanName = requireText(name, "Ingresa el nombre del plato.");
+        BigDecimal cleanPrice = money(price);
+        Long resolvedCategoryId = resolveCategoryId(categoryId, newCategoryName);
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement("""
+                    INSERT INTO product
+                    (name, description, image_path, category_id, price, active, featured, stock, minimum_stock,
+                     restaurant_visible, restaurant_available, restaurant_sort_order)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, Statement.RETURN_GENERATED_KEYS);
+            ps.setString(1, cleanName);
+            ps.setString(2, blankToNull(description));
+            ps.setString(3, blankToNull(imagePath));
+            if (resolvedCategoryId == null) {
+                ps.setObject(4, null);
+            } else {
+                ps.setLong(4, resolvedCategoryId);
+            }
+            ps.setBigDecimal(5, cleanPrice);
+            ps.setBoolean(6, active);
+            ps.setBoolean(7, featured);
+            ps.setBigDecimal(8, nonNegative(stock));
+            ps.setBigDecimal(9, nonNegative(minimumStock));
+            ps.setBoolean(10, restaurantVisible);
+            ps.setBoolean(11, restaurantAvailable);
+            ps.setInt(12, Math.max(0, sortOrder));
+            return ps;
+        }, keyHolder);
+        return Objects.requireNonNull(keyHolder.getKey()).longValue();
+    }
+
+    @Transactional
+    public void updateMenuItem(Long id,
+                               String name,
+                               String description,
+                               String imagePath,
+                               BigDecimal price,
+                               BigDecimal stock,
+                               BigDecimal minimumStock,
+                               Long categoryId,
+                               String newCategoryName,
+                               boolean active,
+                               boolean featured,
+                               boolean restaurantVisible,
+                               boolean restaurantAvailable,
+                               int sortOrder) {
+        String cleanName = requireText(name, "Ingresa el nombre del plato.");
+        BigDecimal cleanPrice = money(price);
+        Long resolvedCategoryId = resolveCategoryId(categoryId, newCategoryName);
+        int updated = jdbcTemplate.update("""
+                UPDATE product
+                SET name = ?, description = ?, image_path = ?, category_id = ?, price = ?, active = ?, featured = ?,
+                    stock = ?, minimum_stock = ?, restaurant_visible = ?, restaurant_available = ?, restaurant_sort_order = ?
+                WHERE id = ?
+                """,
+                cleanName, blankToNull(description), blankToNull(imagePath), resolvedCategoryId, cleanPrice, active, featured,
+                nonNegative(stock), nonNegative(minimumStock), restaurantVisible, restaurantAvailable, Math.max(0, sortOrder), id);
+        if (updated == 0) {
+            throw new IllegalArgumentException("El plato seleccionado no existe.");
+        }
+    }
+
+    @Transactional
+    public void toggleMenuItemAvailability(Long id) {
+        int updated = jdbcTemplate.update("""
+                UPDATE product
+                SET restaurant_available = CASE WHEN restaurant_available = true THEN false ELSE true END
+                WHERE id = ?
+                """, id);
+        if (updated == 0) {
+            throw new IllegalArgumentException("El plato seleccionado no existe.");
+        }
+    }
+
+    @Transactional
+    public void toggleMenuItemVisibility(Long id) {
+        int updated = jdbcTemplate.update("""
+                UPDATE product
+                SET restaurant_visible = CASE WHEN restaurant_visible = true THEN false ELSE true END
+                WHERE id = ?
+                """, id);
+        if (updated == 0) {
+            throw new IllegalArgumentException("El plato seleccionado no existe.");
+        }
+    }
+
+    @Transactional
+    public void toggleMenuItemFeatured(Long id) {
+        int updated = jdbcTemplate.update("""
+                UPDATE product
+                SET featured = CASE WHEN featured = true THEN false ELSE true END
+                WHERE id = ?
+                """, id);
+        if (updated == 0) {
+            throw new IllegalArgumentException("El plato seleccionado no existe.");
+        }
     }
 
     public List<RestaurantTableRow> tables() {
@@ -571,13 +718,85 @@ public class RestaurantService {
         String categoryJoin = hasCategoryTable ? "LEFT JOIN category c ON c.id = p.category_id" : "";
         return """
                 SELECT p.id, p.name, p.description, p.image_path, p.price, p.featured, p.stock,
-                       %s
+                       %s, p.restaurant_visible, p.restaurant_available, p.restaurant_sort_order
                 FROM product p
                 %s
                 WHERE %s
                 %s
                 %s
                 """.formatted(categoryColumns, categoryJoin, whereClause, orderClause, limitClause);
+    }
+
+    private String menuItemsAdminSql(String whereClause, String orderClause) {
+        boolean hasCategoryTable = tableExists("category");
+        String categoryColumns = hasCategoryTable
+                ? "p.category_id, COALESCE(c.name, 'Carta general') AS category_name"
+                : "NULL AS category_id, 'Carta general' AS category_name";
+        String categoryJoin = hasCategoryTable ? "LEFT JOIN category c ON c.id = p.category_id" : "";
+        return """
+                SELECT p.id, p.name, p.description, p.image_path, p.price, p.active, p.featured, p.stock, p.minimum_stock,
+                       %s, p.restaurant_visible, p.restaurant_available, p.restaurant_sort_order
+                FROM product p
+                %s
+                %s
+                %s
+                """.formatted(categoryColumns, categoryJoin, whereClause == null ? "" : whereClause, orderClause == null ? "" : orderClause);
+    }
+
+    private Long resolveCategoryId(Long categoryId, String newCategoryName) {
+        String cleanNewCategory = newCategoryName == null ? "" : newCategoryName.trim();
+        if (!cleanNewCategory.isBlank()) {
+            return ensureProductCategory(cleanNewCategory);
+        }
+        return categoryId;
+    }
+
+    private Long ensureProductCategory(String name) {
+        if (!tableExists("category")) {
+            return null;
+        }
+        Long existing = jdbcTemplate.query("""
+                SELECT id
+                FROM category
+                WHERE LOWER(name) = LOWER(?)
+                  AND type = 'PRODUCT'
+                LIMIT 1
+                """, rs -> rs.next() ? rs.getLong(1) : null, name);
+        if (existing != null) {
+            return existing;
+        }
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement("""
+                    INSERT INTO category
+                    (name, description, type, active, cost_behavior, include_in_break_even, include_in_operational_reading, personnel_mode, created_at)
+                    VALUES (?, 'Categoría de carta restaurante', 'PRODUCT', true, 'NON_OPERATING', false, false, 'NONE', NOW())
+                    """, Statement.RETURN_GENERATED_KEYS);
+            ps.setString(1, name);
+            return ps;
+        }, keyHolder);
+        return Objects.requireNonNull(keyHolder.getKey()).longValue();
+    }
+
+    private String requireText(String value, String message) {
+        String clean = value == null ? "" : value.trim();
+        if (clean.isBlank()) {
+            throw new IllegalArgumentException(message);
+        }
+        return clean;
+    }
+
+    private BigDecimal money(BigDecimal value) {
+        BigDecimal clean = value == null ? BigDecimal.ZERO : value;
+        if (clean.compareTo(BigDecimal.ZERO) < 0) {
+            clean = BigDecimal.ZERO;
+        }
+        return clean.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal nonNegative(BigDecimal value) {
+        BigDecimal clean = value == null ? BigDecimal.ZERO : value;
+        return clean.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : clean;
     }
 
     private boolean tableExists(String tableName) {
@@ -635,7 +854,29 @@ public class RestaurantService {
                 rs.getBoolean("featured"),
                 rs.getBigDecimal("stock"),
                 nullableLong(rs, "category_id"),
-                rs.getString("category_name")
+                rs.getString("category_name"),
+                rs.getBoolean("restaurant_visible"),
+                rs.getBoolean("restaurant_available"),
+                rs.getInt("restaurant_sort_order")
+        );
+    }
+
+    private RowMapper<RestaurantMenuAdminRow> menuAdminMapper() {
+        return (rs, rowNum) -> new RestaurantMenuAdminRow(
+                rs.getLong("id"),
+                rs.getString("name"),
+                rs.getString("description"),
+                rs.getString("image_path"),
+                rs.getBigDecimal("price"),
+                rs.getBoolean("active"),
+                rs.getBoolean("featured"),
+                rs.getBigDecimal("stock"),
+                rs.getBigDecimal("minimum_stock"),
+                nullableLong(rs, "category_id"),
+                rs.getString("category_name"),
+                rs.getBoolean("restaurant_visible"),
+                rs.getBoolean("restaurant_available"),
+                rs.getInt("restaurant_sort_order")
         );
     }
 

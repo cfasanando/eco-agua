@@ -109,7 +109,12 @@
                             <td><span class="badge text-bg-light text-dark" th:text="${order.paymentLabel()}">Pago</span></td>
                             <td th:text="${order.paidAt() == null ? '-' : #temporals.format(order.paidAt(), 'HH:mm')}">hora</td>
                             <td class="text-end fw-semibold">S/ <span th:text="${#numbers.formatDecimal(order.safeSubtotal(),1,2)}">0.00</span></td>
-                            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" th:href="@{/admin/restaurant/orders/{id}(id=${order.id()})}">Ver</a></td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <a class="btn btn-outline-primary" target="_blank" th:href="@{/admin/restaurant/orders/{id}/receipt(id=${order.id()})}">Recibo</a>
+                                    <a class="btn btn-outline-secondary" th:href="@{/admin/restaurant/orders/{id}(id=${order.id()})}">Ver</a>
+                                </div>
+                            </td>
                         </tr>
                         <tr th:if="${paidOrders.isEmpty()}"><td colspan="6" class="text-muted text-center py-4">No hay comandas cobradas en esta fecha.</td></tr>
                         </tbody>

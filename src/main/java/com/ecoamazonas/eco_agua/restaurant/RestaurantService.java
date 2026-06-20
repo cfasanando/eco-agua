@@ -139,6 +139,25 @@ public class RestaurantService {
                 """, cashOrderMapper(), targetDate);
     }
 
+
+    public RestaurantCashOrderRow cashOrder(Long orderId) {
+        try {
+            return jdbcTemplate.queryForObject("""
+                    SELECT o.id, o.order_code, o.service_type, o.table_id, t.name AS table_name,
+                           o.customer_name, o.customer_phone, o.status, o.subtotal, o.payment_method,
+                           o.created_at, o.paid_at, COALESCE(COUNT(i.id), 0) AS item_count
+                    FROM restaurant_order o
+                    LEFT JOIN restaurant_table t ON t.id = o.table_id
+                    LEFT JOIN restaurant_order_item i ON i.order_id = o.id
+                    WHERE o.id = ?
+                    GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone,
+                             o.status, o.subtotal, o.payment_method, o.created_at, o.paid_at
+                    """, cashOrderMapper(), orderId);
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
+    }
+
     public List<RestaurantOrderRow> openOrdersForCash() {
         return jdbcTemplate.query("""
                 SELECT o.id, o.order_code, o.service_type, o.table_id, t.name AS table_name,

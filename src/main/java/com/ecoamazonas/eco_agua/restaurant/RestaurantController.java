@@ -376,6 +376,57 @@ public class RestaurantController {
         return "redirect:/admin/restaurant/orders/" + orderId;
     }
 
+
+    @GetMapping("/admin/restaurant/orders/{id}/kitchen-ticket")
+    public String kitchenTicket(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
+        ensureRestaurantRuntimeReady();
+        RestaurantOrderRow order = restaurantService.order(id);
+        if (order == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "La comanda seleccionada no existe.");
+            return "redirect:/admin/restaurant/kitchen";
+        }
+        model.addAttribute("activePage", "restaurant_kitchen");
+        model.addAttribute("order", order);
+        model.addAttribute("items", restaurantService.orderItems(id));
+        model.addAttribute("generatedAt", java.time.LocalDateTime.now());
+        addPrintableRestaurantAttributes(model);
+        return "admin/restaurant/kitchen_ticket";
+    }
+
+    @GetMapping("/admin/restaurant/orders/{id}/bill")
+    public String bill(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
+        ensureRestaurantRuntimeReady();
+        RestaurantOrderRow order = restaurantService.order(id);
+        if (order == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "La comanda seleccionada no existe.");
+            return "redirect:/admin/restaurant/dashboard";
+        }
+        model.addAttribute("activePage", "restaurant_cash");
+        model.addAttribute("order", order);
+        model.addAttribute("items", restaurantService.orderItems(id));
+        model.addAttribute("generatedAt", java.time.LocalDateTime.now());
+        addPrintableRestaurantAttributes(model);
+        return "admin/restaurant/bill";
+    }
+
+    @GetMapping("/admin/restaurant/orders/{id}/receipt")
+    public String receipt(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
+        ensureRestaurantRuntimeReady();
+        RestaurantOrderRow order = restaurantService.order(id);
+        if (order == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "La comanda seleccionada no existe.");
+            return "redirect:/admin/restaurant/cash";
+        }
+        RestaurantCashOrderRow paidOrder = restaurantService.cashOrder(id);
+        model.addAttribute("activePage", "restaurant_cash");
+        model.addAttribute("order", order);
+        model.addAttribute("paidOrder", paidOrder);
+        model.addAttribute("items", restaurantService.orderItems(id));
+        model.addAttribute("generatedAt", java.time.LocalDateTime.now());
+        addPrintableRestaurantAttributes(model);
+        return "admin/restaurant/receipt";
+    }
+
     @GetMapping("/admin/restaurant/kitchen")
     public String kitchen(Model model) {
         ensureRestaurantRuntimeReady();
@@ -412,7 +463,7 @@ public class RestaurantController {
             ensureRestaurantRuntimeReady();
             restaurantService.payOrder(id, paymentMethod);
             redirectAttributes.addFlashAttribute("successMessage", "Comanda paid and table released.");
-            return "redirect:/admin/restaurant/dashboard";
+            return "redirect:/admin/restaurant/orders/" + id + "/receipt";
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
             return "redirect:/admin/restaurant/orders/" + id;
@@ -435,6 +486,14 @@ public class RestaurantController {
 
     private void ensureRestaurantRuntimeReady() {
         restaurantModuleInstaller.installAndActivate(true);
+    }
+
+
+    private void addPrintableRestaurantAttributes(Model model) {
+        model.addAttribute("businessName", setting("platform.name", businessProperties.getName()));
+        model.addAttribute("businessTagline", setting("platform.tagline", businessProperties.getTagline()));
+        model.addAttribute("platformLogo", setting("platform.logo", businessProperties.getLogo()));
+        model.addAttribute("whatsappNumber", setting("public.whatsapp.number", businessProperties.getWhatsappNumber()));
     }
 
     private void addPublicRestaurantAttributes(Model model, RestaurantPublicTableContext tableContext, String publicMenuUrl) {

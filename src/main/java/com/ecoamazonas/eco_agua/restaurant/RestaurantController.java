@@ -97,10 +97,12 @@ public class RestaurantController {
 
 
     @GetMapping("/admin/restaurant/menu-items")
-    public String menuItems(Model model) {
+    public String menuItems(@RequestParam(defaultValue = "ALL") String stockFilter, Model model) {
         ensureRestaurantRuntimeReady();
         model.addAttribute("activePage", "restaurant_menu_items");
-        model.addAttribute("items", restaurantService.menuItemsAdmin());
+        model.addAttribute("currentStockFilter", normalizeStockFilter(stockFilter));
+        model.addAttribute("stockSummary", restaurantService.stockSummary());
+        model.addAttribute("items", restaurantService.menuItemsAdmin(stockFilter));
         return "admin/restaurant/menu_items";
     }
 
@@ -196,6 +198,20 @@ public class RestaurantController {
             ensureRestaurantRuntimeReady();
             restaurantService.toggleMenuItemAvailability(id);
             redirectAttributes.addFlashAttribute("successMessage", "Disponibilidad actualizada.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/menu-items";
+    }
+
+    @PostMapping("/admin/restaurant/menu-items/{id}/stock")
+    public String replenishMenuItemStock(@PathVariable Long id,
+                                         @RequestParam(required = false) BigDecimal quantity,
+                                         RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.replenishMenuItemStock(id, quantity);
+            redirectAttributes.addFlashAttribute("successMessage", "Stock repuesto y plato marcado como disponible.");
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
         }
@@ -461,6 +477,14 @@ public class RestaurantController {
         boolean defaultHttp = "http".equalsIgnoreCase(request.getScheme()) && port == 80;
         boolean defaultHttps = "https".equalsIgnoreCase(request.getScheme()) && port == 443;
         return defaultHttp || defaultHttps ? "" : ":" + port;
+    }
+
+    private String normalizeStockFilter(String value) {
+        String clean = value == null ? "ALL" : value.trim().toUpperCase();
+        return switch (clean) {
+            case "AVAILABLE", "LOW", "OUT", "HIDDEN" -> clean;
+            default -> "ALL";
+        };
     }
 
     private boolean isChecked(String value) {

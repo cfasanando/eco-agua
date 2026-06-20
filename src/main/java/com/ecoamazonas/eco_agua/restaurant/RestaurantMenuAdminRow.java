@@ -43,14 +43,54 @@ public record RestaurantMenuAdminRow(
     }
 
     public String availabilityLabel() {
-        return restaurantAvailable ? "Disponible" : "Agotado";
+        if (isOutOfStock()) {
+            return "Agotado";
+        }
+        return restaurantAvailable ? "Disponible" : "Pausado";
     }
 
     public String availabilityBadge() {
+        if (isOutOfStock()) {
+            return "text-bg-danger";
+        }
         return restaurantAvailable ? "text-bg-success" : "text-bg-warning";
     }
 
     public String visibilityBadge() {
         return restaurantVisible ? "text-bg-primary" : "text-bg-secondary";
+    }
+
+    public boolean isOutOfStock() {
+        return safeStock().compareTo(BigDecimal.ZERO) <= 0;
+    }
+
+    public boolean isLowStock() {
+        return !isOutOfStock()
+                && safeMinimumStock().compareTo(BigDecimal.ZERO) > 0
+                && safeStock().compareTo(safeMinimumStock()) <= 0;
+    }
+
+    public String stockStatusLabel() {
+        if (isOutOfStock()) {
+            return "Agotado";
+        }
+        if (isLowStock()) {
+            return "Stock bajo";
+        }
+        return "Stock OK";
+    }
+
+    public String stockStatusBadge() {
+        if (isOutOfStock()) {
+            return "text-bg-danger";
+        }
+        if (isLowStock()) {
+            return "text-bg-warning";
+        }
+        return "text-bg-success";
+    }
+
+    public boolean canBeSold() {
+        return active && restaurantVisible && restaurantAvailable && !isOutOfStock();
     }
 }

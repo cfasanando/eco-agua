@@ -155,13 +155,48 @@ public class RestaurantService {
 
     public List<RestaurantMenuItemRow> menuItems() {
         return jdbcTemplate.query(menuItemsSql(
-                "p.active = true AND p.restaurant_visible = true AND p.restaurant_available = true",
+                "p.active = true AND p.restaurant_visible = true AND p.restaurant_available = true AND COALESCE(p.stock, 0) > 0",
                 "ORDER BY category_name ASC, p.restaurant_sort_order ASC, p.featured DESC, p.name ASC",
                 ""), menuMapper());
     }
 
     public List<RestaurantMenuAdminRow> menuItemsAdmin() {
-        return jdbcTemplate.query(menuItemsAdminSql("", "ORDER BY category_name ASC, p.restaurant_sort_order ASC, p.name ASC"), menuAdminMapper());
+        return menuItemsAdmin("ALL");
+    }
+
+    public List<RestaurantMenuAdminRow> menuItemsAdmin(String stockFilter) {
+        String cleanFilter = stockFilter == null ? "ALL" : stockFilter.trim().toUpperCase();
+        String whereClause = switch (cleanFilter) {
+            case "AVAILABLE" -> "WHERE p.active = true AND p.restaurant_visible = true AND p.restaurant_available = true AND COALESCE(p.stock, 0) > 0";
+            case "LOW" -> "WHERE p.active = true AND COALESCE(p.stock, 0) > 0 AND COALESCE(p.minimum_stock, 0) > 0 AND COALESCE(p.stock, 0) <= COALESCE(p.minimum_stock, 0)";
+            case "OUT" -> "WHERE COALESCE(p.stock, 0) <= 0 OR p.restaurant_available = false";
+            case "HIDDEN" -> "WHERE p.active = false OR p.restaurant_visible = false";
+            default -> "";
+        };
+        return jdbcTemplate.query(menuItemsAdminSql(whereClause, "ORDER BY category_name ASC, p.restaurant_sort_order ASC, p.name ASC"), menuAdminMapper());
+    }
+
+    public RestaurantStockSummary stockSummary() {
+        int totalItems = count("SELECT COUNT(*) FROM product");
+        int availableItems = count("""
+                SELECT COUNT(*)
+                FROM product
+                WHERE active = true
+                  AND restaurant_visible = true
+                  AND restaurant_available = true
+                  AND COALESCE(stock, 0) > 0
+                """);
+        int lowStockItems = count("""
+                SELECT COUNT(*)
+                FROM product
+                WHERE active = true
+                  AND COALESCE(stock, 0) > 0
+                  AND COALESCE(minimum_stock, 0) > 0
+                  AND COALESCE(stock, 0) <= COALESCE(minimum_stock, 0)
+                """);
+        int outOfStockItems = count("SELECT COUNT(*) FROM product WHERE COALESCE(stock, 0) <= 0 OR restaurant_available = false");
+        int hiddenItems = count("SELECT COUNT(*) FROM product WHERE active = false OR restaurant_visible = false");
+        return new RestaurantStockSummary(totalItems, availableItems, lowStockItems, outOfStockItems, hiddenItems);
     }
 
     public RestaurantMenuAdminRow menuItemAdmin(Long id) {
@@ -203,7 +238,7 @@ public class RestaurantService {
 
     public List<RestaurantMenuItemRow> featuredMenuItems() {
         return jdbcTemplate.query(menuItemsSql(
-                "p.active = true AND p.restaurant_visible = true AND p.restaurant_available = true AND p.featured = true",
+                "p.active = true AND p.restaurant_visible = true AND p.restaurant_available = true AND COALESCE(p.stock, 0) > 0 AND p.featured = true",
                 "ORDER BY category_name ASC, p.restaurant_sort_order ASC, p.name ASC",
                 "LIMIT 8"), menuMapper());
     }
@@ -224,6 +259,9 @@ public class RestaurantService {
                                int sortOrder) {
         String cleanName = requireText(name, "Ingresa el nombre del plato.");
         BigDecimal cleanPrice = money(price);
+        BigDecimal cleanStock = nonNegative(stock);
+        BigDecimal cleanMinimumStock = nonNegative(minimumStock);
+        boolean cleanRestaurantAvailable = restaurantAvailable && cleanStock.compareTo(BigDecimal.ZERO) > 0;
         Long resolvedCategoryId = resolveCategoryId(categoryId, newCategoryName);
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
@@ -244,10 +282,10 @@ public class RestaurantService {
             ps.setBigDecimal(5, cleanPrice);
             ps.setBoolean(6, active);
             ps.setBoolean(7, featured);
-            ps.setBigDecimal(8, nonNegative(stock));
-            ps.setBigDecimal(9, nonNegative(minimumStock));
+            ps.setBigDecimal(8, cleanStock);
+            ps.setBigDecimal(9, cleanMinimumStock);
             ps.setBoolean(10, restaurantVisible);
-            ps.setBoolean(11, restaurantAvailable);
+            ps.setBoolean(11, cleanRestaurantAvailable);
             ps.setInt(12, Math.max(0, sortOrder));
             return ps;
         }, keyHolder);
@@ -271,6 +309,9 @@ public class RestaurantService {
                                int sortOrder) {
         String cleanName = requireText(name, "Ingresa el nombre del plato.");
         BigDecimal cleanPrice = money(price);
+        BigDecimal cleanStock = nonNegative(stock);
+        BigDecimal cleanMinimumStock = nonNegative(minimumStock);
+        boolean cleanRestaurantAvailable = restaurantAvailable && cleanStock.compareTo(BigDecimal.ZERO) > 0;
         Long resolvedCategoryId = resolveCategoryId(categoryId, newCategoryName);
         int updated = jdbcTemplate.update("""
                 UPDATE product
@@ -279,7 +320,7 @@ public class RestaurantService {
                 WHERE id = ?
                 """,
                 cleanName, blankToNull(description), blankToNull(imagePath), resolvedCategoryId, cleanPrice, active, featured,
-                nonNegative(stock), nonNegative(minimumStock), restaurantVisible, restaurantAvailable, Math.max(0, sortOrder), id);
+                cleanStock, cleanMinimumStock, restaurantVisible, cleanRestaurantAvailable, Math.max(0, sortOrder), id);
         if (updated == 0) {
             throw new IllegalArgumentException("El plato seleccionado no existe.");
         }
@@ -287,14 +328,35 @@ public class RestaurantService {
 
     @Transactional
     public void toggleMenuItemAvailability(Long id) {
-        int updated = jdbcTemplate.update("""
-                UPDATE product
-                SET restaurant_available = CASE WHEN restaurant_available = true THEN false ELSE true END
-                WHERE id = ?
-                """, id);
-        if (updated == 0) {
+        RestaurantMenuAdminRow item = menuItemAdmin(id);
+        if (item == null) {
             throw new IllegalArgumentException("El plato seleccionado no existe.");
         }
+        if (item.restaurantAvailable()) {
+            jdbcTemplate.update("UPDATE product SET restaurant_available = false WHERE id = ?", id);
+            return;
+        }
+        if (item.safeStock().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Repón stock antes de volver a marcar el plato como disponible.");
+        }
+        jdbcTemplate.update("UPDATE product SET restaurant_available = true WHERE id = ?", id);
+    }
+
+    @Transactional
+    public void replenishMenuItemStock(Long id, BigDecimal quantity) {
+        RestaurantMenuAdminRow item = menuItemAdmin(id);
+        if (item == null) {
+            throw new IllegalArgumentException("El plato seleccionado no existe.");
+        }
+        BigDecimal cleanQuantity = nonNegative(quantity);
+        if (cleanQuantity.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Ingresa una cantidad mayor a cero para reponer stock.");
+        }
+        jdbcTemplate.update("""
+                UPDATE product
+                SET stock = COALESCE(stock, 0) + ?, restaurant_available = true, active = true
+                WHERE id = ?
+                """, cleanQuantity, id);
     }
 
     @Transactional
@@ -452,7 +514,7 @@ public class RestaurantService {
 
     public void updateTableStatus(Long tableId, String status) {
         String cleanStatus = normalize(status, VALID_TABLE_STATUSES, "FREE");
-        jdbcTemplate.update("UPDATE restaurant_table SET status = ?, updated_at = NOW() WHERE id = ?", cleanStatus, tableId);
+        jdbcTemplate.update("UPDATE restaurant_table SET status = ? WHERE id = ?", cleanStatus, tableId);
     }
 
     @Transactional
@@ -473,9 +535,7 @@ public class RestaurantService {
         }
 
         List<RestaurantMenuItemRow> selectedItems = selectedMenuItems(quantities);
-        if (selectedItems.isEmpty()) {
-            throw new IllegalArgumentException("Los productos seleccionados ya no están disponibles.");
-        }
+        assertSelectedProductsAvailable(selectedItems, quantities);
 
         Long finalTableId = "DINE_IN".equals(cleanServiceType) ? tableId : null;
         if (finalTableId != null) {
@@ -510,7 +570,7 @@ public class RestaurantService {
         insertOrderItems(orderId, selectedItems, quantities);
 
         if (finalTableId != null) {
-            jdbcTemplate.update("UPDATE restaurant_table SET status = 'OCCUPIED', updated_at = NOW() WHERE id = ?", finalTableId);
+            jdbcTemplate.update("UPDATE restaurant_table SET status = 'OCCUPIED' WHERE id = ?", finalTableId);
         }
 
         return orderId;
@@ -525,19 +585,25 @@ public class RestaurantService {
         }
 
         List<RestaurantMenuItemRow> selectedItems = selectedMenuItems(quantities);
-        if (selectedItems.isEmpty()) {
-            throw new IllegalArgumentException("Los productos seleccionados ya no están disponibles.");
-        }
+        assertSelectedProductsAvailable(selectedItems, quantities);
 
         insertOrderItems(orderId, selectedItems, quantities);
         recalculateOrderTotal(orderId);
-        jdbcTemplate.update("UPDATE restaurant_order SET status = CASE WHEN status = 'NEW' THEN 'IN_KITCHEN' ELSE status END, updated_at = NOW() WHERE id = ?", orderId);
+        jdbcTemplate.update("UPDATE restaurant_order SET status = CASE WHEN status = 'NEW' THEN 'IN_KITCHEN' ELSE status END WHERE id = ?", orderId);
     }
 
     @Transactional
     public void updateItemQuantity(Long orderId, Long itemId, int quantity) {
         assertOrderEditable(orderId);
         int cleanQuantity = Math.max(1, Math.min(quantity, 99));
+        RestaurantOrderItemStock item = orderItemForStock(orderId, itemId);
+        int delta = cleanQuantity - item.quantity();
+        if (delta > 0) {
+            reserveProductStock(item.productId(), item.productName(), delta);
+        } else if (delta < 0) {
+            restoreProductStock(item.productId(), Math.abs(delta));
+        }
+
         int updated = jdbcTemplate.update("""
                 UPDATE restaurant_order_item
                 SET quantity = ?, line_total = unit_price * ?, kitchen_status = CASE WHEN kitchen_status = 'READY' THEN 'PENDING' ELSE kitchen_status END
@@ -552,13 +618,15 @@ public class RestaurantService {
     @Transactional
     public void removeItem(Long orderId, Long itemId) {
         assertOrderEditable(orderId);
+        if (count("SELECT COUNT(*) FROM restaurant_order_item WHERE order_id = " + orderId) <= 1) {
+            throw new IllegalArgumentException("La comanda debe mantener al menos un producto.");
+        }
+        RestaurantOrderItemStock item = orderItemForStock(orderId, itemId);
         int deleted = jdbcTemplate.update("DELETE FROM restaurant_order_item WHERE id = ? AND order_id = ?", itemId, orderId);
         if (deleted == 0) {
             throw new IllegalArgumentException("No se encontró el producto dentro de la comanda.");
         }
-        if (count("SELECT COUNT(*) FROM restaurant_order_item WHERE order_id = " + orderId) == 0) {
-            throw new IllegalArgumentException("La comanda debe mantener al menos un producto.");
-        }
+        restoreProductStock(item.productId(), item.quantity());
         recalculateOrderTotal(orderId);
     }
 
@@ -579,7 +647,7 @@ public class RestaurantService {
             throw new IllegalArgumentException("No se puede cambiar una comanda cerrada.");
         }
 
-        jdbcTemplate.update("UPDATE restaurant_order SET status = ?, updated_at = NOW() WHERE id = ?", cleanStatus, orderId);
+        jdbcTemplate.update("UPDATE restaurant_order SET status = ? WHERE id = ?", cleanStatus, orderId);
         if ("READY".equals(cleanStatus)) {
             jdbcTemplate.update("UPDATE restaurant_order_item SET kitchen_status = 'READY' WHERE order_id = ?", orderId);
         }
@@ -598,7 +666,7 @@ public class RestaurantService {
         String cleanPaymentMethod = normalize(paymentMethod, VALID_PAYMENT_METHODS, "CASH");
         jdbcTemplate.update("""
                 UPDATE restaurant_order
-                SET status = 'PAID', payment_method = ?, paid_at = NOW(), updated_at = NOW()
+                SET status = 'PAID', payment_method = ?, paid_at = NOW()
                 WHERE id = ?
                 """, cleanPaymentMethod, orderId);
         releaseTableForOrder(orderId);
@@ -610,19 +678,89 @@ public class RestaurantService {
         if ("PAID".equals(order.safeStatus())) {
             throw new IllegalArgumentException("No se puede anular una comanda pagada desde esta pantalla.");
         }
-        jdbcTemplate.update("UPDATE restaurant_order SET status = 'CANCELLED', updated_at = NOW() WHERE id = ?", orderId);
+        restoreOrderStock(orderId);
+        jdbcTemplate.update("UPDATE restaurant_order SET status = 'CANCELLED' WHERE id = ?", orderId);
         releaseTableForOrder(orderId);
     }
 
     private void insertOrderItems(Long orderId, List<RestaurantMenuItemRow> selectedItems, Map<Long, Integer> quantities) {
         for (RestaurantMenuItemRow item : selectedItems) {
             int quantity = quantities.get(item.id());
+            reserveProductStock(item.id(), item.name(), quantity);
             BigDecimal lineTotal = item.price().multiply(BigDecimal.valueOf(quantity));
             jdbcTemplate.update("""
                     INSERT INTO restaurant_order_item
                     (order_id, product_id, product_name, quantity, unit_price, line_total, kitchen_status)
                     VALUES (?, ?, ?, ?, ?, ?, 'PENDING')
                     """, orderId, item.id(), item.name(), quantity, item.price(), lineTotal);
+        }
+    }
+
+    private void assertSelectedProductsAvailable(List<RestaurantMenuItemRow> selectedItems, Map<Long, Integer> quantities) {
+        if (selectedItems.isEmpty() || selectedItems.size() != quantities.size()) {
+            throw new IllegalArgumentException("Uno o más platos ya no están disponibles en carta.");
+        }
+        for (RestaurantMenuItemRow item : selectedItems) {
+            int requestedQuantity = quantities.getOrDefault(item.id(), 0);
+            if (requestedQuantity <= 0) {
+                continue;
+            }
+            if (item.safeStock().compareTo(BigDecimal.valueOf(requestedQuantity)) < 0) {
+                throw new IllegalArgumentException("Stock insuficiente para " + item.name() + ". Disponible: " + item.safeStock().stripTrailingZeros().toPlainString() + ".");
+            }
+        }
+    }
+
+    private void reserveProductStock(Long productId, String productName, int quantity) {
+        if (productId == null || quantity <= 0) {
+            return;
+        }
+        int updated = jdbcTemplate.update("""
+                UPDATE product
+                SET stock = COALESCE(stock, 0) - ?,
+                    restaurant_available = CASE WHEN COALESCE(stock, 0) - ? <= 0 THEN false ELSE restaurant_available END
+                WHERE id = ?
+                  AND active = true
+                  AND restaurant_visible = true
+                  AND restaurant_available = true
+                  AND COALESCE(stock, 0) >= ?
+                """, quantity, quantity, productId, quantity);
+        if (updated == 0) {
+            throw new IllegalArgumentException("Stock insuficiente o plato agotado: " + productName + ".");
+        }
+    }
+
+    private void restoreProductStock(Long productId, int quantity) {
+        if (productId == null || quantity <= 0) {
+            return;
+        }
+        jdbcTemplate.update("""
+                UPDATE product
+                SET stock = COALESCE(stock, 0) + ?
+                WHERE id = ?
+                """, quantity, productId);
+    }
+
+    private void restoreOrderStock(Long orderId) {
+        List<RestaurantOrderItemStock> items = jdbcTemplate.query("""
+                SELECT id, order_id, product_id, product_name, quantity
+                FROM restaurant_order_item
+                WHERE order_id = ?
+                """, orderItemStockMapper(), orderId);
+        for (RestaurantOrderItemStock item : items) {
+            restoreProductStock(item.productId(), item.quantity());
+        }
+    }
+
+    private RestaurantOrderItemStock orderItemForStock(Long orderId, Long itemId) {
+        try {
+            return jdbcTemplate.queryForObject("""
+                    SELECT id, order_id, product_id, product_name, quantity
+                    FROM restaurant_order_item
+                    WHERE id = ? AND order_id = ?
+                    """, orderItemStockMapper(), itemId, orderId);
+        } catch (EmptyResultDataAccessException ex) {
+            throw new IllegalArgumentException("No se encontró el producto dentro de la comanda.");
         }
     }
 
@@ -647,7 +785,7 @@ public class RestaurantService {
                     SELECT SUM(line_total)
                     FROM restaurant_order_item
                     WHERE order_id = ?
-                ), 0), updated_at = NOW()
+                ), 0)
                 WHERE id = ?
                 """, orderId, orderId);
     }
@@ -655,7 +793,7 @@ public class RestaurantService {
     private void releaseTableForOrder(Long orderId) {
         Long tableId = jdbcTemplate.query("SELECT table_id FROM restaurant_order WHERE id = ?", rs -> rs.next() ? nullableLong(rs, "table_id") : null, orderId);
         if (tableId != null && tableId > 0) {
-            jdbcTemplate.update("UPDATE restaurant_table SET status = 'FREE', updated_at = NOW() WHERE id = ?", tableId);
+            jdbcTemplate.update("UPDATE restaurant_table SET status = 'FREE' WHERE id = ?", tableId);
         }
     }
 
@@ -959,6 +1097,16 @@ public class RestaurantService {
                 toLocalDateTime(rs.getTimestamp("created_at")),
                 toLocalDateTime(rs.getTimestamp("paid_at")),
                 rs.getInt("item_count")
+        );
+    }
+
+    private RowMapper<RestaurantOrderItemStock> orderItemStockMapper() {
+        return (rs, rowNum) -> new RestaurantOrderItemStock(
+                rs.getLong("id"),
+                rs.getLong("order_id"),
+                nullableLong(rs, "product_id"),
+                rs.getString("product_name"),
+                rs.getInt("quantity")
         );
     }
 

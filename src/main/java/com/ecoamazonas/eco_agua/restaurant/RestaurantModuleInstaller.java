@@ -30,9 +30,10 @@ public class RestaurantModuleInstaller {
                 FROM information_schema.tables
                 WHERE table_schema = DATABASE()
                   AND table_name IN ('restaurant_table', 'restaurant_order', 'restaurant_order_item', 'restaurant_table_request',
-                                     'restaurant_qr_order', 'restaurant_qr_order_item', 'restaurant_reservation')
+                                     'restaurant_qr_order', 'restaurant_qr_order_item', 'restaurant_reservation',
+                                     'restaurant_ingredient', 'restaurant_recipe_item')
                 """, Integer.class);
-        return count != null && count == 7;
+        return count != null && count == 9;
     }
 
     @Transactional
@@ -61,7 +62,7 @@ public class RestaurantModuleInstaller {
                 "false",
                 "boolean",
                 "system_modules",
-                "Módulo Restaurante / carta digital, reservas, mesas, comandas y cocina"
+                "Módulo Restaurante / carta digital, reservas, mesas, comandas, recetas y cocina"
         );
         setting.setValue(Boolean.toString(enabled));
         platformSettingRepository.save(setting);
@@ -79,6 +80,42 @@ public class RestaurantModuleInstaller {
 
     private void createTables() {
         ensureProductTableForRestaurant();
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS restaurant_ingredient (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    name VARCHAR(180) NOT NULL,
+                    unit_code VARCHAR(20) NOT NULL DEFAULT 'UNIT',
+                    unit_cost DECIMAL(14,4) NOT NULL DEFAULT 0.0000,
+                    stock DECIMAL(14,4) NOT NULL DEFAULT 0.0000,
+                    minimum_stock DECIMAL(14,4) NOT NULL DEFAULT 0.0000,
+                    active TINYINT(1) NOT NULL DEFAULT 1,
+                    notes VARCHAR(1000) NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_restaurant_ingredient_name (name),
+                    KEY idx_restaurant_ingredient_active (active),
+                    KEY idx_restaurant_ingredient_stock (stock, minimum_stock)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS restaurant_recipe_item (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    product_id BIGINT NOT NULL,
+                    ingredient_id BIGINT NOT NULL,
+                    quantity DECIMAL(14,4) NOT NULL DEFAULT 0.0000,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_restaurant_recipe_product_ingredient (product_id, ingredient_id),
+                    KEY idx_restaurant_recipe_product (product_id),
+                    KEY idx_restaurant_recipe_ingredient (ingredient_id),
+                    CONSTRAINT fk_restaurant_recipe_ingredient FOREIGN KEY (ingredient_id)
+                        REFERENCES restaurant_ingredient(id) ON DELETE RESTRICT
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
 
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_table (
@@ -325,7 +362,7 @@ public class RestaurantModuleInstaller {
                 INSERT INTO platform_module_catalog
                 (`module_key`, `name`, `area`, `description`, `default_enabled`, `configurable`, `active`, `display_order`, `created_at`, `updated_at`)
                 VALUES ('restaurant', 'Restaurante / carta y comandas', 'Operación restaurante',
-                        'Carta digital, reservas, mesas, comandas, pedidos para llevar, delivery y pantalla de cocina.', 0, 1, 1, 10, NOW(), NOW())
+                        'Carta digital, reservas, mesas, comandas, pedidos para llevar, delivery, ingredientes, recetas y cocina.', 0, 1, 1, 10, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
                     `name` = VALUES(`name`),
                     area = VALUES(area),

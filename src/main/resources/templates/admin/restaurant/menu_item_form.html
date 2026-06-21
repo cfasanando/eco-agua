@@ -70,15 +70,15 @@
                         <div class="card-body">
                             <label class="form-label">Precio de venta</label>
                             <input name="price" type="number" step="0.01" min="0" class="form-control mb-3" required
-                                   th:value="${item != null ? item.safePrice() : '0.00'}">
+                                   th:value="${item != null ? item.priceDisplay() : '0.00'}">
 
                             <label class="form-label">Stock referencial</label>
                             <input name="stock" type="number" step="0.01" min="0" class="form-control mb-3"
-                                   th:value="${item != null ? item.safeStock() : '0.00'}">
+                                   th:value="${item != null ? item.stockDisplay() : '0'}">
 
                             <label class="form-label">Stock mínimo</label>
                             <input name="minimumStock" type="number" step="0.01" min="0" class="form-control mb-3"
-                                   th:value="${item != null ? item.safeMinimumStock() : '0.00'}">
+                                   th:value="${item != null ? item.minimumStockDisplay() : '0'}">
 
                             <label class="form-label">Orden en carta</label>
                             <input name="sortOrder" type="number" min="0" class="form-control mb-3"
@@ -108,6 +108,10 @@
                             <button class="btn btn-primary w-100">
                                 <i class="bi bi-save"></i> Guardar plato
                             </button>
+                            <a th:if="${item != null}" th:href="@{/admin/restaurant/menu-items/{id}/recipe(id=${item.id()})}"
+                               class="btn btn-outline-dark w-100 mt-2">
+                                <i class="bi bi-journal-text"></i> Editar receta y costos
+                            </a>
                         </div>
                     </div>
 

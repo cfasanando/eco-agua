@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead(${formTitle})"></head>
+<body class="bg-light">
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                    <h1 class="h4 mb-1" th:text="${formTitle}">Nuevo ingrediente</h1>
+                    <p class="text-muted small mb-0">Define la unidad de uso, el costo unitario y el stock referencial.</p>
+                </div>
+                <a th:href="@{/admin/restaurant/ingredients}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Volver a ingredientes
+                </a>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show">
+                <span th:text="${successMessage}">OK</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show">
+                <span th:text="${errorMessage}">Error</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+
+            <form th:action="${formAction}" method="post" class="row g-3">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <div class="col-lg-8">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-white"><strong>Información del ingrediente</strong></div>
+                        <div class="card-body">
+                            <label class="form-label">Nombre</label>
+                            <input name="name" class="form-control mb-3" required maxlength="180"
+                                   th:value="${ingredient != null ? ingredient.name() : ''}"
+                                   placeholder="Ejemplo: Plátano verde">
+
+                            <label class="form-label">Unidad de medida</label>
+                            <select name="unitCode" class="form-select mb-3" required>
+                                <option th:each="unit : ${unitOptions}"
+                                        th:value="${unit.value}"
+                                        th:selected="${ingredient != null and ingredient.unitCode().equals(unit.value)}"
+                                        th:text="${unit.label}">Unidad</option>
+                            </select>
+
+                            <label class="form-label">Observaciones</label>
+                            <textarea name="notes" class="form-control" rows="4" maxlength="1000"
+                                      placeholder="Marca, presentación o detalle de compra"
+                                      th:text="${ingredient != null ? ingredient.notes() : ''}"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm border-0 mb-3">
+                        <div class="card-header bg-white"><strong>Costo y stock</strong></div>
+                        <div class="card-body">
+                            <label class="form-label">Costo por unidad de medida</label>
+                            <div class="input-group mb-3">
+                                <span class="input-group-text">S/</span>
+                                <input name="unitCost" type="number" min="0" step="0.0001" class="form-control" required
+                                       th:value="${ingredient != null ? ingredient.unitCostDisplay() : '0.00'}">
+                            </div>
+
+                            <label class="form-label">Stock referencial</label>
+                            <input name="stock" type="number" min="0" step="0.0001" class="form-control mb-3"
+                                   th:value="${ingredient != null ? ingredient.stockDisplay() : '0'}">
+
+                            <label class="form-label">Stock mínimo</label>
+                            <input name="minimumStock" type="number" min="0" step="0.0001" class="form-control mb-3"
+                                   th:value="${ingredient != null ? ingredient.minimumStockDisplay() : '0'}">
+
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="active" name="active"
+                                       th:checked="${ingredient == null or ingredient.active()}">
+                                <label class="form-check-label" for="active">Ingrediente activo</label>
+                            </div>
+
+                            <button class="btn btn-primary w-100" type="submit">
+                                <i class="bi bi-save"></i> Guardar ingrediente
+                            </button>
+                        </div>
+                    </div>
+                    <div class="alert alert-light border small">
+                        El costo debe corresponder a la unidad elegida. Ejemplo: si usas gramos, registra el costo por gramo.
+                    </div>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+<div th:replace="fragments/scripts_admin :: adminScripts"></div>
+</body>
+</html>

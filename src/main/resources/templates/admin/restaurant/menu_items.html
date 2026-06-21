@@ -13,6 +13,9 @@
                     <p class="text-muted small mb-0">Administra platos, disponibilidad, agotados y alertas de stock para la carta QR.</p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
+                    <a th:href="@{/admin/restaurant/ingredients}" class="btn btn-sm btn-outline-dark">
+                        <i class="bi bi-basket2"></i> Ingredientes
+                    </a>
                     <a th:href="@{/restaurant/menu}" target="_blank" class="btn btn-sm btn-outline-success">
                         <i class="bi bi-box-arrow-up-right"></i> Ver carta pública
                     </a>
@@ -94,6 +97,7 @@
                             <th>Plato</th>
                             <th>Categoría</th>
                             <th class="text-end">Precio</th>
+                            <th>Costo y margen</th>
                             <th class="text-center">Stock</th>
                             <th>Estado carta</th>
                             <th class="text-center">Orden</th>
@@ -115,12 +119,21 @@
                                 </div>
                             </td>
                             <td th:text="${item.categoryLabel()}">Carta general</td>
-                            <td class="text-end fw-semibold">S/ <span th:text="${#numbers.formatDecimal(item.safePrice(),1,2)}">0.00</span></td>
+                            <td class="text-end fw-semibold">S/ <span th:text="${item.priceDisplay()}">0.00</span></td>
+                            <td style="min-width:180px;">
+                                <div class="small text-muted">Costo estimado</div>
+                                <div class="fw-semibold">S/ <span th:text="${item.recipeCostDisplay()}">0.00</span></div>
+                                <div class="small" th:classappend="${item.estimatedMarginAmount().signum() < 0} ? ' text-danger' : ' text-success'">
+                                    Margen S/ <span th:text="${item.estimatedMarginAmountDisplay()}">0.00</span>
+                                    (<span th:text="${item.estimatedMarginPercentDisplay()}">0.00</span>%)
+                                </div>
+                                <span class="badge mt-1" th:classappend="${item.recipeStatusBadge()}" th:text="${item.recipeStatusLabel()}">Sin receta</span>
+                            </td>
                             <td class="text-center">
-                                <div class="fw-semibold" th:text="${#numbers.formatDecimal(item.safeStock(),1,2)}">0.00</div>
+                                <div class="fw-semibold" th:text="${item.stockDisplay()}">0.00</div>
                                 <span class="badge" th:classappend="${item.stockStatusBadge()}" th:text="${item.stockStatusLabel()}">Stock OK</span>
                                 <div class="small text-muted" th:if="${item.safeMinimumStock().intValue() > 0}">
-                                    Mín. <span th:text="${#numbers.formatDecimal(item.safeMinimumStock(),1,2)}">0.00</span>
+                                    Mín. <span th:text="${item.minimumStockDisplay()}">0.00</span>
                                 </div>
                             </td>
                             <td>
@@ -154,6 +167,9 @@
                                                 <span th:text="${item.featured()} ? 'Quitar destacado' : 'Destacar'">Destacar</span>
                                             </button>
                                         </form>
+                                        <a th:href="@{/admin/restaurant/menu-items/{id}/recipe(id=${item.id()})}" class="btn btn-sm btn-outline-dark">
+                                            <i class="bi bi-journal-text"></i> Receta
+                                        </a>
                                         <a th:href="@{/admin/restaurant/menu-items/{id}/edit(id=${item.id()})}" class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-pencil"></i> Editar
                                         </a>
@@ -176,7 +192,7 @@
                             </td>
                         </tr>
                         <tr th:if="${items.isEmpty()}">
-                            <td colspan="7" class="text-center py-5 text-muted">
+                            <td colspan="8" class="text-center py-5 text-muted">
                                 <i class="bi bi-card-list fs-2 d-block mb-2"></i>
                                 No hay platos para este filtro.
                             </td>

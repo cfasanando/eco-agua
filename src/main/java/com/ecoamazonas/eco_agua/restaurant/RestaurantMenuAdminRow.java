@@ -16,7 +16,10 @@ public record RestaurantMenuAdminRow(
         String categoryName,
         boolean restaurantVisible,
         boolean restaurantAvailable,
-        int restaurantSortOrder
+        int restaurantSortOrder,
+        BigDecimal recipeCost,
+        int recipeItemCount,
+        int recipeIssueCount
 ) {
     public BigDecimal safePrice() {
         return price == null ? BigDecimal.ZERO : price;
@@ -88,6 +91,69 @@ public record RestaurantMenuAdminRow(
             return "text-bg-warning";
         }
         return "text-bg-success";
+    }
+
+    public BigDecimal safeRecipeCost() {
+        return recipeCost == null ? BigDecimal.ZERO : recipeCost;
+    }
+
+    public String priceDisplay() {
+        return RestaurantDecimalFormat.money(safePrice());
+    }
+
+    public String stockDisplay() {
+        return RestaurantDecimalFormat.quantity(safeStock());
+    }
+
+    public String minimumStockDisplay() {
+        return RestaurantDecimalFormat.quantity(safeMinimumStock());
+    }
+
+    public String recipeCostDisplay() {
+        return RestaurantDecimalFormat.money(safeRecipeCost());
+    }
+
+    public BigDecimal estimatedMarginAmount() {
+        return safePrice().subtract(safeRecipeCost());
+    }
+
+    public BigDecimal estimatedMarginPercent() {
+        if (safePrice().compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return estimatedMarginAmount()
+                .multiply(BigDecimal.valueOf(100))
+                .divide(safePrice(), 2, java.math.RoundingMode.HALF_UP);
+    }
+
+    public String estimatedMarginAmountDisplay() {
+        return RestaurantDecimalFormat.money(estimatedMarginAmount());
+    }
+
+    public String estimatedMarginPercentDisplay() {
+        return RestaurantDecimalFormat.percentage(estimatedMarginPercent());
+    }
+
+    public boolean hasRecipe() {
+        return recipeItemCount > 0;
+    }
+
+    public boolean isRecipeComplete() {
+        return hasRecipe() && recipeIssueCount == 0;
+    }
+
+    public String recipeStatusLabel() {
+        if (!hasRecipe()) {
+            return "Sin receta";
+        }
+        return isRecipeComplete() ? "Receta completa" : "Receta incompleta";
+    }
+
+    public String recipeStatusBadge() {
+        if (!hasRecipe()) {
+            return "text-bg-secondary";
+        }
+        return isRecipeComplete() ? "text-bg-success" : "text-bg-warning";
     }
 
     public boolean canBeSold() {

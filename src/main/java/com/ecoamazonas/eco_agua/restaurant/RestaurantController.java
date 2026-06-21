@@ -432,6 +432,95 @@ public class RestaurantController {
     }
 
 
+    @GetMapping("/admin/restaurant/ingredients")
+    public String ingredients(@RequestParam(defaultValue = "ALL") String stockFilter, Model model) {
+        ensureRestaurantRuntimeReady();
+        model.addAttribute("activePage", "restaurant_ingredients");
+        model.addAttribute("currentStockFilter", normalizeIngredientFilter(stockFilter));
+        model.addAttribute("summary", restaurantService.ingredientSummary());
+        model.addAttribute("ingredients", restaurantService.ingredients(stockFilter));
+        return "admin/restaurant/ingredients";
+    }
+
+    @GetMapping("/admin/restaurant/ingredients/new")
+    public String newIngredient(Model model) {
+        ensureRestaurantRuntimeReady();
+        model.addAttribute("activePage", "restaurant_ingredients");
+        model.addAttribute("ingredient", null);
+        model.addAttribute("unitOptions", ingredientUnitOptions());
+        model.addAttribute("formAction", "/admin/restaurant/ingredients");
+        model.addAttribute("formTitle", "Nuevo ingrediente");
+        return "admin/restaurant/ingredient_form";
+    }
+
+    @GetMapping("/admin/restaurant/ingredients/{id}/edit")
+    public String editIngredient(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
+        ensureRestaurantRuntimeReady();
+        RestaurantIngredientRow ingredient = restaurantService.ingredient(id);
+        if (ingredient == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "El ingrediente seleccionado no existe.");
+            return "redirect:/admin/restaurant/ingredients";
+        }
+        model.addAttribute("activePage", "restaurant_ingredients");
+        model.addAttribute("ingredient", ingredient);
+        model.addAttribute("unitOptions", ingredientUnitOptions());
+        model.addAttribute("formAction", "/admin/restaurant/ingredients/" + id);
+        model.addAttribute("formTitle", "Editar ingrediente");
+        return "admin/restaurant/ingredient_form";
+    }
+
+    @PostMapping("/admin/restaurant/ingredients")
+    public String createIngredient(@RequestParam String name,
+                                   @RequestParam(defaultValue = "UNIT") String unitCode,
+                                   @RequestParam(required = false) BigDecimal unitCost,
+                                   @RequestParam(required = false) BigDecimal stock,
+                                   @RequestParam(required = false) BigDecimal minimumStock,
+                                   @RequestParam(required = false) String active,
+                                   @RequestParam(required = false) String notes,
+                                   RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            Long id = restaurantService.createIngredient(name, unitCode, unitCost, stock, minimumStock, isChecked(active), notes);
+            redirectAttributes.addFlashAttribute("successMessage", "Ingrediente creado correctamente.");
+            return "redirect:/admin/restaurant/ingredients/" + id + "/edit";
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            return "redirect:/admin/restaurant/ingredients/new";
+        }
+    }
+
+    @PostMapping("/admin/restaurant/ingredients/{id}")
+    public String updateIngredient(@PathVariable Long id,
+                                   @RequestParam String name,
+                                   @RequestParam(defaultValue = "UNIT") String unitCode,
+                                   @RequestParam(required = false) BigDecimal unitCost,
+                                   @RequestParam(required = false) BigDecimal stock,
+                                   @RequestParam(required = false) BigDecimal minimumStock,
+                                   @RequestParam(required = false) String active,
+                                   @RequestParam(required = false) String notes,
+                                   RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.updateIngredient(id, name, unitCode, unitCost, stock, minimumStock, isChecked(active), notes);
+            redirectAttributes.addFlashAttribute("successMessage", "Ingrediente actualizado correctamente.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/ingredients/" + id + "/edit";
+    }
+
+    @PostMapping("/admin/restaurant/ingredients/{id}/active")
+    public String toggleIngredientActive(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.toggleIngredientActive(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Estado del ingrediente actualizado.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/ingredients";
+    }
+
     @GetMapping("/admin/restaurant/menu-items")
     public String menuItems(@RequestParam(defaultValue = "ALL") String stockFilter, Model model) {
         ensureRestaurantRuntimeReady();
@@ -526,6 +615,65 @@ public class RestaurantController {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
             return "redirect:/admin/restaurant/menu-items/" + id + "/edit";
         }
+    }
+
+    @GetMapping("/admin/restaurant/menu-items/{id}/recipe")
+    public String recipe(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
+        ensureRestaurantRuntimeReady();
+        RestaurantMenuAdminRow item = restaurantService.menuItemAdmin(id);
+        if (item == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "El plato seleccionado no existe.");
+            return "redirect:/admin/restaurant/menu-items";
+        }
+        model.addAttribute("activePage", "restaurant_recipe");
+        model.addAttribute("item", item);
+        model.addAttribute("recipeItems", restaurantService.recipeItems(id));
+        model.addAttribute("ingredients", restaurantService.ingredients("ACTIVE"));
+        return "admin/restaurant/recipe";
+    }
+
+    @PostMapping("/admin/restaurant/menu-items/{id}/recipe")
+    public String saveRecipeItem(@PathVariable Long id,
+                                 @RequestParam Long ingredientId,
+                                 @RequestParam BigDecimal quantity,
+                                 RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.saveRecipeItem(id, ingredientId, quantity);
+            redirectAttributes.addFlashAttribute("successMessage", "Ingrediente agregado a la receta.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/menu-items/" + id + "/recipe";
+    }
+
+    @PostMapping("/admin/restaurant/menu-items/{productId}/recipe/{recipeItemId}/quantity")
+    public String updateRecipeItemQuantity(@PathVariable Long productId,
+                                           @PathVariable Long recipeItemId,
+                                           @RequestParam BigDecimal quantity,
+                                           RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.updateRecipeItemQuantity(productId, recipeItemId, quantity);
+            redirectAttributes.addFlashAttribute("successMessage", "Cantidad de la receta actualizada.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/menu-items/" + productId + "/recipe";
+    }
+
+    @PostMapping("/admin/restaurant/menu-items/{productId}/recipe/{recipeItemId}/remove")
+    public String removeRecipeItem(@PathVariable Long productId,
+                                   @PathVariable Long recipeItemId,
+                                   RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.removeRecipeItem(productId, recipeItemId);
+            redirectAttributes.addFlashAttribute("successMessage", "Ingrediente retirado de la receta.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/menu-items/" + productId + "/recipe";
     }
 
     @PostMapping("/admin/restaurant/menu-items/{id}/availability")
@@ -959,6 +1107,25 @@ public class RestaurantController {
         boolean defaultHttp = "http".equalsIgnoreCase(request.getScheme()) && port == 80;
         boolean defaultHttps = "https".equalsIgnoreCase(request.getScheme()) && port == 443;
         return defaultHttp || defaultHttps ? "" : ":" + port;
+    }
+
+    private List<Map<String, String>> ingredientUnitOptions() {
+        return List.of(
+                Map.of("value", "UNIT", "label", "Unidad"),
+                Map.of("value", "KG", "label", "Kilogramo"),
+                Map.of("value", "G", "label", "Gramo"),
+                Map.of("value", "L", "label", "Litro"),
+                Map.of("value", "ML", "label", "Mililitro"),
+                Map.of("value", "PORTION", "label", "Porción")
+        );
+    }
+
+    private String normalizeIngredientFilter(String value) {
+        String clean = value == null ? "ALL" : value.trim().toUpperCase();
+        return switch (clean) {
+            case "ACTIVE", "LOW", "OUT", "INACTIVE" -> clean;
+            default -> "ALL";
+        };
     }
 
     private String normalizeStockFilter(String value) {

@@ -88,6 +88,8 @@
           or activePage == 'restaurant_tables'
           or activePage == 'restaurant_reservations'
           or activePage == 'restaurant_menu_items'
+          or activePage == 'restaurant_ingredients'
+          or activePage == 'restaurant_recipe'
           or activePage == 'restaurant_table_requests'
           or activePage == 'restaurant_qr_orders'
           or activePage == 'restaurant_external_orders'
@@ -150,6 +152,16 @@
           </a>
 
           <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','administra_restaurante')"
+            th:href="@{/admin/restaurant/ingredients}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'restaurant_ingredients' or activePage == 'restaurant_recipe' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-basket2"></i></span>
+            <span>Ingredientes y recetas</span>
+          </a>
+
+          <a
             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"
             th:href="@{/admin/restaurant/table-requests}"
             class="menu-link submenu"
@@ -167,16 +179,6 @@
           >
             <span class="icon"><i class="bi bi-phone"></i></span>
             <span>Pedidos QR</span>
-          </a>
-
-          <a
-            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"
-            th:href="@{/admin/restaurant/external-orders}"
-            class="menu-link submenu"
-            th:classappend="${activePage == 'restaurant_external_orders' ? ' active' : ''}"
-          >
-            <span class="icon"><i class="bi bi-truck"></i></span>
-            <span>Pedidos externos</span>
           </a>
 
           <a
@@ -571,6 +573,8 @@
             or activePage == 'restaurant_tables'
           or activePage == 'restaurant_reservations'
             or activePage == 'restaurant_menu_items'
+            or activePage == 'restaurant_ingredients'
+            or activePage == 'restaurant_recipe'
           or activePage == 'restaurant_table_requests'
           or activePage == 'restaurant_qr_orders'
           or activePage == 'restaurant_external_orders'
@@ -628,6 +632,16 @@
             >
               <span class="icon"><i class="bi bi-card-list"></i></span>
               <span>Platos y carta</span>
+            </a>
+
+            <a
+              sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','administra_restaurante')"
+              th:href="@{/admin/restaurant/ingredients}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'restaurant_ingredients' or activePage == 'restaurant_recipe' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-basket2"></i></span>
+              <span>Ingredientes y recetas</span>
             </a>
             <a
               sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"

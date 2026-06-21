@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Receta del plato')"></head>
+<body class="bg-light">
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Receta: <span th:text="${item.name()}">Plato</span></h1>
+                    <p class="text-muted small mb-0">Relaciona ingredientes y cantidades para calcular el costo y margen estimado.</p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a th:href="@{/admin/restaurant/ingredients}" class="btn btn-sm btn-outline-dark">
+                        <i class="bi bi-basket2"></i> Ingredientes
+                    </a>
+                    <a th:href="@{/admin/restaurant/menu-items}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Volver a platos
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show">
+                <span th:text="${successMessage}">OK</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show">
+                <span th:text="${errorMessage}">Error</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Precio de venta</div>
+                        <div class="h4 mb-0">S/ <span th:text="${item.priceDisplay()}">0.00</span></div>
+                    </div></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Costo estimado</div>
+                        <div class="h4 mb-0">S/ <span th:text="${item.recipeCostDisplay()}">0.00</span></div>
+                    </div></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Margen estimado</div>
+                        <div class="h4 mb-0" th:classappend="${item.estimatedMarginAmount().signum() < 0} ? ' text-danger' : ' text-success'">
+                            S/ <span th:text="${item.estimatedMarginAmountDisplay()}">0.00</span>
+                        </div>
+                    </div></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+                        <div class="small text-muted">Margen porcentual</div>
+                        <div class="h4 mb-1" th:text="|${item.estimatedMarginPercentDisplay()}%|">0.00%</div>
+                        <span class="badge" th:classappend="${item.recipeStatusBadge()}" th:text="${item.recipeStatusLabel()}">Sin receta</span>
+                    </div></div>
+                </div>
+            </div>
+
+            <div class="alert alert-warning border-0 shadow-sm small" th:if="${!item.hasRecipe()}">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                La receta está incompleta porque aún no tiene ingredientes.
+            </div>
+            <div class="alert alert-warning border-0 shadow-sm small" th:if="${item.hasRecipe() and !item.isRecipeComplete()}">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                Revisa ingredientes inactivos, cantidades en cero o costos unitarios pendientes.
+            </div>
+
+            <div class="row g-3">
+                <div class="col-xl-8">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <strong>Composición de la receta</strong>
+                            <span class="badge text-bg-light" th:text="|${recipeItems.size()} ingredientes|">0 ingredientes</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Ingrediente</th>
+                                    <th class="text-end">Costo unitario</th>
+                                    <th style="min-width:230px;">Cantidad usada</th>
+                                    <th class="text-end">Aporte al costo</th>
+                                    <th class="text-end">Acción</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="recipeItem : ${recipeItems}">
+                                    <td>
+                                        <div class="fw-semibold" th:text="${recipeItem.ingredientName()}">Ingrediente</div>
+                                        <span class="badge text-bg-danger" th:unless="${recipeItem.ingredientActive()}">Inactivo</span>
+                                        <span class="badge text-bg-warning" th:if="${recipeItem.hasCostIssue()}">Sin costo</span>
+                                    </td>
+                                    <td class="text-end">S/ <span th:text="${recipeItem.unitCostDisplay()}">0.0000</span></td>
+                                    <td>
+                                        <form th:action="@{/admin/restaurant/menu-items/{productId}/recipe/{recipeItemId}/quantity(productId=${item.id()},recipeItemId=${recipeItem.id()})}" method="post" class="input-group input-group-sm">
+                                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <input type="number" name="quantity" min="0.0001" step="0.0001" class="form-control" required th:value="${recipeItem.quantityDisplay()}">
+                                            <span class="input-group-text" th:text="${recipeItem.unitAbbreviation()}">unid.</span>
+                                            <button class="btn btn-outline-primary" type="submit" title="Actualizar cantidad"><i class="bi bi-check2"></i></button>
+                                        </form>
+                                    </td>
+                                    <td class="text-end fw-semibold">S/ <span th:text="${recipeItem.lineCostDisplay()}">0.0000</span></td>
+                                    <td class="text-end">
+                                        <form th:action="@{/admin/restaurant/menu-items/{productId}/recipe/{recipeItemId}/remove(productId=${item.id()},recipeItemId=${recipeItem.id()})}" method="post">
+                                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                            <button class="btn btn-sm btn-outline-danger" type="submit" title="Quitar de la receta">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <tr th:if="${recipeItems.isEmpty()}">
+                                    <td colspan="5" class="text-center py-5 text-muted">
+                                        <i class="bi bi-journal-text fs-2 d-block mb-2"></i>
+                                        Agrega el primer ingrediente para comenzar la receta.
+                                    </td>
+                                </tr>
+                                </tbody>
+                                <tfoot th:if="${!recipeItems.isEmpty()}">
+                                <tr class="table-light">
+                                    <th colspan="3" class="text-end">Costo total estimado</th>
+                                    <th class="text-end">S/ <span th:text="${item.recipeCostDisplay()}">0.0000</span></th>
+                                    <th></th>
+                                </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4">
+                    <div class="card shadow-sm border-0 mb-3">
+                        <div class="card-header bg-white"><strong>Agregar ingrediente</strong></div>
+                        <div class="card-body">
+                            <form th:action="@{/admin/restaurant/menu-items/{id}/recipe(id=${item.id()})}" method="post">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <label class="form-label">Ingrediente activo</label>
+                                <select name="ingredientId" class="form-select mb-3" required>
+                                    <option value="">Seleccionar...</option>
+                                    <option th:each="ingredient : ${ingredients}"
+                                            th:value="${ingredient.id()}"
+                                            th:text="|${ingredient.name()} · ${ingredient.unitAbbreviation()} · S/ ${ingredient.unitCostDisplay()}|">Ingrediente</option>
+                                </select>
+
+                                <label class="form-label">Cantidad usada por plato</label>
+                                <input name="quantity" type="number" min="0.0001" step="0.0001" class="form-control mb-3" required value="1.0000">
+
+                                <button class="btn btn-primary w-100" type="submit">
+                                    <i class="bi bi-plus-circle"></i> Agregar a receta
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-light border small">
+                        <strong>Ejemplo:</strong> si el ingrediente está en gramos y el plato usa 180 gramos, registra <strong>180</strong>. El costo se calcula como cantidad × costo unitario.
+                    </div>
+                    <a th:href="@{/admin/restaurant/menu-items/{id}/edit(id=${item.id()})}" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-pencil"></i> Editar precio y datos del plato
+                    </a>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<div th:replace="fragments/scripts_admin :: adminScripts"></div>
+</body>
+</html>

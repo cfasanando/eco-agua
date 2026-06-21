@@ -37,6 +37,7 @@ public class RestaurantService {
     private static final List<String> CLOSED_ORDER_STATUSES = List.of("PAID", "CANCELLED");
     private static final List<String> EXTERNAL_ORDER_SERVICE_TYPES = List.of("TAKEAWAY", "DELIVERY");
     private static final List<String> EXTERNAL_ORDER_ACTIVE_STATUSES = List.of("NEW", "CONFIRMED", "IN_KITCHEN", "READY", "OUT_FOR_DELIVERY", "DELIVERED");
+    private static final List<String> VALID_INGREDIENT_UNITS = List.of("UNIT", "KG", "G", "L", "ML", "PORTION");
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -885,6 +886,181 @@ public class RestaurantService {
                     SET kitchen_status = 'READY'
                     WHERE order_id = ?
                     """, orderId);
+        }
+    }
+
+    public List<RestaurantIngredientRow> ingredients(String stockFilter) {
+        if (!tableExists("restaurant_ingredient")) {
+            return List.of();
+        }
+        String cleanFilter = stockFilter == null ? "ALL" : stockFilter.trim().toUpperCase();
+        String whereClause = switch (cleanFilter) {
+            case "ACTIVE" -> "WHERE active = true";
+            case "LOW" -> "WHERE active = true AND stock > 0 AND minimum_stock > 0 AND stock <= minimum_stock";
+            case "OUT" -> "WHERE active = true AND stock <= 0";
+            case "INACTIVE" -> "WHERE active = false";
+            default -> "";
+        };
+        return jdbcTemplate.query("""
+                SELECT id, name, unit_code, unit_cost, stock, minimum_stock, active, notes
+                FROM restaurant_ingredient
+                %s
+                ORDER BY active DESC, name ASC
+                """.formatted(whereClause), ingredientMapper());
+    }
+
+    public RestaurantIngredientSummary ingredientSummary() {
+        if (!tableExists("restaurant_ingredient")) {
+            return new RestaurantIngredientSummary(0, 0, 0, 0, 0);
+        }
+        int total = count("SELECT COUNT(*) FROM restaurant_ingredient");
+        int active = count("SELECT COUNT(*) FROM restaurant_ingredient WHERE active = true");
+        int low = count("SELECT COUNT(*) FROM restaurant_ingredient WHERE active = true AND stock > 0 AND minimum_stock > 0 AND stock <= minimum_stock");
+        int out = count("SELECT COUNT(*) FROM restaurant_ingredient WHERE active = true AND stock <= 0");
+        int inactive = count("SELECT COUNT(*) FROM restaurant_ingredient WHERE active = false");
+        return new RestaurantIngredientSummary(total, active, low, out, inactive);
+    }
+
+    public RestaurantIngredientRow ingredient(Long ingredientId) {
+        if (ingredientId == null || !tableExists("restaurant_ingredient")) {
+            return null;
+        }
+        try {
+            return jdbcTemplate.queryForObject("""
+                    SELECT id, name, unit_code, unit_cost, stock, minimum_stock, active, notes
+                    FROM restaurant_ingredient
+                    WHERE id = ?
+                    """, ingredientMapper(), ingredientId);
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
+    }
+
+    @Transactional
+    public Long createIngredient(String name,
+                                 String unitCode,
+                                 BigDecimal unitCost,
+                                 BigDecimal stock,
+                                 BigDecimal minimumStock,
+                                 boolean active,
+                                 String notes) {
+        String cleanName = requireText(name, "Ingresa el nombre del ingrediente.");
+        ensureIngredientNameAvailable(cleanName, null);
+        String cleanUnit = normalize(unitCode, VALID_INGREDIENT_UNITS, "UNIT");
+        BigDecimal cleanUnitCost = decimal4(unitCost);
+        BigDecimal cleanStock = decimal4(stock);
+        BigDecimal cleanMinimumStock = decimal4(minimumStock);
+
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement("""
+                    INSERT INTO restaurant_ingredient
+                    (name, unit_code, unit_cost, stock, minimum_stock, active, notes, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                    """, Statement.RETURN_GENERATED_KEYS);
+            ps.setString(1, cleanName);
+            ps.setString(2, cleanUnit);
+            ps.setBigDecimal(3, cleanUnitCost);
+            ps.setBigDecimal(4, cleanStock);
+            ps.setBigDecimal(5, cleanMinimumStock);
+            ps.setBoolean(6, active);
+            ps.setString(7, blankToNull(notes));
+            return ps;
+        }, keyHolder);
+        return Objects.requireNonNull(keyHolder.getKey()).longValue();
+    }
+
+    @Transactional
+    public void updateIngredient(Long ingredientId,
+                                 String name,
+                                 String unitCode,
+                                 BigDecimal unitCost,
+                                 BigDecimal stock,
+                                 BigDecimal minimumStock,
+                                 boolean active,
+                                 String notes) {
+        if (ingredient(ingredientId) == null) {
+            throw new IllegalArgumentException("El ingrediente seleccionado no existe.");
+        }
+        String cleanName = requireText(name, "Ingresa el nombre del ingrediente.");
+        ensureIngredientNameAvailable(cleanName, ingredientId);
+        String cleanUnit = normalize(unitCode, VALID_INGREDIENT_UNITS, "UNIT");
+        int updated = jdbcTemplate.update("""
+                UPDATE restaurant_ingredient
+                SET name = ?, unit_code = ?, unit_cost = ?, stock = ?, minimum_stock = ?, active = ?, notes = ?, updated_at = NOW()
+                WHERE id = ?
+                """, cleanName, cleanUnit, decimal4(unitCost), decimal4(stock), decimal4(minimumStock), active,
+                blankToNull(notes), ingredientId);
+        if (updated == 0) {
+            throw new IllegalArgumentException("El ingrediente seleccionado no existe.");
+        }
+    }
+
+    @Transactional
+    public void toggleIngredientActive(Long ingredientId) {
+        int updated = jdbcTemplate.update("""
+                UPDATE restaurant_ingredient
+                SET active = CASE WHEN active = true THEN false ELSE true END, updated_at = NOW()
+                WHERE id = ?
+                """, ingredientId);
+        if (updated == 0) {
+            throw new IllegalArgumentException("El ingrediente seleccionado no existe.");
+        }
+    }
+
+    public List<RestaurantRecipeItemRow> recipeItems(Long productId) {
+        if (productId == null || !tableExists("restaurant_recipe_item") || !tableExists("restaurant_ingredient")) {
+            return List.of();
+        }
+        return jdbcTemplate.query("""
+                SELECT r.id, r.product_id, r.ingredient_id, i.name AS ingredient_name, i.unit_code,
+                       i.unit_cost, r.quantity, i.active AS ingredient_active
+                FROM restaurant_recipe_item r
+                JOIN restaurant_ingredient i ON i.id = r.ingredient_id
+                WHERE r.product_id = ?
+                ORDER BY i.name ASC, r.id ASC
+                """, recipeItemMapper(), productId);
+    }
+
+    @Transactional
+    public void saveRecipeItem(Long productId, Long ingredientId, BigDecimal quantity) {
+        requireRecipeProduct(productId);
+        RestaurantIngredientRow ingredient = ingredient(ingredientId);
+        if (ingredient == null) {
+            throw new IllegalArgumentException("El ingrediente seleccionado no existe.");
+        }
+        if (!ingredient.active()) {
+            throw new IllegalArgumentException("Activa el ingrediente antes de agregarlo a una receta.");
+        }
+        BigDecimal cleanQuantity = positiveDecimal4(quantity, "Ingresa una cantidad mayor a cero para la receta.");
+        jdbcTemplate.update("""
+                INSERT INTO restaurant_recipe_item
+                (product_id, ingredient_id, quantity, created_at, updated_at)
+                VALUES (?, ?, ?, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE quantity = VALUES(quantity), updated_at = NOW()
+                """, productId, ingredientId, cleanQuantity);
+    }
+
+    @Transactional
+    public void updateRecipeItemQuantity(Long productId, Long recipeItemId, BigDecimal quantity) {
+        requireRecipeProduct(productId);
+        BigDecimal cleanQuantity = positiveDecimal4(quantity, "Ingresa una cantidad mayor a cero para la receta.");
+        int updated = jdbcTemplate.update("""
+                UPDATE restaurant_recipe_item
+                SET quantity = ?, updated_at = NOW()
+                WHERE id = ? AND product_id = ?
+                """, cleanQuantity, recipeItemId, productId);
+        if (updated == 0) {
+            throw new IllegalArgumentException("El ingrediente de la receta no existe.");
+        }
+    }
+
+    @Transactional
+    public void removeRecipeItem(Long productId, Long recipeItemId) {
+        requireRecipeProduct(productId);
+        int deleted = jdbcTemplate.update("DELETE FROM restaurant_recipe_item WHERE id = ? AND product_id = ?", recipeItemId, productId);
+        if (deleted == 0) {
+            throw new IllegalArgumentException("El ingrediente de la receta no existe.");
         }
     }
 
@@ -1826,18 +2002,25 @@ public class RestaurantService {
 
     private String menuItemsAdminSql(String whereClause, String orderClause) {
         boolean hasCategoryTable = tableExists("category");
+        boolean hasRecipeTables = tableExists("restaurant_recipe_item") && tableExists("restaurant_ingredient");
         String categoryColumns = hasCategoryTable
                 ? "p.category_id, COALESCE(c.name, 'Carta general') AS category_name"
                 : "NULL AS category_id, 'Carta general' AS category_name";
         String categoryJoin = hasCategoryTable ? "LEFT JOIN category c ON c.id = p.category_id" : "";
+        String recipeColumns = hasRecipeTables
+                ? "COALESCE((SELECT SUM(r.quantity * i.unit_cost) FROM restaurant_recipe_item r JOIN restaurant_ingredient i ON i.id = r.ingredient_id WHERE r.product_id = p.id), 0) AS recipe_cost, "
+                  + "COALESCE((SELECT COUNT(*) FROM restaurant_recipe_item r WHERE r.product_id = p.id), 0) AS recipe_item_count, "
+                  + "COALESCE((SELECT COUNT(*) FROM restaurant_recipe_item r JOIN restaurant_ingredient i ON i.id = r.ingredient_id WHERE r.product_id = p.id AND (i.active = false OR i.unit_cost <= 0 OR r.quantity <= 0)), 0) AS recipe_issue_count"
+                : "0.0000 AS recipe_cost, 0 AS recipe_item_count, 0 AS recipe_issue_count";
         return """
                 SELECT p.id, p.name, p.description, p.image_path, p.price, p.active, p.featured, p.stock, p.minimum_stock,
-                       %s, p.restaurant_visible, p.restaurant_available, p.restaurant_sort_order
+                       %s, p.restaurant_visible, p.restaurant_available, p.restaurant_sort_order, %s
                 FROM product p
                 %s
                 %s
                 %s
-                """.formatted(categoryColumns, categoryJoin, whereClause == null ? "" : whereClause, orderClause == null ? "" : orderClause);
+                """.formatted(categoryColumns, recipeColumns, categoryJoin,
+                whereClause == null ? "" : whereClause, orderClause == null ? "" : orderClause);
     }
 
     private Long resolveCategoryId(Long categoryId, String newCategoryName) {
@@ -1873,6 +2056,40 @@ public class RestaurantService {
             return ps;
         }, keyHolder);
         return Objects.requireNonNull(keyHolder.getKey()).longValue();
+    }
+
+    private void ensureIngredientNameAvailable(String name, Long ignoredId) {
+        int duplicates;
+        if (ignoredId == null) {
+            duplicates = count("SELECT COUNT(*) FROM restaurant_ingredient WHERE LOWER(name) = LOWER(?)", name);
+        } else {
+            duplicates = count("SELECT COUNT(*) FROM restaurant_ingredient WHERE LOWER(name) = LOWER(?) AND id <> ?", name, ignoredId);
+        }
+        if (duplicates > 0) {
+            throw new IllegalArgumentException("Ya existe un ingrediente con ese nombre.");
+        }
+    }
+
+    private void requireRecipeProduct(Long productId) {
+        if (productId == null || count("SELECT COUNT(*) FROM product WHERE id = ?", productId) == 0) {
+            throw new IllegalArgumentException("El plato seleccionado no existe.");
+        }
+    }
+
+    private BigDecimal decimal4(BigDecimal value) {
+        BigDecimal clean = value == null ? BigDecimal.ZERO : value;
+        if (clean.compareTo(BigDecimal.ZERO) < 0) {
+            clean = BigDecimal.ZERO;
+        }
+        return clean.setScale(4, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal positiveDecimal4(BigDecimal value, String message) {
+        BigDecimal clean = decimal4(value);
+        if (clean.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException(message);
+        }
+        return clean;
     }
 
     private String requireText(String value, String message) {
@@ -1981,7 +2198,36 @@ public class RestaurantService {
                 rs.getString("category_name"),
                 rs.getBoolean("restaurant_visible"),
                 rs.getBoolean("restaurant_available"),
-                rs.getInt("restaurant_sort_order")
+                rs.getInt("restaurant_sort_order"),
+                rs.getBigDecimal("recipe_cost"),
+                rs.getInt("recipe_item_count"),
+                rs.getInt("recipe_issue_count")
+        );
+    }
+
+    private RowMapper<RestaurantIngredientRow> ingredientMapper() {
+        return (rs, rowNum) -> new RestaurantIngredientRow(
+                rs.getLong("id"),
+                rs.getString("name"),
+                rs.getString("unit_code"),
+                rs.getBigDecimal("unit_cost"),
+                rs.getBigDecimal("stock"),
+                rs.getBigDecimal("minimum_stock"),
+                rs.getBoolean("active"),
+                rs.getString("notes")
+        );
+    }
+
+    private RowMapper<RestaurantRecipeItemRow> recipeItemMapper() {
+        return (rs, rowNum) -> new RestaurantRecipeItemRow(
+                rs.getLong("id"),
+                rs.getLong("product_id"),
+                rs.getLong("ingredient_id"),
+                rs.getString("ingredient_name"),
+                rs.getString("unit_code"),
+                rs.getBigDecimal("unit_cost"),
+                rs.getBigDecimal("quantity"),
+                rs.getBoolean("ingredient_active")
         );
     }
 

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead(${formTitle})}"></head>
+<body class="bg-light">
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+                <div>
+                    <h1 class="h4 mb-1" th:text="${formTitle}">Nueva reserva</h1>
+                    <p class="text-muted small mb-0">Asigna cliente, horario y mesa. El sistema impedirá horarios cruzados.</p>
+                </div>
+                <a th:href="@{/admin/restaurant/reservations}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Volver a reservas
+                </a>
+            </div>
+
+            <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                <span th:text="${errorMessage}">No se pudo guardar.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+
+            <form th:action="${formAction}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <div class="row g-3">
+                    <div class="col-lg-8">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-header bg-white"><strong>Datos de la reserva</strong></div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-7">
+                                        <label class="form-label">Nombre del cliente</label>
+                                        <input type="text" name="customerName" class="form-control" maxlength="180" required
+                                               th:value="${reservation == null ? '' : reservation.customerName()}" placeholder="Ej. María Pérez">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label">Teléfono / WhatsApp</label>
+                                        <input type="text" name="customerPhone" class="form-control" maxlength="40"
+                                               th:value="${reservation == null ? '' : reservation.customerPhone()}" placeholder="Ej. 987 654 321">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Fecha y hora</label>
+                                        <input type="datetime-local" name="reservationAt" class="form-control" required
+                                               th:value="${#temporals.format(defaultReservationAt, 'yyyy-MM-dd') + 'T' + #temporals.format(defaultReservationAt, 'HH:mm')}">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Duración estimada</label>
+                                        <select name="durationMinutes" class="form-select">
+                                            <option value="60" th:selected="${reservation != null and reservation.durationMinutes() == 60}">1 hora</option>
+                                            <option value="90" th:selected="${reservation == null or reservation.durationMinutes() == 90}">1 h 30 min</option>
+                                            <option value="120" th:selected="${reservation != null and reservation.durationMinutes() == 120}">2 horas</option>
+                                            <option value="150" th:selected="${reservation != null and reservation.durationMinutes() == 150}">2 h 30 min</option>
+                                            <option value="180" th:selected="${reservation != null and reservation.durationMinutes() == 180}">3 horas</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Personas</label>
+                                        <input type="number" name="partySize" class="form-control" min="1" max="100" required
+                                               th:value="${reservation == null ? 2 : reservation.partySize()}">
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label">Mesa</label>
+                                        <select name="tableId" class="form-select" required>
+                                            <option value="">Selecciona una mesa</option>
+                                            <option th:each="table : ${tables}"
+                                                    th:value="${table.id()}"
+                                                    th:selected="${selectedTableId != null and table.id().equals(selectedTableId)}"
+                                                    th:text="|${table.name()} · ${table.area() ?: 'Sin área'} · ${table.seats()} sillas|">Mesa</option>
+                                        </select>
+                                        <div class="form-text">La cantidad de personas no puede superar la capacidad registrada de la mesa.</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Estado inicial</label>
+                                        <select name="status" class="form-select">
+                                            <option value="PENDING" th:selected="${reservation == null or reservation.isPending()}">Pendiente</option>
+                                            <option value="CONFIRMED" th:selected="${reservation != null and reservation.isConfirmed()}">Confirmada</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Observaciones</label>
+                                        <textarea name="notes" class="form-control" rows="4" maxlength="2000" placeholder="Cumpleaños, silla para bebé, ubicación preferida, etc." th:text="${reservation == null ? '' : reservation.notes()}"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="card shadow-sm border-0 mb-3">
+                            <div class="card-header bg-white"><strong>Control de horario</strong></div>
+                            <div class="card-body">
+                                <div class="alert alert-info small mb-3">
+                                    <i class="bi bi-info-circle"></i>
+                                    No se podrá guardar si la misma mesa tiene otra reserva pendiente o confirmada que se cruce con este horario.
+                                </div>
+                                <ul class="small text-muted ps-3 mb-3">
+                                    <li>Las reservas próximas pueden marcar la mesa como reservada.</li>
+                                    <li>Al llegar el cliente, usa “Convertir en comanda”.</li>
+                                    <li>La comanda conservará cliente, teléfono y observaciones.</li>
+                                </ul>
+                                <button class="btn btn-primary w-100 btn-lg">
+                                    <i class="bi bi-save"></i> Guardar reserva
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+<div th:replace="fragments/scripts_admin :: adminScripts"></div>
+</body>
+</html>

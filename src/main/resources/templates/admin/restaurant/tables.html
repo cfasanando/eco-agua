@@ -16,6 +16,9 @@
                     <a th:href="@{/admin/restaurant/tables/qr-cards}" class="btn btn-sm btn-outline-success" target="_blank">
                         <i class="bi bi-qr-code"></i> Imprimir QR
                     </a>
+                    <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')" th:href="@{/admin/restaurant/reservations}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-calendar-check"></i> Reservas
+                    </a>
                     <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')" th:href="@{/admin/restaurant/orders/new}" class="btn btn-sm btn-primary">
                         <i class="bi bi-plus-circle"></i> Nueva comanda
                     </a>
@@ -64,6 +67,11 @@
                                 <a class="btn btn-sm btn-outline-success" target="_blank"
                                    th:href="@{/restaurant/menu(tableId=${table.id()})}">
                                     <i class="bi bi-box-arrow-up-right"></i> Ver carta de esta mesa
+                                </a>
+                                <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')"
+                                   class="btn btn-sm btn-outline-primary"
+                                   th:href="@{/admin/restaurant/reservations/new(tableId=${table.id()})}">
+                                    <i class="bi bi-calendar-plus"></i> Crear reserva
                                 </a>
                             </div>
 

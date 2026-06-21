@@ -14,37 +14,56 @@
 
             <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show"><span th:text="${errorMessage}">Error</span><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
 
+            <div th:if="${reservation != null}" class="alert alert-primary border-0 shadow-sm d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                <div>
+                    <div class="fw-semibold"><i class="bi bi-calendar-check"></i> Comanda desde reserva <span th:text="${reservation.reservationCode()}">RSV</span></div>
+                    <div class="small mt-1">
+                        <span th:text="${reservation.customerName()}">Cliente</span>
+                        · <span th:text="${reservation.tableLabel()}">Mesa</span>
+                        · <span th:text="${#temporals.format(reservation.reservationAt(), 'dd/MM/yyyy HH:mm')}">Fecha</span>
+                    </div>
+                </div>
+                <a th:href="@{/admin/restaurant/reservations}" class="btn btn-sm btn-outline-primary">Volver a reservas</a>
+            </div>
+
             <form th:action="@{/admin/restaurant/orders}" method="post">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <input th:if="${reservation != null}" type="hidden" name="reservationId" th:value="${reservation.id()}">
                 <div class="row g-3">
                     <div class="col-lg-4">
                         <div class="card shadow-sm mb-3">
                             <div class="card-header bg-white"><strong>Datos de atención</strong></div>
                             <div class="card-body">
                                 <label class="form-label">Tipo de servicio</label>
-                                <select name="serviceType" class="form-select mb-3">
+                                <select th:if="${reservation == null}" name="serviceType" class="form-select mb-3">
                                     <option value="DINE_IN">Mesa / salón</option>
                                     <option value="TAKEAWAY">Para llevar</option>
                                     <option value="DELIVERY">Delivery</option>
                                 </select>
+                                <input th:if="${reservation != null}" type="hidden" name="serviceType" value="DINE_IN">
+                                <input th:if="${reservation != null}" class="form-control mb-3" value="Mesa / salón" disabled>
 
                                 <label class="form-label">Mesa</label>
-                                <select name="tableId" class="form-select mb-3">
+                                <select th:if="${reservation == null}" name="tableId" class="form-select mb-3">
                                     <option value="">Sin mesa</option>
                                     <option th:each="table : ${tables}"
                                             th:value="${table.id()}"
                                             th:selected="${selectedTableId != null and table.id().equals(selectedTableId)}"
                                             th:text="|${table.name()} - ${table.statusLabel()}|">Mesa</option>
                                 </select>
+                                <input th:if="${reservation != null}" type="hidden" name="tableId" th:value="${selectedTableId}">
+                                <input th:if="${reservation != null}" class="form-control mb-3" th:value="${reservation.tableLabel()}" disabled>
 
                                 <label class="form-label">Cliente / referencia</label>
-                                <input name="customerName" class="form-control mb-3" placeholder="Cliente, oficina, habitación, etc.">
+                                <input name="customerName" class="form-control mb-3" placeholder="Cliente, oficina, habitación, etc."
+                                       th:value="${prefillCustomerName}" th:readonly="${reservation != null}">
 
                                 <label class="form-label">Teléfono</label>
-                                <input name="customerPhone" class="form-control mb-3" placeholder="WhatsApp">
+                                <input name="customerPhone" class="form-control mb-3" placeholder="WhatsApp"
+                                       th:value="${prefillCustomerPhone}" th:readonly="${reservation != null}">
 
                                 <label class="form-label">Observaciones</label>
-                                <textarea name="notes" class="form-control" rows="3" placeholder="Sin ají, llevar cubiertos, etc."></textarea>
+                                <textarea name="notes" class="form-control" rows="3" placeholder="Sin ají, llevar cubiertos, etc." th:text="${prefillNotes}"></textarea>
                             </div>
                         </div>
                         <div class="alert alert-light border d-flex justify-content-between align-items-center">

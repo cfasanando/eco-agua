@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 @Service
 public class RestaurantService {
@@ -31,6 +32,8 @@ public class RestaurantService {
     private static final List<String> VALID_TABLE_REQUEST_TYPES = List.of("ATTENTION", "BILL", "PAID_NOTICE", "WAITER", "NOTE");
     private static final List<String> VALID_TABLE_REQUEST_STATUSES = List.of("PENDING", "RESOLVED");
     private static final List<String> VALID_QR_ORDER_STATUSES = List.of("PENDING", "APPROVED", "REJECTED");
+    private static final List<String> VALID_RESERVATION_STATUSES = List.of("PENDING", "CONFIRMED", "ATTENDED", "CANCELLED", "NO_SHOW");
+    private static final List<String> ACTIVE_RESERVATION_STATUSES = List.of("PENDING", "CONFIRMED");
     private static final List<String> CLOSED_ORDER_STATUSES = List.of("PAID", "CANCELLED");
 
     private final JdbcTemplate jdbcTemplate;
@@ -366,6 +369,249 @@ public class RestaurantService {
         }
     }
 
+    public List<RestaurantReservationRow> reservations(LocalDate businessDate, String statusFilter) {
+        if (!tableExists("restaurant_reservation")) {
+            return List.of();
+        }
+        LocalDate targetDate = businessDate == null ? LocalDate.now() : businessDate;
+        String cleanStatus = normalizeReservationFilter(statusFilter);
+        String statusClause = switch (cleanStatus) {
+            case "PENDING", "CONFIRMED", "ATTENDED", "CANCELLED", "NO_SHOW" -> "AND r.status = '" + cleanStatus + "'";
+            case "ACTIVE" -> "AND r.status IN ('PENDING','CONFIRMED')";
+            default -> "";
+        };
+        return jdbcTemplate.query("""
+                SELECT r.id, r.reservation_code, r.table_id, t.name AS table_name, t.area AS table_area,
+                       r.customer_name, r.customer_phone, r.reservation_at, r.duration_minutes,
+                       r.party_size, r.status, r.notes, r.order_id, r.created_at, r.updated_at
+                FROM restaurant_reservation r
+                JOIN restaurant_table t ON t.id = r.table_id
+                WHERE DATE(r.reservation_at) = ?
+                %s
+                ORDER BY r.reservation_at ASC, r.id ASC
+                """.formatted(statusClause), reservationMapper(), targetDate);
+    }
+
+    public Map<String, Integer> reservationStatusCounts(LocalDate businessDate) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        counts.put("ALL", 0);
+        counts.put("PENDING", 0);
+        counts.put("CONFIRMED", 0);
+        counts.put("ATTENDED", 0);
+        counts.put("CANCELLED", 0);
+        counts.put("NO_SHOW", 0);
+        if (!tableExists("restaurant_reservation")) {
+            return counts;
+        }
+        LocalDate targetDate = businessDate == null ? LocalDate.now() : businessDate;
+        jdbcTemplate.query("""
+                SELECT status, COUNT(*) AS total
+                FROM restaurant_reservation
+                WHERE DATE(reservation_at) = ?
+                GROUP BY status
+                """, rs -> {
+            String status = rs.getString("status");
+            int total = rs.getInt("total");
+            if (status != null) {
+                counts.put(status.toUpperCase(), total);
+            }
+            counts.put("ALL", counts.get("ALL") + total);
+        }, targetDate);
+        return counts;
+    }
+
+    public List<RestaurantReservationRow> upcomingReservations() {
+        return upcomingReservations(12, 2);
+    }
+
+    public Map<Long, RestaurantReservationRow> nextReservationsByTable() {
+        Map<Long, RestaurantReservationRow> result = new LinkedHashMap<>();
+        for (RestaurantReservationRow reservation : upcomingReservations(200, 7)) {
+            result.putIfAbsent(reservation.tableId(), reservation);
+        }
+        return result;
+    }
+
+    private List<RestaurantReservationRow> upcomingReservations(int limit, int daysAhead) {
+        if (!tableExists("restaurant_reservation")) {
+            return List.of();
+        }
+        int cleanLimit = Math.max(1, Math.min(limit, 250));
+        int cleanDaysAhead = Math.max(1, Math.min(daysAhead, 30));
+        return jdbcTemplate.query("""
+                SELECT r.id, r.reservation_code, r.table_id, t.name AS table_name, t.area AS table_area,
+                       r.customer_name, r.customer_phone, r.reservation_at, r.duration_minutes,
+                       r.party_size, r.status, r.notes, r.order_id, r.created_at, r.updated_at
+                FROM restaurant_reservation r
+                JOIN restaurant_table t ON t.id = r.table_id
+                WHERE r.status IN ('PENDING','CONFIRMED')
+                  AND DATE_ADD(r.reservation_at, INTERVAL r.duration_minutes MINUTE) >= NOW()
+                  AND r.reservation_at <= DATE_ADD(NOW(), INTERVAL %d DAY)
+                ORDER BY r.reservation_at ASC, r.id ASC
+                LIMIT %d
+                """.formatted(cleanDaysAhead, cleanLimit), reservationMapper());
+    }
+
+    public RestaurantReservationRow reservation(Long reservationId) {
+        if (!tableExists("restaurant_reservation") || reservationId == null) {
+            return null;
+        }
+        try {
+            return jdbcTemplate.queryForObject("""
+                    SELECT r.id, r.reservation_code, r.table_id, t.name AS table_name, t.area AS table_area,
+                           r.customer_name, r.customer_phone, r.reservation_at, r.duration_minutes,
+                           r.party_size, r.status, r.notes, r.order_id, r.created_at, r.updated_at
+                    FROM restaurant_reservation r
+                    JOIN restaurant_table t ON t.id = r.table_id
+                    WHERE r.id = ?
+                    """, reservationMapper(), reservationId);
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
+    }
+
+    public List<RestaurantTableRow> reservationTables() {
+        return jdbcTemplate.query("""
+                SELECT id, code, name, area, seats, status, active, notes
+                FROM restaurant_table
+                WHERE active = true AND status <> 'DISABLED'
+                ORDER BY area ASC, name ASC
+                """, tableMapper());
+    }
+
+    @Transactional
+    public Long createReservation(Long tableId,
+                                  String customerName,
+                                  String customerPhone,
+                                  LocalDateTime reservationAt,
+                                  int durationMinutes,
+                                  int partySize,
+                                  String status,
+                                  String notes) {
+        String cleanName = requireText(customerName, "Ingresa el nombre del cliente.");
+        String cleanPhone = limitText(customerPhone, 40);
+        String cleanStatus = normalize(status, VALID_RESERVATION_STATUSES, "PENDING");
+        if (!ACTIVE_RESERVATION_STATUSES.contains(cleanStatus)) {
+            cleanStatus = "PENDING";
+        }
+        String cleanNotes = limitText(notes, 2000);
+        validateReservation(tableId, reservationAt, durationMinutes, partySize, cleanStatus, null);
+
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        String reservationCode = nextReservationCode();
+        String finalStatus = cleanStatus;
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement("""
+                    INSERT INTO restaurant_reservation
+                    (reservation_code, table_id, customer_name, customer_phone, reservation_at,
+                     duration_minutes, party_size, status, notes, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                    """, Statement.RETURN_GENERATED_KEYS);
+            ps.setString(1, reservationCode);
+            ps.setLong(2, tableId);
+            ps.setString(3, cleanName);
+            ps.setString(4, blankToNull(cleanPhone));
+            ps.setTimestamp(5, Timestamp.valueOf(reservationAt));
+            ps.setInt(6, durationMinutes);
+            ps.setInt(7, partySize);
+            ps.setString(8, finalStatus);
+            ps.setString(9, blankToNull(cleanNotes));
+            return ps;
+        }, keyHolder);
+        refreshTableReservationStatus(tableId);
+        return Objects.requireNonNull(keyHolder.getKey()).longValue();
+    }
+
+    @Transactional
+    public void updateReservation(Long reservationId,
+                                  Long tableId,
+                                  String customerName,
+                                  String customerPhone,
+                                  LocalDateTime reservationAt,
+                                  int durationMinutes,
+                                  int partySize,
+                                  String status,
+                                  String notes) {
+        RestaurantReservationRow current = assertReservationExists(reservationId);
+        if (!current.canEdit()) {
+            throw new IllegalArgumentException("La reserva ya fue cerrada o convertida en comanda.");
+        }
+        String cleanName = requireText(customerName, "Ingresa el nombre del cliente.");
+        String cleanPhone = limitText(customerPhone, 40);
+        String cleanStatus = normalize(status, ACTIVE_RESERVATION_STATUSES, current.safeStatus());
+        String cleanNotes = limitText(notes, 2000);
+        validateReservation(tableId, reservationAt, durationMinutes, partySize, cleanStatus, reservationId);
+
+        jdbcTemplate.update("""
+                UPDATE restaurant_reservation
+                SET table_id = ?, customer_name = ?, customer_phone = ?, reservation_at = ?,
+                    duration_minutes = ?, party_size = ?, status = ?, notes = ?, updated_at = NOW()
+                WHERE id = ?
+                """, tableId, cleanName, blankToNull(cleanPhone), Timestamp.valueOf(reservationAt),
+                durationMinutes, partySize, cleanStatus, blankToNull(cleanNotes), reservationId);
+        refreshTableReservationStatus(current.tableId());
+        refreshTableReservationStatus(tableId);
+    }
+
+    @Transactional
+    public void updateReservationStatus(Long reservationId, String status) {
+        RestaurantReservationRow current = assertReservationExists(reservationId);
+        String cleanStatus = normalize(status, VALID_RESERVATION_STATUSES, current.safeStatus());
+        if (current.isClosed() && !current.safeStatus().equals(cleanStatus)) {
+            throw new IllegalArgumentException("Una reserva cerrada no puede volver a abrirse.");
+        }
+        if (current.safeStatus().equals(cleanStatus)) {
+            refreshTableReservationStatus(current.tableId());
+            return;
+        }
+        if ("CONFIRMED".equals(cleanStatus)) {
+            validateReservation(current.tableId(), current.reservationAt(), current.durationMinutes(),
+                    current.partySize(), cleanStatus, current.id());
+        }
+        if (current.hasOrder() && !"ATTENDED".equals(cleanStatus)) {
+            throw new IllegalArgumentException("La reserva ya está asociada a una comanda y debe permanecer atendida.");
+        }
+        jdbcTemplate.update("""
+                UPDATE restaurant_reservation
+                SET status = ?, updated_at = NOW()
+                WHERE id = ?
+                """, cleanStatus, reservationId);
+        refreshTableReservationStatus(current.tableId());
+    }
+
+    public RestaurantReservationRow reservationForOrder(Long reservationId) {
+        RestaurantReservationRow reservation = assertReservationExists(reservationId);
+        if (!reservation.canOpenOrder()) {
+            throw new IllegalArgumentException("La reserva ya fue cerrada o convertida en comanda.");
+        }
+        assertTableAvailable(reservation.tableId());
+        return reservation;
+    }
+
+    @Transactional
+    public Long createOrderFromReservation(Long reservationId,
+                                           String notes,
+                                           Map<String, String> requestParams) {
+        RestaurantReservationRow reservation = reservationForOrder(reservationId);
+        String reservationNote = limitText(reservation.notes(), 1000);
+        String cleanNotes = limitText(notes, 1000);
+        String combinedNotes = cleanNotes.isBlank() ? reservationNote : cleanNotes;
+        Long orderId = createOrder(
+                "DINE_IN",
+                reservation.tableId(),
+                reservation.customerName(),
+                reservation.customerPhone(),
+                combinedNotes,
+                requestParams
+        );
+        jdbcTemplate.update("""
+                UPDATE restaurant_reservation
+                SET status = 'ATTENDED', order_id = ?, updated_at = NOW()
+                WHERE id = ?
+                """, orderId, reservationId);
+        return orderId;
+    }
+
     public List<RestaurantPaymentBreakdownRow> paymentBreakdown(LocalDate businessDate) {
         LocalDate targetDate = businessDate == null ? LocalDate.now() : businessDate;
         return jdbcTemplate.query("""
@@ -665,6 +911,7 @@ public class RestaurantService {
     }
 
     public List<RestaurantTableRow> tables() {
+        refreshUpcomingTableStatuses();
         return jdbcTemplate.query("""
                 SELECT id, code, name, area, seats, status, active, notes
                 FROM restaurant_table
@@ -673,6 +920,7 @@ public class RestaurantService {
     }
 
     public List<RestaurantTableBoardRow> tableBoard() {
+        refreshUpcomingTableStatuses();
         return jdbcTemplate.query("""
                 SELECT rt.id, rt.code, rt.name, rt.area, rt.seats, rt.status, rt.active, rt.notes,
                        o.id AS order_id, o.order_code, o.status AS order_status, o.subtotal AS order_subtotal,
@@ -693,6 +941,7 @@ public class RestaurantService {
     }
 
     public List<RestaurantTableRow> availableTables() {
+        refreshUpcomingTableStatuses();
         return jdbcTemplate.query("""
                 SELECT id, code, name, area, seats, status, active, notes
                 FROM restaurant_table
@@ -1075,6 +1324,7 @@ public class RestaurantService {
         Long tableId = jdbcTemplate.query("SELECT table_id FROM restaurant_order WHERE id = ?", rs -> rs.next() ? nullableLong(rs, "table_id") : null, orderId);
         if (tableId != null && tableId > 0) {
             jdbcTemplate.update("UPDATE restaurant_table SET status = 'FREE' WHERE id = ?", tableId);
+            refreshTableReservationStatus(tableId);
         }
     }
 
@@ -1094,6 +1344,148 @@ public class RestaurantService {
         if (activeOrders != null && activeOrders > 0) {
             throw new IllegalArgumentException("La mesa seleccionada ya tiene una comanda activa.");
         }
+    }
+
+    private void validateReservation(Long tableId,
+                                     LocalDateTime reservationAt,
+                                     int durationMinutes,
+                                     int partySize,
+                                     String status,
+                                     Long excludeReservationId) {
+        if (tableId == null) {
+            throw new IllegalArgumentException("Selecciona una mesa para la reserva.");
+        }
+        RestaurantTableRow table = reservationTable(tableId);
+        if (table == null || !table.active()) {
+            throw new IllegalArgumentException("La mesa seleccionada no existe o está inactiva.");
+        }
+        if ("DISABLED".equalsIgnoreCase(table.status())) {
+            throw new IllegalArgumentException("La mesa seleccionada está fuera de servicio.");
+        }
+        if (reservationAt == null) {
+            throw new IllegalArgumentException("Selecciona la fecha y hora de la reserva.");
+        }
+        if (ACTIVE_RESERVATION_STATUSES.contains(status)
+                && reservationAt.isBefore(LocalDateTime.now().minusMinutes(5))) {
+            throw new IllegalArgumentException("La fecha y hora de la reserva no puede estar en el pasado.");
+        }
+        if (durationMinutes < 30 || durationMinutes > 480) {
+            throw new IllegalArgumentException("La duración debe estar entre 30 y 480 minutos.");
+        }
+        if (partySize < 1 || partySize > 100) {
+            throw new IllegalArgumentException("La cantidad de personas debe estar entre 1 y 100.");
+        }
+        if (table.seats() > 0 && partySize > table.seats()) {
+            throw new IllegalArgumentException("La mesa seleccionada tiene capacidad para " + table.seats() + " personas.");
+        }
+        if (ACTIVE_RESERVATION_STATUSES.contains(status)) {
+            assertNoReservationOverlap(tableId, reservationAt, durationMinutes, excludeReservationId);
+        }
+    }
+
+    private void assertNoReservationOverlap(Long tableId,
+                                            LocalDateTime reservationAt,
+                                            int durationMinutes,
+                                            Long excludeReservationId) {
+        LocalDateTime reservationEnd = reservationAt.plusMinutes(durationMinutes);
+        String exclusion = excludeReservationId == null ? "" : "AND id <> ?";
+        String sql = """
+                SELECT COUNT(*)
+                FROM restaurant_reservation
+                WHERE table_id = ?
+                  AND status IN ('PENDING','CONFIRMED')
+                  %s
+                  AND reservation_at < ?
+                  AND DATE_ADD(reservation_at, INTERVAL duration_minutes MINUTE) > ?
+                """.formatted(exclusion);
+        int conflicts = excludeReservationId == null
+                ? count(sql, tableId, Timestamp.valueOf(reservationEnd), Timestamp.valueOf(reservationAt))
+                : count(sql, tableId, excludeReservationId, Timestamp.valueOf(reservationEnd), Timestamp.valueOf(reservationAt));
+        if (conflicts > 0) {
+            throw new IllegalArgumentException("La mesa ya tiene una reserva que cruza ese horario.");
+        }
+    }
+
+    private RestaurantTableRow reservationTable(Long tableId) {
+        try {
+            return jdbcTemplate.queryForObject("""
+                    SELECT id, code, name, area, seats, status, active, notes
+                    FROM restaurant_table
+                    WHERE id = ?
+                    """, tableMapper(), tableId);
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
+    }
+
+    private RestaurantReservationRow assertReservationExists(Long reservationId) {
+        RestaurantReservationRow reservation = reservation(reservationId);
+        if (reservation == null) {
+            throw new IllegalArgumentException("La reserva seleccionada no existe.");
+        }
+        return reservation;
+    }
+
+    private void refreshUpcomingTableStatuses() {
+        if (!tableExists("restaurant_reservation")) {
+            return;
+        }
+        List<Long> tableIds = jdbcTemplate.query(
+                "SELECT id FROM restaurant_table WHERE active = true AND status <> 'DISABLED'",
+                (rs, rowNum) -> rs.getLong("id")
+        );
+        for (Long tableId : tableIds) {
+            refreshTableReservationStatus(tableId);
+        }
+    }
+
+    private void refreshTableReservationStatus(Long tableId) {
+        if (tableId == null || !tableExists("restaurant_reservation")) {
+            return;
+        }
+        String currentStatus = jdbcTemplate.query(
+                "SELECT status FROM restaurant_table WHERE id = ?",
+                rs -> rs.next() ? rs.getString(1) : null,
+                tableId
+        );
+        if (currentStatus == null || "DISABLED".equalsIgnoreCase(currentStatus)) {
+            return;
+        }
+        if (count("""
+                SELECT COUNT(*)
+                FROM restaurant_order
+                WHERE table_id = ? AND status IN ('NEW','IN_KITCHEN','READY','SERVED')
+                """, tableId) > 0) {
+            jdbcTemplate.update("UPDATE restaurant_table SET status = 'OCCUPIED' WHERE id = ?", tableId);
+            return;
+        }
+        int nearReservations = count("""
+                SELECT COUNT(*)
+                FROM restaurant_reservation
+                WHERE table_id = ?
+                  AND status = 'CONFIRMED'
+                  AND reservation_at <= DATE_ADD(NOW(), INTERVAL 120 MINUTE)
+                  AND DATE_ADD(reservation_at, INTERVAL duration_minutes MINUTE) > NOW()
+                """, tableId);
+        if (nearReservations > 0) {
+            jdbcTemplate.update("UPDATE restaurant_table SET status = 'RESERVED' WHERE id = ?", tableId);
+        } else if ("RESERVED".equalsIgnoreCase(currentStatus)) {
+            jdbcTemplate.update("UPDATE restaurant_table SET status = 'FREE' WHERE id = ?", tableId);
+        }
+    }
+
+    private String normalizeReservationFilter(String value) {
+        String clean = value == null ? "ALL" : value.trim().toUpperCase();
+        return switch (clean) {
+            case "ACTIVE", "PENDING", "CONFIRMED", "ATTENDED", "CANCELLED", "NO_SHOW", "ALL" -> clean;
+            default -> "ALL";
+        };
+    }
+
+    private String nextReservationCode() {
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+        String suffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return "RSV-" + timestamp + "-" + suffix;
     }
 
     private RestaurantOrderRow assertOrderExists(Long orderId) {
@@ -1416,6 +1808,26 @@ public class RestaurantService {
         );
     }
 
+
+    private RowMapper<RestaurantReservationRow> reservationMapper() {
+        return (rs, rowNum) -> new RestaurantReservationRow(
+                rs.getLong("id"),
+                rs.getString("reservation_code"),
+                rs.getLong("table_id"),
+                rs.getString("table_name"),
+                rs.getString("table_area"),
+                rs.getString("customer_name"),
+                rs.getString("customer_phone"),
+                toLocalDateTime(rs.getTimestamp("reservation_at")),
+                rs.getInt("duration_minutes"),
+                rs.getInt("party_size"),
+                rs.getString("status"),
+                rs.getString("notes"),
+                nullableLong(rs, "order_id"),
+                toLocalDateTime(rs.getTimestamp("created_at")),
+                toLocalDateTime(rs.getTimestamp("updated_at"))
+        );
+    }
 
     private RowMapper<RestaurantTableRequestRow> tableRequestMapper() {
         return (rs, rowNum) -> new RestaurantTableRequestRow(

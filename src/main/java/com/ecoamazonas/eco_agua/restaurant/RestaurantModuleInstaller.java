@@ -30,9 +30,9 @@ public class RestaurantModuleInstaller {
                 FROM information_schema.tables
                 WHERE table_schema = DATABASE()
                   AND table_name IN ('restaurant_table', 'restaurant_order', 'restaurant_order_item', 'restaurant_table_request',
-                                     'restaurant_qr_order', 'restaurant_qr_order_item')
+                                     'restaurant_qr_order', 'restaurant_qr_order_item', 'restaurant_reservation')
                 """, Integer.class);
-        return count != null && count == 6;
+        return count != null && count == 7;
     }
 
     @Transactional
@@ -61,7 +61,7 @@ public class RestaurantModuleInstaller {
                 "false",
                 "boolean",
                 "system_modules",
-                "Módulo Restaurante / carta digital, mesas, comandas y cocina"
+                "Módulo Restaurante / carta digital, reservas, mesas, comandas y cocina"
         );
         setting.setValue(Boolean.toString(enabled));
         platformSettingRepository.save(setting);
@@ -197,6 +197,34 @@ public class RestaurantModuleInstaller {
                     CONSTRAINT fk_restaurant_qr_order_item_order FOREIGN KEY (qr_order_id) REFERENCES restaurant_qr_order(id) ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS restaurant_reservation (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    reservation_code VARCHAR(80) NOT NULL,
+                    table_id BIGINT NOT NULL,
+                    customer_name VARCHAR(180) NOT NULL,
+                    customer_phone VARCHAR(40) NULL,
+                    reservation_at DATETIME NOT NULL,
+                    duration_minutes INT NOT NULL DEFAULT 90,
+                    party_size INT NOT NULL DEFAULT 1,
+                    status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+                    notes TEXT NULL,
+                    order_id BIGINT NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_restaurant_reservation_code (reservation_code),
+                    KEY idx_restaurant_reservation_table (table_id),
+                    KEY idx_restaurant_reservation_at (reservation_at),
+                    KEY idx_restaurant_reservation_status (status),
+                    KEY idx_restaurant_reservation_schedule (table_id, status, reservation_at),
+                    KEY idx_restaurant_reservation_order (order_id),
+                    CONSTRAINT fk_restaurant_reservation_table FOREIGN KEY (table_id) REFERENCES restaurant_table(id) ON DELETE RESTRICT,
+                    CONSTRAINT fk_restaurant_reservation_order FOREIGN KEY (order_id) REFERENCES restaurant_order(id) ON DELETE SET NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
     }
 
 
@@ -269,7 +297,7 @@ public class RestaurantModuleInstaller {
                 INSERT INTO platform_module_catalog
                 (`module_key`, `name`, `area`, `description`, `default_enabled`, `configurable`, `active`, `display_order`, `created_at`, `updated_at`)
                 VALUES ('restaurant', 'Restaurante / carta y comandas', 'Operación restaurante',
-                        'Carta digital, mesas, comandas y pantalla de cocina.', 0, 1, 1, 10, NOW(), NOW())
+                        'Carta digital, reservas, mesas, comandas y pantalla de cocina.', 0, 1, 1, 10, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
                     `name` = VALUES(`name`),
                     area = VALUES(area),

@@ -478,6 +478,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/admin/academy/**").hasAnyAuthority(ACADEMY_WRITE)
                 .requestMatchers("/admin/academy/**").hasAnyAuthority(ACADEMY_VIEW)
 
+                .requestMatchers(HttpMethod.POST, "/admin/restaurant/reservations/**").hasAnyAuthority(RESTAURANT_TABLES_WRITE)
+                .requestMatchers(HttpMethod.GET, "/admin/restaurant/reservations", "/admin/restaurant/reservations/**").hasAnyAuthority(RESTAURANT_TABLES_VIEW)
                 .requestMatchers("/admin/restaurant/menu-items", "/admin/restaurant/menu-items/**").hasAnyAuthority(RESTAURANT_MENU_MANAGE)
                 .requestMatchers(HttpMethod.GET, "/admin/restaurant/qr-orders", "/admin/restaurant/qr-orders/**").hasAnyAuthority(RESTAURANT_DASHBOARD_VIEW)
                 .requestMatchers(HttpMethod.POST, "/admin/restaurant/qr-orders/**").hasAnyAuthority(RESTAURANT_ORDER_WRITE)

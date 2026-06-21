@@ -24,6 +24,9 @@
                         <i class="bi bi-phone"></i> Pedidos QR
                         <span th:if="${pendingQrOrderCount > 0}" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success" th:text="${pendingQrOrderCount}">0</span>
                     </a>
+                    <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')" th:href="@{/admin/restaurant/reservations}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-calendar-check"></i> Reservas
+                    </a>
                     <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')" th:href="@{/admin/restaurant/cash}" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-cash-coin"></i> Caja diaria
                     </a>
@@ -122,7 +125,7 @@
                         </div>
                         <div class="card-body">
                             <div class="row g-3">
-                                <div class="col-md-6 col-xxl-4" th:each="table : ${tableBoard}">
+                                <div class="col-md-6 col-xxl-4" th:each="table : ${tableBoard}" th:with="nextReservation=${nextReservationsByTable.get(table.id())}">
                                     <div class="card h-100 shadow-sm border-2" th:classappend="${table.cardBorderClass()}">
                                         <div class="card-body d-flex flex-column">
                                             <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
@@ -154,9 +157,23 @@
                                                 </div>
                                             </div>
 
+                                            <div th:if="${!table.hasActiveOrder() and nextReservation != null}" class="alert alert-warning py-2 px-3 small mb-3">
+                                                <div class="fw-semibold"><i class="bi bi-calendar-event"></i> Próxima reserva</div>
+                                                <div>
+                                                    <span th:text="${#temporals.format(nextReservation.reservationAt(), 'dd/MM HH:mm')}">Fecha</span>
+                                                    · <span th:text="${nextReservation.customerName()}">Cliente</span>
+                                                    · <span th:text="${nextReservation.partySize()}">2</span> personas
+                                                </div>
+                                            </div>
+
                                             <p class="small text-muted mb-3" th:if="${!table.hasActiveOrder()}" th:text="${table.notes() ?: 'Mesa lista para atender.'}">Mesa lista</p>
 
                                             <div class="mt-auto d-grid gap-2">
+                                                <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')" th:if="${!table.hasActiveOrder()}"
+                                                   th:href="@{/admin/restaurant/reservations/new(tableId=${table.id()})}"
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-calendar-plus"></i> Reservar mesa
+                                                </a>
                                                 <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')" th:if="${!table.hasActiveOrder()}"
                                                    th:href="@{/admin/restaurant/orders/new(tableId=${table.id()})}"
                                                    class="btn btn-sm btn-primary">
@@ -196,6 +213,34 @@
                 </div>
 
                 <div class="col-xl-4">
+                    <div class="card shadow-sm border-0 mb-3">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <strong>Próximas reservas</strong>
+                            <span class="badge text-bg-primary" th:text="${upcomingReservations.size()} + ' próximas'">0 próximas</span>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            <div class="list-group-item" th:each="reservation, iter : ${upcomingReservations}" th:if="${iter.index < 5}">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div>
+                                        <div class="fw-semibold" th:text="${reservation.customerName()}">Cliente</div>
+                                        <div class="small text-muted">
+                                            <span th:text="${reservation.tableLabel()}">Mesa</span>
+                                            · <span th:text="${#temporals.format(reservation.reservationAt(), 'dd/MM HH:mm')}">Fecha</span>
+                                            · <span th:text="${reservation.partySize()}">2</span> personas
+                                        </div>
+                                    </div>
+                                    <span class="badge" th:classappend="${reservation.statusBadge()}" th:text="${reservation.statusLabel()}">Estado</span>
+                                </div>
+                            </div>
+                            <div class="list-group-item text-muted small" th:if="${upcomingReservations.isEmpty()}">No hay reservas próximas.</div>
+                        </div>
+                        <div class="card-footer bg-white">
+                            <a th:href="@{/admin/restaurant/reservations}" class="btn btn-sm btn-outline-primary w-100">
+                                <i class="bi bi-calendar-check"></i> Abrir agenda de reservas
+                            </a>
+                        </div>
+                    </div>
+
                     <div class="card shadow-sm border-0 mb-3">
                         <div class="card-header bg-white d-flex justify-content-between align-items-center">
                             <strong>Solicitudes de mesa</strong>
@@ -312,6 +357,9 @@
                             </a>
                             <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')" th:href="@{/admin/restaurant/tables}" class="btn btn-outline-secondary">
                                 <i class="bi bi-grid-3x3-gap"></i> Mesas y salón
+                            </a>
+                            <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')" th:href="@{/admin/restaurant/reservations}" class="btn btn-outline-primary">
+                                <i class="bi bi-calendar-check"></i> Reservas
                             </a>
                             <a th:href="@{/admin/restaurant/table-requests}" class="btn btn-outline-danger">
                                 <i class="bi bi-bell"></i> Solicitudes de mesa

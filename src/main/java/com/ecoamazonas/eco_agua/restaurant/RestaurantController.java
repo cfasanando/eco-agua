@@ -15,6 +15,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -97,10 +98,11 @@ public class RestaurantController {
     public String dashboard(Model model) {
         ensureRestaurantRuntimeReady();
         model.addAttribute("activePage", "restaurant_dashboard");
+        List<RestaurantTableBoardRow> tableBoard = restaurantService.tableBoard();
         model.addAttribute("summary", restaurantService.dashboardSummary());
         List<RestaurantOrderRow> activeOrders = restaurantService.activeOrders();
         List<RestaurantOrderRow> kitchenOrders = restaurantService.kitchenOrders();
-        model.addAttribute("tableBoard", restaurantService.tableBoard());
+        model.addAttribute("tableBoard", tableBoard);
         model.addAttribute("activeOrders", activeOrders);
         model.addAttribute("kitchenOrders", kitchenOrders);
         model.addAttribute("itemsByOrder", restaurantService.itemsByOrder(activeOrders));
@@ -111,6 +113,8 @@ public class RestaurantController {
         model.addAttribute("pendingQrOrders", pendingQrOrders);
         model.addAttribute("pendingQrOrderCount", restaurantService.pendingQrOrderCount());
         model.addAttribute("qrItemsByOrder", restaurantService.itemsByQrOrder(pendingQrOrders));
+        model.addAttribute("upcomingReservations", restaurantService.upcomingReservations());
+        model.addAttribute("nextReservationsByTable", restaurantService.nextReservationsByTable());
         return "admin/restaurant/dashboard";
     }
 
@@ -186,6 +190,127 @@ public class RestaurantController {
             return "redirect:" + returnTo;
         }
         return "redirect:/admin/restaurant/table-requests";
+    }
+
+    @GetMapping("/admin/restaurant/reservations")
+    public String reservations(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                               @RequestParam(defaultValue = "ALL") String statusFilter,
+                               Model model) {
+        ensureRestaurantRuntimeReady();
+        LocalDate selectedDate = date == null ? LocalDate.now() : date;
+        model.addAttribute("activePage", "restaurant_reservations");
+        model.addAttribute("selectedDate", selectedDate);
+        model.addAttribute("currentStatusFilter", normalizeReservationFilter(statusFilter));
+        model.addAttribute("reservationCounts", restaurantService.reservationStatusCounts(selectedDate));
+        model.addAttribute("reservations", restaurantService.reservations(selectedDate, statusFilter));
+        return "admin/restaurant/reservations";
+    }
+
+    @GetMapping("/admin/restaurant/reservations/new")
+    public String newReservation(@RequestParam(required = false) Long tableId, Model model) {
+        ensureRestaurantRuntimeReady();
+        model.addAttribute("activePage", "restaurant_reservations");
+        model.addAttribute("formTitle", "Nueva reserva");
+        model.addAttribute("reservation", null);
+        model.addAttribute("formAction", "/admin/restaurant/reservations");
+        model.addAttribute("tables", restaurantService.reservationTables());
+        model.addAttribute("selectedTableId", tableId);
+        model.addAttribute("defaultReservationAt", LocalDateTime.now().plusHours(1).withMinute(0).withSecond(0).withNano(0));
+        return "admin/restaurant/reservation_form";
+    }
+
+    @GetMapping("/admin/restaurant/reservations/{id}/edit")
+    public String editReservation(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
+        ensureRestaurantRuntimeReady();
+        RestaurantReservationRow reservation = restaurantService.reservation(id);
+        if (reservation == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "La reserva seleccionada no existe.");
+            return "redirect:/admin/restaurant/reservations";
+        }
+        if (!reservation.canEdit()) {
+            redirectAttributes.addFlashAttribute("errorMessage", "La reserva ya fue cerrada o convertida en comanda.");
+            return "redirect:/admin/restaurant/reservations?date=" + reservation.reservationAt().toLocalDate();
+        }
+        model.addAttribute("activePage", "restaurant_reservations");
+        model.addAttribute("formTitle", "Editar reserva");
+        model.addAttribute("reservation", reservation);
+        model.addAttribute("formAction", "/admin/restaurant/reservations/" + reservation.id());
+        model.addAttribute("tables", restaurantService.reservationTables());
+        model.addAttribute("selectedTableId", reservation.tableId());
+        model.addAttribute("defaultReservationAt", reservation.reservationAt());
+        return "admin/restaurant/reservation_form";
+    }
+
+    @PostMapping("/admin/restaurant/reservations")
+    public String createReservation(@RequestParam Long tableId,
+                                    @RequestParam String customerName,
+                                    @RequestParam(required = false) String customerPhone,
+                                    @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime reservationAt,
+                                    @RequestParam(defaultValue = "90") int durationMinutes,
+                                    @RequestParam(defaultValue = "1") int partySize,
+                                    @RequestParam(defaultValue = "PENDING") String status,
+                                    @RequestParam(required = false) String notes,
+                                    RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.createReservation(tableId, customerName, customerPhone, reservationAt,
+                    durationMinutes, partySize, status, notes);
+            redirectAttributes.addFlashAttribute("successMessage", "Reserva registrada correctamente.");
+            return "redirect:/admin/restaurant/reservations?date=" + reservationAt.toLocalDate();
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            return "redirect:/admin/restaurant/reservations/new?tableId=" + tableId;
+        }
+    }
+
+    @PostMapping("/admin/restaurant/reservations/{id}")
+    public String updateReservation(@PathVariable Long id,
+                                    @RequestParam Long tableId,
+                                    @RequestParam String customerName,
+                                    @RequestParam(required = false) String customerPhone,
+                                    @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime reservationAt,
+                                    @RequestParam(defaultValue = "90") int durationMinutes,
+                                    @RequestParam(defaultValue = "1") int partySize,
+                                    @RequestParam(defaultValue = "PENDING") String status,
+                                    @RequestParam(required = false) String notes,
+                                    RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.updateReservation(id, tableId, customerName, customerPhone, reservationAt,
+                    durationMinutes, partySize, status, notes);
+            redirectAttributes.addFlashAttribute("successMessage", "Reserva actualizada correctamente.");
+            return "redirect:/admin/restaurant/reservations?date=" + reservationAt.toLocalDate();
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            return "redirect:/admin/restaurant/reservations/" + id + "/edit";
+        }
+    }
+
+    @PostMapping("/admin/restaurant/reservations/{id}/status")
+    public String updateReservationStatus(@PathVariable Long id,
+                                          @RequestParam String status,
+                                          @RequestParam(defaultValue = "/admin/restaurant/reservations") String returnTo,
+                                          RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.updateReservationStatus(id, status);
+            redirectAttributes.addFlashAttribute("successMessage", "Estado de la reserva actualizado.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return returnTo.startsWith("/admin/restaurant") ? "redirect:" + returnTo : "redirect:/admin/restaurant/reservations";
+    }
+
+    @GetMapping("/admin/restaurant/reservations/{id}/open-order")
+    public String openReservationOrder(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.reservationForOrder(id);
+            return "redirect:/admin/restaurant/orders/new?reservationId=" + id;
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            return "redirect:/admin/restaurant/reservations";
+        }
     }
 
     @GetMapping("/admin/restaurant/tables")
@@ -396,17 +521,35 @@ public class RestaurantController {
     }
 
     @GetMapping("/admin/restaurant/orders/new")
-    public String newOrder(@RequestParam(required = false) Long tableId, Model model) {
+    public String newOrder(@RequestParam(required = false) Long tableId,
+                           @RequestParam(required = false) Long reservationId,
+                           Model model,
+                           RedirectAttributes redirectAttributes) {
         ensureRestaurantRuntimeReady();
+        RestaurantReservationRow reservation = null;
+        if (reservationId != null) {
+            try {
+                reservation = restaurantService.reservationForOrder(reservationId);
+                tableId = reservation.tableId();
+            } catch (IllegalArgumentException ex) {
+                redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+                return "redirect:/admin/restaurant/reservations";
+            }
+        }
         model.addAttribute("activePage", "restaurant_orders_new");
         model.addAttribute("tables", restaurantService.availableTables());
         model.addAttribute("menuItems", restaurantService.menuItems());
         model.addAttribute("selectedTableId", tableId);
+        model.addAttribute("reservation", reservation);
+        model.addAttribute("prefillCustomerName", reservation == null ? "" : reservation.customerName());
+        model.addAttribute("prefillCustomerPhone", reservation == null ? "" : reservation.customerPhone());
+        model.addAttribute("prefillNotes", reservation == null ? "" : reservation.notes());
         return "admin/restaurant/order_form";
     }
 
     @PostMapping("/admin/restaurant/orders")
-    public String createOrder(@RequestParam(defaultValue = "DINE_IN") String serviceType,
+    public String createOrder(@RequestParam(required = false) Long reservationId,
+                              @RequestParam(defaultValue = "DINE_IN") String serviceType,
                               @RequestParam(required = false) Long tableId,
                               @RequestParam(required = false) String customerName,
                               @RequestParam(required = false) String customerPhone,
@@ -415,12 +558,18 @@ public class RestaurantController {
                               RedirectAttributes redirectAttributes) {
         try {
             ensureRestaurantRuntimeReady();
-            Long orderId = restaurantService.createOrder(serviceType, tableId, customerName, customerPhone, notes, params);
-            redirectAttributes.addFlashAttribute("successMessage", "Comanda registered and sent to kitchen.");
+            Long orderId = reservationId == null
+                    ? restaurantService.createOrder(serviceType, tableId, customerName, customerPhone, notes, params)
+                    : restaurantService.createOrderFromReservation(reservationId, notes, params);
+            redirectAttributes.addFlashAttribute("successMessage", reservationId == null
+                    ? "Comanda registrada y enviada a cocina."
+                    : "Reserva convertida en comanda y enviada a cocina.");
             return "redirect:/admin/restaurant/orders/" + orderId;
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
-            return "redirect:/admin/restaurant/orders/new";
+            return reservationId == null
+                    ? "redirect:/admin/restaurant/orders/new"
+                    : "redirect:/admin/restaurant/orders/new?reservationId=" + reservationId;
         }
     }
 
@@ -654,6 +803,14 @@ public class RestaurantController {
         return switch (clean) {
             case "PENDING", "APPROVED", "REJECTED", "ALL" -> clean;
             default -> "PENDING";
+        };
+    }
+
+    private String normalizeReservationFilter(String value) {
+        String clean = value == null ? "ALL" : value.trim().toUpperCase();
+        return switch (clean) {
+            case "ACTIVE", "PENDING", "CONFIRMED", "ATTENDED", "CANCELLED", "NO_SHOW", "ALL" -> clean;
+            default -> "ALL";
         };
     }
 

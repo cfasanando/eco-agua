@@ -86,6 +86,7 @@
         class="menu-group"
         th:with="isRestaurantActive=${activePage == 'restaurant_dashboard'
           or activePage == 'restaurant_tables'
+          or activePage == 'restaurant_reservations'
           or activePage == 'restaurant_menu_items'
           or activePage == 'restaurant_table_requests'
           or activePage == 'restaurant_qr_orders'
@@ -125,6 +126,16 @@
           >
             <span class="icon"><i class="bi bi-grid-3x3-gap"></i></span>
             <span>Mesas y salón</span>
+          </a>
+
+          <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')"
+            th:href="@{/admin/restaurant/reservations}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'restaurant_reservations' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-calendar-check"></i></span>
+            <span>Reservas</span>
           </a>
 
           <a
@@ -537,6 +548,7 @@
           class="menu-group"
           th:with="isRestaurantActive=${activePage == 'restaurant_dashboard'
             or activePage == 'restaurant_tables'
+          or activePage == 'restaurant_reservations'
             or activePage == 'restaurant_menu_items'
           or activePage == 'restaurant_table_requests'
           or activePage == 'restaurant_qr_orders'
@@ -576,6 +588,16 @@
               <span class="icon"><i class="bi bi-grid-3x3-gap"></i></span>
               <span>Mesas y salón</span>
             </a>
+
+          <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')"
+            th:href="@{/admin/restaurant/reservations}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'restaurant_reservations' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-calendar-check"></i></span>
+            <span>Reservas</span>
+          </a>
             <a
               sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','administra_restaurante')"
               th:href="@{/admin/restaurant/menu-items}"

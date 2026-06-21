@@ -99,7 +99,7 @@
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <div class="small text-muted">Ventas del día</div>
-                                    <div class="h3 mb-0">S/ <span th:text="${#numbers.formatDecimal(summary.todaySales(),1,2)}">0.00</span></div>
+                                    <div class="h3 mb-0"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(summary.todaySales())}">0.00</span></div>
                                     <div class="small text-muted">comandas no anuladas</div>
                                 </div>
                                 <span class="rounded-circle bg-primary bg-opacity-10 text-primary d-inline-flex align-items-center justify-content-center" style="width:44px;height:44px;">
@@ -153,7 +153,7 @@
                                                 <div class="small text-muted mt-2" th:if="${table.customerName() != null}" th:text="${table.customerName()}">Cliente</div>
                                                 <div class="d-flex justify-content-between align-items-center mt-2">
                                                     <span class="small text-muted">Total actual</span>
-                                                    <strong>S/ <span th:text="${#numbers.formatDecimal(table.safeOrderSubtotal(),1,2)}">0.00</span></strong>
+                                                    <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(table.safeOrderSubtotal())}">0.00</span></strong>
                                                 </div>
                                             </div>
 
@@ -439,7 +439,7 @@
                                 <div class="small text-muted" th:if="${order.customerPhone() != null}" th:text="${order.customerPhone()}">tel</div>
                             </td>
                             <td th:text="${order.itemCount()}">0</td>
-                            <td>S/ <span th:text="${#numbers.formatDecimal(order.subtotal(),1,2)}">0.00</span></td>
+                            <td><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(order.subtotal())}">0.00</span></td>
                             <td><span class="badge" th:classappend="${order.statusBadge()}" th:text="${order.statusLabel()}">Estado</span></td>
                             <td class="text-end">
                                 <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')" th:href="@{/admin/restaurant/orders/{id}(id=${order.id()})}" class="btn btn-sm btn-outline-primary" title="Abrir comanda">

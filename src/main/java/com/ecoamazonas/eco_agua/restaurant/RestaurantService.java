@@ -50,10 +50,20 @@ public class RestaurantService {
     ) {
     }
 
-    private final JdbcTemplate jdbcTemplate;
+    private record OrderChargeSnapshot(
+            String serviceType,
+            BigDecimal subtotal,
+            BigDecimal serviceCharge
+    ) {
+    }
 
-    public RestaurantService(JdbcTemplate jdbcTemplate) {
+    private final JdbcTemplate jdbcTemplate;
+    private final RestaurantSettingsService restaurantSettingsService;
+
+    public RestaurantService(JdbcTemplate jdbcTemplate,
+                             RestaurantSettingsService restaurantSettingsService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.restaurantSettingsService = restaurantSettingsService;
     }
 
     public RestaurantDashboardSummary dashboardSummary() {
@@ -64,7 +74,7 @@ public class RestaurantService {
         int activeOrders = count("SELECT COUNT(*) FROM restaurant_order WHERE status IN ('NEW','CONFIRMED','IN_KITCHEN','READY','OUT_FOR_DELIVERY','DELIVERED','SERVED') AND NOT (service_type IN ('TAKEAWAY','DELIVERY') AND status = 'DELIVERED' AND paid_at IS NOT NULL)");
         int kitchenPendingOrders = count("SELECT COUNT(*) FROM restaurant_order WHERE status = 'IN_KITCHEN' OR (status = 'NEW' AND service_type = 'DINE_IN')");
         int readyOrders = count("SELECT COUNT(*) FROM restaurant_order WHERE status = 'READY'");
-        BigDecimal todaySales = amount("SELECT COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0)),0) FROM restaurant_order WHERE paid_at IS NOT NULL AND DATE(paid_at) = CURDATE()");
+        BigDecimal todaySales = amount("SELECT COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0) + COALESCE(service_charge, 0)),0) FROM restaurant_order WHERE paid_at IS NOT NULL AND DATE(paid_at) = CURDATE()");
         return new RestaurantDashboardSummary(totalTables, freeTables, occupiedTables, reservedTables, activeOrders, kitchenPendingOrders, readyOrders, todaySales);
     }
 
@@ -78,7 +88,7 @@ public class RestaurantService {
                   AND DATE(paid_at) = ?
                 """, targetDate);
         BigDecimal paidTotal = amount("""
-                SELECT COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0)), 0)
+                SELECT COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0) + COALESCE(service_charge, 0)), 0)
                 FROM restaurant_order
                 WHERE paid_at IS NOT NULL
                   AND DATE(paid_at) = ?
@@ -89,14 +99,14 @@ public class RestaurantService {
         BigDecimal plinTotal = paymentTotal(targetDate, "PLIN");
         BigDecimal transferTotal = paymentTotal(targetDate, "TRANSFER");
         BigDecimal otherTotal = amount("""
-                SELECT COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0)), 0)
+                SELECT COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0) + COALESCE(service_charge, 0)), 0)
                 FROM restaurant_order
                 WHERE paid_at IS NOT NULL
                   AND DATE(paid_at) = ?
                   AND COALESCE(payment_method, 'OTHER') NOT IN ('CASH','CARD','YAPE','PLIN','TRANSFER')
                 """, targetDate);
         int openOrders = count("SELECT COUNT(*) FROM restaurant_order WHERE paid_at IS NULL AND status IN ('NEW','CONFIRMED','IN_KITCHEN','READY','OUT_FOR_DELIVERY','DELIVERED','SERVED')");
-        BigDecimal openTotal = amount("SELECT COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0)), 0) FROM restaurant_order WHERE paid_at IS NULL AND status IN ('NEW','CONFIRMED','IN_KITCHEN','READY','OUT_FOR_DELIVERY','DELIVERED','SERVED')");
+        BigDecimal openTotal = amount("SELECT COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0) + COALESCE(service_charge, 0)), 0) FROM restaurant_order WHERE paid_at IS NULL AND status IN ('NEW','CONFIRMED','IN_KITCHEN','READY','OUT_FOR_DELIVERY','DELIVERED','SERVED')");
         int cancelledOrders = count("""
                 SELECT COUNT(*)
                 FROM restaurant_order
@@ -174,6 +184,7 @@ public class RestaurantService {
 
     @Transactional
     public void createTableRequest(Long tableId, String requestType, String customerNote) {
+        restaurantSettingsService.assertTableRequestsEnabled();
         if (!tableExists("restaurant_table_request")) {
             throw new IllegalArgumentException("La bandeja de solicitudes aún no está instalada.");
         }
@@ -290,6 +301,7 @@ public class RestaurantService {
 
     @Transactional
     public Long createQrOrder(Long tableId, String customerNote, Map<String, String> requestParams) {
+        restaurantSettingsService.assertQrOrderingEnabled();
         if (!tableExists("restaurant_qr_order") || !tableExists("restaurant_qr_order_item")) {
             throw new IllegalArgumentException("La bandeja de pedidos QR aún no está instalada.");
         }
@@ -305,6 +317,7 @@ public class RestaurantService {
         if (quantities.isEmpty()) {
             throw new IllegalArgumentException("Selecciona al menos un producto para enviar el pedido.");
         }
+        restaurantSettingsService.validateQrQuantities(quantities);
 
         List<RestaurantMenuItemRow> selectedItems = selectedMenuItems(quantities);
         assertSelectedProductsAvailable(selectedItems, quantities);
@@ -648,7 +661,7 @@ public class RestaurantService {
         return jdbcTemplate.query("""
                 SELECT COALESCE(payment_method, 'OTHER') AS payment_method,
                        COUNT(*) AS order_count,
-                       COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0)), 0) AS total_amount
+                       COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0) + COALESCE(service_charge, 0)), 0) AS total_amount
                 FROM restaurant_order
                 WHERE paid_at IS NOT NULL
                   AND DATE(paid_at) = ?
@@ -665,7 +678,7 @@ public class RestaurantService {
         LocalDate targetDate = businessDate == null ? LocalDate.now() : businessDate;
         return jdbcTemplate.query("""
                 SELECT o.id, o.order_code, o.service_type, o.table_id, t.name AS table_name,
-                       o.customer_name, o.customer_phone, o.status, (o.subtotal + COALESCE(o.delivery_fee, 0)) AS subtotal, o.payment_method,
+                       o.customer_name, o.customer_phone, o.status, (o.subtotal + COALESCE(o.delivery_fee, 0) + COALESCE(o.service_charge, 0)) AS subtotal, o.payment_method,
                        o.created_at, o.paid_at, COALESCE(COUNT(i.id), 0) AS item_count
                 FROM restaurant_order o
                 LEFT JOIN restaurant_table t ON t.id = o.table_id
@@ -673,7 +686,7 @@ public class RestaurantService {
                 WHERE o.paid_at IS NOT NULL
                   AND DATE(o.paid_at) = ?
                 GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone,
-                         o.status, o.subtotal, o.delivery_fee, o.payment_method, o.created_at, o.paid_at
+                         o.status, o.subtotal, o.delivery_fee, o.service_charge, o.payment_method, o.created_at, o.paid_at
                 ORDER BY COALESCE(o.paid_at, o.updated_at, o.created_at) DESC, o.id DESC
                 """, cashOrderMapper(), targetDate);
     }
@@ -683,14 +696,14 @@ public class RestaurantService {
         try {
             return jdbcTemplate.queryForObject("""
                     SELECT o.id, o.order_code, o.service_type, o.table_id, t.name AS table_name,
-                           o.customer_name, o.customer_phone, o.status, (o.subtotal + COALESCE(o.delivery_fee, 0)) AS subtotal, o.payment_method,
+                           o.customer_name, o.customer_phone, o.status, (o.subtotal + COALESCE(o.delivery_fee, 0) + COALESCE(o.service_charge, 0)) AS subtotal, o.payment_method,
                            o.created_at, o.paid_at, COALESCE(COUNT(i.id), 0) AS item_count
                     FROM restaurant_order o
                     LEFT JOIN restaurant_table t ON t.id = o.table_id
                     LEFT JOIN restaurant_order_item i ON i.order_id = o.id
                     WHERE o.id = ?
                     GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone,
-                             o.status, o.subtotal, o.delivery_fee, o.payment_method, o.created_at, o.paid_at
+                             o.status, o.subtotal, o.delivery_fee, o.service_charge, o.payment_method, o.created_at, o.paid_at
                     """, cashOrderMapper(), orderId);
         } catch (EmptyResultDataAccessException ex) {
             return null;
@@ -700,14 +713,14 @@ public class RestaurantService {
     public List<RestaurantOrderRow> openOrdersForCash() {
         return jdbcTemplate.query("""
                 SELECT o.id, o.order_code, o.service_type, o.table_id, t.name AS table_name,
-                       o.customer_name, o.customer_phone, o.status, (o.subtotal + COALESCE(o.delivery_fee, 0)) AS subtotal, o.notes, o.created_at,
+                       o.customer_name, o.customer_phone, o.status, (o.subtotal + COALESCE(o.delivery_fee, 0) + COALESCE(o.service_charge, 0)) AS subtotal, o.notes, o.created_at,
                        COALESCE(COUNT(i.id), 0) AS item_count
                 FROM restaurant_order o
                 LEFT JOIN restaurant_table t ON t.id = o.table_id
                 LEFT JOIN restaurant_order_item i ON i.order_id = o.id
                 WHERE o.paid_at IS NULL
                   AND o.status IN ('NEW','CONFIRMED','IN_KITCHEN','READY','OUT_FOR_DELIVERY','DELIVERED','SERVED')
-                GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.delivery_fee, o.notes, o.created_at
+                GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.delivery_fee, o.service_charge, o.notes, o.created_at
                 ORDER BY o.created_at ASC
                 """, orderMapper());
     }
@@ -813,6 +826,7 @@ public class RestaurantService {
                                     String notes,
                                     Map<String, String> requestParams) {
         String cleanServiceType = normalize(serviceType, EXTERNAL_ORDER_SERVICE_TYPES, "TAKEAWAY");
+        restaurantSettingsService.assertExternalServiceEnabled(cleanServiceType);
         String cleanCustomerName = requireText(customerName, "Ingresa el nombre del cliente.");
         String cleanCustomerPhone = requireText(customerPhone, "Ingresa el teléfono del cliente.");
 
@@ -827,7 +841,9 @@ public class RestaurantService {
         }
 
         BigDecimal cleanDeliveryFee = "DELIVERY".equals(cleanServiceType)
-                ? nonNegative(deliveryFee)
+                ? nonNegative(deliveryFee == null
+                    ? restaurantSettingsService.getSettings().safeDefaultDeliveryFee()
+                    : deliveryFee)
                 : BigDecimal.ZERO;
 
         Map<Long, Integer> quantities = selectedQuantities(requestParams);
@@ -846,8 +862,8 @@ public class RestaurantService {
                     INSERT INTO restaurant_order
                     (order_code, service_type, table_id, customer_name, customer_phone,
                      delivery_address, delivery_reference, scheduled_at, status,
-                     subtotal, delivery_fee, notes, created_at, updated_at)
-                    VALUES (?, ?, NULL, ?, ?, ?, ?, ?, 'NEW', ?, ?, ?, NOW(), NOW())
+                     subtotal, delivery_fee, service_charge, notes, created_at, updated_at)
+                    VALUES (?, ?, NULL, ?, ?, ?, ?, ?, 'NEW', ?, ?, 0.00, ?, NOW(), NOW())
                     """, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, orderCode);
             ps.setString(2, cleanServiceType);
@@ -1392,7 +1408,7 @@ public class RestaurantService {
         refreshUpcomingTableStatuses();
         return jdbcTemplate.query("""
                 SELECT rt.id, rt.code, rt.name, rt.area, rt.seats, rt.status, rt.active, rt.notes,
-                       o.id AS order_id, o.order_code, o.status AS order_status, o.subtotal AS order_subtotal,
+                       o.id AS order_id, o.order_code, o.status AS order_status, (o.subtotal + COALESCE(o.delivery_fee, 0) + COALESCE(o.service_charge, 0)) AS order_subtotal,
                        o.customer_name, o.customer_phone, o.created_at AS order_created_at,
                        CASE WHEN o.created_at IS NULL THEN NULL ELSE TIMESTAMPDIFF(MINUTE, o.created_at, NOW()) END AS order_minutes
                 FROM restaurant_table rt
@@ -1453,13 +1469,13 @@ public class RestaurantService {
         try {
             return jdbcTemplate.queryForObject("""
                     SELECT o.id, o.order_code, o.service_type, o.table_id, t.name AS table_name,
-                           o.customer_name, o.customer_phone, o.status, (o.subtotal + COALESCE(o.delivery_fee, 0)) AS subtotal, o.notes, o.created_at,
+                           o.customer_name, o.customer_phone, o.status, (o.subtotal + COALESCE(o.delivery_fee, 0) + COALESCE(o.service_charge, 0)) AS subtotal, o.notes, o.created_at,
                            COALESCE(COUNT(i.id), 0) AS item_count
                     FROM restaurant_order o
                     LEFT JOIN restaurant_table t ON t.id = o.table_id
                     LEFT JOIN restaurant_order_item i ON i.order_id = o.id
                     WHERE o.id = ?
-                    GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.delivery_fee, o.notes, o.created_at
+                    GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.delivery_fee, o.service_charge, o.notes, o.created_at
                     """, orderMapper(), orderId);
         } catch (EmptyResultDataAccessException ex) {
             return null;
@@ -1469,14 +1485,14 @@ public class RestaurantService {
     public List<RestaurantOrderRow> activeOrders() {
         return jdbcTemplate.query("""
                 SELECT o.id, o.order_code, o.service_type, o.table_id, t.name AS table_name,
-                       o.customer_name, o.customer_phone, o.status, (o.subtotal + COALESCE(o.delivery_fee, 0)) AS subtotal, o.notes, o.created_at,
+                       o.customer_name, o.customer_phone, o.status, (o.subtotal + COALESCE(o.delivery_fee, 0) + COALESCE(o.service_charge, 0)) AS subtotal, o.notes, o.created_at,
                        COALESCE(COUNT(i.id), 0) AS item_count
                 FROM restaurant_order o
                 LEFT JOIN restaurant_table t ON t.id = o.table_id
                 LEFT JOIN restaurant_order_item i ON i.order_id = o.id
                 WHERE o.status IN ('NEW','CONFIRMED','IN_KITCHEN','READY','OUT_FOR_DELIVERY','DELIVERED','SERVED')
                   AND NOT (o.service_type IN ('TAKEAWAY','DELIVERY') AND o.status = 'DELIVERED' AND o.paid_at IS NOT NULL)
-                GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.delivery_fee, o.notes, o.created_at
+                GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.delivery_fee, o.service_charge, o.notes, o.created_at
                 ORDER BY o.created_at DESC
                 """, orderMapper());
     }
@@ -1484,13 +1500,13 @@ public class RestaurantService {
     public List<RestaurantOrderRow> kitchenOrders() {
         return jdbcTemplate.query("""
                 SELECT o.id, o.order_code, o.service_type, o.table_id, t.name AS table_name,
-                       o.customer_name, o.customer_phone, o.status, (o.subtotal + COALESCE(o.delivery_fee, 0)) AS subtotal, o.notes, o.created_at,
+                       o.customer_name, o.customer_phone, o.status, (o.subtotal + COALESCE(o.delivery_fee, 0) + COALESCE(o.service_charge, 0)) AS subtotal, o.notes, o.created_at,
                        COALESCE(COUNT(i.id), 0) AS item_count
                 FROM restaurant_order o
                 LEFT JOIN restaurant_table t ON t.id = o.table_id
                 LEFT JOIN restaurant_order_item i ON i.order_id = o.id
                 WHERE o.status IN ('IN_KITCHEN','READY') OR (o.status = 'NEW' AND o.service_type = 'DINE_IN')
-                GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.delivery_fee, o.notes, o.created_at
+                GROUP BY o.id, o.order_code, o.service_type, o.table_id, t.name, o.customer_name, o.customer_phone, o.status, o.subtotal, o.delivery_fee, o.service_charge, o.notes, o.created_at
                 ORDER BY FIELD(o.status, 'READY', 'NEW', 'IN_KITCHEN'), o.created_at ASC
                 """, orderMapper());
     }
@@ -1543,14 +1559,16 @@ public class RestaurantService {
         }
 
         BigDecimal subtotal = subtotal(selectedItems, quantities);
+        BigDecimal serviceCharge = restaurantSettingsService.calculateServiceCharge(subtotal, cleanServiceType);
         String orderCode = nextOrderCode();
         KeyHolder keyHolder = new GeneratedKeyHolder();
         BigDecimal finalSubtotal = subtotal;
+        BigDecimal finalServiceCharge = serviceCharge;
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement("""
                     INSERT INTO restaurant_order
-                    (order_code, service_type, table_id, customer_name, customer_phone, status, subtotal, notes, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, 'IN_KITCHEN', ?, ?, NOW(), NOW())
+                    (order_code, service_type, table_id, customer_name, customer_phone, status, subtotal, service_charge, notes, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, 'IN_KITCHEN', ?, ?, ?, NOW(), NOW())
                     """, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, orderCode);
             ps.setString(2, cleanServiceType);
@@ -1562,7 +1580,8 @@ public class RestaurantService {
             ps.setString(4, blankToNull(customerName));
             ps.setString(5, blankToNull(customerPhone));
             ps.setBigDecimal(6, finalSubtotal);
-            ps.setString(7, blankToNull(notes));
+            ps.setBigDecimal(7, finalServiceCharge);
+            ps.setString(8, blankToNull(notes));
             return ps;
         }, keyHolder);
 
@@ -1998,15 +2017,41 @@ public class RestaurantService {
     }
 
     private void recalculateOrderTotal(Long orderId) {
+        BigDecimal subtotal = amount("""
+                SELECT COALESCE(SUM(line_total), 0)
+                FROM restaurant_order_item
+                WHERE order_id = ?
+                """, orderId);
+        OrderChargeSnapshot snapshot = jdbcTemplate.query(
+                "SELECT service_type, COALESCE(subtotal, 0), COALESCE(service_charge, 0) FROM restaurant_order WHERE id = ?",
+                rs -> rs.next()
+                        ? new OrderChargeSnapshot(rs.getString(1), rs.getBigDecimal(2), rs.getBigDecimal(3))
+                        : new OrderChargeSnapshot("DINE_IN", BigDecimal.ZERO, BigDecimal.ZERO),
+                orderId
+        );
+        BigDecimal serviceCharge = recalculateStoredServiceCharge(subtotal, snapshot);
         jdbcTemplate.update("""
                 UPDATE restaurant_order
-                SET subtotal = COALESCE((
-                    SELECT SUM(line_total)
-                    FROM restaurant_order_item
-                    WHERE order_id = ?
-                ), 0)
+                SET subtotal = ?, service_charge = ?
                 WHERE id = ?
-                """, orderId, orderId);
+                """, subtotal, serviceCharge, orderId);
+    }
+
+    private BigDecimal recalculateStoredServiceCharge(BigDecimal newSubtotal, OrderChargeSnapshot snapshot) {
+        if (snapshot == null
+                || !"DINE_IN".equalsIgnoreCase(snapshot.serviceType())
+                || snapshot.subtotal() == null
+                || snapshot.subtotal().compareTo(BigDecimal.ZERO) <= 0
+                || snapshot.serviceCharge() == null
+                || snapshot.serviceCharge().compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal storedRate = snapshot.serviceCharge()
+                .multiply(new BigDecimal("100"))
+                .divide(snapshot.subtotal(), 8, RoundingMode.HALF_UP);
+        return newSubtotal.max(BigDecimal.ZERO)
+                .multiply(storedRate)
+                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
     }
 
     private void releaseTableForOrder(Long orderId) {
@@ -2489,6 +2534,39 @@ public class RestaurantService {
     }
 
 
+    public RestaurantOrderFinancialSummary orderFinancialSummary(Long orderId) {
+        RestaurantSettings settings = restaurantSettingsService.getSettings();
+        return jdbcTemplate.query("""
+                SELECT COALESCE(subtotal, 0) AS items_subtotal,
+                       COALESCE(delivery_fee, 0) AS delivery_fee,
+                       COALESCE(service_charge, 0) AS service_charge
+                FROM restaurant_order
+                WHERE id = ?
+                """, rs -> {
+            if (!rs.next()) {
+                return new RestaurantOrderFinancialSummary(
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                        false, settings.safeIgvRate(), BigDecimal.ZERO, BigDecimal.ZERO
+                );
+            }
+            BigDecimal itemsSubtotal = rs.getBigDecimal("items_subtotal");
+            BigDecimal deliveryFee = rs.getBigDecimal("delivery_fee");
+            BigDecimal serviceCharge = rs.getBigDecimal("service_charge");
+            BigDecimal total = itemsSubtotal.add(deliveryFee).add(serviceCharge).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal taxableBase = total;
+            BigDecimal igvAmount = BigDecimal.ZERO;
+            if (settings.showIgvBreakdown() && total.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal divisor = new BigDecimal("100").add(settings.safeIgvRate());
+                taxableBase = total.multiply(new BigDecimal("100")).divide(divisor, 2, RoundingMode.HALF_UP);
+                igvAmount = total.subtract(taxableBase).setScale(2, RoundingMode.HALF_UP);
+            }
+            return new RestaurantOrderFinancialSummary(
+                    itemsSubtotal, deliveryFee, serviceCharge, total,
+                    settings.showIgvBreakdown(), settings.safeIgvRate(), taxableBase, igvAmount
+            );
+        }, orderId);
+    }
+
     private int count(String sql, Object... args) {
         Integer value = jdbcTemplate.queryForObject(sql, Integer.class, args);
         return value == null ? 0 : value;
@@ -2501,7 +2579,7 @@ public class RestaurantService {
 
     private BigDecimal paymentTotal(LocalDate businessDate, String paymentMethod) {
         return amount("""
-                SELECT COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0)), 0)
+                SELECT COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0) + COALESCE(service_charge, 0)), 0)
                 FROM restaurant_order
                 WHERE paid_at IS NOT NULL
                   AND DATE(paid_at) = ?
@@ -2510,7 +2588,10 @@ public class RestaurantService {
     }
 
     private String nextOrderCode() {
-        return "CMD-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+        String prefix = restaurantSettingsService.getSettings().safeOrderPrefix();
+        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+        String suffix = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+        return prefix + "-" + timestamp + "-" + suffix;
     }
 
     private String normalize(String value, List<String> allowed, String fallback) {

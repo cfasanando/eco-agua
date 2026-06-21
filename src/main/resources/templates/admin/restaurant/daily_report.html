@@ -25,9 +25,9 @@
     </section>
 
     <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3"><div class="border rounded p-3"><div class="small text-muted">Total cobrado</div><strong>S/ <span th:text="${#numbers.formatDecimal(summary.safePaidTotal(),1,2)}">0.00</span></strong></div></div>
+        <div class="col-6 col-md-3"><div class="border rounded p-3"><div class="small text-muted">Total cobrado</div><strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(summary.safePaidTotal())}">0.00</span></strong></div></div>
         <div class="col-6 col-md-3"><div class="border rounded p-3"><div class="small text-muted">Comandas pagadas</div><strong th:text="${summary.paidOrders()}">0</strong></div></div>
-        <div class="col-6 col-md-3"><div class="border rounded p-3"><div class="small text-muted">Ticket promedio</div><strong>S/ <span th:text="${#numbers.formatDecimal(summary.safeAverageTicket(),1,2)}">0.00</span></strong></div></div>
+        <div class="col-6 col-md-3"><div class="border rounded p-3"><div class="small text-muted">Ticket promedio</div><strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(summary.safeAverageTicket())}">0.00</span></strong></div></div>
         <div class="col-6 col-md-3"><div class="border rounded p-3"><div class="small text-muted">Abiertas por cobrar</div><strong th:text="${summary.openOrders()}">0</strong></div></div>
     </div>
 
@@ -35,7 +35,7 @@
     <table class="table table-sm table-bordered align-middle mb-4">
         <thead class="table-light"><tr><th>Método</th><th class="text-end">Comandas</th><th class="text-end">Total</th></tr></thead>
         <tbody>
-        <tr th:each="row : ${paymentBreakdown}"><td th:text="${row.paymentLabel()}">Pago</td><td class="text-end" th:text="${row.orderCount()}">0</td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(row.safeTotalAmount(),1,2)}">0.00</span></td></tr>
+        <tr th:each="row : ${paymentBreakdown}"><td th:text="${row.paymentLabel()}">Pago</td><td class="text-end" th:text="${row.orderCount()}">0</td><td class="text-end"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(row.safeTotalAmount())}">0.00</span></td></tr>
         <tr th:if="${paymentBreakdown.isEmpty()}"><td colspan="3" class="text-muted text-center">Sin pagos registrados.</td></tr>
         </tbody>
     </table>
@@ -44,7 +44,7 @@
     <table class="table table-sm table-bordered align-middle">
         <thead class="table-light"><tr><th>Código</th><th>Referencia</th><th>Pago</th><th>Hora</th><th class="text-end">Total</th></tr></thead>
         <tbody>
-        <tr th:each="order : ${paidOrders}"><td th:text="${order.orderCode()}">CMD</td><td th:text="${order.serviceReference()}">Mesa</td><td th:text="${order.paymentLabel()}">Pago</td><td th:text="${order.paidAt() == null ? '-' : #temporals.format(order.paidAt(), 'HH:mm')}">hora</td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(order.safeSubtotal(),1,2)}">0.00</span></td></tr>
+        <tr th:each="order : ${paidOrders}"><td th:text="${order.orderCode()}">CMD</td><td th:text="${order.serviceReference()}">Mesa</td><td th:text="${order.paymentLabel()}">Pago</td><td th:text="${order.paidAt() == null ? '-' : #temporals.format(order.paidAt(), 'HH:mm')}">hora</td><td class="text-end"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(order.safeSubtotal())}">0.00</span></td></tr>
         <tr th:if="${paidOrders.isEmpty()}"><td colspan="5" class="text-muted text-center">No hay comandas cobradas.</td></tr>
         </tbody>
     </table>

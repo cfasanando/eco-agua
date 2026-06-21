@@ -13,10 +13,10 @@
                     <p class="text-muted small mb-0">Controla recojos, entregas, cocina y cobro sin asignar una mesa.</p>
                 </div>
                 <div class="d-flex gap-2 flex-wrap" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')">
-                    <a th:href="@{/admin/restaurant/external-orders/new(serviceType='TAKEAWAY')}" class="btn btn-outline-primary">
+                    <a th:if="${restaurantTakeawayEnabled}" th:href="@{/admin/restaurant/external-orders/new(serviceType='TAKEAWAY')}" class="btn btn-outline-primary">
                         <i class="bi bi-bag-check"></i> Nuevo para llevar
                     </a>
-                    <a th:href="@{/admin/restaurant/external-orders/new(serviceType='DELIVERY')}" class="btn btn-primary">
+                    <a th:if="${restaurantDeliveryEnabled}" th:href="@{/admin/restaurant/external-orders/new(serviceType='DELIVERY')}" class="btn btn-primary">
                         <i class="bi bi-truck"></i> Nuevo delivery
                     </a>
                 </div>
@@ -29,6 +29,12 @@
             <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show">
                 <span th:text="${errorMessage}">Error</span>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+
+            <div th:if="${!restaurantTakeawayEnabled and !restaurantDeliveryEnabled}" class="alert alert-warning border-0 shadow-sm">
+                <i class="bi bi-slash-circle me-1"></i> Para llevar y delivery están desactivados. Puedes reactivarlos en
+                <a th:href="@{/admin/restaurant/settings}" class="alert-link">Configuración del restaurante</a>.
+                Los pedidos históricos permanecen disponibles para consulta.
             </div>
 
             <div class="row g-3 mb-4">
@@ -123,7 +129,7 @@
                                 <span th:if="${order.isPaid()}" class="badge text-bg-success ms-1"><i class="bi bi-cash-coin"></i> Pagado</span>
                             </td>
                             <td class="text-center" th:text="${order.itemCount()}">0</td>
-                            <td class="text-end fw-semibold">S/ <span th:text="${#numbers.formatDecimal(order.safeTotal(),1,2)}">0.00</span></td>
+                            <td class="text-end fw-semibold"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(order.safeTotal())}">0.00</span></td>
                             <td class="text-end">
                                 <a th:href="@{/admin/restaurant/external-orders/{id}(id=${order.id()})}" class="btn btn-sm btn-outline-primary" title="Abrir pedido">
                                     <i class="bi bi-eye"></i>

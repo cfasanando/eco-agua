@@ -95,7 +95,8 @@
           or activePage == 'restaurant_external_orders'
           or activePage == 'restaurant_orders_new'
           or activePage == 'restaurant_kitchen'
-          or activePage == 'restaurant_cash'}"
+          or activePage == 'restaurant_cash'
+            or activePage == 'restaurant_settings'}"
       >
         <input
           type="checkbox"
@@ -229,6 +230,16 @@
           >
             <span class="icon"><i class="bi bi-printer"></i></span>
             <span>Reporte diario</span>
+          </a>
+
+          <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','administra_restaurante')"
+            th:href="@{/admin/restaurant/settings}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'restaurant_settings' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-gear"></i></span>
+            <span>Configuración</span>
           </a>
 
           <a
@@ -580,7 +591,8 @@
           or activePage == 'restaurant_external_orders'
           or activePage == 'restaurant_orders_new'
             or activePage == 'restaurant_kitchen'
-            or activePage == 'restaurant_cash'}"
+            or activePage == 'restaurant_cash'
+            or activePage == 'restaurant_settings'}"
         >
           <input
             type="checkbox"
@@ -688,6 +700,15 @@
             >
               <span class="icon"><i class="bi bi-cash-coin"></i></span>
               <span>Caja diaria</span>
+            </a>
+            <a
+              sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','administra_restaurante')"
+              th:href="@{/admin/restaurant/settings}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'restaurant_settings' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-gear"></i></span>
+              <span>Configuración</span>
             </a>
             <a
               sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"

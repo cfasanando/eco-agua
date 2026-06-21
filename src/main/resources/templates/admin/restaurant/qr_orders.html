@@ -74,10 +74,10 @@
                                     <tr th:each="item : ${itemsByOrder.get(order.id())}">
                                         <td>
                                             <span th:text="${item.productName()}">Producto</span>
-                                            <div class="small text-muted">S/ <span th:text="${#numbers.formatDecimal(item.safeUnitPrice(),1,2)}">0.00</span> c/u</div>
+                                            <div class="small text-muted"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(item.safeUnitPrice())}">0.00</span> c/u</div>
                                         </td>
                                         <td class="text-center" th:text="${item.quantity()}">1</td>
-                                        <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(item.safeLineTotal(),1,2)}">0.00</span></td>
+                                        <td class="text-end"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(item.safeLineTotal())}">0.00</span></td>
                                     </tr>
                                     </tbody>
                                 </table>
@@ -85,7 +85,7 @@
 
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="text-muted">Total solicitado</span>
-                                <strong class="fs-5">S/ <span th:text="${#numbers.formatDecimal(order.safeSubtotal(),1,2)}">0.00</span></strong>
+                                <strong class="fs-5"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(order.safeSubtotal())}">0.00</span></strong>
                             </div>
                             <div class="alert alert-light border small mb-3" th:if="${order.customerNote() != null}">
                                 <strong>Nota:</strong> <span th:text="${order.customerNoteLabel()}">Nota</span>

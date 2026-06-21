@@ -49,8 +49,8 @@
                                 <tr th:each="item : ${items}">
                                     <td th:text="${item.productName()}">Producto</td>
                                     <td class="text-center" th:text="${item.quantity()}">1</td>
-                                    <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(item.unitPrice(),1,2)}">0.00</span></td>
-                                    <td class="text-end fw-semibold">S/ <span th:text="${#numbers.formatDecimal(item.lineTotal(),1,2)}">0.00</span></td>
+                                    <td class="text-end"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(item.unitPrice())}">0.00</span></td>
+                                    <td class="text-end fw-semibold"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(item.lineTotal())}">0.00</span></td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -58,9 +58,10 @@
                         <div class="card-footer bg-white">
                             <div class="row justify-content-end">
                                 <div class="col-sm-6 col-lg-4">
-                                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Productos</span><strong>S/ <span th:text="${#numbers.formatDecimal(order.safeSubtotal(),1,2)}">0.00</span></strong></div>
-                                    <div class="d-flex justify-content-between mb-2" th:if="${order.isDelivery()}"><span class="text-muted">Delivery</span><strong>S/ <span th:text="${#numbers.formatDecimal(order.safeDeliveryFee(),1,2)}">0.00</span></strong></div>
-                                    <div class="d-flex justify-content-between border-top pt-2 fs-5"><span>Total</span><strong>S/ <span th:text="${#numbers.formatDecimal(order.safeTotal(),1,2)}">0.00</span></strong></div>
+                                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Productos</span><strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeItemsSubtotal())}">0.00</span></strong></div>
+                                    <div class="d-flex justify-content-between mb-2" th:if="${financialSummary.hasDeliveryFee()}"><span class="text-muted">Delivery</span><strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeDeliveryFee())}">0.00</span></strong></div>
+                                    <div class="d-flex justify-content-between mb-2" th:if="${financialSummary.hasServiceCharge()}"><span class="text-muted">Cargo por servicio</span><strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeServiceCharge())}">0.00</span></strong></div>
+                                    <div class="d-flex justify-content-between border-top pt-2 fs-5"><span>Total</span><strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeTotal())}">0.00</span></strong></div>
                                 </div>
                             </div>
                         </div>
@@ -140,7 +141,7 @@
                                     <option value="TRANSFER">Transferencia</option>
                                     <option value="OTHER">Otro</option>
                                 </select>
-                                <button class="btn btn-success btn-lg"><i class="bi bi-cash-coin"></i> Cobrar S/ <span th:text="${#numbers.formatDecimal(order.safeTotal(),1,2)}">0.00</span></button>
+                                <button class="btn btn-success btn-lg"><i class="bi bi-cash-coin"></i> Cobrar <span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeTotal())}">0.00</span></button>
                             </form>
                         </div>
                     </div>

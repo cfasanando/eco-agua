@@ -31,8 +31,8 @@
                             <div class="card-body">
                                 <label class="form-label">Tipo de atención</label>
                                 <select name="serviceType" id="service-type" class="form-select mb-3">
-                                    <option value="TAKEAWAY" th:selected="${serviceType == 'TAKEAWAY'}">Para llevar</option>
-                                    <option value="DELIVERY" th:selected="${serviceType == 'DELIVERY'}">Delivery</option>
+                                    <option th:if="${restaurantTakeawayEnabled}" value="TAKEAWAY" th:selected="${serviceType == 'TAKEAWAY'}">Para llevar</option>
+                                    <option th:if="${restaurantDeliveryEnabled}" value="DELIVERY" th:selected="${serviceType == 'DELIVERY'}">Delivery</option>
                                 </select>
 
                                 <label class="form-label">Nombre del cliente</label>
@@ -50,8 +50,8 @@
 
                                     <label class="form-label">Costo de delivery</label>
                                     <div class="input-group mb-3">
-                                        <span class="input-group-text">S/</span>
-                                        <input name="deliveryFee" id="delivery-fee" type="number" min="0" step="0.10" value="0.00" class="form-control">
+                                        <span class="input-group-text" th:text="${currencySymbol}">S/</span>
+                                        <input name="deliveryFee" id="delivery-fee" type="number" min="0" step="0.01" class="form-control" th:value="${defaultDeliveryFee}">
                                     </div>
                                 </div>
 
@@ -69,15 +69,15 @@
                             <div class="card-body">
                                 <div class="d-flex justify-content-between mb-2">
                                     <span class="text-muted">Productos</span>
-                                    <strong>S/ <span id="items-total">0.00</span></strong>
+                                    <strong><span th:text="${currencySymbol}">S/</span> <span id="items-total">0.00</span></strong>
                                 </div>
                                 <div class="d-flex justify-content-between mb-3 js-delivery-total-row">
                                     <span class="text-muted">Delivery</span>
-                                    <strong>S/ <span id="delivery-total">0.00</span></strong>
+                                    <strong><span th:text="${currencySymbol}">S/</span> <span id="delivery-total">0.00</span></strong>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center border-top pt-3 fs-5">
                                     <span>Total estimado</span>
-                                    <strong>S/ <span id="grand-total">0.00</span></strong>
+                                    <strong><span th:text="${currencySymbol}">S/</span> <span id="grand-total">0.00</span></strong>
                                 </div>
                             </div>
                         </div>
@@ -104,10 +104,10 @@
                                                     <div class="fw-semibold" th:text="${item.name()}">Producto</div>
                                                     <div class="small text-muted mb-1" th:text="${item.description()}">Descripción</div>
                                                     <div class="small text-muted mb-2">
-                                                        Stock: <strong th:text="${#numbers.formatDecimal(item.safeStock(),1,0)}">0</strong>
+                                                        Stock: <strong th:text="${@restaurantFormat.quantity(item.safeStock())}">0</strong>
                                                     </div>
                                                     <div class="d-flex justify-content-between align-items-center gap-2">
-                                                        <strong>S/ <span th:text="${#numbers.formatDecimal(item.price(),1,2)}">0.00</span></strong>
+                                                        <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(item.price())}">0.00</span></strong>
                                                         <input type="number" min="0" th:max="${item.safeStock().intValue()}" value="0"
                                                                class="form-control form-control-sm text-center js-qty"
                                                                style="max-width:90px;"

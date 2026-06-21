@@ -90,8 +90,8 @@
                                         </form>
                                         <div th:if="${!canEdit}" class="text-center" th:text="${item.quantity()}">1</div>
                                     </td>
-                                    <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(item.unitPrice(),1,2)}">0.00</span></td>
-                                    <td class="text-end fw-semibold">S/ <span th:text="${#numbers.formatDecimal(item.lineTotal(),1,2)}">0.00</span></td>
+                                    <td class="text-end"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(item.unitPrice())}">0.00</span></td>
+                                    <td class="text-end fw-semibold"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(item.lineTotal())}">0.00</span></td>
                                     <td class="text-end">
                                         <form sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')" th:if="${canEdit}"
                                               th:action="@{/admin/restaurant/orders/{orderId}/items/{itemId}/remove(orderId=${order.id()}, itemId=${item.id()})}"
@@ -109,9 +109,27 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
-                            <span class="text-muted">Total actual</span>
-                            <strong class="fs-4">S/ <span th:text="${#numbers.formatDecimal(order.safeSubtotal(),1,2)}">0.00</span></strong>
+                        <div class="card-footer bg-white">
+                            <div class="row justify-content-end">
+                                <div class="col-sm-7 col-lg-5">
+                                    <div class="d-flex justify-content-between small mb-2">
+                                        <span class="text-muted">Productos</span>
+                                        <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeItemsSubtotal())}">0.00</span></strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between small mb-2" th:if="${financialSummary.hasDeliveryFee()}">
+                                        <span class="text-muted">Delivery</span>
+                                        <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeDeliveryFee())}">0.00</span></strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between small mb-2" th:if="${financialSummary.hasServiceCharge()}">
+                                        <span class="text-muted">Cargo por servicio</span>
+                                        <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeServiceCharge())}">0.00</span></strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center border-top pt-2">
+                                        <span class="fw-semibold">Total actual</span>
+                                        <strong class="fs-4"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeTotal())}">0.00</span></strong>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -135,11 +153,11 @@
                                                     <div class="fw-semibold" th:text="${item.name()}">Producto</div>
                                                     <div class="small text-muted mb-1" th:text="${item.description()}">Descripción</div>
                                                     <div class="small text-muted mb-2">
-                                                        Stock: <strong th:text="${#numbers.formatDecimal(item.safeStock(),1,0)}">0</strong>
+                                                        Stock: <strong th:text="${@restaurantFormat.quantity(item.safeStock())}">0</strong>
                                                         <span th:if="${item.safeStock().intValue() <= 5}" class="badge text-bg-warning ms-1">Queda poco</span>
                                                     </div>
                                                     <div class="d-flex justify-content-between align-items-center gap-2">
-                                                        <strong>S/ <span th:text="${#numbers.formatDecimal(item.price(),1,2)}">0.00</span></strong>
+                                                        <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(item.price())}">0.00</span></strong>
                                                         <input type="number" min="0" th:max="${item.safeStock().intValue()}" value="0" class="form-control form-control-sm text-center js-qty" style="max-width:90px;" th:name="${'qty_' + item.id()}" th:attr="data-price=${item.price()}" aria-label="Cantidad">
                                                     </div>
                                                 </div>
@@ -149,7 +167,7 @@
                                 </div>
                             </div>
                             <div class="card-footer bg-white d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                                <div class="small text-muted">Nuevo adicional: S/ <strong id="additional-total">0.00</strong></div>
+                                <div class="small text-muted">Nuevo adicional: <span th:text="${currencySymbol}">S/</span> <strong id="additional-total">0.00</strong></div>
                                 <button class="btn btn-primary">
                                     <i class="bi bi-plus-circle"></i> Agregar a comanda
                                 </button>
@@ -217,7 +235,7 @@
                                     </select>
                                 </div>
                                 <button class="btn btn-success btn-lg">
-                                    <i class="bi bi-cash-coin"></i> Cobrar S/ <span th:text="${#numbers.formatDecimal(order.safeSubtotal(),1,2)}">0.00</span>
+                                    <i class="bi bi-cash-coin"></i> Cobrar <span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeTotal())}">0.00</span>
                                 </button>
                             </form>
                         </div>

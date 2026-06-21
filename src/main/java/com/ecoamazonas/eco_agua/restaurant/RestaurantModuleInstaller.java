@@ -15,13 +15,16 @@ public class RestaurantModuleInstaller {
     private final JdbcTemplate jdbcTemplate;
     private final PlatformSettingService platformSettingService;
     private final PlatformSettingRepository platformSettingRepository;
+    private final RestaurantSettingsService restaurantSettingsService;
 
     public RestaurantModuleInstaller(JdbcTemplate jdbcTemplate,
                                      PlatformSettingService platformSettingService,
-                                     PlatformSettingRepository platformSettingRepository) {
+                                     PlatformSettingRepository platformSettingRepository,
+                                     RestaurantSettingsService restaurantSettingsService) {
         this.jdbcTemplate = jdbcTemplate;
         this.platformSettingService = platformSettingService;
         this.platformSettingRepository = platformSettingRepository;
+        this.restaurantSettingsService = restaurantSettingsService;
     }
 
     public boolean isInstalled() {
@@ -42,6 +45,7 @@ public class RestaurantModuleInstaller {
         createTables();
         ensureModuleCatalog();
         ensurePublicLabels();
+        restaurantSettingsService.ensureDefaults();
         enable();
         if (demoData) {
             seedDemoData();
@@ -148,6 +152,7 @@ public class RestaurantModuleInstaller {
                     status VARCHAR(30) NOT NULL DEFAULT 'NEW',
                     subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
                     delivery_fee DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                    service_charge DECIMAL(10,2) NOT NULL DEFAULT 0.00,
                     delivery_address VARCHAR(255) NULL,
                     delivery_reference VARCHAR(255) NULL,
                     scheduled_at DATETIME NULL,
@@ -349,6 +354,7 @@ public class RestaurantModuleInstaller {
             return;
         }
         ensureColumn("restaurant_order", "delivery_fee", "ALTER TABLE restaurant_order ADD COLUMN delivery_fee DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER subtotal");
+        ensureColumn("restaurant_order", "service_charge", "ALTER TABLE restaurant_order ADD COLUMN service_charge DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER delivery_fee");
         ensureColumn("restaurant_order", "delivery_address", "ALTER TABLE restaurant_order ADD COLUMN delivery_address VARCHAR(255) NULL AFTER customer_phone");
         ensureColumn("restaurant_order", "delivery_reference", "ALTER TABLE restaurant_order ADD COLUMN delivery_reference VARCHAR(255) NULL AFTER delivery_address");
         ensureColumn("restaurant_order", "scheduled_at", "ALTER TABLE restaurant_order ADD COLUMN scheduled_at DATETIME NULL AFTER delivery_reference");

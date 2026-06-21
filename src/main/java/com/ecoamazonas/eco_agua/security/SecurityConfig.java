@@ -484,6 +484,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/admin/academy/**").hasAnyAuthority(ACADEMY_WRITE)
                 .requestMatchers("/admin/academy/**").hasAnyAuthority(ACADEMY_VIEW)
 
+                .requestMatchers("/admin/restaurant/settings").hasAnyAuthority(RESTAURANT_ADMIN)
                 .requestMatchers(HttpMethod.POST, "/admin/restaurant/external-orders/*/status").hasAnyAuthority(RESTAURANT_EXTERNAL_STATUS_WRITE)
                 .requestMatchers(HttpMethod.POST, "/admin/restaurant/external-orders/*/cancel").hasAnyAuthority(RESTAURANT_ORDER_WRITE)
                 .requestMatchers(HttpMethod.POST, "/admin/restaurant/external-orders").hasAnyAuthority(RESTAURANT_ORDER_WRITE)

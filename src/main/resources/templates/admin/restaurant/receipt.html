@@ -7,65 +7,97 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <style>
         body { background: #f8fafc; color: #111827; }
-        .receipt-shell { max-width: 420px; margin: 24px auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; }
-        .print-actions { max-width: 420px; margin: 16px auto 0; }
-        .line-row { border-top: 1px dashed #cbd5e1; padding: 9px 0; }
+        .print-shell { max-width: 560px; margin: 24px auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; }
+        .print-actions { max-width: 560px; margin: 16px auto 0; }
+        .line-row { border-top: 1px dashed #cbd5e1; padding: 10px 0; }
         @media print {
             body { background: #fff; }
-            .receipt-shell { margin: 0; max-width: none; border: none; border-radius: 0; padding: 0; }
+            .print-shell { margin: 0; max-width: none; border: none; border-radius: 0; padding: 0; }
             .print-actions { display: none !important; }
         }
     </style>
 </head>
 <body>
 <div class="print-actions d-flex gap-2 justify-content-end">
-    <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir recibo</button>
+    <button class="btn btn-primary btn-sm" onclick="window.print()">Imprimir recibo</button>
     <a class="btn btn-outline-secondary btn-sm" th:href="@{/admin/restaurant/cash}">Volver a caja</a>
     <a class="btn btn-outline-secondary btn-sm" th:href="@{/admin/restaurant/orders/{id}(id=${order.id()})}">Ver comanda</a>
 </div>
 
-<main class="receipt-shell shadow-sm">
-    <header class="text-center mb-3">
-        <img th:if="${platformLogo != null and !platformLogo.isBlank()}" th:src="@{${platformLogo}}" alt="Logo" style="max-height:52px;" class="mb-2">
-        <h1 class="h5 mb-1" th:text="${businessName}">Restaurante</h1>
-        <p class="text-muted small mb-0">Recibo simple</p>
+<main class="print-shell shadow-sm">
+    <header class="text-center mb-4">
+        <img th:if="${ticketShowLogo and platformLogo != null and !platformLogo.isBlank()}"
+             th:src="@{${platformLogo}}" alt="Logo" style="max-height:56px;max-width:180px;object-fit:contain;" class="mb-2">
+        <h1 class="h4 mb-1" th:text="${businessName}">Restaurante</h1>
+        <div class="small text-muted" th:if="${businessLegalName != null and !businessLegalName.isBlank() and !businessLegalName.equals(businessName)}"
+             th:text="${businessLegalName}">Razón social</div>
+        <div class="small" th:if="${businessRuc != null and !businessRuc.isBlank()}">RUC: <span th:text="${businessRuc}">00000000000</span></div>
+        <div class="small text-muted" th:if="${businessAddress != null and !businessAddress.isBlank()}" th:text="${businessAddress}">Dirección</div>
+        <div class="small text-muted" th:if="${businessPhone != null and !businessPhone.isBlank()}">Tel.: <span th:text="${businessPhone}">000000</span></div>
+        <p class="fw-semibold mt-2 mb-0">Recibo simple</p>
     </header>
 
-    <div class="border-top border-bottom py-3 mb-3 small">
-        <div class="d-flex justify-content-between"><span class="text-muted">Comanda</span><strong th:text="${order.orderCode()}">CMD</strong></div>
-        <div class="d-flex justify-content-between"><span class="text-muted">Referencia</span><strong th:text="${order.serviceReference()}">Mesa</strong></div>
-        <div class="d-flex justify-content-between"><span class="text-muted">Pago</span><strong th:text="${paidOrder == null ? '-' : paidOrder.paymentLabel()}">Efectivo</strong></div>
-        <div class="d-flex justify-content-between"><span class="text-muted">Cobrado</span><strong th:text="${paidOrder == null or paidOrder.paidAt() == null ? #temporals.format(generatedAt, 'dd/MM/yyyy HH:mm') : #temporals.format(paidOrder.paidAt(), 'dd/MM/yyyy HH:mm')}">fecha</strong></div>
+    <div class="d-flex justify-content-between align-items-start border-top border-bottom py-3 mb-3">
+        <div>
+            <div class="small text-muted">Comanda</div>
+            <strong th:text="${order.orderCode()}">CMD-0001</strong>
+            <div class="small text-muted" th:text="${order.serviceReference()}">Mesa</div>
+            <div class="small mt-1">Pago: <strong th:text="${paidOrder == null ? '-' : paidOrder.paymentLabel()}">Efectivo</strong></div>
+        </div>
+        <div class="text-end">
+            <span class="badge" th:classappend="${order.statusBadge()}" th:text="${order.statusLabel()}">Estado</span>
+            <div class="small text-muted mt-2" th:text="${paidOrder == null or paidOrder.paidAt() == null ? #temporals.format(generatedAt, 'dd/MM/yyyy HH:mm') : #temporals.format(paidOrder.paidAt(), 'dd/MM/yyyy HH:mm')}">fecha</div>
+        </div>
     </div>
 
-    <section>
+    <div th:if="${externalOrder != null}" class="border rounded-3 p-3 mb-3 bg-light small">
+        <div class="d-flex justify-content-between"><span class="text-muted">Cliente</span><strong th:text="${externalOrder.customerName()}">Cliente</strong></div>
+        <div class="d-flex justify-content-between"><span class="text-muted">Teléfono</span><strong th:text="${externalOrder.customerPhone()}">Teléfono</strong></div>
+        <div th:if="${externalOrder.isDelivery()}" class="mt-2">
+            <div class="text-muted">Dirección</div>
+            <div class="fw-semibold" th:text="${externalOrder.deliveryAddress()}">Dirección</div>
+            <div th:if="${externalOrder.deliveryReference() != null}" class="text-muted" th:text="${externalOrder.deliveryReference()}">Referencia</div>
+        </div>
+    </div>
+
+    <section class="mb-3">
         <div class="line-row" th:each="item : ${items}">
             <div class="d-flex justify-content-between gap-3">
                 <div>
                     <strong><span th:text="${item.quantity()}">1</span> x <span th:text="${item.productName()}">Producto</span></strong>
-                    <div class="small text-muted">S/ <span th:text="${#numbers.formatDecimal(item.unitPrice(),1,2)}">0.00</span> c/u</div>
+                    <div class="small text-muted"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(item.unitPrice())}">0.00</span> c/u</div>
                 </div>
-                <strong>S/ <span th:text="${#numbers.formatDecimal(item.lineTotal(),1,2)}">0.00</span></strong>
+                <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(item.lineTotal())}">0.00</span></strong>
             </div>
         </div>
+        <div th:if="${items.isEmpty()}" class="text-muted text-center py-4">Sin productos.</div>
     </section>
 
-    <div class="border-top pt-3 mt-2">
-        <div th:if="${externalOrder != null}" class="d-flex justify-content-between small mb-2">
+    <div class="border-top pt-3">
+        <div class="d-flex justify-content-between small mb-2">
             <span class="text-muted">Productos</span>
-            <strong>S/ <span th:text="${#numbers.formatDecimal(externalOrder.safeSubtotal(),1,2)}">0.00</span></strong>
+            <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeItemsSubtotal())}">0.00</span></strong>
         </div>
-        <div th:if="${externalOrder != null and externalOrder.isDelivery()}" class="d-flex justify-content-between small mb-2">
+        <div th:if="${financialSummary.hasDeliveryFee()}" class="d-flex justify-content-between small mb-2">
             <span class="text-muted">Delivery</span>
-            <strong>S/ <span th:text="${#numbers.formatDecimal(externalOrder.safeDeliveryFee(),1,2)}">0.00</span></strong>
+            <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeDeliveryFee())}">0.00</span></strong>
         </div>
-        <div class="d-flex justify-content-between align-items-center fs-4">
+        <div th:if="${financialSummary.hasServiceCharge()}" class="d-flex justify-content-between small mb-2">
+            <span class="text-muted">Cargo por servicio</span>
+            <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeServiceCharge())}">0.00</span></strong>
+        </div>
+        <div th:if="${financialSummary.showIgvBreakdown()}" class="border-top pt-2 mt-2 small text-muted">
+            <div class="d-flex justify-content-between"><span>Base imponible</span><span><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeTaxableBase())}">0.00</span></span></div>
+            <div class="d-flex justify-content-between"><span>IGV incluido (<span th:text="${@restaurantFormat.percentage(financialSummary.safeIgvRate())}">18.00</span>%)</span><span><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeIgvAmount())}">0.00</span></span></div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center fs-4 border-top pt-3 mt-2">
             <span>Total</span>
-            <strong>S/ <span th:text="${#numbers.formatDecimal(order.safeSubtotal(),1,2)}">0.00</span></strong>
+            <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(financialSummary.safeTotal())}">0.00</span></strong>
         </div>
     </div>
 
-    <p class="text-center text-muted small mt-4 mb-0">Documento interno de control. No reemplaza comprobante electrónico.</p>
+    <p class="text-center text-muted small mt-4 mb-0" th:if="${receiptFooter != null and !receiptFooter.isBlank()}" th:text="${receiptFooter}">Gracias por tu preferencia.</p>
+    <p class="text-center text-muted small mt-2 mb-0">Documento interno de control. No reemplaza un comprobante electrónico.</p>
 </main>
 </body>
 </html>

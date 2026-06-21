@@ -21,8 +21,11 @@
         </a>
         <div class="ms-auto d-flex gap-2 align-items-center">
             <a class="btn btn-sm btn-outline-secondary" th:href="@{/portal}">Inicio</a>
-            <a class="btn btn-sm btn-success" href="#table-request-panel" th:if="${tableContext != null}">
+            <a class="btn btn-sm btn-success" href="#table-request-panel" th:if="${tableContext != null and restaurantTableRequestsEnabled}">
                 <i class="bi bi-bell"></i> Solicitar atención
+            </a>
+            <a class="btn btn-sm btn-success" href="#qr-order-panel" th:if="${tableContext != null and !restaurantTableRequestsEnabled and restaurantQrOrdersEnabled}">
+                <i class="bi bi-phone"></i> Pedir por QR
             </a>
             <a class="btn btn-sm btn-success" th:href="${attentionWhatsappLink}" target="_blank" th:if="${tableContext == null}">
                 <i class="bi bi-whatsapp"></i> Solicitar atención
@@ -47,7 +50,14 @@
                 <div class="col-lg-7">
                     <span class="badge text-bg-light mb-3"><i class="bi bi-qr-code"></i> Carta digital QR</span>
                     <h1 class="display-6 fw-bold mb-3">Carta digital de <span th:text="${businessName}">Restaurante</span></h1>
-                    <p class="lead mb-3">Explora platos, bebidas y combos. Si estás en mesa, solicita atención directamente desde el QR.</p>
+                    <p class="lead mb-3" th:text="${publicWelcomeMessage}">Explora platos, bebidas y combos.</p>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <span class="badge bg-white bg-opacity-10 border border-light border-opacity-25">
+                            <i class="bi bi-clock"></i> Horario: <span th:text="${openingHoursLabel}">09:00 - 23:00</span>
+                        </span>
+                        <span class="badge" th:classappend="${restaurantOpenNow ? 'text-bg-success' : 'text-bg-secondary'}"
+                              th:text="${restaurantOpenNow ? 'Abierto ahora' : 'Fuera de horario'}">Abierto ahora</span>
+                    </div>
                     <div th:if="${tableContext != null}" class="bg-white bg-opacity-10 border border-light border-opacity-25 rounded-4 p-3 d-inline-flex align-items-center gap-3">
                         <i class="bi bi-table fs-2"></i>
                         <div>
@@ -66,8 +76,11 @@
                             </div>
                             <i class="bi bi-journal-richtext display-5 text-success"></i>
                         </div>
-                        <a class="btn btn-success w-100" href="#table-request-panel" th:if="${tableContext != null}">
+                        <a class="btn btn-success w-100" href="#table-request-panel" th:if="${tableContext != null and restaurantTableRequestsEnabled}">
                             <i class="bi bi-bell"></i> Solicitar desde esta mesa
+                        </a>
+                        <a class="btn btn-success w-100" href="#qr-order-panel" th:if="${tableContext != null and !restaurantTableRequestsEnabled and restaurantQrOrdersEnabled}">
+                            <i class="bi bi-phone"></i> Realizar pedido QR
                         </a>
                         <a class="btn btn-success w-100" th:href="${attentionWhatsappLink}" target="_blank" th:if="${tableContext == null}">
                             <i class="bi bi-whatsapp"></i> Solicitar atención
@@ -78,7 +91,7 @@
             </div>
         </section>
 
-        <section id="table-request-panel" class="mb-4" th:if="${tableContext != null}">
+        <section id="table-request-panel" class="mb-4" th:if="${tableContext != null and restaurantTableRequestsEnabled}">
             <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div>
@@ -135,7 +148,7 @@
                             <span class="badge text-bg-success mb-2">Destacado</span>
                             <h3 class="h6" th:text="${item.name()}">Plato</h3>
                             <p class="small text-muted" th:text="${item.description()}">Descripción</p>
-                            <div class="fw-bold fs-5">S/ <span th:text="${#numbers.formatDecimal(item.safePrice(),1,2)}">0.00</span></div>
+                            <div class="fw-bold fs-5"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(item.safePrice())}">0.00</span></div>
                         </div>
                     </div>
                 </div>
@@ -146,10 +159,11 @@
             <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
                 <div>
                     <h2 class="h4 mb-1">Carta completa</h2>
-                    <p class="text-muted mb-0" th:if="${tableContext != null}">Elige cantidades y envía el pedido. El mozo lo revisará antes de enviarlo a cocina.</p>
+                    <p class="text-muted mb-0" th:if="${tableContext != null and restaurantQrOrdersEnabled}">Elige cantidades y envía el pedido. El mozo lo revisará antes de enviarlo a cocina.</p>
+                    <p class="text-muted mb-0" th:if="${tableContext != null and !restaurantQrOrdersEnabled}">Consulta platos, bebidas y promociones disponibles.</p>
                     <p class="text-muted mb-0" th:if="${tableContext == null}">Productos agrupados para encontrar rápido platos, bebidas y combos.</p>
                 </div>
-                <a class="btn btn-outline-success" href="#table-request-panel" th:if="${tableContext != null}">
+                <a class="btn btn-outline-success" href="#table-request-panel" th:if="${tableContext != null and restaurantTableRequestsEnabled}">
                     <i class="bi bi-bell"></i> Pedir al mozo
                 </a>
                 <a class="btn btn-outline-success" th:href="${attentionWhatsappLink}" target="_blank" th:if="${tableContext == null}">
@@ -157,7 +171,7 @@
                 </a>
             </div>
 
-            <form th:action="@{/restaurant/qr-order}" method="post" th:if="${!menuItems.isEmpty()}">
+            <form id="qr-order-panel" th:action="@{/restaurant/qr-order}" method="post" th:if="${!menuItems.isEmpty() and tableContext != null and restaurantQrOrdersEnabled}">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                 <input type="hidden" name="tableId" th:value="${tableContext.id()}" th:if="${tableContext != null}"/>
 
@@ -184,13 +198,13 @@
                                         <h4 class="h6 mb-1" th:text="${item.name()}">Plato</h4>
                                         <p class="small text-muted mb-2" th:text="${item.description()} ?: 'Sin descripción'">Descripción</p>
                                         <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-                                            <strong>S/ <span th:text="${#numbers.formatDecimal(item.safePrice(),1,2)}">0.00</span></strong>
-                                            <span class="badge text-bg-light">Stock: <span th:text="${#numbers.formatDecimal(item.safeStock(),1,0)}">0</span></span>
+                                            <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(item.safePrice())}">0.00</span></strong>
+                                            <span class="badge text-bg-light">Stock: <span th:text="${@restaurantFormat.quantity(item.safeStock())}">0</span></span>
                                         </div>
 
-                                        <div th:if="${tableContext != null}" class="input-group input-group-sm">
+                                        <div th:if="${tableContext != null and restaurantQrOrdersEnabled}" class="input-group input-group-sm">
                                             <span class="input-group-text">Cantidad</span>
-                                            <input type="number" min="0" max="99" value="0" class="form-control text-center" th:name="|qty_${item.id()}|" th:attr="max=${item.safeStock().intValue()}">
+                                            <input type="number" min="0" th:max="${restaurantSettings.qrMaxQuantityPerItem()}" value="0" class="form-control text-center" th:name="|qty_${item.id()}|">
                                         </div>
                                         <a class="btn btn-sm btn-outline-success" th:href="${attentionWhatsappLink}" target="_blank" th:if="${tableContext == null}">
                                             <i class="bi bi-whatsapp"></i> Consultar
@@ -202,12 +216,12 @@
                     </div>
                 </div>
 
-                <div class="card border-0 shadow-sm rounded-4 mb-4" th:if="${tableContext != null}">
+                <div class="card border-0 shadow-sm rounded-4 mb-4" th:if="${tableContext != null and restaurantQrOrdersEnabled}">
                     <div class="card-body">
                         <label class="form-label small text-muted">Nota para el mozo o cocina</label>
                         <textarea name="customerNote" maxlength="500" rows="2" class="form-control mb-3" placeholder="Ejemplo: sin ají, bebida sin hielo, primero traer entradas"></textarea>
                         <div class="d-grid d-md-flex justify-content-md-end gap-2">
-                            <a class="btn btn-outline-secondary" href="#table-request-panel">
+                            <a class="btn btn-outline-secondary" href="#table-request-panel" th:if="${restaurantTableRequestsEnabled}">
                                 <i class="bi bi-bell"></i> Solo llamar al mozo
                             </a>
                             <button class="btn btn-success btn-lg">
@@ -218,6 +232,13 @@
                     </div>
                 </div>
             </form>
+
+            <div class="alert alert-light border" th:if="${tableContext != null and !restaurantQrOrdersEnabled}">
+                <i class="bi bi-info-circle me-1"></i> Los pedidos desde QR están desactivados temporalmente. Puedes revisar la carta y comunicarte con el personal.
+            </div>
+            <div class="alert alert-light border" th:if="${tableContext != null and !restaurantTableRequestsEnabled and !restaurantQrOrdersEnabled}">
+                Para realizar un pedido, comunícate directamente con el personal del restaurante.
+            </div>
 
             <div class="alert alert-info" th:if="${menuItems.isEmpty()}">Aún no hay productos visibles en la carta.</div>
         </section>

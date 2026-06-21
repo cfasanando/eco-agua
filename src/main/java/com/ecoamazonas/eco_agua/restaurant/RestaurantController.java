@@ -7,6 +7,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -28,15 +29,29 @@ public class RestaurantController {
     private final RestaurantModuleInstaller restaurantModuleInstaller;
     private final PlatformSettingService platformSettingService;
     private final BusinessProperties businessProperties;
+    private final RestaurantSettingsService restaurantSettingsService;
 
     public RestaurantController(RestaurantService restaurantService,
                                 RestaurantModuleInstaller restaurantModuleInstaller,
                                 PlatformSettingService platformSettingService,
-                                BusinessProperties businessProperties) {
+                                BusinessProperties businessProperties,
+                                RestaurantSettingsService restaurantSettingsService) {
         this.restaurantService = restaurantService;
         this.restaurantModuleInstaller = restaurantModuleInstaller;
         this.platformSettingService = platformSettingService;
         this.businessProperties = businessProperties;
+        this.restaurantSettingsService = restaurantSettingsService;
+    }
+
+    @ModelAttribute
+    public void addRestaurantSettingsAttributes(Model model) {
+        RestaurantSettings settings = restaurantSettingsService.getSettings();
+        model.addAttribute("restaurantSettings", settings);
+        model.addAttribute("currencySymbol", settings.safeCurrencySymbol());
+        model.addAttribute("restaurantQrOrdersEnabled", settings.qrOrdersEnabled());
+        model.addAttribute("restaurantTableRequestsEnabled", settings.tableRequestsEnabled());
+        model.addAttribute("restaurantTakeawayEnabled", settings.takeawayEnabled());
+        model.addAttribute("restaurantDeliveryEnabled", settings.deliveryEnabled());
     }
 
     @GetMapping({"/restaurant", "/restaurant/menu"})
@@ -55,7 +70,8 @@ public class RestaurantController {
         model.addAttribute("tableContext", tableContext);
         model.addAttribute("publicMenuUrl", publicMenuUrl);
         model.addAttribute("attentionWhatsappLink", attentionWhatsappLink(tableContext, publicMenuUrl));
-        model.addAttribute("tableRequestTypes", publicTableRequestTypes());
+        RestaurantSettings settings = restaurantSettingsService.getSettings();
+        model.addAttribute("tableRequestTypes", settings.tableRequestsEnabled() ? publicTableRequestTypes() : List.of());
         addPublicRestaurantAttributes(model, tableContext, publicMenuUrl);
         return "public/restaurant_menu";
     }
@@ -316,6 +332,27 @@ public class RestaurantController {
         }
     }
 
+    @GetMapping("/admin/restaurant/settings")
+    public String restaurantSettings(Model model) {
+        ensureRestaurantRuntimeReady();
+        model.addAttribute("activePage", "restaurant_settings");
+        model.addAttribute("settings", restaurantSettingsService.getSettings());
+        return "admin/restaurant/settings";
+    }
+
+    @PostMapping("/admin/restaurant/settings")
+    public String updateRestaurantSettings(@RequestParam Map<String, String> values,
+                                           RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantSettingsService.update(values);
+            redirectAttributes.addFlashAttribute("successMessage", "Configuración del restaurante actualizada.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/settings";
+    }
+
     @GetMapping("/admin/restaurant/external-orders")
     public String externalOrders(@RequestParam(defaultValue = "ACTIVE") String statusFilter, Model model) {
         ensureRestaurantRuntimeReady();
@@ -327,12 +364,32 @@ public class RestaurantController {
     }
 
     @GetMapping("/admin/restaurant/external-orders/new")
-    public String newExternalOrder(@RequestParam(defaultValue = "TAKEAWAY") String serviceType, Model model) {
+    public String newExternalOrder(@RequestParam(defaultValue = "TAKEAWAY") String serviceType,
+                                   Model model,
+                                   RedirectAttributes redirectAttributes) {
         ensureRestaurantRuntimeReady();
+        RestaurantSettings settings = restaurantSettingsService.getSettings();
         String cleanServiceType = "DELIVERY".equalsIgnoreCase(serviceType) ? "DELIVERY" : "TAKEAWAY";
+        if ("DELIVERY".equals(cleanServiceType) && !settings.deliveryEnabled()) {
+            if (settings.takeawayEnabled()) {
+                cleanServiceType = "TAKEAWAY";
+            } else {
+                redirectAttributes.addFlashAttribute("errorMessage", "Delivery y para llevar están desactivados en Configuración del restaurante.");
+                return "redirect:/admin/restaurant/external-orders";
+            }
+        }
+        if ("TAKEAWAY".equals(cleanServiceType) && !settings.takeawayEnabled()) {
+            if (settings.deliveryEnabled()) {
+                cleanServiceType = "DELIVERY";
+            } else {
+                redirectAttributes.addFlashAttribute("errorMessage", "Delivery y para llevar están desactivados en Configuración del restaurante.");
+                return "redirect:/admin/restaurant/external-orders";
+            }
+        }
         model.addAttribute("activePage", "restaurant_external_orders");
         model.addAttribute("serviceType", cleanServiceType);
-        model.addAttribute("defaultScheduledAt", LocalDateTime.now().plusMinutes(30).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")));
+        model.addAttribute("defaultScheduledAt", LocalDateTime.now().plusMinutes(settings.preparationMinutes()).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")));
+        model.addAttribute("defaultDeliveryFee", settings.safeDefaultDeliveryFee());
         model.addAttribute("menuItems", restaurantService.menuItems());
         return "admin/restaurant/external_order_form";
     }
@@ -383,6 +440,7 @@ public class RestaurantController {
         model.addAttribute("activePage", "restaurant_external_orders");
         model.addAttribute("order", order);
         model.addAttribute("items", restaurantService.orderItems(id));
+        model.addAttribute("financialSummary", restaurantService.orderFinancialSummary(id));
         return "admin/restaurant/external_order_detail";
     }
 
@@ -876,6 +934,7 @@ public class RestaurantController {
         model.addAttribute("order", order);
         model.addAttribute("items", restaurantService.orderItems(id));
         model.addAttribute("menuItems", restaurantService.menuItems());
+        model.addAttribute("financialSummary", restaurantService.orderFinancialSummary(id));
         model.addAttribute("canEdit", order.canEdit());
         model.addAttribute("canSendToKitchen", order.canSendToKitchen());
         model.addAttribute("canMarkReady", order.canMarkReady());
@@ -942,6 +1001,7 @@ public class RestaurantController {
         model.addAttribute("externalOrder", restaurantService.externalOrder(id));
         model.addAttribute("items", restaurantService.orderItems(id));
         model.addAttribute("generatedAt", java.time.LocalDateTime.now());
+        model.addAttribute("financialSummary", restaurantService.orderFinancialSummary(id));
         addPrintableRestaurantAttributes(model);
         return "admin/restaurant/kitchen_ticket";
     }
@@ -959,6 +1019,7 @@ public class RestaurantController {
         model.addAttribute("externalOrder", restaurantService.externalOrder(id));
         model.addAttribute("items", restaurantService.orderItems(id));
         model.addAttribute("generatedAt", java.time.LocalDateTime.now());
+        model.addAttribute("financialSummary", restaurantService.orderFinancialSummary(id));
         addPrintableRestaurantAttributes(model);
         return "admin/restaurant/bill";
     }
@@ -978,6 +1039,7 @@ public class RestaurantController {
         model.addAttribute("paidOrder", paidOrder);
         model.addAttribute("items", restaurantService.orderItems(id));
         model.addAttribute("generatedAt", java.time.LocalDateTime.now());
+        model.addAttribute("financialSummary", restaurantService.orderFinancialSummary(id));
         addPrintableRestaurantAttributes(model);
         return "admin/restaurant/receipt";
     }
@@ -1045,25 +1107,39 @@ public class RestaurantController {
 
 
     private void addPrintableRestaurantAttributes(Model model) {
-        model.addAttribute("businessName", setting("platform.name", businessProperties.getName()));
+        RestaurantSettings settings = restaurantSettingsService.getSettings();
+        model.addAttribute("businessName", settings.safeTradeName());
+        model.addAttribute("businessLegalName", settings.safeLegalName());
+        model.addAttribute("businessRuc", settings.ruc());
+        model.addAttribute("businessAddress", settings.address());
+        model.addAttribute("businessPhone", settings.phone());
         model.addAttribute("businessTagline", setting("platform.tagline", businessProperties.getTagline()));
-        model.addAttribute("platformLogo", setting("platform.logo", businessProperties.getLogo()));
-        model.addAttribute("whatsappNumber", setting("public.whatsapp.number", businessProperties.getWhatsappNumber()));
+        model.addAttribute("platformLogo", settings.logoPath());
+        model.addAttribute("whatsappNumber", configuredWhatsapp(settings));
+        model.addAttribute("receiptFooter", settings.receiptFooter());
+        model.addAttribute("ticketShowLogo", settings.ticketShowLogo());
+        model.addAttribute("currencySymbol", settings.safeCurrencySymbol());
     }
 
     private void addPublicRestaurantAttributes(Model model, RestaurantPublicTableContext tableContext, String publicMenuUrl) {
-        String platformName = setting("platform.name", businessProperties.getName());
+        RestaurantSettings settings = restaurantSettingsService.getSettings();
+        String platformName = settings.safeTradeName();
         String platformTagline = setting("platform.tagline", businessProperties.getTagline());
-        String platformLogo = setting("platform.logo", businessProperties.getLogo());
-        String whatsappNumber = setting("public.whatsapp.number", businessProperties.getWhatsappNumber());
+        String platformLogo = settings.logoPath();
+        String whatsappNumber = configuredWhatsapp(settings);
 
         model.addAttribute("businessName", platformName);
         model.addAttribute("businessTagline", platformTagline);
         model.addAttribute("platformLogo", platformLogo);
         model.addAttribute("whatsappNumber", whatsappNumber);
-        model.addAttribute("topbarLocation", setting("public.topbar.location", "Iquitos"));
+        model.addAttribute("topbarLocation", settings.address() == null || settings.address().isBlank()
+                ? setting("public.topbar.location", "Iquitos")
+                : settings.address());
         model.addAttribute("publicPrimaryColor", setting("public.theme.primary_color", "#dc3545"));
         model.addAttribute("publicSecondaryColor", setting("public.theme.secondary_color", "#f97316"));
+        model.addAttribute("publicWelcomeMessage", settings.publicWelcomeMessage());
+        model.addAttribute("openingHoursLabel", settings.openingHoursLabel());
+        model.addAttribute("restaurantOpenNow", settings.isOpenNow());
         model.addAttribute("seoTitle", tableContext == null ? "Carta digital - " + platformName : "Carta digital " + tableContext.displayName() + " - " + platformName);
         model.addAttribute("seoDescription", "Carta digital QR de " + platformName + ". Revisa platos, bebidas y solicita atención desde tu mesa.");
         model.addAttribute("seoCanonicalUrl", publicMenuUrl);
@@ -1125,7 +1201,7 @@ public class RestaurantController {
     }
 
     private String attentionWhatsappLink(RestaurantPublicTableContext tableContext, String publicMenuUrl) {
-        String whatsappNumber = setting("public.whatsapp.number", businessProperties.getWhatsappNumber());
+        String whatsappNumber = configuredWhatsapp(restaurantSettingsService.getSettings()).replaceAll("[^0-9]", "");
         String tableLabel = tableContext == null ? "la carta digital" : tableContext.displayName();
         String message = "Hola, estoy revisando " + tableLabel + " y deseo solicitar atención. Link: " + publicMenuUrl;
         return "https://wa.me/" + whatsappNumber + "?text=" + URLEncoder.encode(message, StandardCharsets.UTF_8);
@@ -1183,6 +1259,13 @@ public class RestaurantController {
 
     private boolean isChecked(String value) {
         return value != null && ("on".equalsIgnoreCase(value) || "true".equalsIgnoreCase(value) || "1".equals(value));
+    }
+
+    private String configuredWhatsapp(RestaurantSettings settings) {
+        if (settings != null && settings.whatsapp() != null && !settings.whatsapp().isBlank()) {
+            return settings.whatsapp().trim();
+        }
+        return businessProperties.getWhatsappNumber();
     }
 
     private String setting(String variable, String defaultValue) {

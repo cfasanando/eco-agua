@@ -72,11 +72,22 @@
                             <input name="price" type="number" step="0.01" min="0" class="form-control mb-3" required
                                    th:value="${item != null ? item.priceDisplay() : '0.00'}">
 
-                            <label class="form-label">Stock referencial</label>
+                            <label class="form-label">Control de stock</label>
+                            <select name="stockControlMode" class="form-select mb-2">
+                                <option th:each="option : ${stockControlOptions}"
+                                        th:value="${option['value']}"
+                                        th:text="${option['label']}"
+                                        th:selected="${item != null ? item.safeStockControlMode() == option['value'] : option['value'] == 'PRODUCT'}">Por plato terminado</option>
+                            </select>
+                            <div class="form-text mb-3">
+                                <strong>Por plato:</strong> descuenta el stock del producto. <strong>Por receta:</strong> descuenta ingredientes. <strong>Sin control:</strong> no mueve inventario.
+                            </div>
+
+                            <label class="form-label">Stock del plato terminado</label>
                             <input name="stock" type="number" step="0.01" min="0" class="form-control mb-3"
                                    th:value="${item != null ? item.stockDisplay() : '0'}">
 
-                            <label class="form-label">Stock mínimo</label>
+                            <label class="form-label">Stock mínimo del plato</label>
                             <input name="minimumStock" type="number" step="0.01" min="0" class="form-control mb-3"
                                    th:value="${item != null ? item.minimumStockDisplay() : '0'}">
 
@@ -116,7 +127,7 @@
                     </div>
 
                     <div class="alert alert-light border small">
-                        <strong>Nota:</strong> un plato agotado u oculto no aparece en la carta pública ni en la creación de comandas.
+                        <strong>Nota:</strong> para control <em>Por receta</em>, el plato solo estará disponible si la receta está completa y todos sus ingredientes alcanzan para preparar al menos una porción.
                     </div>
                 </div>
             </form>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Movimientos de ingrediente')"></head>
+<body class="bg-light">
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Movimientos: <span th:text="${ingredient.name()}">Ingrediente</span></h1>
+                    <p class="text-muted small mb-0">Historial de reposiciones, consumos, devoluciones y ajustes.</p>
+                </div>
+                <a th:href="@{/admin/restaurant/ingredients}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Volver a ingredientes</a>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Stock actual</div><div class="h3 mb-0"><span th:text="${ingredient.stockDisplay()}">0</span> <small class="fs-6 text-muted" th:text="${ingredient.unitAbbreviation()}">unid.</small></div></div></div></div>
+                <div class="col-md-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Stock mínimo</div><div class="h3 mb-0"><span th:text="${ingredient.minimumStockDisplay()}">0</span> <small class="fs-6 text-muted" th:text="${ingredient.unitAbbreviation()}">unid.</small></div></div></div></div>
+                <div class="col-md-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Estado</div><span class="badge fs-6" th:classappend="${ingredient.stockStatusBadge()}" th:text="${ingredient.stockStatusLabel()}">Stock OK</span></div></div></div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center"><strong>Historial</strong><span class="badge text-bg-light" th:text="|${movements.size()} movimientos|">0 movimientos</span></div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light"><tr><th>Fecha</th><th>Tipo</th><th class="text-end">Movimiento</th><th class="text-end">Saldo</th><th>Referencia</th><th>Observación</th></tr></thead>
+                        <tbody>
+                        <tr th:each="movement : ${movements}">
+                            <td th:text="${movement.createdAtDisplay()}">-</td>
+                            <td><span class="badge" th:classappend="${movement.movementBadge()}" th:text="${movement.movementLabel()}">Movimiento</span></td>
+                            <td class="text-end fw-semibold" th:classappend="${movement.safeQuantityChange().signum() < 0} ? ' text-danger' : ' text-success'"> <span th:text="${movement.quantityDisplay()}">0</span> <span class="small" th:text="${movement.unitAbbreviation()}">unid.</span></td>
+                            <td class="text-end"><span th:text="${movement.balanceDisplay()}">0</span> <span class="small text-muted" th:text="${movement.unitAbbreviation()}">unid.</span></td>
+                            <td><a th:if="${movement.orderId() != null}" th:href="@{/admin/restaurant/orders/{id}(id=${movement.orderId()})}" th:text="${movement.referenceLabel()}">Pedido</a><span th:unless="${movement.orderId() != null}" th:text="${movement.referenceLabel()}">Manual</span></td>
+                            <td class="small text-muted" th:text="${movement.notesLabel()}">Nota</td>
+                        </tr>
+                        <tr th:if="${movements.isEmpty()}"><td colspan="6" class="text-center py-5 text-muted"><i class="bi bi-clock-history fs-2 d-block mb-2"></i>No hay movimientos registrados.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<div th:replace="fragments/scripts_admin :: adminScripts"></div>
+</body>
+</html>

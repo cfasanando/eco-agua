@@ -31,9 +31,10 @@ public class RestaurantModuleInstaller {
                 WHERE table_schema = DATABASE()
                   AND table_name IN ('restaurant_table', 'restaurant_order', 'restaurant_order_item', 'restaurant_table_request',
                                      'restaurant_qr_order', 'restaurant_qr_order_item', 'restaurant_reservation',
-                                     'restaurant_ingredient', 'restaurant_recipe_item')
+                                     'restaurant_ingredient', 'restaurant_recipe_item', 'restaurant_ingredient_movement',
+                                     'restaurant_order_item_ingredient')
                 """, Integer.class);
-        return count != null && count == 9;
+        return count != null && count == 11;
     }
 
     @Transactional
@@ -178,12 +179,59 @@ public class RestaurantModuleInstaller {
                     unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
                     line_total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
                     kitchen_status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+                    stock_control_mode VARCHAR(20) NOT NULL DEFAULT 'PRODUCT',
                     PRIMARY KEY (id),
                     KEY idx_restaurant_order_item_order (order_id),
                     KEY idx_restaurant_order_item_product (product_id),
                     CONSTRAINT fk_restaurant_order_item_order FOREIGN KEY (order_id) REFERENCES restaurant_order(id) ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+
+        ensureRestaurantOrderItemStockColumns();
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS restaurant_order_item_ingredient (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    order_item_id BIGINT NOT NULL,
+                    ingredient_id BIGINT NOT NULL,
+                    ingredient_name VARCHAR(180) NOT NULL,
+                    unit_code VARCHAR(20) NOT NULL DEFAULT 'UNIT',
+                    quantity_per_unit DECIMAL(14,4) NOT NULL DEFAULT 0.0000,
+                    quantity_reserved DECIMAL(14,4) NOT NULL DEFAULT 0.0000,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_restaurant_order_item_ingredient (order_item_id, ingredient_id),
+                    KEY idx_restaurant_order_item_ingredient_item (order_item_id),
+                    KEY idx_restaurant_order_item_ingredient_ingredient (ingredient_id),
+                    CONSTRAINT fk_restaurant_order_item_ingredient_item FOREIGN KEY (order_item_id)
+                        REFERENCES restaurant_order_item(id) ON DELETE CASCADE,
+                    CONSTRAINT fk_restaurant_order_item_ingredient_ingredient FOREIGN KEY (ingredient_id)
+                        REFERENCES restaurant_ingredient(id) ON DELETE RESTRICT
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS restaurant_ingredient_movement (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    ingredient_id BIGINT NOT NULL,
+                    movement_type VARCHAR(30) NOT NULL DEFAULT 'ADJUSTMENT',
+                    quantity_change DECIMAL(14,4) NOT NULL DEFAULT 0.0000,
+                    balance_after DECIMAL(14,4) NOT NULL DEFAULT 0.0000,
+                    order_id BIGINT NULL,
+                    order_item_id BIGINT NULL,
+                    notes VARCHAR(500) NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    KEY idx_restaurant_ingredient_movement_ingredient (ingredient_id, created_at),
+                    KEY idx_restaurant_ingredient_movement_order (order_id),
+                    KEY idx_restaurant_ingredient_movement_item (order_item_id),
+                    CONSTRAINT fk_restaurant_ingredient_movement_ingredient FOREIGN KEY (ingredient_id)
+                        REFERENCES restaurant_ingredient(id) ON DELETE RESTRICT
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+
+        seedOpeningIngredientMovements();
 
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_table_request (
@@ -271,6 +319,31 @@ public class RestaurantModuleInstaller {
     }
 
 
+    private void ensureRestaurantOrderItemStockColumns() {
+        if (!tableExists("restaurant_order_item")) {
+            return;
+        }
+        ensureColumn("restaurant_order_item", "stock_control_mode",
+                "ALTER TABLE restaurant_order_item ADD COLUMN stock_control_mode VARCHAR(20) NOT NULL DEFAULT 'PRODUCT' AFTER kitchen_status");
+    }
+
+    private void seedOpeningIngredientMovements() {
+        if (!tableExists("restaurant_ingredient") || !tableExists("restaurant_ingredient_movement")) {
+            return;
+        }
+        jdbcTemplate.update("""
+                INSERT INTO restaurant_ingredient_movement
+                (ingredient_id, movement_type, quantity_change, balance_after, notes, created_at)
+                SELECT i.id, 'OPENING', i.stock, i.stock, 'Saldo inicial registrado al instalar el control de ingredientes', NOW()
+                FROM restaurant_ingredient i
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM restaurant_ingredient_movement m
+                    WHERE m.ingredient_id = i.id
+                )
+                """);
+    }
+
     private void ensureRestaurantOperationalColumns() {
         if (!tableExists("restaurant_order")) {
             return;
@@ -332,6 +405,7 @@ public class RestaurantModuleInstaller {
                         restaurant_visible TINYINT(1) NOT NULL DEFAULT 1,
                         restaurant_available TINYINT(1) NOT NULL DEFAULT 1,
                         restaurant_sort_order INT NOT NULL DEFAULT 0,
+                        restaurant_stock_control VARCHAR(20) NOT NULL DEFAULT 'PRODUCT',
                         PRIMARY KEY (id),
                         KEY idx_product_active (active),
                         KEY idx_product_featured (featured),
@@ -351,6 +425,7 @@ public class RestaurantModuleInstaller {
         ensureColumn("product", "restaurant_visible", "ALTER TABLE product ADD COLUMN restaurant_visible TINYINT(1) NOT NULL DEFAULT 1 AFTER minimum_stock");
         ensureColumn("product", "restaurant_available", "ALTER TABLE product ADD COLUMN restaurant_available TINYINT(1) NOT NULL DEFAULT 1 AFTER restaurant_visible");
         ensureColumn("product", "restaurant_sort_order", "ALTER TABLE product ADD COLUMN restaurant_sort_order INT NOT NULL DEFAULT 0 AFTER restaurant_available");
+        ensureColumn("product", "restaurant_stock_control", "ALTER TABLE product ADD COLUMN restaurant_stock_control VARCHAR(20) NOT NULL DEFAULT 'PRODUCT' AFTER restaurant_sort_order");
     }
 
     private void ensureModuleCatalog() {
@@ -362,7 +437,7 @@ public class RestaurantModuleInstaller {
                 INSERT INTO platform_module_catalog
                 (`module_key`, `name`, `area`, `description`, `default_enabled`, `configurable`, `active`, `display_order`, `created_at`, `updated_at`)
                 VALUES ('restaurant', 'Restaurante / carta y comandas', 'Operación restaurante',
-                        'Carta digital, reservas, mesas, comandas, pedidos para llevar, delivery, ingredientes, recetas y cocina.', 0, 1, 1, 10, NOW(), NOW())
+                        'Carta digital, reservas, mesas, comandas, pedidos para llevar, delivery, ingredientes, recetas, inventario por ingredientes y cocina.', 0, 1, 1, 10, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
                     `name` = VALUES(`name`),
                     area = VALUES(area),

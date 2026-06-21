@@ -71,7 +71,7 @@
 
             <div class="alert alert-info border-0 shadow-sm small">
                 <i class="bi bi-info-circle me-1"></i>
-                Un plato con stock cero queda como <strong>agotado</strong> y se oculta de la carta pública y de nueva comanda. Usa <strong>Reponer</strong> para volver a venderlo.
+                La disponibilidad depende del modo de control: <strong>por plato</strong> usa el stock del producto, <strong>por receta</strong> calcula las porciones según sus ingredientes y <strong>sin control</strong> no descuenta inventario.
             </div>
 
             <div class="card shadow-sm border-0 mb-3">
@@ -129,12 +129,18 @@
                                 </div>
                                 <span class="badge mt-1" th:classappend="${item.recipeStatusBadge()}" th:text="${item.recipeStatusLabel()}">Sin receta</span>
                             </td>
-                            <td class="text-center">
-                                <div class="fw-semibold" th:text="${item.stockDisplay()}">0.00</div>
-                                <span class="badge" th:classappend="${item.stockStatusBadge()}" th:text="${item.stockStatusLabel()}">Stock OK</span>
-                                <div class="small text-muted" th:if="${item.safeMinimumStock().intValue() > 0}">
-                                    Mín. <span th:text="${item.minimumStockDisplay()}">0.00</span>
+                            <td class="text-center" style="min-width:170px;">
+                                <span class="badge mb-1" th:classappend="${item.stockControlBadge()}" th:text="${item.stockControlLabel()}">Por plato</span>
+                                <div th:if="${item.usesProductStock()}">
+                                    <div class="fw-semibold" th:text="${item.stockDisplay()}">0</div>
+                                    <div class="small text-muted" th:if="${item.safeMinimumStock().signum() > 0}">Mín. <span th:text="${item.minimumStockDisplay()}">0</span></div>
                                 </div>
+                                <div th:if="${item.usesRecipeStock()}">
+                                    <div class="fw-semibold"><span th:text="${item.effectiveAvailableDisplay()}">0</span> porciones</div>
+                                    <div class="small text-muted">Limita: <span th:text="${item.limitingIngredientLabel()}">-</span></div>
+                                </div>
+                                <div th:if="${item.hasNoStockControl()}" class="small text-muted">No descuenta inventario</div>
+                                <span class="badge mt-1" th:classappend="${item.stockStatusBadge()}" th:text="${item.stockStatusLabel()}">Stock OK</span>
                             </td>
                             <td>
                                 <div class="d-flex flex-wrap gap-1">
@@ -174,20 +180,19 @@
                                             <i class="bi bi-pencil"></i> Editar
                                         </a>
                                     </div>
-                                    <form th:action="@{/admin/restaurant/menu-items/{id}/stock(id=${item.id()})}" method="post" class="w-100" style="max-width:320px;">
+                                    <form th:if="${item.usesProductStock()}" th:action="@{/admin/restaurant/menu-items/{id}/stock(id=${item.id()})}" method="post" class="w-100" style="max-width:320px;">
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                        <label class="form-label small text-muted mb-1" th:for="|stock-quantity-${item.id()}|">
-                                            Cantidad a reponer
-                                        </label>
+                                        <label class="form-label small text-muted mb-1" th:for="|stock-quantity-${item.id()}|">Cantidad de platos a reponer</label>
                                         <div class="input-group input-group-sm">
                                             <span class="input-group-text">+</span>
                                             <input th:id="|stock-quantity-${item.id()}|" type="number" name="quantity" min="1" step="1" value="5" class="form-control text-center" aria-label="Cantidad a reponer">
-                                            <button class="btn btn-outline-success" type="submit" title="Sumar esta cantidad al stock actual y marcar el plato como disponible">
-                                                <i class="bi bi-plus-square"></i> Reponer stock
-                                            </button>
+                                            <button class="btn btn-outline-success" type="submit" title="Sumar al stock del plato terminado"><i class="bi bi-plus-square"></i> Reponer</button>
                                         </div>
-                                        <div class="form-text text-start">Suma la cantidad indicada al stock actual.</div>
                                     </form>
+                                    <div th:if="${item.usesRecipeStock()}" class="small text-muted text-end" style="max-width:320px;">
+                                        Repón los ingredientes desde <a th:href="@{/admin/restaurant/ingredients}">Ingredientes y recetas</a>.
+                                    </div>
+                                    <div th:if="${item.hasNoStockControl()}" class="small text-muted text-end">Este plato no requiere reposición.</div>
                                 </div>
                             </td>
                         </tr>

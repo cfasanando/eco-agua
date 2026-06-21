@@ -1,6 +1,7 @@
 package com.ecoamazonas.eco_agua.restaurant;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 public record RestaurantMenuAdminRow(
         Long id,
@@ -19,7 +20,11 @@ public record RestaurantMenuAdminRow(
         int restaurantSortOrder,
         BigDecimal recipeCost,
         int recipeItemCount,
-        int recipeIssueCount
+        int recipeIssueCount,
+        String stockControlMode,
+        BigDecimal availablePortions,
+        String limitingIngredient,
+        int recipeLowIngredientCount
 ) {
     public BigDecimal safePrice() {
         return price == null ? BigDecimal.ZERO : price;
@@ -33,6 +38,10 @@ public record RestaurantMenuAdminRow(
         return minimumStock == null ? BigDecimal.ZERO : minimumStock;
     }
 
+    public BigDecimal safeAvailablePortions() {
+        return availablePortions == null ? BigDecimal.ZERO : availablePortions.max(BigDecimal.ZERO);
+    }
+
     public String imageOrFallback() {
         return imagePath == null || imagePath.isBlank() ? "/img/logo3-transparente.png" : imagePath;
     }
@@ -41,19 +50,73 @@ public record RestaurantMenuAdminRow(
         return categoryName == null || categoryName.isBlank() ? "Carta general" : categoryName;
     }
 
+    public String safeStockControlMode() {
+        String clean = stockControlMode == null ? "PRODUCT" : stockControlMode.trim().toUpperCase();
+        return switch (clean) {
+            case "RECIPE", "NONE" -> clean;
+            default -> "PRODUCT";
+        };
+    }
+
+    public boolean usesProductStock() {
+        return "PRODUCT".equals(safeStockControlMode());
+    }
+
+    public boolean usesRecipeStock() {
+        return "RECIPE".equals(safeStockControlMode());
+    }
+
+    public boolean hasNoStockControl() {
+        return "NONE".equals(safeStockControlMode());
+    }
+
+    public String stockControlLabel() {
+        return switch (safeStockControlMode()) {
+            case "RECIPE" -> "Por receta";
+            case "NONE" -> "Sin control";
+            default -> "Por plato";
+        };
+    }
+
+    public String stockControlBadge() {
+        return switch (safeStockControlMode()) {
+            case "RECIPE" -> "text-bg-info";
+            case "NONE" -> "text-bg-secondary";
+            default -> "text-bg-primary";
+        };
+    }
+
+    public BigDecimal effectiveAvailableQuantity() {
+        if (hasNoStockControl()) {
+            return BigDecimal.valueOf(999999);
+        }
+        if (usesRecipeStock()) {
+            return isRecipeComplete() ? safeAvailablePortions().setScale(0, RoundingMode.FLOOR) : BigDecimal.ZERO;
+        }
+        return safeStock().setScale(0, RoundingMode.FLOOR);
+    }
+
+    public String effectiveAvailableDisplay() {
+        return hasNoStockControl() ? "Sin límite" : RestaurantDecimalFormat.quantity(effectiveAvailableQuantity());
+    }
+
+    public String limitingIngredientLabel() {
+        return limitingIngredient == null || limitingIngredient.isBlank() ? "-" : limitingIngredient;
+    }
+
     public String visibilityLabel() {
         return restaurantVisible ? "Visible" : "Oculto";
     }
 
     public String availabilityLabel() {
-        if (isOutOfStock()) {
-            return "Agotado";
+        if (!hasEffectiveStock()) {
+            return usesRecipeStock() && !isRecipeComplete() ? "Receta incompleta" : "Agotado";
         }
         return restaurantAvailable ? "Disponible" : "Pausado";
     }
 
     public String availabilityBadge() {
-        if (isOutOfStock()) {
+        if (!hasEffectiveStock()) {
             return "text-bg-danger";
         }
         return restaurantAvailable ? "text-bg-success" : "text-bg-warning";
@@ -63,17 +126,29 @@ public record RestaurantMenuAdminRow(
         return restaurantVisible ? "text-bg-primary" : "text-bg-secondary";
     }
 
+    public boolean hasEffectiveStock() {
+        return hasNoStockControl() || effectiveAvailableQuantity().compareTo(BigDecimal.ZERO) > 0;
+    }
+
     public boolean isOutOfStock() {
-        return safeStock().compareTo(BigDecimal.ZERO) <= 0;
+        return !hasEffectiveStock();
     }
 
     public boolean isLowStock() {
-        return !isOutOfStock()
-                && safeMinimumStock().compareTo(BigDecimal.ZERO) > 0
+        if (hasNoStockControl() || isOutOfStock()) {
+            return false;
+        }
+        if (usesRecipeStock()) {
+            return recipeLowIngredientCount > 0 || safeAvailablePortions().compareTo(BigDecimal.valueOf(3)) <= 0;
+        }
+        return safeMinimumStock().compareTo(BigDecimal.ZERO) > 0
                 && safeStock().compareTo(safeMinimumStock()) <= 0;
     }
 
     public String stockStatusLabel() {
+        if (hasNoStockControl()) {
+            return "Sin control";
+        }
         if (isOutOfStock()) {
             return "Agotado";
         }
@@ -84,6 +159,9 @@ public record RestaurantMenuAdminRow(
     }
 
     public String stockStatusBadge() {
+        if (hasNoStockControl()) {
+            return "text-bg-secondary";
+        }
         if (isOutOfStock()) {
             return "text-bg-danger";
         }
@@ -123,7 +201,7 @@ public record RestaurantMenuAdminRow(
         }
         return estimatedMarginAmount()
                 .multiply(BigDecimal.valueOf(100))
-                .divide(safePrice(), 2, java.math.RoundingMode.HALF_UP);
+                .divide(safePrice(), 2, RoundingMode.HALF_UP);
     }
 
     public String estimatedMarginAmountDisplay() {
@@ -157,6 +235,6 @@ public record RestaurantMenuAdminRow(
     }
 
     public boolean canBeSold() {
-        return active && restaurantVisible && restaurantAvailable && !isOutOfStock();
+        return active && restaurantVisible && restaurantAvailable && hasEffectiveStock();
     }
 }

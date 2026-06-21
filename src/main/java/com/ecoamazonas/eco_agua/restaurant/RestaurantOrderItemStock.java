@@ -5,6 +5,14 @@ public record RestaurantOrderItemStock(
         Long orderId,
         Long productId,
         String productName,
-        int quantity
+        int quantity,
+        String stockControlMode
 ) {
+    public String safeStockControlMode() {
+        String clean = stockControlMode == null ? "PRODUCT" : stockControlMode.trim().toUpperCase();
+        return switch (clean) {
+            case "RECIPE", "NONE" -> clean;
+            default -> "PRODUCT";
+        };
+    }
 }

@@ -521,6 +521,37 @@ public class RestaurantController {
         return "redirect:/admin/restaurant/ingredients";
     }
 
+    @PostMapping("/admin/restaurant/ingredients/{id}/stock")
+    public String replenishIngredientStock(@PathVariable Long id,
+                                           @RequestParam(required = false) BigDecimal quantity,
+                                           @RequestParam(required = false) String notes,
+                                           RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.replenishIngredientStock(id, quantity, notes);
+            redirectAttributes.addFlashAttribute("successMessage", "Stock del ingrediente repuesto correctamente.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/ingredients";
+    }
+
+    @GetMapping("/admin/restaurant/ingredients/{id}/movements")
+    public String ingredientMovements(@PathVariable Long id,
+                                      Model model,
+                                      RedirectAttributes redirectAttributes) {
+        ensureRestaurantRuntimeReady();
+        RestaurantIngredientRow ingredient = restaurantService.ingredient(id);
+        if (ingredient == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "El ingrediente seleccionado no existe.");
+            return "redirect:/admin/restaurant/ingredients";
+        }
+        model.addAttribute("activePage", "restaurant_ingredient_movements");
+        model.addAttribute("ingredient", ingredient);
+        model.addAttribute("movements", restaurantService.ingredientMovements(id));
+        return "admin/restaurant/ingredient_movements";
+    }
+
     @GetMapping("/admin/restaurant/menu-items")
     public String menuItems(@RequestParam(defaultValue = "ALL") String stockFilter, Model model) {
         ensureRestaurantRuntimeReady();
@@ -537,6 +568,7 @@ public class RestaurantController {
         model.addAttribute("activePage", "restaurant_menu_items");
         model.addAttribute("item", null);
         model.addAttribute("categories", restaurantService.productCategories());
+        model.addAttribute("stockControlOptions", stockControlOptions());
         model.addAttribute("formAction", "/admin/restaurant/menu-items");
         model.addAttribute("formTitle", "Nuevo plato");
         return "admin/restaurant/menu_item_form";
@@ -553,6 +585,7 @@ public class RestaurantController {
         model.addAttribute("activePage", "restaurant_menu_items");
         model.addAttribute("item", item);
         model.addAttribute("categories", restaurantService.productCategories());
+        model.addAttribute("stockControlOptions", stockControlOptions());
         model.addAttribute("formAction", "/admin/restaurant/menu-items/" + id);
         model.addAttribute("formTitle", "Editar plato");
         return "admin/restaurant/menu_item_form";
@@ -571,13 +604,15 @@ public class RestaurantController {
                                  @RequestParam(required = false) String featured,
                                  @RequestParam(required = false) String restaurantVisible,
                                  @RequestParam(required = false) String restaurantAvailable,
+                                 @RequestParam(defaultValue = "PRODUCT") String stockControlMode,
                                  @RequestParam(defaultValue = "0") int sortOrder,
                                  RedirectAttributes redirectAttributes) {
         try {
             ensureRestaurantRuntimeReady();
             restaurantService.createMenuItem(
                     name, description, imagePath, price, stock, minimumStock, categoryId, newCategoryName,
-                    isChecked(active), isChecked(featured), isChecked(restaurantVisible), isChecked(restaurantAvailable), sortOrder
+                    isChecked(active), isChecked(featured), isChecked(restaurantVisible), isChecked(restaurantAvailable),
+                    stockControlMode, sortOrder
             );
             redirectAttributes.addFlashAttribute("successMessage", "Plato creado correctamente.");
             return "redirect:/admin/restaurant/menu-items";
@@ -601,13 +636,15 @@ public class RestaurantController {
                                  @RequestParam(required = false) String featured,
                                  @RequestParam(required = false) String restaurantVisible,
                                  @RequestParam(required = false) String restaurantAvailable,
+                                 @RequestParam(defaultValue = "PRODUCT") String stockControlMode,
                                  @RequestParam(defaultValue = "0") int sortOrder,
                                  RedirectAttributes redirectAttributes) {
         try {
             ensureRestaurantRuntimeReady();
             restaurantService.updateMenuItem(
                     id, name, description, imagePath, price, stock, minimumStock, categoryId, newCategoryName,
-                    isChecked(active), isChecked(featured), isChecked(restaurantVisible), isChecked(restaurantAvailable), sortOrder
+                    isChecked(active), isChecked(featured), isChecked(restaurantVisible), isChecked(restaurantAvailable),
+                    stockControlMode, sortOrder
             );
             redirectAttributes.addFlashAttribute("successMessage", "Plato actualizado correctamente.");
             return "redirect:/admin/restaurant/menu-items";
@@ -1107,6 +1144,14 @@ public class RestaurantController {
         boolean defaultHttp = "http".equalsIgnoreCase(request.getScheme()) && port == 80;
         boolean defaultHttps = "https".equalsIgnoreCase(request.getScheme()) && port == 443;
         return defaultHttp || defaultHttps ? "" : ":" + port;
+    }
+
+    private List<Map<String, String>> stockControlOptions() {
+        return List.of(
+                Map.of("value", "PRODUCT", "label", "Por plato terminado"),
+                Map.of("value", "RECIPE", "label", "Por ingredientes de la receta"),
+                Map.of("value", "NONE", "label", "Sin control de stock")
+        );
     }
 
     private List<Map<String, String>> ingredientUnitOptions() {

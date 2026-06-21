@@ -10,7 +10,7 @@
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                 <div>
                     <h1 class="h4 mb-1">Ingredientes</h1>
-                    <p class="text-muted small mb-0">Registra costos, unidades y stock referencial para calcular el costo de cada receta.</p>
+                    <p class="text-muted small mb-0">Controla costos, existencias y movimientos utilizados por las recetas.</p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
                     <a th:href="@{/admin/restaurant/menu-items}" class="btn btn-sm btn-outline-secondary">
@@ -32,41 +32,16 @@
             </div>
 
             <div class="row g-3 mb-3" th:if="${summary != null}">
-                <div class="col-6 col-xl">
-                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
-                        <div class="small text-muted">Total</div>
-                        <div class="h3 mb-0" th:text="${summary.totalIngredients()}">0</div>
-                    </div></div>
-                </div>
-                <div class="col-6 col-xl">
-                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
-                        <div class="small text-muted">Activos</div>
-                        <div class="h3 mb-0 text-success" th:text="${summary.activeIngredients()}">0</div>
-                    </div></div>
-                </div>
-                <div class="col-6 col-xl">
-                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
-                        <div class="small text-muted">Stock bajo</div>
-                        <div class="h3 mb-0 text-warning" th:text="${summary.lowStockIngredients()}">0</div>
-                    </div></div>
-                </div>
-                <div class="col-6 col-xl">
-                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
-                        <div class="small text-muted">Agotados</div>
-                        <div class="h3 mb-0 text-danger" th:text="${summary.outOfStockIngredients()}">0</div>
-                    </div></div>
-                </div>
-                <div class="col-6 col-xl">
-                    <div class="card border-0 shadow-sm h-100"><div class="card-body">
-                        <div class="small text-muted">Inactivos</div>
-                        <div class="h3 mb-0 text-secondary" th:text="${summary.inactiveIngredients()}">0</div>
-                    </div></div>
-                </div>
+                <div class="col-6 col-xl"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="small text-muted">Total</div><div class="h3 mb-0" th:text="${summary.totalIngredients()}">0</div></div></div></div>
+                <div class="col-6 col-xl"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="small text-muted">Activos</div><div class="h3 mb-0 text-success" th:text="${summary.activeIngredients()}">0</div></div></div></div>
+                <div class="col-6 col-xl"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="small text-muted">Stock bajo</div><div class="h3 mb-0 text-warning" th:text="${summary.lowStockIngredients()}">0</div></div></div></div>
+                <div class="col-6 col-xl"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="small text-muted">Agotados</div><div class="h3 mb-0 text-danger" th:text="${summary.outOfStockIngredients()}">0</div></div></div></div>
+                <div class="col-6 col-xl"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="small text-muted">Inactivos</div><div class="h3 mb-0 text-secondary" th:text="${summary.inactiveIngredients()}">0</div></div></div></div>
             </div>
 
-            <div class="alert alert-info border-0 shadow-sm small">
-                <i class="bi bi-info-circle me-1"></i>
-                En esta fase el stock de ingredientes es informativo. El descuento automático por comanda se conectará en la siguiente fase.
+            <div class="alert alert-success border-0 shadow-sm small">
+                <i class="bi bi-check-circle me-1"></i>
+                El stock por receta está activo. Los pedidos descuentan ingredientes y las anulaciones o reducciones los devuelven automáticamente.
             </div>
 
             <div class="card shadow-sm border-0 mb-3">
@@ -93,46 +68,45 @@
                             <th>Unidad</th>
                             <th class="text-end">Costo unitario</th>
                             <th class="text-end">Stock</th>
-                            <th class="text-end">Stock mínimo</th>
+                            <th class="text-end">Mínimo</th>
                             <th>Estado</th>
+                            <th style="min-width:300px;">Reposición rápida</th>
                             <th class="text-end">Acciones</th>
                         </tr>
                         </thead>
                         <tbody>
                         <tr th:each="ingredient : ${ingredients}">
-                            <td style="min-width:240px;">
+                            <td style="min-width:220px;">
                                 <div class="fw-semibold" th:text="${ingredient.name()}">Ingrediente</div>
-                                <div class="small text-muted text-truncate" style="max-width:320px;" th:text="${ingredient.notesLabel()}">Notas</div>
+                                <div class="small text-muted text-truncate" style="max-width:280px;" th:text="${ingredient.notesLabel()}">Notas</div>
                             </td>
-                            <td>
-                                <span th:text="${ingredient.unitLabel()}">Unidad</span>
-                                <span class="small text-muted" th:text="|(${ingredient.unitAbbreviation()})|">(unid.)</span>
-                            </td>
-                            <td class="text-end fw-semibold">S/ <span th:text="${ingredient.unitCostDisplay()}">0.0000</span></td>
-                            <td class="text-end" th:text="${ingredient.stockDisplay()}">0.0000</td>
-                            <td class="text-end" th:text="${ingredient.minimumStockDisplay()}">0.0000</td>
+                            <td><span th:text="${ingredient.unitLabel()}">Unidad</span> <span class="small text-muted" th:text="|(${ingredient.unitAbbreviation()})|">(unid.)</span></td>
+                            <td class="text-end fw-semibold">S/ <span th:text="${ingredient.unitCostDisplay()}">0.00</span></td>
+                            <td class="text-end fw-semibold" th:text="${ingredient.stockDisplay()}">0</td>
+                            <td class="text-end" th:text="${ingredient.minimumStockDisplay()}">0</td>
                             <td><span class="badge" th:classappend="${ingredient.stockStatusBadge()}" th:text="${ingredient.stockStatusLabel()}">Stock OK</span></td>
+                            <td>
+                                <form th:action="@{/admin/restaurant/ingredients/{id}/stock(id=${ingredient.id()})}" method="post" class="d-flex gap-1">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <input type="number" name="quantity" min="0.0001" step="0.0001" value="1" class="form-control form-control-sm" style="max-width:110px;" aria-label="Cantidad a reponer">
+                                    <input type="text" name="notes" maxlength="500" class="form-control form-control-sm" placeholder="Nota opcional">
+                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Sumar al stock actual"><i class="bi bi-plus-square"></i></button>
+                                </form>
+                            </td>
                             <td class="text-end">
                                 <div class="d-inline-flex flex-wrap justify-content-end gap-1">
+                                    <a th:href="@{/admin/restaurant/ingredients/{id}/movements(id=${ingredient.id()})}" class="btn btn-sm btn-outline-dark" title="Ver movimientos"><i class="bi bi-clock-history"></i></a>
                                     <form th:action="@{/admin/restaurant/ingredients/{id}/active(id=${ingredient.id()})}" method="post">
                                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                                        <button type="submit" class="btn btn-sm" th:classappend="${ingredient.active()} ? ' btn-outline-warning' : ' btn-outline-success'">
+                                        <button type="submit" class="btn btn-sm" th:classappend="${ingredient.active()} ? ' btn-outline-warning' : ' btn-outline-success'" th:title="${ingredient.active()} ? 'Desactivar' : 'Activar'">
                                             <i class="bi" th:classappend="${ingredient.active()} ? ' bi-pause-circle' : ' bi-play-circle'"></i>
-                                            <span th:text="${ingredient.active()} ? 'Desactivar' : 'Activar'">Estado</span>
                                         </button>
                                     </form>
-                                    <a th:href="@{/admin/restaurant/ingredients/{id}/edit(id=${ingredient.id()})}" class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-pencil"></i> Editar
-                                    </a>
+                                    <a th:href="@{/admin/restaurant/ingredients/{id}/edit(id=${ingredient.id()})}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="bi bi-pencil"></i></a>
                                 </div>
                             </td>
                         </tr>
-                        <tr th:if="${ingredients.isEmpty()}">
-                            <td colspan="7" class="text-center py-5 text-muted">
-                                <i class="bi bi-basket2 fs-2 d-block mb-2"></i>
-                                No hay ingredientes para este filtro.
-                            </td>
-                        </tr>
+                        <tr th:if="${ingredients.isEmpty()}"><td colspan="8" class="text-center py-5 text-muted"><i class="bi bi-basket2 fs-2 d-block mb-2"></i>No hay ingredientes para este filtro.</td></tr>
                         </tbody>
                     </table>
                 </div>

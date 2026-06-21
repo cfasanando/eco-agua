@@ -10,7 +10,7 @@
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                 <div>
                     <h1 class="h4 mb-1">Receta: <span th:text="${item.name()}">Plato</span></h1>
-                    <p class="text-muted small mb-0">Relaciona ingredientes y cantidades para calcular el costo y margen estimado.</p>
+                    <p class="text-muted small mb-0">Relaciona ingredientes y cantidades para calcular costo, margen y disponibilidad real por receta.</p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
                     <a th:href="@{/admin/restaurant/ingredients}" class="btn btn-sm btn-outline-dark">
@@ -58,6 +58,23 @@
                         <div class="h4 mb-1" th:text="|${item.estimatedMarginPercentDisplay()}%|">0.00%</div>
                         <span class="badge" th:classappend="${item.recipeStatusBadge()}" th:text="${item.recipeStatusLabel()}">Sin receta</span>
                     </div></div>
+                </div>
+            </div>
+
+            <div class="alert border-0 shadow-sm small"
+                 th:classappend="${item.usesRecipeStock()} ? ' alert-info' : ' alert-light'">
+                <div class="d-flex flex-wrap justify-content-between gap-2 align-items-center">
+                    <div>
+                        <strong>Control de stock:</strong>
+                        <span class="badge" th:classappend="${item.stockControlBadge()}" th:text="${item.stockControlLabel()}">Por plato</span>
+                    </div>
+                    <div th:if="${item.usesRecipeStock()}">
+                        <strong>Porciones disponibles:</strong> <span th:text="${item.effectiveAvailableDisplay()}">0</span>
+                        <span class="text-muted">· Ingrediente limitante:</span> <span th:text="${item.limitingIngredientLabel()}">-</span>
+                    </div>
+                    <div th:unless="${item.usesRecipeStock()}" class="text-muted">
+                        Cambia a <strong>Por ingredientes de la receta</strong> desde Editar plato para descontar ingredientes automáticamente.
+                    </div>
                 </div>
             </div>
 

@@ -87,6 +87,7 @@
         th:with="isRestaurantActive=${activePage == 'restaurant_dashboard'
           or activePage == 'restaurant_tables'
           or activePage == 'restaurant_menu_items'
+          or activePage == 'restaurant_table_requests'
           or activePage == 'restaurant_orders_new'
           or activePage == 'restaurant_kitchen'
           or activePage == 'restaurant_cash'}"
@@ -133,6 +134,16 @@
           >
             <span class="icon"><i class="bi bi-card-list"></i></span>
             <span>Platos y carta</span>
+          </a>
+
+          <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"
+            th:href="@{/admin/restaurant/table-requests}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'restaurant_table_requests' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-bell"></i></span>
+            <span>Solicitudes</span>
           </a>
 
           <a
@@ -516,6 +527,7 @@
           th:with="isRestaurantActive=${activePage == 'restaurant_dashboard'
             or activePage == 'restaurant_tables'
             or activePage == 'restaurant_menu_items'
+          or activePage == 'restaurant_table_requests'
           or activePage == 'restaurant_orders_new'
             or activePage == 'restaurant_kitchen'
             or activePage == 'restaurant_cash'}"
@@ -560,6 +572,15 @@
             >
               <span class="icon"><i class="bi bi-card-list"></i></span>
               <span>Platos y carta</span>
+            </a>
+            <a
+              sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"
+              th:href="@{/admin/restaurant/table-requests}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'restaurant_table_requests' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-bell"></i></span>
+              <span>Solicitudes</span>
             </a>
             <a
               sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')"

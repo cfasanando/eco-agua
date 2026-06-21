@@ -16,6 +16,10 @@
                     <a th:href="@{/restaurant/menu}" target="_blank" class="btn btn-sm btn-outline-success">
                         <i class="bi bi-qr-code"></i> Carta pública
                     </a>
+                    <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')" th:href="@{/admin/restaurant/table-requests}" class="btn btn-sm btn-outline-danger position-relative">
+                        <i class="bi bi-bell"></i> Solicitudes
+                        <span th:if="${pendingTableRequestCount > 0}" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" th:text="${pendingTableRequestCount}">0</span>
+                    </a>
                     <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')" th:href="@{/admin/restaurant/cash}" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-cash-coin"></i> Caja diaria
                     </a>
@@ -190,6 +194,43 @@
                 <div class="col-xl-4">
                     <div class="card shadow-sm border-0 mb-3">
                         <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <strong>Solicitudes de mesa</strong>
+                            <span class="badge text-bg-danger" th:text="${pendingTableRequestCount} + ' pendientes'">0 pendientes</span>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            <div class="list-group-item" th:each="request, iter : ${pendingTableRequests}" th:if="${iter.index < 5}">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                    <div>
+                                        <div class="fw-semibold">
+                                            <i class="bi" th:classappend="${request.iconClass()}"></i>
+                                            <span th:text="${request.tableLabel()}">Mesa</span>
+                                        </div>
+                                        <div class="small text-muted">
+                                            <span th:text="${request.typeLabel()}">Solicita atención</span>
+                                            <span> · </span>
+                                            <span th:text="${request.ageLabel()}">ahora</span>
+                                        </div>
+                                    </div>
+                                    <span class="badge" th:classappend="${request.typeBadge()}" th:text="${request.statusLabel()}">Pendiente</span>
+                                </div>
+                                <div class="small text-muted" th:if="${request.customerNote() != null}" th:text="${request.customerNoteLabel()}">Nota</div>
+                                <form th:action="@{/admin/restaurant/table-requests/{id}/resolve(id=${request.id()})}" method="post" class="mt-2">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <input type="hidden" name="returnTo" th:value="@{/admin/restaurant/dashboard}"/>
+                                    <button class="btn btn-sm btn-outline-success w-100"><i class="bi bi-check2"></i> Marcar atendida</button>
+                                </form>
+                            </div>
+                            <div class="list-group-item text-muted small" th:if="${pendingTableRequests.isEmpty()}">No hay solicitudes pendientes.</div>
+                        </div>
+                        <div class="card-footer bg-white">
+                            <a th:href="@{/admin/restaurant/table-requests}" class="btn btn-sm btn-outline-danger w-100">
+                                <i class="bi bi-bell"></i> Ver bandeja de solicitudes
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm border-0 mb-3">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
                             <strong>Cola de cocina</strong>
                             <span class="badge text-bg-danger" th:text="${kitchenOrders.size()} + ' pedidos'">0 pedidos</span>
                         </div>
@@ -226,6 +267,9 @@
                             </a>
                             <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')" th:href="@{/admin/restaurant/tables}" class="btn btn-outline-secondary">
                                 <i class="bi bi-grid-3x3-gap"></i> Mesas y salón
+                            </a>
+                            <a th:href="@{/admin/restaurant/table-requests}" class="btn btn-outline-danger">
+                                <i class="bi bi-bell"></i> Solicitudes de mesa
                             </a>
                             <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')" th:href="@{/admin/restaurant/cash}" class="btn btn-outline-primary">
                                 <i class="bi bi-cash-coin"></i> Caja diaria

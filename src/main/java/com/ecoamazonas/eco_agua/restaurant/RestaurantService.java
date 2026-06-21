@@ -28,6 +28,8 @@ public class RestaurantService {
     private static final List<String> VALID_ORDER_STATUSES = List.of("NEW", "IN_KITCHEN", "READY", "SERVED", "PAID", "CANCELLED");
     private static final List<String> VALID_SERVICE_TYPES = List.of("DINE_IN", "TAKEAWAY", "DELIVERY");
     private static final List<String> VALID_PAYMENT_METHODS = List.of("CASH", "CARD", "YAPE", "PLIN", "TRANSFER", "OTHER");
+    private static final List<String> VALID_TABLE_REQUEST_TYPES = List.of("ATTENTION", "BILL", "PAID_NOTICE", "WAITER", "NOTE");
+    private static final List<String> VALID_TABLE_REQUEST_STATUSES = List.of("PENDING", "RESOLVED");
     private static final List<String> CLOSED_ORDER_STATUSES = List.of("PAID", "CANCELLED");
 
     private final JdbcTemplate jdbcTemplate;
@@ -102,6 +104,87 @@ public class RestaurantService {
                 cancelledOrders,
                 averageTicket
         );
+    }
+
+    public List<RestaurantTableRequestRow> pendingTableRequests() {
+        return tableRequests("PENDING", 30);
+    }
+
+    public List<RestaurantTableRequestRow> recentTableRequests() {
+        return tableRequests("ALL", 80);
+    }
+
+    public List<RestaurantTableRequestRow> tableRequests(String statusFilter) {
+        return tableRequests(statusFilter, 120);
+    }
+
+    private List<RestaurantTableRequestRow> tableRequests(String statusFilter, int limit) {
+        if (!tableExists("restaurant_table_request")) {
+            return List.of();
+        }
+        String cleanStatus = statusFilter == null ? "PENDING" : statusFilter.trim().toUpperCase();
+        String whereClause = switch (cleanStatus) {
+            case "RESOLVED" -> "WHERE r.status = 'RESOLVED'";
+            case "ALL" -> "";
+            default -> "WHERE r.status = 'PENDING'";
+        };
+        int cleanLimit = Math.max(1, Math.min(limit, 200));
+        return jdbcTemplate.query("""
+                SELECT r.id, r.table_id, t.name AS table_name, t.area AS table_area,
+                       r.request_type, r.customer_note, r.status, r.created_at, r.resolved_at
+                FROM restaurant_table_request r
+                JOIN restaurant_table t ON t.id = r.table_id
+                %s
+                ORDER BY CASE WHEN r.status = 'PENDING' THEN 0 ELSE 1 END, r.created_at DESC, r.id DESC
+                LIMIT %d
+                """.formatted(whereClause, cleanLimit), tableRequestMapper());
+    }
+
+    public int pendingTableRequestCount() {
+        if (!tableExists("restaurant_table_request")) {
+            return 0;
+        }
+        return count("SELECT COUNT(*) FROM restaurant_table_request WHERE status = 'PENDING'");
+    }
+
+    public int pendingBillRequestCount() {
+        if (!tableExists("restaurant_table_request")) {
+            return 0;
+        }
+        return count("SELECT COUNT(*) FROM restaurant_table_request WHERE status = 'PENDING' AND request_type IN ('BILL','PAID_NOTICE')");
+    }
+
+    @Transactional
+    public void createTableRequest(Long tableId, String requestType, String customerNote) {
+        if (!tableExists("restaurant_table_request")) {
+            throw new IllegalArgumentException("La bandeja de solicitudes aún no está instalada.");
+        }
+        RestaurantPublicTableContext tableContext = publicTableContext(tableId);
+        if (tableContext == null) {
+            throw new IllegalArgumentException("No se pudo identificar la mesa del QR.");
+        }
+        String cleanType = normalize(requestType, VALID_TABLE_REQUEST_TYPES, "ATTENTION");
+        String cleanNote = limitText(customerNote, 500);
+        jdbcTemplate.update("""
+                INSERT INTO restaurant_table_request
+                (table_id, request_type, customer_note, status, created_at, updated_at)
+                VALUES (?, ?, ?, 'PENDING', NOW(), NOW())
+                """, tableId, cleanType, blankToNull(cleanNote));
+    }
+
+    @Transactional
+    public void resolveTableRequest(Long requestId) {
+        if (!tableExists("restaurant_table_request")) {
+            throw new IllegalArgumentException("La bandeja de solicitudes aún no está instalada.");
+        }
+        int updated = jdbcTemplate.update("""
+                UPDATE restaurant_table_request
+                SET status = 'RESOLVED', resolved_at = NOW(), updated_at = NOW()
+                WHERE id = ?
+                """, requestId);
+        if (updated == 0) {
+            throw new IllegalArgumentException("La solicitud seleccionada no existe.");
+        }
     }
 
     public List<RestaurantPaymentBreakdownRow> paymentBreakdown(LocalDate businessDate) {
@@ -996,6 +1079,14 @@ public class RestaurantService {
         return allowed.contains(clean) ? clean : fallback;
     }
 
+    private String limitText(String value, int maxLength) {
+        String clean = value == null ? "" : value.trim();
+        if (clean.length() <= maxLength) {
+            return clean;
+        }
+        return clean.substring(0, maxLength);
+    }
+
     private String blankToNull(String value) {
         String clean = value == null ? "" : value.trim();
         return clean.isBlank() ? null : clean;
@@ -1100,6 +1191,20 @@ public class RestaurantService {
         );
     }
 
+
+    private RowMapper<RestaurantTableRequestRow> tableRequestMapper() {
+        return (rs, rowNum) -> new RestaurantTableRequestRow(
+                rs.getLong("id"),
+                rs.getLong("table_id"),
+                rs.getString("table_name"),
+                rs.getString("table_area"),
+                rs.getString("request_type"),
+                rs.getString("customer_note"),
+                rs.getString("status"),
+                toLocalDateTime(rs.getTimestamp("created_at")),
+                toLocalDateTime(rs.getTimestamp("resolved_at"))
+        );
+    }
 
     private RowMapper<RestaurantCashOrderRow> cashOrderMapper() {
         return (rs, rowNum) -> new RestaurantCashOrderRow(

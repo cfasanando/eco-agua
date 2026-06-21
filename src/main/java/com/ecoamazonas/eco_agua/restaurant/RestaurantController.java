@@ -53,8 +53,24 @@ public class RestaurantController {
         model.addAttribute("tableContext", tableContext);
         model.addAttribute("publicMenuUrl", publicMenuUrl);
         model.addAttribute("attentionWhatsappLink", attentionWhatsappLink(tableContext, publicMenuUrl));
+        model.addAttribute("tableRequestTypes", publicTableRequestTypes());
         addPublicRestaurantAttributes(model, tableContext, publicMenuUrl);
         return "public/restaurant_menu";
+    }
+
+    @PostMapping("/restaurant/table-request")
+    public String createPublicTableRequest(@RequestParam(required = false) Long tableId,
+                                           @RequestParam(defaultValue = "ATTENTION") String requestType,
+                                           @RequestParam(required = false) String customerNote,
+                                           RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.createTableRequest(tableId, requestType, customerNote);
+            redirectAttributes.addFlashAttribute("successMessage", publicTableRequestMessage(requestType));
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return tableId == null ? "redirect:/restaurant/menu" : "redirect:/restaurant/menu?tableId=" + tableId;
     }
 
     @GetMapping("/admin/restaurant")
@@ -74,7 +90,36 @@ public class RestaurantController {
         model.addAttribute("kitchenOrders", kitchenOrders);
         model.addAttribute("itemsByOrder", restaurantService.itemsByOrder(activeOrders));
         model.addAttribute("kitchenItemsByOrder", restaurantService.itemsByOrder(kitchenOrders));
+        model.addAttribute("pendingTableRequests", restaurantService.pendingTableRequests());
+        model.addAttribute("pendingTableRequestCount", restaurantService.pendingTableRequestCount());
         return "admin/restaurant/dashboard";
+    }
+
+    @GetMapping("/admin/restaurant/table-requests")
+    public String tableRequests(@RequestParam(defaultValue = "PENDING") String statusFilter, Model model) {
+        ensureRestaurantRuntimeReady();
+        model.addAttribute("activePage", "restaurant_table_requests");
+        model.addAttribute("currentStatusFilter", normalizeTableRequestFilter(statusFilter));
+        model.addAttribute("pendingTableRequestCount", restaurantService.pendingTableRequestCount());
+        model.addAttribute("requests", restaurantService.tableRequests(statusFilter));
+        return "admin/restaurant/table_requests";
+    }
+
+    @PostMapping("/admin/restaurant/table-requests/{id}/resolve")
+    public String resolveTableRequest(@PathVariable Long id,
+                                      @RequestParam(defaultValue = "/admin/restaurant/table-requests") String returnTo,
+                                      RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.resolveTableRequest(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Solicitud marcada como atendida.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        if (returnTo.startsWith("/admin/restaurant")) {
+            return "redirect:" + returnTo;
+        }
+        return "redirect:/admin/restaurant/table-requests";
     }
 
     @GetMapping("/admin/restaurant/tables")
@@ -254,6 +299,8 @@ public class RestaurantController {
         model.addAttribute("paymentBreakdown", restaurantService.paymentBreakdown(businessDate));
         model.addAttribute("paidOrders", restaurantService.paidOrdersForDate(businessDate));
         model.addAttribute("openOrders", restaurantService.openOrdersForCash());
+        model.addAttribute("pendingTableRequests", restaurantService.pendingTableRequests());
+        model.addAttribute("pendingBillRequestCount", restaurantService.pendingBillRequestCount());
         return "admin/restaurant/cash";
     }
 
@@ -514,6 +561,34 @@ public class RestaurantController {
         model.addAttribute("seoCanonicalUrl", publicMenuUrl);
         model.addAttribute("seoOgType", "website");
         model.addAttribute("seoOgImage", platformLogo);
+    }
+
+    private List<Map<String, String>> publicTableRequestTypes() {
+        return List.of(
+                Map.of("value", "ATTENTION", "label", "Solicitar atención", "icon", "bi-bell"),
+                Map.of("value", "WAITER", "label", "Llamar al mozo", "icon", "bi-person-raised-hand"),
+                Map.of("value", "BILL", "label", "Pedir la cuenta", "icon", "bi-receipt"),
+                Map.of("value", "PAID_NOTICE", "label", "Ya pagué", "icon", "bi-check2-circle")
+        );
+    }
+
+    private String publicTableRequestMessage(String requestType) {
+        String cleanType = requestType == null ? "ATTENTION" : requestType.trim().toUpperCase();
+        return switch (cleanType) {
+            case "BILL" -> "Solicitud enviada. En breve te llevarán la cuenta.";
+            case "PAID_NOTICE" -> "Aviso enviado. El equipo verificará tu pago.";
+            case "WAITER" -> "Solicitud enviada. Un mozo se acercará a tu mesa.";
+            case "NOTE" -> "Nota enviada al equipo del restaurante.";
+            default -> "Solicitud enviada. Te atenderemos en breve.";
+        };
+    }
+
+    private String normalizeTableRequestFilter(String value) {
+        String clean = value == null ? "PENDING" : value.trim().toUpperCase();
+        return switch (clean) {
+            case "PENDING", "RESOLVED", "ALL" -> clean;
+            default -> "PENDING";
+        };
     }
 
     private String attentionWhatsappLink(RestaurantPublicTableContext tableContext, String publicMenuUrl) {

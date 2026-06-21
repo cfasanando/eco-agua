@@ -29,9 +29,9 @@ public class RestaurantModuleInstaller {
                 SELECT COUNT(*)
                 FROM information_schema.tables
                 WHERE table_schema = DATABASE()
-                  AND table_name IN ('restaurant_table', 'restaurant_order', 'restaurant_order_item')
+                  AND table_name IN ('restaurant_table', 'restaurant_order', 'restaurant_order_item', 'restaurant_table_request')
                 """, Integer.class);
-        return count != null && count == 3;
+        return count != null && count == 4;
     }
 
     @Transactional
@@ -138,6 +138,25 @@ public class RestaurantModuleInstaller {
                     KEY idx_restaurant_order_item_order (order_id),
                     KEY idx_restaurant_order_item_product (product_id),
                     CONSTRAINT fk_restaurant_order_item_order FOREIGN KEY (order_id) REFERENCES restaurant_order(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS restaurant_table_request (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    table_id BIGINT NOT NULL,
+                    request_type VARCHAR(40) NOT NULL DEFAULT 'ATTENTION',
+                    customer_note VARCHAR(500) NULL,
+                    status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    resolved_at DATETIME NULL,
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    KEY idx_restaurant_table_request_table (table_id),
+                    KEY idx_restaurant_table_request_status (status),
+                    KEY idx_restaurant_table_request_type (request_type),
+                    KEY idx_restaurant_table_request_created (created_at),
+                    CONSTRAINT fk_restaurant_table_request_table FOREIGN KEY (table_id) REFERENCES restaurant_table(id) ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
     }

@@ -51,6 +51,14 @@
     </section>
 
     <div class="border-top pt-3 mt-2">
+        <div th:if="${externalOrder != null}" class="d-flex justify-content-between small mb-2">
+            <span class="text-muted">Productos</span>
+            <strong>S/ <span th:text="${#numbers.formatDecimal(externalOrder.safeSubtotal(),1,2)}">0.00</span></strong>
+        </div>
+        <div th:if="${externalOrder != null and externalOrder.isDelivery()}" class="d-flex justify-content-between small mb-2">
+            <span class="text-muted">Delivery</span>
+            <strong>S/ <span th:text="${#numbers.formatDecimal(externalOrder.safeDeliveryFee(),1,2)}">0.00</span></strong>
+        </div>
         <div class="d-flex justify-content-between align-items-center fs-4">
             <span>Total</span>
             <strong>S/ <span th:text="${#numbers.formatDecimal(order.safeSubtotal(),1,2)}">0.00</span></strong>

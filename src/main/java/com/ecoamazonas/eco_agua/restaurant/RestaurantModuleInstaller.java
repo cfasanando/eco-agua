@@ -109,6 +109,10 @@ public class RestaurantModuleInstaller {
                     customer_phone VARCHAR(40) NULL,
                     status VARCHAR(30) NOT NULL DEFAULT 'NEW',
                     subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                    delivery_fee DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                    delivery_address VARCHAR(255) NULL,
+                    delivery_reference VARCHAR(255) NULL,
+                    scheduled_at DATETIME NULL,
                     notes TEXT NULL,
                     payment_method VARCHAR(30) NULL,
                     paid_at DATETIME NULL,
@@ -119,6 +123,8 @@ public class RestaurantModuleInstaller {
                     KEY idx_restaurant_order_status (status),
                     KEY idx_restaurant_order_created (created_at),
                     KEY idx_restaurant_order_table (table_id),
+                    KEY idx_restaurant_order_service_status (service_type, status),
+                    KEY idx_restaurant_order_scheduled (scheduled_at),
                     CONSTRAINT fk_restaurant_order_table FOREIGN KEY (table_id) REFERENCES restaurant_table(id) ON DELETE SET NULL
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
@@ -232,8 +238,16 @@ public class RestaurantModuleInstaller {
         if (!tableExists("restaurant_order")) {
             return;
         }
+        ensureColumn("restaurant_order", "delivery_fee", "ALTER TABLE restaurant_order ADD COLUMN delivery_fee DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER subtotal");
+        ensureColumn("restaurant_order", "delivery_address", "ALTER TABLE restaurant_order ADD COLUMN delivery_address VARCHAR(255) NULL AFTER customer_phone");
+        ensureColumn("restaurant_order", "delivery_reference", "ALTER TABLE restaurant_order ADD COLUMN delivery_reference VARCHAR(255) NULL AFTER delivery_address");
+        ensureColumn("restaurant_order", "scheduled_at", "ALTER TABLE restaurant_order ADD COLUMN scheduled_at DATETIME NULL AFTER delivery_reference");
         ensureColumn("restaurant_order", "payment_method", "ALTER TABLE restaurant_order ADD COLUMN payment_method VARCHAR(30) NULL AFTER notes");
         ensureColumn("restaurant_order", "paid_at", "ALTER TABLE restaurant_order ADD COLUMN paid_at DATETIME NULL AFTER payment_method");
+        ensureIndex("restaurant_order", "idx_restaurant_order_service_status",
+                "ALTER TABLE restaurant_order ADD INDEX idx_restaurant_order_service_status (service_type, status)");
+        ensureIndex("restaurant_order", "idx_restaurant_order_scheduled",
+                "ALTER TABLE restaurant_order ADD INDEX idx_restaurant_order_scheduled (scheduled_at)");
     }
 
     private void ensureColumn(String tableName, String columnName, String alterSql) {
@@ -244,6 +258,20 @@ public class RestaurantModuleInstaller {
                   AND table_name = ?
                   AND column_name = ?
                 """, Integer.class, tableName, columnName);
+        if (count == null || count == 0) {
+            jdbcTemplate.execute(alterSql);
+        }
+    }
+
+
+    private void ensureIndex(String tableName, String indexName, String alterSql) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND index_name = ?
+                """, Integer.class, tableName, indexName);
         if (count == null || count == 0) {
             jdbcTemplate.execute(alterSql);
         }
@@ -297,7 +325,7 @@ public class RestaurantModuleInstaller {
                 INSERT INTO platform_module_catalog
                 (`module_key`, `name`, `area`, `description`, `default_enabled`, `configurable`, `active`, `display_order`, `created_at`, `updated_at`)
                 VALUES ('restaurant', 'Restaurante / carta y comandas', 'Operación restaurante',
-                        'Carta digital, reservas, mesas, comandas y pantalla de cocina.', 0, 1, 1, 10, NOW(), NOW())
+                        'Carta digital, reservas, mesas, comandas, pedidos para llevar, delivery y pantalla de cocina.', 0, 1, 1, 10, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
                     `name` = VALUES(`name`),
                     area = VALUES(area),

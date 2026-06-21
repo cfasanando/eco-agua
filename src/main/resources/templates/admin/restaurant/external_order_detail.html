@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="fragments/head_admin :: adminHead('Detalle de pedido externo')"></head>
+<body class="bg-light">
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <h1 class="h4 mb-0" th:text="${order.orderCode()}">CMD</h1>
+                        <span class="badge" th:classappend="${order.statusBadge()}" th:text="${order.statusLabel()}">Estado</span>
+                    </div>
+                    <p class="text-muted small mb-0 mt-1">
+                        <span th:text="${order.serviceLabel()}">Servicio</span>
+                        · registrado <span th:text="${#temporals.format(order.createdAt(), 'dd/MM/yyyy HH:mm')}">fecha</span>
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a th:href="@{/admin/restaurant/external-orders}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Bandeja</a>
+                    <a th:href="@{/admin/restaurant/orders/{id}/kitchen-ticket(id=${order.id()})}" target="_blank" class="btn btn-outline-warning"><i class="bi bi-printer"></i> Ticket cocina</a>
+                    <a th:href="@{/admin/restaurant/orders/{id}/bill(id=${order.id()})}" target="_blank" class="btn btn-outline-success"><i class="bi bi-receipt"></i> Cuenta</a>
+                    <a th:if="${order.isPaid()}" th:href="@{/admin/restaurant/orders/{id}/receipt(id=${order.id()})}" target="_blank" class="btn btn-outline-primary"><i class="bi bi-receipt-cutoff"></i> Recibo</a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show">
+                <span th:text="${successMessage}">OK</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show">
+                <span th:text="${errorMessage}">Error</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-xl-8">
+                    <div class="card shadow-sm border-0 mb-3">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <strong>Productos</strong>
+                            <span class="badge text-bg-secondary" th:text="${order.itemCount()} + ' ítems'">0</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table align-middle mb-0">
+                                <thead class="table-light"><tr><th>Producto</th><th class="text-center">Cantidad</th><th class="text-end">Precio</th><th class="text-end">Importe</th></tr></thead>
+                                <tbody>
+                                <tr th:each="item : ${items}">
+                                    <td th:text="${item.productName()}">Producto</td>
+                                    <td class="text-center" th:text="${item.quantity()}">1</td>
+                                    <td class="text-end">S/ <span th:text="${#numbers.formatDecimal(item.unitPrice(),1,2)}">0.00</span></td>
+                                    <td class="text-end fw-semibold">S/ <span th:text="${#numbers.formatDecimal(item.lineTotal(),1,2)}">0.00</span></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="card-footer bg-white">
+                            <div class="row justify-content-end">
+                                <div class="col-sm-6 col-lg-4">
+                                    <div class="d-flex justify-content-between mb-2"><span class="text-muted">Productos</span><strong>S/ <span th:text="${#numbers.formatDecimal(order.safeSubtotal(),1,2)}">0.00</span></strong></div>
+                                    <div class="d-flex justify-content-between mb-2" th:if="${order.isDelivery()}"><span class="text-muted">Delivery</span><strong>S/ <span th:text="${#numbers.formatDecimal(order.safeDeliveryFee(),1,2)}">0.00</span></strong></div>
+                                    <div class="d-flex justify-content-between border-top pt-2 fs-5"><span>Total</span><strong>S/ <span th:text="${#numbers.formatDecimal(order.safeTotal(),1,2)}">0.00</span></strong></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-white"><strong>Flujo operativo</strong></div>
+                        <div class="card-body">
+                            <div class="d-flex gap-2 flex-wrap">
+                                <form th:if="${order.canConfirm()}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')" th:action="@{/admin/restaurant/external-orders/{id}/status(id=${order.id()})}" method="post">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <input type="hidden" name="status" value="CONFIRMED">
+                                    <button class="btn btn-primary"><i class="bi bi-check2-circle"></i> Confirmar pedido</button>
+                                </form>
+                                <form th:if="${order.canSendToKitchen()}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','administra_restaurante','restaurante_mozo','restaurante_cocina')" th:action="@{/admin/restaurant/external-orders/{id}/status(id=${order.id()})}" method="post">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <input type="hidden" name="status" value="IN_KITCHEN">
+                                    <button class="btn btn-warning"><i class="bi bi-fire"></i> Enviar a cocina</button>
+                                </form>
+                                <form th:if="${order.canMarkReady()}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_KITCHEN','administra_restaurante','restaurante_cocina')" th:action="@{/admin/restaurant/external-orders/{id}/status(id=${order.id()})}" method="post">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <input type="hidden" name="status" value="READY">
+                                    <button class="btn btn-info"><i class="bi bi-bell"></i> Marcar listo</button>
+                                </form>
+                                <form th:if="${order.canDispatch()}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')" th:action="@{/admin/restaurant/external-orders/{id}/status(id=${order.id()})}" method="post">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <input type="hidden" name="status" value="OUT_FOR_DELIVERY">
+                                    <button class="btn btn-dark"><i class="bi bi-truck"></i> Marcar en reparto</button>
+                                </form>
+                                <form th:if="${order.canDeliver()}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')" th:action="@{/admin/restaurant/external-orders/{id}/status(id=${order.id()})}" method="post">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <input type="hidden" name="status" value="DELIVERED">
+                                    <button class="btn btn-success"><i class="bi bi-check-circle"></i> Marcar entregado</button>
+                                </form>
+                            </div>
+
+                            <div class="alert alert-light border mt-3 mb-0 small">
+                                <strong>Secuencia:</strong>
+                                Pendiente → Confirmado → En preparación → Listo
+                                <span th:if="${order.isDelivery()}">→ En reparto</span>
+                                → Entregado. El cobro puede registrarse desde Listo.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-4">
+                    <div class="card shadow-sm border-0 mb-3">
+                        <div class="card-header bg-white"><strong>Cliente y entrega</strong></div>
+                        <div class="card-body small">
+                            <div class="d-flex justify-content-between gap-3 mb-2"><span class="text-muted">Cliente</span><strong class="text-end" th:text="${order.customerName()}">Cliente</strong></div>
+                            <div class="d-flex justify-content-between gap-3 mb-2"><span class="text-muted">Teléfono</span><strong class="text-end" th:text="${order.customerPhone()}">Teléfono</strong></div>
+                            <div class="d-flex justify-content-between gap-3 mb-2"><span class="text-muted">Atención</span><strong class="text-end" th:text="${order.serviceLabel()}">Servicio</strong></div>
+                            <div class="d-flex justify-content-between gap-3 mb-2"><span class="text-muted">Hora estimada</span><strong class="text-end" th:text="${order.scheduledAt() == null ? 'Lo antes posible' : #temporals.format(order.scheduledAt(), 'dd/MM/yyyy HH:mm')}">Hora</strong></div>
+                            <div th:if="${order.isDelivery()}" class="border-top pt-3 mt-3">
+                                <div class="text-muted mb-1">Dirección</div>
+                                <div class="fw-semibold" th:text="${order.deliveryAddress()}">Dirección</div>
+                                <div class="text-muted mt-2" th:if="${order.deliveryReference() != null}" th:text="${order.deliveryReference()}">Referencia</div>
+                            </div>
+                            <div th:if="${order.notes() != null}" class="border-top pt-3 mt-3">
+                                <div class="text-muted mb-1">Observaciones</div>
+                                <div th:text="${order.notes()}">Notas</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm border-0 mb-3" th:if="${order.canPay()}">
+                        <div class="card-header bg-white"><strong>Cobrar pedido</strong></div>
+                        <div class="card-body">
+                            <form sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')" th:action="@{/admin/restaurant/orders/{id}/pay(id=${order.id()})}" method="post" class="d-grid gap-3">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <select name="paymentMethod" class="form-select">
+                                    <option value="CASH">Efectivo</option>
+                                    <option value="YAPE">Yape</option>
+                                    <option value="PLIN">Plin</option>
+                                    <option value="CARD">Tarjeta</option>
+                                    <option value="TRANSFER">Transferencia</option>
+                                    <option value="OTHER">Otro</option>
+                                </select>
+                                <button class="btn btn-success btn-lg"><i class="bi bi-cash-coin"></i> Cobrar S/ <span th:text="${#numbers.formatDecimal(order.safeTotal(),1,2)}">0.00</span></button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm border-0 mb-3" th:if="${order.isPaid()}">
+                        <div class="card-body">
+                            <div class="text-success fw-semibold"><i class="bi bi-check-circle-fill"></i> Pedido pagado</div>
+                            <div class="small text-muted mt-1">Método: <span th:text="${order.paymentLabel()}">Pago</span></div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm border-0" th:if="${order.canCancel()}">
+                        <div class="card-body">
+                            <form sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')" th:action="@{/admin/restaurant/external-orders/{id}/cancel(id=${order.id()})}" method="post" onsubmit="return confirm('¿Cancelar este pedido y devolver el stock?');">
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                <button class="btn btn-outline-danger w-100"><i class="bi bi-x-circle"></i> Cancelar pedido</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<div th:replace="fragments/scripts_admin :: adminScripts"></div>
+</body>
+</html>

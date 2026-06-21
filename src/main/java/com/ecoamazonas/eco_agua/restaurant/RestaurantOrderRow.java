@@ -28,8 +28,11 @@ public record RestaurantOrderRow(
     public String statusLabel() {
         return switch (safeStatus()) {
             case "NEW" -> "Nueva";
+            case "CONFIRMED" -> "Confirmada";
             case "IN_KITCHEN" -> "En cocina";
             case "READY" -> "Lista";
+            case "OUT_FOR_DELIVERY" -> "En reparto";
+            case "DELIVERED" -> "Entregada";
             case "SERVED" -> "Servida";
             case "PAID" -> "Pagada";
             case "CANCELLED" -> "Anulada";
@@ -39,10 +42,11 @@ public record RestaurantOrderRow(
 
     public String statusBadge() {
         return switch (safeStatus()) {
+            case "CONFIRMED" -> "text-bg-primary";
             case "IN_KITCHEN" -> "text-bg-warning";
             case "READY" -> "text-bg-info";
-            case "SERVED" -> "text-bg-primary";
-            case "PAID" -> "text-bg-success";
+            case "OUT_FOR_DELIVERY" -> "text-bg-dark";
+            case "DELIVERED", "SERVED", "PAID" -> "text-bg-success";
             case "CANCELLED" -> "text-bg-secondary";
             default -> "text-bg-light text-dark";
         };
@@ -71,18 +75,21 @@ public record RestaurantOrderRow(
     }
 
     public boolean canSendToKitchen() {
-        return "NEW".equals(safeStatus());
+        return "NEW".equals(safeStatus()) || "CONFIRMED".equals(safeStatus());
     }
 
     public boolean canMarkReady() {
-        return "NEW".equals(safeStatus()) || "IN_KITCHEN".equals(safeStatus());
+        return "NEW".equals(safeStatus()) || "CONFIRMED".equals(safeStatus()) || "IN_KITCHEN".equals(safeStatus());
     }
 
     public boolean canMarkServed() {
-        return "READY".equals(safeStatus());
+        return "DINE_IN".equals(safeServiceType()) && "READY".equals(safeStatus());
     }
 
     public boolean canPay() {
+        if ("TAKEAWAY".equals(safeServiceType()) || "DELIVERY".equals(safeServiceType())) {
+            return "DELIVERED".equals(safeStatus());
+        }
         return "SERVED".equals(safeStatus()) || "READY".equals(safeStatus()) || "IN_KITCHEN".equals(safeStatus());
     }
 

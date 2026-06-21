@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Nuevo pedido externo')"></head>
+<body class="bg-light">
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Nuevo pedido externo</h1>
+                    <p class="text-muted small mb-0">Registra un pedido para llevar o delivery y luego confirma su flujo operativo.</p>
+                </div>
+                <a th:href="@{/admin/restaurant/external-orders}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Volver
+                </a>
+            </div>
+
+            <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show">
+                <span th:text="${errorMessage}">Error</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+
+            <form th:action="@{/admin/restaurant/external-orders}" method="post" id="external-order-form">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <div class="row g-3">
+                    <div class="col-xl-4">
+                        <div class="card shadow-sm border-0 mb-3">
+                            <div class="card-header bg-white"><strong>Datos del pedido</strong></div>
+                            <div class="card-body">
+                                <label class="form-label">Tipo de atención</label>
+                                <select name="serviceType" id="service-type" class="form-select mb-3">
+                                    <option value="TAKEAWAY" th:selected="${serviceType == 'TAKEAWAY'}">Para llevar</option>
+                                    <option value="DELIVERY" th:selected="${serviceType == 'DELIVERY'}">Delivery</option>
+                                </select>
+
+                                <label class="form-label">Nombre del cliente</label>
+                                <input name="customerName" class="form-control mb-3" maxlength="180" required placeholder="Ej. María López">
+
+                                <label class="form-label">Teléfono / WhatsApp</label>
+                                <input name="customerPhone" class="form-control mb-3" maxlength="40" required placeholder="Ej. 999 888 777">
+
+                                <div class="js-delivery-fields">
+                                    <label class="form-label">Dirección de entrega</label>
+                                    <input name="deliveryAddress" id="delivery-address" class="form-control mb-3" maxlength="255" placeholder="Calle, número y distrito">
+
+                                    <label class="form-label">Referencia</label>
+                                    <input name="deliveryReference" class="form-control mb-3" maxlength="255" placeholder="Frente al parque, puerta azul, etc.">
+
+                                    <label class="form-label">Costo de delivery</label>
+                                    <div class="input-group mb-3">
+                                        <span class="input-group-text">S/</span>
+                                        <input name="deliveryFee" id="delivery-fee" type="number" min="0" step="0.10" value="0.00" class="form-control">
+                                    </div>
+                                </div>
+
+                                <label class="form-label">Hora estimada</label>
+                                <input name="scheduledAt" type="datetime-local" class="form-control mb-3"
+                                       th:value="${defaultScheduledAt}">
+                                <div class="form-text mb-3">Puede ser hora de recojo o de entrega.</div>
+
+                                <label class="form-label">Observaciones</label>
+                                <textarea name="notes" class="form-control" rows="3" maxlength="1000" placeholder="Sin ají, incluir cubiertos, llamar al llegar, etc."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="card shadow-sm border-0 mb-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-muted">Productos</span>
+                                    <strong>S/ <span id="items-total">0.00</span></strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-3 js-delivery-total-row">
+                                    <span class="text-muted">Delivery</span>
+                                    <strong>S/ <span id="delivery-total">0.00</span></strong>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center border-top pt-3 fs-5">
+                                    <span>Total estimado</span>
+                                    <strong>S/ <span id="grand-total">0.00</span></strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary btn-lg w-100">
+                            <i class="bi bi-check2-circle"></i> Registrar pedido pendiente
+                        </button>
+                        <p class="small text-muted mt-2 mb-0">El pedido no entra a cocina hasta que sea confirmado.</p>
+                    </div>
+
+                    <div class="col-xl-8">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                <strong>Seleccionar platos</strong>
+                                <span class="badge text-bg-secondary" th:text="${menuItems.size()} + ' disponibles'">0</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6" th:each="item : ${menuItems}">
+                                        <div class="border rounded-3 p-3 h-100 bg-white">
+                                            <div class="d-flex gap-3">
+                                                <img th:src="@{${item.imageOrFallback()}}" class="rounded-3 flex-shrink-0" style="width:72px;height:72px;object-fit:cover;" alt="Producto">
+                                                <div class="flex-grow-1">
+                                                    <div class="fw-semibold" th:text="${item.name()}">Producto</div>
+                                                    <div class="small text-muted mb-1" th:text="${item.description()}">Descripción</div>
+                                                    <div class="small text-muted mb-2">
+                                                        Stock: <strong th:text="${#numbers.formatDecimal(item.safeStock(),1,0)}">0</strong>
+                                                    </div>
+                                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                                        <strong>S/ <span th:text="${#numbers.formatDecimal(item.price(),1,2)}">0.00</span></strong>
+                                                        <input type="number" min="0" th:max="${item.safeStock().intValue()}" value="0"
+                                                               class="form-control form-control-sm text-center js-qty"
+                                                               style="max-width:90px;"
+                                                               th:name="${'qty_' + item.id()}"
+                                                               th:attr="data-price=${item.price()}"
+                                                               aria-label="Cantidad">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-12" th:if="${menuItems.isEmpty()}">
+                                        <div class="alert alert-info mb-0">No hay platos disponibles. Revisa stock y disponibilidad en Platos y carta.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+<div th:replace="fragments/scripts_admin :: adminScripts"></div>
+<script>
+    (() => {
+        const serviceType = document.getElementById('service-type');
+        const deliveryFields = document.querySelectorAll('.js-delivery-fields');
+        const deliveryAddress = document.getElementById('delivery-address');
+        const deliveryFee = document.getElementById('delivery-fee');
+        const deliveryRow = document.querySelector('.js-delivery-total-row');
+
+        const refreshServiceFields = () => {
+            const isDelivery = serviceType && serviceType.value === 'DELIVERY';
+            deliveryFields.forEach((element) => element.classList.toggle('d-none', !isDelivery));
+            if (deliveryAddress) {
+                deliveryAddress.required = isDelivery;
+            }
+            if (deliveryRow) {
+                deliveryRow.classList.toggle('d-none', !isDelivery);
+            }
+            refreshTotals();
+        };
+
+        const refreshTotals = () => {
+            let itemsTotal = 0;
+            document.querySelectorAll('.js-qty').forEach((input) => {
+                itemsTotal += Number(input.value || 0) * Number(input.dataset.price || 0);
+            });
+            const fee = serviceType && serviceType.value === 'DELIVERY'
+                ? Number(deliveryFee ? deliveryFee.value || 0 : 0)
+                : 0;
+            document.getElementById('items-total').textContent = itemsTotal.toFixed(2);
+            document.getElementById('delivery-total').textContent = fee.toFixed(2);
+            document.getElementById('grand-total').textContent = (itemsTotal + fee).toFixed(2);
+        };
+
+        document.querySelectorAll('.js-qty').forEach((input) => input.addEventListener('input', refreshTotals));
+        if (serviceType) {
+            serviceType.addEventListener('change', refreshServiceFields);
+        }
+        if (deliveryFee) {
+            deliveryFee.addEventListener('input', refreshTotals);
+        }
+
+        refreshServiceFields();
+    })();
+</script>
+</body>
+</html>

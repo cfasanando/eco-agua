@@ -321,6 +321,34 @@
 
                     <div class="card shadow-sm border-0 mb-3">
                         <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <strong>Pedidos externos</strong>
+                            <span class="badge text-bg-primary" th:text="${activeExternalOrderCount} + ' activos'">0 activos</span>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            <a class="list-group-item list-group-item-action" th:each="order : ${externalOrders}" th:href="@{/admin/restaurant/external-orders/{id}(id=${order.id()})}">
+                                <div class="d-flex justify-content-between align-items-start gap-2">
+                                    <div>
+                                        <div class="fw-semibold" th:text="${order.orderCode()}">CMD</div>
+                                        <div class="small text-muted">
+                                            <span th:text="${order.serviceLabel()}">Servicio</span>
+                                            · <span th:text="${order.customerName()}">Cliente</span>
+                                        </div>
+                                    </div>
+                                    <span class="badge" th:classappend="${order.statusBadge()}" th:text="${order.statusLabel()}">Estado</span>
+                                </div>
+                                <div class="small text-muted mt-1" th:text="${order.scheduledAt() == null ? 'Lo antes posible' : #temporals.format(order.scheduledAt(), 'dd/MM HH:mm')}">Hora</div>
+                            </a>
+                            <div class="list-group-item text-muted small" th:if="${externalOrders.isEmpty()}">No hay pedidos para llevar o delivery activos.</div>
+                        </div>
+                        <div class="card-footer bg-white">
+                            <a th:href="@{/admin/restaurant/external-orders}" class="btn btn-sm btn-outline-primary w-100">
+                                <i class="bi bi-truck"></i> Abrir pedidos externos
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm border-0 mb-3">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
                             <strong>Cola de cocina</strong>
                             <span class="badge text-bg-danger" th:text="${kitchenOrders.size()} + ' pedidos'">0 pedidos</span>
                         </div>
@@ -366,6 +394,9 @@
                             </a>
                             <a th:href="@{/admin/restaurant/qr-orders}" class="btn btn-outline-success">
                                 <i class="bi bi-phone"></i> Pedidos QR
+                            </a>
+                            <a th:href="@{/admin/restaurant/external-orders}" class="btn btn-outline-primary">
+                                <i class="bi bi-truck"></i> Pedidos externos
                             </a>
                             <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')" th:href="@{/admin/restaurant/cash}" class="btn btn-outline-primary">
                                 <i class="bi bi-cash-coin"></i> Caja diaria

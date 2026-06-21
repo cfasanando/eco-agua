@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="fragments/head_admin :: adminHead('Pedidos externos')"></head>
+<body class="bg-light">
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Pedidos para llevar y delivery</h1>
+                    <p class="text-muted small mb-0">Controla recojos, entregas, cocina y cobro sin asignar una mesa.</p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')">
+                    <a th:href="@{/admin/restaurant/external-orders/new(serviceType='TAKEAWAY')}" class="btn btn-outline-primary">
+                        <i class="bi bi-bag-check"></i> Nuevo para llevar
+                    </a>
+                    <a th:href="@{/admin/restaurant/external-orders/new(serviceType='DELIVERY')}" class="btn btn-primary">
+                        <i class="bi bi-truck"></i> Nuevo delivery
+                    </a>
+                </div>
+            </div>
+
+            <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show">
+                <span th:text="${successMessage}">OK</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show">
+                <span th:text="${errorMessage}">Error</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-xl-3">
+                    <a th:href="@{/admin/restaurant/external-orders(statusFilter='ACTIVE')}" class="text-decoration-none text-dark">
+                        <div class="card border-0 shadow-sm h-100" th:classappend="${currentStatusFilter == 'ACTIVE' ? ' border border-primary' : ''}">
+                            <div class="card-body">
+                                <div class="small text-muted">Activos</div>
+                                <div class="h3 mb-0" th:text="${statusCounts.get('ACTIVE')}">0</div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-6 col-xl-3">
+                    <a th:href="@{/admin/restaurant/external-orders(statusFilter='NEW')}" class="text-decoration-none text-dark">
+                        <div class="card border-0 shadow-sm h-100" th:classappend="${currentStatusFilter == 'NEW' ? ' border border-primary' : ''}">
+                            <div class="card-body">
+                                <div class="small text-muted">Pendientes</div>
+                                <div class="h3 mb-0" th:text="${statusCounts.get('NEW')}">0</div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-6 col-xl-3">
+                    <a th:href="@{/admin/restaurant/external-orders(statusFilter='READY')}" class="text-decoration-none text-dark">
+                        <div class="card border-0 shadow-sm h-100" th:classappend="${currentStatusFilter == 'READY' ? ' border border-primary' : ''}">
+                            <div class="card-body">
+                                <div class="small text-muted">Listos</div>
+                                <div class="h3 mb-0" th:text="${statusCounts.get('READY')}">0</div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-6 col-xl-3">
+                    <a th:href="@{/admin/restaurant/external-orders(statusFilter='OUT_FOR_DELIVERY')}" class="text-decoration-none text-dark">
+                        <div class="card border-0 shadow-sm h-100" th:classappend="${currentStatusFilter == 'OUT_FOR_DELIVERY' ? ' border border-primary' : ''}">
+                            <div class="card-body">
+                                <div class="small text-muted">En reparto</div>
+                                <div class="h3 mb-0" th:text="${statusCounts.get('OUT_FOR_DELIVERY')}">0</div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                    <strong>Bandeja operativa</strong>
+                    <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Filtro de pedidos">
+                        <a class="btn btn-outline-secondary" th:classappend="${currentStatusFilter == 'ACTIVE' ? ' active' : ''}" th:href="@{/admin/restaurant/external-orders(statusFilter='ACTIVE')}">Activos</a>
+                        <a class="btn btn-outline-secondary" th:classappend="${currentStatusFilter == 'CONFIRMED' ? ' active' : ''}" th:href="@{/admin/restaurant/external-orders(statusFilter='CONFIRMED')}">Confirmados</a>
+                        <a class="btn btn-outline-secondary" th:classappend="${currentStatusFilter == 'IN_KITCHEN' ? ' active' : ''}" th:href="@{/admin/restaurant/external-orders(statusFilter='IN_KITCHEN')}">Preparación</a>
+                        <a class="btn btn-outline-secondary" th:classappend="${currentStatusFilter == 'DELIVERED' ? ' active' : ''}" th:href="@{/admin/restaurant/external-orders(statusFilter='DELIVERED')}">Entregados</a>
+                        <a class="btn btn-outline-secondary" th:classappend="${currentStatusFilter == 'PAID' ? ' active' : ''}" th:href="@{/admin/restaurant/external-orders(statusFilter='PAID')}">Pagados</a>
+                        <a class="btn btn-outline-secondary" th:classappend="${currentStatusFilter == 'ALL' ? ' active' : ''}" th:href="@{/admin/restaurant/external-orders(statusFilter='ALL')}">Todos</a>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th>Pedido</th>
+                            <th>Cliente</th>
+                            <th>Programación</th>
+                            <th>Estado</th>
+                            <th class="text-center">Ítems</th>
+                            <th class="text-end">Total</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="order : ${orders}">
+                            <td>
+                                <a class="fw-semibold text-decoration-none" th:href="@{/admin/restaurant/external-orders/{id}(id=${order.id()})}" th:text="${order.orderCode()}">CMD</a>
+                                <div class="small text-muted">
+                                    <i class="bi" th:classappend="${order.isDelivery() ? ' bi-truck' : ' bi-bag-check'}"></i>
+                                    <span th:text="${order.serviceLabel()}">Servicio</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="fw-semibold" th:text="${order.customerName()}">Cliente</div>
+                                <div class="small text-muted" th:text="${order.customerPhone()}">Teléfono</div>
+                                <div class="small text-muted text-truncate" style="max-width:240px" th:if="${order.isDelivery()}" th:text="${order.deliveryAddress()}">Dirección</div>
+                            </td>
+                            <td>
+                                <span th:if="${order.scheduledAt() != null}" th:text="${#temporals.format(order.scheduledAt(), 'dd/MM/yyyy HH:mm')}">Fecha</span>
+                                <span th:if="${order.scheduledAt() == null}" class="text-muted">Lo antes posible</span>
+                                <div class="small text-muted" th:text="${#temporals.format(order.createdAt(), 'dd/MM HH:mm')}">Creado</div>
+                            </td>
+                            <td>
+                                <span class="badge" th:classappend="${order.statusBadge()}" th:text="${order.statusLabel()}">Estado</span>
+                                <span th:if="${order.isPaid()}" class="badge text-bg-success ms-1"><i class="bi bi-cash-coin"></i> Pagado</span>
+                            </td>
+                            <td class="text-center" th:text="${order.itemCount()}">0</td>
+                            <td class="text-end fw-semibold">S/ <span th:text="${#numbers.formatDecimal(order.safeTotal(),1,2)}">0.00</span></td>
+                            <td class="text-end">
+                                <a th:href="@{/admin/restaurant/external-orders/{id}(id=${order.id()})}" class="btn btn-sm btn-outline-primary" title="Abrir pedido">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <tr th:if="${orders.isEmpty()}">
+                            <td colspan="7" class="text-center text-muted py-5">
+                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                                No hay pedidos externos para este filtro.
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<div th:replace="fragments/scripts_admin :: adminScripts"></div>
+</body>
+</html>

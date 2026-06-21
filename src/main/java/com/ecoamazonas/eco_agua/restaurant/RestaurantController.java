@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -115,6 +116,8 @@ public class RestaurantController {
         model.addAttribute("qrItemsByOrder", restaurantService.itemsByQrOrder(pendingQrOrders));
         model.addAttribute("upcomingReservations", restaurantService.upcomingReservations());
         model.addAttribute("nextReservationsByTable", restaurantService.nextReservationsByTable());
+        model.addAttribute("externalOrders", restaurantService.externalOrdersForDashboard());
+        model.addAttribute("activeExternalOrderCount", restaurantService.activeExternalOrderCount());
         return "admin/restaurant/dashboard";
     }
 
@@ -310,6 +313,103 @@ public class RestaurantController {
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
             return "redirect:/admin/restaurant/reservations";
+        }
+    }
+
+    @GetMapping("/admin/restaurant/external-orders")
+    public String externalOrders(@RequestParam(defaultValue = "ACTIVE") String statusFilter, Model model) {
+        ensureRestaurantRuntimeReady();
+        model.addAttribute("activePage", "restaurant_external_orders");
+        model.addAttribute("currentStatusFilter", normalizeExternalOrderFilter(statusFilter));
+        model.addAttribute("statusCounts", restaurantService.externalOrderStatusCounts());
+        model.addAttribute("orders", restaurantService.externalOrders(statusFilter));
+        return "admin/restaurant/external_orders";
+    }
+
+    @GetMapping("/admin/restaurant/external-orders/new")
+    public String newExternalOrder(@RequestParam(defaultValue = "TAKEAWAY") String serviceType, Model model) {
+        ensureRestaurantRuntimeReady();
+        String cleanServiceType = "DELIVERY".equalsIgnoreCase(serviceType) ? "DELIVERY" : "TAKEAWAY";
+        model.addAttribute("activePage", "restaurant_external_orders");
+        model.addAttribute("serviceType", cleanServiceType);
+        model.addAttribute("defaultScheduledAt", LocalDateTime.now().plusMinutes(30).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")));
+        model.addAttribute("menuItems", restaurantService.menuItems());
+        return "admin/restaurant/external_order_form";
+    }
+
+    @PostMapping("/admin/restaurant/external-orders")
+    public String createExternalOrder(@RequestParam(defaultValue = "TAKEAWAY") String serviceType,
+                                      @RequestParam String customerName,
+                                      @RequestParam String customerPhone,
+                                      @RequestParam(required = false) String deliveryAddress,
+                                      @RequestParam(required = false) String deliveryReference,
+                                      @RequestParam(required = false)
+                                      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime scheduledAt,
+                                      @RequestParam(required = false) BigDecimal deliveryFee,
+                                      @RequestParam(required = false) String notes,
+                                      @RequestParam Map<String, String> params,
+                                      RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            Long orderId = restaurantService.createExternalOrder(
+                    serviceType,
+                    customerName,
+                    customerPhone,
+                    deliveryAddress,
+                    deliveryReference,
+                    scheduledAt,
+                    deliveryFee,
+                    notes,
+                    params
+            );
+            redirectAttributes.addFlashAttribute("successMessage", "Pedido externo registrado correctamente.");
+            return "redirect:/admin/restaurant/external-orders/" + orderId;
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            String cleanServiceType = "DELIVERY".equalsIgnoreCase(serviceType) ? "DELIVERY" : "TAKEAWAY";
+            return "redirect:/admin/restaurant/external-orders/new?serviceType=" + cleanServiceType;
+        }
+    }
+
+    @GetMapping("/admin/restaurant/external-orders/{id}")
+    public String externalOrderDetail(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
+        ensureRestaurantRuntimeReady();
+        RestaurantExternalOrderRow order = restaurantService.externalOrder(id);
+        if (order == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "El pedido externo seleccionado no existe.");
+            return "redirect:/admin/restaurant/external-orders";
+        }
+
+        model.addAttribute("activePage", "restaurant_external_orders");
+        model.addAttribute("order", order);
+        model.addAttribute("items", restaurantService.orderItems(id));
+        return "admin/restaurant/external_order_detail";
+    }
+
+    @PostMapping("/admin/restaurant/external-orders/{id}/status")
+    public String updateExternalOrderStatus(@PathVariable Long id,
+                                            @RequestParam String status,
+                                            RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.updateExternalOrderStatus(id, status);
+            redirectAttributes.addFlashAttribute("successMessage", "Estado del pedido actualizado.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/external-orders/" + id;
+    }
+
+    @PostMapping("/admin/restaurant/external-orders/{id}/cancel")
+    public String cancelExternalOrder(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.cancelOrder(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Pedido externo cancelado y stock devuelto.");
+            return "redirect:/admin/restaurant/external-orders";
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            return "redirect:/admin/restaurant/external-orders/" + id;
         }
     }
 
@@ -582,6 +682,11 @@ public class RestaurantController {
             return "redirect:/admin/restaurant/dashboard";
         }
 
+        RestaurantExternalOrderRow externalOrder = restaurantService.externalOrder(id);
+        if (externalOrder != null) {
+            return "redirect:/admin/restaurant/external-orders/" + id;
+        }
+
         model.addAttribute("activePage", "restaurant_kitchen");
         model.addAttribute("order", order);
         model.addAttribute("items", restaurantService.orderItems(id));
@@ -649,6 +754,7 @@ public class RestaurantController {
         }
         model.addAttribute("activePage", "restaurant_kitchen");
         model.addAttribute("order", order);
+        model.addAttribute("externalOrder", restaurantService.externalOrder(id));
         model.addAttribute("items", restaurantService.orderItems(id));
         model.addAttribute("generatedAt", java.time.LocalDateTime.now());
         addPrintableRestaurantAttributes(model);
@@ -665,6 +771,7 @@ public class RestaurantController {
         }
         model.addAttribute("activePage", "restaurant_cash");
         model.addAttribute("order", order);
+        model.addAttribute("externalOrder", restaurantService.externalOrder(id));
         model.addAttribute("items", restaurantService.orderItems(id));
         model.addAttribute("generatedAt", java.time.LocalDateTime.now());
         addPrintableRestaurantAttributes(model);
@@ -682,6 +789,7 @@ public class RestaurantController {
         RestaurantCashOrderRow paidOrder = restaurantService.cashOrder(id);
         model.addAttribute("activePage", "restaurant_cash");
         model.addAttribute("order", order);
+        model.addAttribute("externalOrder", restaurantService.externalOrder(id));
         model.addAttribute("paidOrder", paidOrder);
         model.addAttribute("items", restaurantService.orderItems(id));
         model.addAttribute("generatedAt", java.time.LocalDateTime.now());
@@ -803,6 +911,15 @@ public class RestaurantController {
         return switch (clean) {
             case "PENDING", "APPROVED", "REJECTED", "ALL" -> clean;
             default -> "PENDING";
+        };
+    }
+
+    private String normalizeExternalOrderFilter(String value) {
+        String clean = value == null ? "ACTIVE" : value.trim().toUpperCase();
+        return switch (clean) {
+            case "ALL", "ACTIVE", "NEW", "CONFIRMED", "IN_KITCHEN", "READY",
+                    "OUT_FOR_DELIVERY", "DELIVERED", "PAID", "CANCELLED" -> clean;
+            default -> "ACTIVE";
         };
     }
 

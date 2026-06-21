@@ -280,6 +280,12 @@ public class SecurityConfig {
             "administra_restaurante", "restaurante_mozo"
     );
 
+    private static final String[] RESTAURANT_EXTERNAL_STATUS_WRITE = authorities(
+            ROLE_OWNER, ROLE_MANAGEMENT, ROLE_RESTAURANT_WAITER, ROLE_RESTAURANT_KITCHEN,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR,
+            "administra_restaurante", "restaurante_mozo", "restaurante_cocina"
+    );
+
     private static final String[] RESTAURANT_KITCHEN_VIEW = authorities(
             ROLE_OWNER, ROLE_MANAGEMENT, ROLE_RESTAURANT_WAITER, ROLE_RESTAURANT_KITCHEN,
             LEGACY_ADMIN_PRINC, LEGACY_ADMIN, LEGACY_SUPERVISOR,
@@ -478,6 +484,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/admin/academy/**").hasAnyAuthority(ACADEMY_WRITE)
                 .requestMatchers("/admin/academy/**").hasAnyAuthority(ACADEMY_VIEW)
 
+                .requestMatchers(HttpMethod.POST, "/admin/restaurant/external-orders/*/status").hasAnyAuthority(RESTAURANT_EXTERNAL_STATUS_WRITE)
+                .requestMatchers(HttpMethod.POST, "/admin/restaurant/external-orders/*/cancel").hasAnyAuthority(RESTAURANT_ORDER_WRITE)
+                .requestMatchers(HttpMethod.POST, "/admin/restaurant/external-orders").hasAnyAuthority(RESTAURANT_ORDER_WRITE)
+                .requestMatchers(HttpMethod.GET, "/admin/restaurant/external-orders/new").hasAnyAuthority(RESTAURANT_ORDER_WRITE)
+                .requestMatchers(HttpMethod.GET, "/admin/restaurant/external-orders", "/admin/restaurant/external-orders/**").hasAnyAuthority(RESTAURANT_ORDER_VIEW)
                 .requestMatchers(HttpMethod.POST, "/admin/restaurant/reservations/**").hasAnyAuthority(RESTAURANT_TABLES_WRITE)
                 .requestMatchers(HttpMethod.GET, "/admin/restaurant/reservations", "/admin/restaurant/reservations/**").hasAnyAuthority(RESTAURANT_TABLES_VIEW)
                 .requestMatchers("/admin/restaurant/menu-items", "/admin/restaurant/menu-items/**").hasAnyAuthority(RESTAURANT_MENU_MANAGE)

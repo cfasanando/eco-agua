@@ -20,6 +20,10 @@
                         <i class="bi bi-bell"></i> Solicitudes
                         <span th:if="${pendingTableRequestCount > 0}" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" th:text="${pendingTableRequestCount}">0</span>
                     </a>
+                    <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')" th:href="@{/admin/restaurant/qr-orders}" class="btn btn-sm btn-outline-success position-relative">
+                        <i class="bi bi-phone"></i> Pedidos QR
+                        <span th:if="${pendingQrOrderCount > 0}" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success" th:text="${pendingQrOrderCount}">0</span>
+                    </a>
                     <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')" th:href="@{/admin/restaurant/cash}" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-cash-coin"></i> Caja diaria
                     </a>
@@ -231,6 +235,47 @@
 
                     <div class="card shadow-sm border-0 mb-3">
                         <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <strong>Pedidos QR pendientes</strong>
+                            <span class="badge text-bg-success" th:text="${pendingQrOrderCount} + ' pendientes'">0 pendientes</span>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            <div class="list-group-item" th:each="qrOrder, iter : ${pendingQrOrders}" th:if="${iter.index < 4}">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                    <div>
+                                        <div class="fw-semibold">
+                                            <i class="bi bi-phone"></i>
+                                            QR-<span th:text="${qrOrder.id()}">1</span> · <span th:text="${qrOrder.tableLabel()}">Mesa</span>
+                                        </div>
+                                        <div class="small text-muted">
+                                            <span th:text="${qrOrder.itemCount()}">0</span> productos
+                                            <span> · </span>
+                                            <span th:text="${qrOrder.ageLabel()}">ahora</span>
+                                        </div>
+                                    </div>
+                                    <span class="badge" th:classappend="${qrOrder.statusBadge()}" th:text="${qrOrder.statusLabel()}">Pendiente</span>
+                                </div>
+                                <ul class="small text-muted mb-2 ps-3">
+                                    <li th:each="item, itemIter : ${qrItemsByOrder.get(qrOrder.id())}" th:if="${itemIter.index < 3}">
+                                        <span th:text="${item.productName()}">Producto</span> x<span th:text="${item.quantity()}">1</span>
+                                    </li>
+                                </ul>
+                                <form th:action="@{/admin/restaurant/qr-orders/{id}/approve(id=${qrOrder.id()})}" method="post" class="d-grid">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                    <input type="hidden" name="returnTo" th:value="@{/admin/restaurant/dashboard}"/>
+                                    <button class="btn btn-sm btn-outline-success"><i class="bi bi-send-check"></i> Aprobar y enviar a cocina</button>
+                                </form>
+                            </div>
+                            <div class="list-group-item text-muted small" th:if="${pendingQrOrders.isEmpty()}">No hay pedidos QR pendientes.</div>
+                        </div>
+                        <div class="card-footer bg-white">
+                            <a th:href="@{/admin/restaurant/qr-orders}" class="btn btn-sm btn-outline-success w-100">
+                                <i class="bi bi-phone"></i> Ver bandeja de pedidos QR
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm border-0 mb-3">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
                             <strong>Cola de cocina</strong>
                             <span class="badge text-bg-danger" th:text="${kitchenOrders.size()} + ' pedidos'">0 pedidos</span>
                         </div>
@@ -270,6 +315,9 @@
                             </a>
                             <a th:href="@{/admin/restaurant/table-requests}" class="btn btn-outline-danger">
                                 <i class="bi bi-bell"></i> Solicitudes de mesa
+                            </a>
+                            <a th:href="@{/admin/restaurant/qr-orders}" class="btn btn-outline-success">
+                                <i class="bi bi-phone"></i> Pedidos QR
                             </a>
                             <a sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')" th:href="@{/admin/restaurant/cash}" class="btn btn-outline-primary">
                                 <i class="bi bi-cash-coin"></i> Caja diaria

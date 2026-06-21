@@ -479,6 +479,8 @@ public class SecurityConfig {
                 .requestMatchers("/admin/academy/**").hasAnyAuthority(ACADEMY_VIEW)
 
                 .requestMatchers("/admin/restaurant/menu-items", "/admin/restaurant/menu-items/**").hasAnyAuthority(RESTAURANT_MENU_MANAGE)
+                .requestMatchers(HttpMethod.GET, "/admin/restaurant/qr-orders", "/admin/restaurant/qr-orders/**").hasAnyAuthority(RESTAURANT_DASHBOARD_VIEW)
+                .requestMatchers(HttpMethod.POST, "/admin/restaurant/qr-orders/**").hasAnyAuthority(RESTAURANT_ORDER_WRITE)
                 .requestMatchers(HttpMethod.POST, "/admin/restaurant/orders/*/pay").hasAnyAuthority(RESTAURANT_CASH_WRITE)
                 .requestMatchers(HttpMethod.POST, "/admin/restaurant/orders/*/status").hasAnyAuthority(RESTAURANT_KITCHEN_WRITE)
                 .requestMatchers(HttpMethod.POST, "/admin/restaurant/orders/**").hasAnyAuthority(RESTAURANT_ORDER_WRITE)

@@ -30,6 +30,7 @@ public class RestaurantService {
     private static final List<String> VALID_PAYMENT_METHODS = List.of("CASH", "CARD", "YAPE", "PLIN", "TRANSFER", "OTHER");
     private static final List<String> VALID_TABLE_REQUEST_TYPES = List.of("ATTENTION", "BILL", "PAID_NOTICE", "WAITER", "NOTE");
     private static final List<String> VALID_TABLE_REQUEST_STATUSES = List.of("PENDING", "RESOLVED");
+    private static final List<String> VALID_QR_ORDER_STATUSES = List.of("PENDING", "APPROVED", "REJECTED");
     private static final List<String> CLOSED_ORDER_STATUSES = List.of("PAID", "CANCELLED");
 
     private final JdbcTemplate jdbcTemplate;
@@ -184,6 +185,184 @@ public class RestaurantService {
                 """, requestId);
         if (updated == 0) {
             throw new IllegalArgumentException("La solicitud seleccionada no existe.");
+        }
+    }
+
+    public List<RestaurantQrOrderRow> pendingQrOrders() {
+        return qrOrders("PENDING", 20);
+    }
+
+    public List<RestaurantQrOrderRow> qrOrders(String statusFilter) {
+        return qrOrders(statusFilter, 120);
+    }
+
+    private List<RestaurantQrOrderRow> qrOrders(String statusFilter, int limit) {
+        if (!tableExists("restaurant_qr_order")) {
+            return List.of();
+        }
+        String cleanStatus = statusFilter == null ? "PENDING" : statusFilter.trim().toUpperCase();
+        String whereClause = switch (cleanStatus) {
+            case "APPROVED" -> "WHERE q.status = 'APPROVED'";
+            case "REJECTED" -> "WHERE q.status = 'REJECTED'";
+            case "ALL" -> "";
+            default -> "WHERE q.status = 'PENDING'";
+        };
+        int cleanLimit = Math.max(1, Math.min(limit, 200));
+        return jdbcTemplate.query("""
+                SELECT q.id, q.table_id, t.name AS table_name, t.area AS table_area,
+                       q.customer_note, q.status, q.subtotal, q.approved_order_id,
+                       q.created_at, q.processed_at, COALESCE(COUNT(i.id), 0) AS item_count
+                FROM restaurant_qr_order q
+                JOIN restaurant_table t ON t.id = q.table_id
+                LEFT JOIN restaurant_qr_order_item i ON i.qr_order_id = q.id
+                %s
+                GROUP BY q.id, q.table_id, t.name, t.area, q.customer_note, q.status, q.subtotal,
+                         q.approved_order_id, q.created_at, q.processed_at
+                ORDER BY CASE WHEN q.status = 'PENDING' THEN 0 ELSE 1 END, q.created_at DESC, q.id DESC
+                LIMIT %d
+                """.formatted(whereClause, cleanLimit), qrOrderMapper());
+    }
+
+    public RestaurantQrOrderRow qrOrder(Long qrOrderId) {
+        if (!tableExists("restaurant_qr_order")) {
+            return null;
+        }
+        try {
+            return jdbcTemplate.queryForObject("""
+                    SELECT q.id, q.table_id, t.name AS table_name, t.area AS table_area,
+                           q.customer_note, q.status, q.subtotal, q.approved_order_id,
+                           q.created_at, q.processed_at, COALESCE(COUNT(i.id), 0) AS item_count
+                    FROM restaurant_qr_order q
+                    JOIN restaurant_table t ON t.id = q.table_id
+                    LEFT JOIN restaurant_qr_order_item i ON i.qr_order_id = q.id
+                    WHERE q.id = ?
+                    GROUP BY q.id, q.table_id, t.name, t.area, q.customer_note, q.status, q.subtotal,
+                             q.approved_order_id, q.created_at, q.processed_at
+                    """, qrOrderMapper(), qrOrderId);
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
+    }
+
+    public List<RestaurantQrOrderItemRow> qrOrderItems(Long qrOrderId) {
+        if (!tableExists("restaurant_qr_order_item")) {
+            return List.of();
+        }
+        return jdbcTemplate.query("""
+                SELECT id, qr_order_id, product_id, product_name, quantity, unit_price, line_total
+                FROM restaurant_qr_order_item
+                WHERE qr_order_id = ?
+                ORDER BY id ASC
+                """, qrOrderItemMapper(), qrOrderId);
+    }
+
+    public Map<Long, List<RestaurantQrOrderItemRow>> itemsByQrOrder(List<RestaurantQrOrderRow> orders) {
+        Map<Long, List<RestaurantQrOrderItemRow>> result = new LinkedHashMap<>();
+        for (RestaurantQrOrderRow order : orders) {
+            result.put(order.id(), qrOrderItems(order.id()));
+        }
+        return result;
+    }
+
+    public int pendingQrOrderCount() {
+        if (!tableExists("restaurant_qr_order")) {
+            return 0;
+        }
+        return count("SELECT COUNT(*) FROM restaurant_qr_order WHERE status = 'PENDING'");
+    }
+
+    @Transactional
+    public Long createQrOrder(Long tableId, String customerNote, Map<String, String> requestParams) {
+        if (!tableExists("restaurant_qr_order") || !tableExists("restaurant_qr_order_item")) {
+            throw new IllegalArgumentException("La bandeja de pedidos QR aún no está instalada.");
+        }
+        RestaurantPublicTableContext tableContext = publicTableContext(tableId);
+        if (tableContext == null) {
+            throw new IllegalArgumentException("No se pudo identificar la mesa del QR.");
+        }
+        if ("DISABLED".equalsIgnoreCase(tableContext.status())) {
+            throw new IllegalArgumentException("Esta mesa está fuera de servicio.");
+        }
+
+        Map<Long, Integer> quantities = selectedQuantities(requestParams);
+        if (quantities.isEmpty()) {
+            throw new IllegalArgumentException("Selecciona al menos un producto para enviar el pedido.");
+        }
+
+        List<RestaurantMenuItemRow> selectedItems = selectedMenuItems(quantities);
+        assertSelectedProductsAvailable(selectedItems, quantities);
+        BigDecimal subtotal = subtotal(selectedItems, quantities);
+        String cleanNote = limitText(customerNote, 500);
+
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement("""
+                    INSERT INTO restaurant_qr_order
+                    (table_id, customer_note, status, subtotal, created_at, updated_at)
+                    VALUES (?, ?, 'PENDING', ?, NOW(), NOW())
+                    """, Statement.RETURN_GENERATED_KEYS);
+            ps.setLong(1, tableId);
+            ps.setString(2, blankToNull(cleanNote));
+            ps.setBigDecimal(3, subtotal);
+            return ps;
+        }, keyHolder);
+
+        Long qrOrderId = Objects.requireNonNull(keyHolder.getKey()).longValue();
+        for (RestaurantMenuItemRow item : selectedItems) {
+            int quantity = quantities.get(item.id());
+            BigDecimal lineTotal = item.safePrice().multiply(BigDecimal.valueOf(quantity));
+            jdbcTemplate.update("""
+                    INSERT INTO restaurant_qr_order_item
+                    (qr_order_id, product_id, product_name, quantity, unit_price, line_total)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, qrOrderId, item.id(), item.name(), quantity, item.safePrice(), lineTotal);
+        }
+        return qrOrderId;
+    }
+
+    @Transactional
+    public Long approveQrOrder(Long qrOrderId) {
+        RestaurantQrOrderRow qrOrder = qrOrder(qrOrderId);
+        if (qrOrder == null) {
+            throw new IllegalArgumentException("El pedido QR seleccionado no existe.");
+        }
+        if (!qrOrder.isPending()) {
+            throw new IllegalArgumentException("Este pedido QR ya fue procesado.");
+        }
+        List<RestaurantQrOrderItemRow> items = qrOrderItems(qrOrderId);
+        if (items.isEmpty()) {
+            throw new IllegalArgumentException("El pedido QR no tiene productos.");
+        }
+
+        Map<String, String> quantityParams = qrOrderQuantityParams(items);
+        Long orderId = activeOrderIdForTable(qrOrder.tableId());
+        if (orderId == null) {
+            orderId = createOrder("DINE_IN", qrOrder.tableId(), null, null, qrOrderNote(qrOrder), quantityParams);
+        } else {
+            addItemsToOrder(orderId, quantityParams);
+            appendQrOrderNote(orderId, qrOrder.customerNote());
+        }
+
+        jdbcTemplate.update("""
+                UPDATE restaurant_qr_order
+                SET status = 'APPROVED', approved_order_id = ?, processed_at = NOW(), updated_at = NOW()
+                WHERE id = ? AND status = 'PENDING'
+                """, orderId, qrOrderId);
+        return orderId;
+    }
+
+    @Transactional
+    public void rejectQrOrder(Long qrOrderId) {
+        if (!tableExists("restaurant_qr_order")) {
+            throw new IllegalArgumentException("La bandeja de pedidos QR aún no está instalada.");
+        }
+        int updated = jdbcTemplate.update("""
+                UPDATE restaurant_qr_order
+                SET status = 'REJECTED', processed_at = NOW(), updated_at = NOW()
+                WHERE id = ? AND status = 'PENDING'
+                """, qrOrderId);
+        if (updated == 0) {
+            throw new IllegalArgumentException("El pedido QR seleccionado no existe o ya fue procesado.");
         }
     }
 
@@ -691,7 +870,7 @@ public class RestaurantService {
 
         insertOrderItems(orderId, selectedItems, quantities);
         recalculateOrderTotal(orderId);
-        jdbcTemplate.update("UPDATE restaurant_order SET status = CASE WHEN status = 'NEW' THEN 'IN_KITCHEN' ELSE status END WHERE id = ?", orderId);
+        jdbcTemplate.update("UPDATE restaurant_order SET status = CASE WHEN status IN ('NEW','READY','SERVED') THEN 'IN_KITCHEN' ELSE status END WHERE id = ?", orderId);
     }
 
     @Transactional
@@ -930,6 +1109,52 @@ public class RestaurantService {
         if (CLOSED_ORDER_STATUSES.contains(order.safeStatus())) {
             throw new IllegalArgumentException("No se puede editar una comanda pagada o anulada.");
         }
+    }
+
+    private Map<String, String> qrOrderQuantityParams(List<RestaurantQrOrderItemRow> items) {
+        Map<String, String> params = new LinkedHashMap<>();
+        for (RestaurantQrOrderItemRow item : items) {
+            if (item.productId() != null && item.quantity() > 0) {
+                String key = "qty_" + item.productId();
+                int current = Integer.parseInt(params.getOrDefault(key, "0"));
+                params.put(key, Integer.toString(current + item.quantity()));
+            }
+        }
+        return params;
+    }
+
+    private Long activeOrderIdForTable(Long tableId) {
+        if (tableId == null) {
+            return null;
+        }
+        return jdbcTemplate.query("""
+                SELECT id
+                FROM restaurant_order
+                WHERE table_id = ?
+                  AND status IN ('NEW','IN_KITCHEN','READY','SERVED')
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+                """, rs -> rs.next() ? rs.getLong(1) : null, tableId);
+    }
+
+    private String qrOrderNote(RestaurantQrOrderRow qrOrder) {
+        String note = qrOrder == null ? null : qrOrder.customerNote();
+        return note == null || note.isBlank() ? "Pedido enviado desde QR." : "Pedido enviado desde QR. Nota: " + note.trim();
+    }
+
+    private void appendQrOrderNote(Long orderId, String customerNote) {
+        String cleanNote = limitText(customerNote, 500);
+        if (cleanNote.isBlank()) {
+            return;
+        }
+        jdbcTemplate.update("""
+                UPDATE restaurant_order
+                SET notes = CASE
+                    WHEN notes IS NULL OR notes = '' THEN ?
+                    ELSE CONCAT(notes, '\n', ?)
+                END
+                WHERE id = ?
+                """, "Pedido QR: " + cleanNote, "Pedido QR: " + cleanNote, orderId);
     }
 
     private Map<Long, Integer> selectedQuantities(Map<String, String> requestParams) {
@@ -1203,6 +1428,34 @@ public class RestaurantService {
                 rs.getString("status"),
                 toLocalDateTime(rs.getTimestamp("created_at")),
                 toLocalDateTime(rs.getTimestamp("resolved_at"))
+        );
+    }
+
+    private RowMapper<RestaurantQrOrderRow> qrOrderMapper() {
+        return (rs, rowNum) -> new RestaurantQrOrderRow(
+                rs.getLong("id"),
+                rs.getLong("table_id"),
+                rs.getString("table_name"),
+                rs.getString("table_area"),
+                rs.getString("customer_note"),
+                rs.getString("status"),
+                rs.getBigDecimal("subtotal"),
+                nullableLong(rs, "approved_order_id"),
+                toLocalDateTime(rs.getTimestamp("created_at")),
+                toLocalDateTime(rs.getTimestamp("processed_at")),
+                rs.getInt("item_count")
+        );
+    }
+
+    private RowMapper<RestaurantQrOrderItemRow> qrOrderItemMapper() {
+        return (rs, rowNum) -> new RestaurantQrOrderItemRow(
+                rs.getLong("id"),
+                rs.getLong("qr_order_id"),
+                nullableLong(rs, "product_id"),
+                rs.getString("product_name"),
+                rs.getInt("quantity"),
+                rs.getBigDecimal("unit_price"),
+                rs.getBigDecimal("line_total")
         );
     }
 

@@ -73,6 +73,21 @@ public class RestaurantController {
         return tableId == null ? "redirect:/restaurant/menu" : "redirect:/restaurant/menu?tableId=" + tableId;
     }
 
+    @PostMapping("/restaurant/qr-order")
+    public String createPublicQrOrder(@RequestParam Long tableId,
+                                      @RequestParam(required = false) String customerNote,
+                                      @RequestParam Map<String, String> params,
+                                      RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            Long qrOrderId = restaurantService.createQrOrder(tableId, customerNote, params);
+            redirectAttributes.addFlashAttribute("successMessage", "Pedido QR enviado. Un mozo lo revisará antes de enviarlo a cocina. Código interno: QR-" + qrOrderId + ".");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/restaurant/menu?tableId=" + tableId;
+    }
+
     @GetMapping("/admin/restaurant")
     public String restaurantHome() {
         return "redirect:/admin/restaurant/dashboard";
@@ -90,9 +105,60 @@ public class RestaurantController {
         model.addAttribute("kitchenOrders", kitchenOrders);
         model.addAttribute("itemsByOrder", restaurantService.itemsByOrder(activeOrders));
         model.addAttribute("kitchenItemsByOrder", restaurantService.itemsByOrder(kitchenOrders));
+        List<RestaurantQrOrderRow> pendingQrOrders = restaurantService.pendingQrOrders();
         model.addAttribute("pendingTableRequests", restaurantService.pendingTableRequests());
         model.addAttribute("pendingTableRequestCount", restaurantService.pendingTableRequestCount());
+        model.addAttribute("pendingQrOrders", pendingQrOrders);
+        model.addAttribute("pendingQrOrderCount", restaurantService.pendingQrOrderCount());
+        model.addAttribute("qrItemsByOrder", restaurantService.itemsByQrOrder(pendingQrOrders));
         return "admin/restaurant/dashboard";
+    }
+
+    @GetMapping("/admin/restaurant/qr-orders")
+    public String qrOrders(@RequestParam(defaultValue = "PENDING") String statusFilter, Model model) {
+        ensureRestaurantRuntimeReady();
+        List<RestaurantQrOrderRow> qrOrders = restaurantService.qrOrders(statusFilter);
+        model.addAttribute("activePage", "restaurant_qr_orders");
+        model.addAttribute("currentStatusFilter", normalizeQrOrderFilter(statusFilter));
+        model.addAttribute("pendingQrOrderCount", restaurantService.pendingQrOrderCount());
+        model.addAttribute("qrOrders", qrOrders);
+        model.addAttribute("itemsByOrder", restaurantService.itemsByQrOrder(qrOrders));
+        return "admin/restaurant/qr_orders";
+    }
+
+    @PostMapping("/admin/restaurant/qr-orders/{id}/approve")
+    public String approveQrOrder(@PathVariable Long id,
+                                 @RequestParam(defaultValue = "/admin/restaurant/qr-orders") String returnTo,
+                                 RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            Long orderId = restaurantService.approveQrOrder(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Pedido QR aprobado y enviado a cocina.");
+            return "redirect:/admin/restaurant/orders/" + orderId;
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        if (returnTo.startsWith("/admin/restaurant")) {
+            return "redirect:" + returnTo;
+        }
+        return "redirect:/admin/restaurant/qr-orders";
+    }
+
+    @PostMapping("/admin/restaurant/qr-orders/{id}/reject")
+    public String rejectQrOrder(@PathVariable Long id,
+                                @RequestParam(defaultValue = "/admin/restaurant/qr-orders") String returnTo,
+                                RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.rejectQrOrder(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Pedido QR rechazado.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        if (returnTo.startsWith("/admin/restaurant")) {
+            return "redirect:" + returnTo;
+        }
+        return "redirect:/admin/restaurant/qr-orders";
     }
 
     @GetMapping("/admin/restaurant/table-requests")
@@ -580,6 +646,14 @@ public class RestaurantController {
             case "WAITER" -> "Solicitud enviada. Un mozo se acercará a tu mesa.";
             case "NOTE" -> "Nota enviada al equipo del restaurante.";
             default -> "Solicitud enviada. Te atenderemos en breve.";
+        };
+    }
+
+    private String normalizeQrOrderFilter(String value) {
+        String clean = value == null ? "PENDING" : value.trim().toUpperCase();
+        return switch (clean) {
+            case "PENDING", "APPROVED", "REJECTED", "ALL" -> clean;
+            default -> "PENDING";
         };
     }
 

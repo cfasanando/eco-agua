@@ -29,9 +29,10 @@ public class RestaurantModuleInstaller {
                 SELECT COUNT(*)
                 FROM information_schema.tables
                 WHERE table_schema = DATABASE()
-                  AND table_name IN ('restaurant_table', 'restaurant_order', 'restaurant_order_item', 'restaurant_table_request')
+                  AND table_name IN ('restaurant_table', 'restaurant_order', 'restaurant_order_item', 'restaurant_table_request',
+                                     'restaurant_qr_order', 'restaurant_qr_order_item')
                 """, Integer.class);
-        return count != null && count == 4;
+        return count != null && count == 6;
     }
 
     @Transactional
@@ -157,6 +158,43 @@ public class RestaurantModuleInstaller {
                     KEY idx_restaurant_table_request_type (request_type),
                     KEY idx_restaurant_table_request_created (created_at),
                     CONSTRAINT fk_restaurant_table_request_table FOREIGN KEY (table_id) REFERENCES restaurant_table(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS restaurant_qr_order (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    table_id BIGINT NOT NULL,
+                    customer_note VARCHAR(500) NULL,
+                    status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+                    subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                    approved_order_id BIGINT NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    processed_at DATETIME NULL,
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    KEY idx_restaurant_qr_order_table (table_id),
+                    KEY idx_restaurant_qr_order_status (status),
+                    KEY idx_restaurant_qr_order_created (created_at),
+                    KEY idx_restaurant_qr_order_approved_order (approved_order_id),
+                    CONSTRAINT fk_restaurant_qr_order_table FOREIGN KEY (table_id) REFERENCES restaurant_table(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS restaurant_qr_order_item (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    qr_order_id BIGINT NOT NULL,
+                    product_id BIGINT NULL,
+                    product_name VARCHAR(200) NOT NULL,
+                    quantity INT NOT NULL DEFAULT 1,
+                    unit_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                    line_total DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                    PRIMARY KEY (id),
+                    KEY idx_restaurant_qr_order_item_order (qr_order_id),
+                    KEY idx_restaurant_qr_order_item_product (product_id),
+                    CONSTRAINT fk_restaurant_qr_order_item_order FOREIGN KEY (qr_order_id) REFERENCES restaurant_qr_order(id) ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
     }

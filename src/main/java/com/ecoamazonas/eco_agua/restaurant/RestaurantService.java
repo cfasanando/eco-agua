@@ -862,8 +862,8 @@ public class RestaurantService {
                     INSERT INTO restaurant_order
                     (order_code, service_type, table_id, customer_name, customer_phone,
                      delivery_address, delivery_reference, scheduled_at, status,
-                     subtotal, delivery_fee, service_charge, notes, created_at, updated_at)
-                    VALUES (?, ?, NULL, ?, ?, ?, ?, ?, 'NEW', ?, ?, 0.00, ?, NOW(), NOW())
+                     subtotal, delivery_fee, service_charge, notes, created_by, created_at, updated_at)
+                    VALUES (?, ?, NULL, ?, ?, ?, ?, ?, 'NEW', ?, ?, 0.00, ?, ?, NOW(), NOW())
                     """, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, orderCode);
             ps.setString(2, cleanServiceType);
@@ -875,6 +875,7 @@ public class RestaurantService {
             ps.setBigDecimal(8, subtotal);
             ps.setBigDecimal(9, cleanDeliveryFee);
             ps.setString(10, blankToNull(notes));
+            ps.setString(11, currentUsername());
             return ps;
         }, keyHolder);
 
@@ -917,7 +918,15 @@ public class RestaurantService {
             throw new IllegalArgumentException("La transición de estado no es válida para este pedido.");
         }
 
-        jdbcTemplate.update("UPDATE restaurant_order SET status = ?, updated_at = NOW() WHERE id = ?", cleanStatus, orderId);
+        jdbcTemplate.update("""
+                UPDATE restaurant_order
+                SET status = ?,
+                    kitchen_started_at = CASE WHEN ? = 'IN_KITCHEN' THEN COALESCE(kitchen_started_at, NOW()) ELSE kitchen_started_at END,
+                    ready_at = CASE WHEN ? = 'READY' THEN COALESCE(ready_at, NOW()) ELSE ready_at END,
+                    delivered_at = CASE WHEN ? = 'DELIVERED' THEN COALESCE(delivered_at, NOW()) ELSE delivered_at END,
+                    updated_at = NOW()
+                WHERE id = ?
+                """, cleanStatus, cleanStatus, cleanStatus, cleanStatus, orderId);
         if ("IN_KITCHEN".equals(cleanStatus)) {
             jdbcTemplate.update("""
                     UPDATE restaurant_order_item
@@ -1567,8 +1576,9 @@ public class RestaurantService {
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement("""
                     INSERT INTO restaurant_order
-                    (order_code, service_type, table_id, customer_name, customer_phone, status, subtotal, service_charge, notes, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, 'IN_KITCHEN', ?, ?, ?, NOW(), NOW())
+                    (order_code, service_type, table_id, customer_name, customer_phone, status, subtotal, service_charge, notes,
+                     created_by, kitchen_started_at, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, 'IN_KITCHEN', ?, ?, ?, ?, NOW(), NOW(), NOW())
                     """, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, orderCode);
             ps.setString(2, cleanServiceType);
@@ -1582,6 +1592,7 @@ public class RestaurantService {
             ps.setBigDecimal(6, finalSubtotal);
             ps.setBigDecimal(7, finalServiceCharge);
             ps.setString(8, blankToNull(notes));
+            ps.setString(9, currentUsername());
             return ps;
         }, keyHolder);
 
@@ -1608,7 +1619,13 @@ public class RestaurantService {
 
         insertOrderItems(orderId, selectedItems, quantities);
         recalculateOrderTotal(orderId);
-        jdbcTemplate.update("UPDATE restaurant_order SET status = CASE WHEN status IN ('NEW','READY','SERVED') THEN 'IN_KITCHEN' ELSE status END WHERE id = ?", orderId);
+        jdbcTemplate.update("""
+                UPDATE restaurant_order
+                SET status = CASE WHEN status IN ('NEW','READY','SERVED') THEN 'IN_KITCHEN' ELSE status END,
+                    kitchen_started_at = COALESCE(kitchen_started_at, NOW()),
+                    updated_at = NOW()
+                WHERE id = ?
+                """, orderId);
     }
 
     @Transactional
@@ -1670,7 +1687,15 @@ public class RestaurantService {
             throw new IllegalArgumentException("No se puede cambiar una comanda cerrada.");
         }
 
-        jdbcTemplate.update("UPDATE restaurant_order SET status = ? WHERE id = ?", cleanStatus, orderId);
+        jdbcTemplate.update("""
+                UPDATE restaurant_order
+                SET status = ?,
+                    kitchen_started_at = CASE WHEN ? = 'IN_KITCHEN' THEN COALESCE(kitchen_started_at, NOW()) ELSE kitchen_started_at END,
+                    ready_at = CASE WHEN ? = 'READY' THEN COALESCE(ready_at, NOW()) ELSE ready_at END,
+                    delivered_at = CASE WHEN ? IN ('DELIVERED','SERVED') THEN COALESCE(delivered_at, NOW()) ELSE delivered_at END,
+                    updated_at = NOW()
+                WHERE id = ?
+                """, cleanStatus, cleanStatus, cleanStatus, cleanStatus, orderId);
         if ("READY".equals(cleanStatus)) {
             jdbcTemplate.update("UPDATE restaurant_order_item SET kitchen_status = 'READY' WHERE order_id = ?", orderId);
         }
@@ -1681,6 +1706,7 @@ public class RestaurantService {
 
     @Transactional
     public void payOrder(Long orderId, String paymentMethod) {
+        assertCashPaymentAllowed();
         RestaurantOrderRow order = assertOrderExists(orderId);
         RestaurantExternalOrderRow externalOrder = externalOrder(orderId);
         if (externalOrder != null) {
@@ -1694,9 +1720,9 @@ public class RestaurantService {
             String cleanPaymentMethod = normalize(paymentMethod, VALID_PAYMENT_METHODS, "CASH");
             jdbcTemplate.update("""
                     UPDATE restaurant_order
-                    SET payment_method = ?, paid_at = NOW(), updated_at = NOW()
+                    SET payment_method = ?, paid_at = NOW(), paid_by = ?, updated_at = NOW()
                     WHERE id = ?
-                    """, cleanPaymentMethod, orderId);
+                    """, cleanPaymentMethod, currentUsername(), orderId);
             return;
         }
 
@@ -1707,9 +1733,9 @@ public class RestaurantService {
         String cleanPaymentMethod = normalize(paymentMethod, VALID_PAYMENT_METHODS, "CASH");
         jdbcTemplate.update("""
                 UPDATE restaurant_order
-                SET status = 'PAID', payment_method = ?, paid_at = NOW()
+                SET status = 'PAID', payment_method = ?, paid_at = NOW(), paid_by = ?, updated_at = NOW()
                 WHERE id = ?
-                """, cleanPaymentMethod, orderId);
+                """, cleanPaymentMethod, currentUsername(), orderId);
         releaseTableForOrder(orderId);
     }
 
@@ -1728,7 +1754,11 @@ public class RestaurantService {
             throw new IllegalArgumentException("El pedido ya salió a reparto o fue entregado y no puede anularse desde esta pantalla.");
         }
         restoreOrderStock(orderId);
-        jdbcTemplate.update("UPDATE restaurant_order SET status = 'CANCELLED' WHERE id = ?", orderId);
+        jdbcTemplate.update("""
+                UPDATE restaurant_order
+                SET status = 'CANCELLED', cancelled_at = COALESCE(cancelled_at, NOW()), updated_at = NOW()
+                WHERE id = ?
+                """, orderId);
         releaseTableForOrder(orderId);
     }
 
@@ -2565,6 +2595,532 @@ public class RestaurantService {
                     settings.showIgvBreakdown(), settings.safeIgvRate(), taxableBase, igvAmount
             );
         }, orderId);
+    }
+
+    public List<RestaurantCashSessionRow> cashSessions() {
+        if (!tableExists("restaurant_cash_session")) {
+            return List.of();
+        }
+        return jdbcTemplate.query("""
+                SELECT id, business_date, status, opening_amount, opened_by, opened_at,
+                       closing_amount, expected_cash, difference_amount, closed_by, closed_at, notes
+                FROM restaurant_cash_session
+                ORDER BY business_date DESC, id DESC
+                LIMIT 180
+                """, cashSessionMapper());
+    }
+
+    public RestaurantCashSessionRow cashSession(Long sessionId) {
+        if (sessionId == null || !tableExists("restaurant_cash_session")) {
+            return null;
+        }
+        try {
+            return jdbcTemplate.queryForObject("""
+                    SELECT id, business_date, status, opening_amount, opened_by, opened_at,
+                           closing_amount, expected_cash, difference_amount, closed_by, closed_at, notes
+                    FROM restaurant_cash_session
+                    WHERE id = ?
+                    """, cashSessionMapper(), sessionId);
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
+    }
+
+    public RestaurantCashSessionRow cashSessionForDate(LocalDate businessDate) {
+        if (!tableExists("restaurant_cash_session")) {
+            return null;
+        }
+        LocalDate targetDate = businessDate == null ? LocalDate.now() : businessDate;
+        try {
+            return jdbcTemplate.queryForObject("""
+                    SELECT id, business_date, status, opening_amount, opened_by, opened_at,
+                           closing_amount, expected_cash, difference_amount, closed_by, closed_at, notes
+                    FROM restaurant_cash_session
+                    WHERE business_date = ?
+                    """, cashSessionMapper(), targetDate);
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
+    }
+
+    @Transactional
+    public Long openCashSession(LocalDate businessDate, BigDecimal openingAmount, String username) {
+        LocalDate targetDate = businessDate == null ? LocalDate.now() : businessDate;
+        if (targetDate.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("La fecha de caja no puede estar en el futuro.");
+        }
+        if (cashSessionForDate(targetDate) != null) {
+            throw new IllegalArgumentException("Ya existe una jornada de caja para la fecha seleccionada.");
+        }
+        BigDecimal cleanOpening = moneyNonNegative(openingAmount);
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement("""
+                    INSERT INTO restaurant_cash_session
+                    (business_date, status, opening_amount, opened_by, opened_at, created_at, updated_at)
+                    VALUES (?, 'OPEN', ?, ?, NOW(), NOW(), NOW())
+                    """, Statement.RETURN_GENERATED_KEYS);
+            ps.setObject(1, targetDate);
+            ps.setBigDecimal(2, cleanOpening);
+            ps.setString(3, safeUsername(username));
+            return ps;
+        }, keyHolder);
+        return Objects.requireNonNull(keyHolder.getKey()).longValue();
+    }
+
+    @Transactional
+    public void addCashMovement(Long sessionId,
+                                String movementType,
+                                BigDecimal amount,
+                                String description,
+                                String username) {
+        RestaurantCashSessionRow session = lockOpenCashSession(sessionId);
+        String cleanType = normalize(movementType, List.of("INCOME", "EXPENSE"), "INCOME");
+        BigDecimal cleanAmount = moneyPositive(amount, "El importe del movimiento debe ser mayor que cero.");
+        String cleanDescription = limitText(description, 500);
+        if (cleanDescription.isBlank()) {
+            throw new IllegalArgumentException("Ingresa una descripción para el movimiento.");
+        }
+        jdbcTemplate.update("""
+                INSERT INTO restaurant_cash_movement
+                (cash_session_id, movement_type, amount, description, created_by, created_at)
+                VALUES (?, ?, ?, ?, ?, NOW())
+                """, session.id(), cleanType, cleanAmount, cleanDescription, safeUsername(username));
+    }
+
+    @Transactional
+    public void closeCashSession(Long sessionId,
+                                 BigDecimal countedCash,
+                                 String notes,
+                                 String username) {
+        RestaurantCashSessionRow session = lockOpenCashSession(sessionId);
+        BigDecimal cleanCounted = moneyNonNegative(countedCash);
+        RestaurantCashCloseSummary summary = cashCloseSummary(session.id());
+        BigDecimal expected = summary.safeExpectedCash().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal difference = cleanCounted.subtract(expected).setScale(2, RoundingMode.HALF_UP);
+        jdbcTemplate.update("""
+                UPDATE restaurant_cash_session
+                SET status = 'CLOSED', closing_amount = ?, expected_cash = ?, difference_amount = ?,
+                    closed_by = ?, closed_at = NOW(), notes = ?, updated_at = NOW()
+                WHERE id = ? AND status = 'OPEN'
+                """, cleanCounted, expected, difference, safeUsername(username),
+                blankToNull(limitText(notes, 1000)), session.id());
+    }
+
+    public List<RestaurantCashMovementRow> cashMovements(Long sessionId) {
+        if (sessionId == null || !tableExists("restaurant_cash_movement")) {
+            return List.of();
+        }
+        return jdbcTemplate.query("""
+                SELECT id, cash_session_id, movement_type, amount, description, created_by, created_at
+                FROM restaurant_cash_movement
+                WHERE cash_session_id = ?
+                ORDER BY created_at DESC, id DESC
+                """, cashMovementMapper(), sessionId);
+    }
+
+    public RestaurantCashCloseSummary cashCloseSummary(Long sessionId) {
+        RestaurantCashSessionRow session = cashSession(sessionId);
+        if (session == null) {
+            throw new IllegalArgumentException("La jornada de caja seleccionada no existe.");
+        }
+        BigDecimal cashSales = paymentTotal(session.businessDate(), "CASH");
+        BigDecimal manualIncome = cashMovementTotal(session.id(), "INCOME");
+        BigDecimal manualExpense = cashMovementTotal(session.id(), "EXPENSE");
+        BigDecimal expected = session.safeOpeningAmount()
+                .add(cashSales)
+                .add(manualIncome)
+                .subtract(manualExpense)
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal counted = session.isOpen() ? BigDecimal.ZERO : session.safeClosingAmount();
+        BigDecimal difference = session.isOpen()
+                ? BigDecimal.ZERO
+                : counted.subtract(expected).setScale(2, RoundingMode.HALF_UP);
+        return new RestaurantCashCloseSummary(session, cashSales, manualIncome, manualExpense, expected, counted, difference);
+    }
+
+    public RestaurantReportSummary reportSummary(LocalDate fromDate, LocalDate toDate) {
+        LocalDate[] range = normalizeDateRange(fromDate, toDate);
+        LocalDate from = range[0];
+        LocalDate to = range[1];
+        int paidOrders = count("""
+                SELECT COUNT(*) FROM restaurant_order
+                WHERE paid_at IS NOT NULL AND DATE(paid_at) BETWEEN ? AND ?
+                """, from, to);
+        BigDecimal totalSales = amount("""
+                SELECT COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0) + COALESCE(service_charge, 0)), 0)
+                FROM restaurant_order
+                WHERE paid_at IS NOT NULL AND DATE(paid_at) BETWEEN ? AND ?
+                """, from, to);
+        BigDecimal estimatedCost = amount("""
+                SELECT COALESCE(SUM(a.quantity_reserved * i.unit_cost), 0)
+                FROM restaurant_order o
+                JOIN restaurant_order_item oi ON oi.order_id = o.id
+                JOIN restaurant_order_item_ingredient a ON a.order_item_id = oi.id
+                JOIN restaurant_ingredient i ON i.id = a.ingredient_id
+                WHERE o.paid_at IS NOT NULL AND DATE(o.paid_at) BETWEEN ? AND ?
+                """, from, to);
+        BigDecimal grossProfit = totalSales.subtract(estimatedCost).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal margin = totalSales.compareTo(BigDecimal.ZERO) == 0
+                ? BigDecimal.ZERO
+                : grossProfit.multiply(new BigDecimal("100")).divide(totalSales, 2, RoundingMode.HALF_UP);
+        int cancelled = count("""
+                SELECT COUNT(*) FROM restaurant_order
+                WHERE status = 'CANCELLED' AND DATE(COALESCE(cancelled_at, updated_at, created_at)) BETWEEN ? AND ?
+                """, from, to);
+        int approvedQr = tableExists("restaurant_qr_order") ? count("""
+                SELECT COUNT(*) FROM restaurant_qr_order
+                WHERE status = 'APPROVED' AND DATE(COALESCE(processed_at, created_at)) BETWEEN ? AND ?
+                """, from, to) : 0;
+        int rejectedQr = tableExists("restaurant_qr_order") ? count("""
+                SELECT COUNT(*) FROM restaurant_qr_order
+                WHERE status = 'REJECTED' AND DATE(COALESCE(processed_at, created_at)) BETWEEN ? AND ?
+                """, from, to) : 0;
+        BigDecimal averageKitchen = amount("""
+                SELECT COALESCE(AVG(TIMESTAMPDIFF(MINUTE, kitchen_started_at, ready_at)), 0)
+                FROM restaurant_order
+                WHERE kitchen_started_at IS NOT NULL AND ready_at IS NOT NULL
+                  AND DATE(ready_at) BETWEEN ? AND ?
+                """, from, to).setScale(2, RoundingMode.HALF_UP);
+        return new RestaurantReportSummary(from, to, paidOrders, totalSales, estimatedCost,
+                grossProfit, margin, cancelled, approvedQr, rejectedQr, averageKitchen);
+    }
+
+    public List<RestaurantReportValueRow> reportPayments(LocalDate fromDate, LocalDate toDate) {
+        LocalDate[] range = normalizeDateRange(fromDate, toDate);
+        return jdbcTemplate.query("""
+                SELECT COALESCE(payment_method, 'OTHER') AS row_key,
+                       COUNT(*) AS order_count,
+                       0 AS quantity,
+                       COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0) + COALESCE(service_charge, 0)), 0) AS amount
+                FROM restaurant_order
+                WHERE paid_at IS NOT NULL AND DATE(paid_at) BETWEEN ? AND ?
+                GROUP BY COALESCE(payment_method, 'OTHER')
+                ORDER BY amount DESC
+                """, (rs, rowNum) -> reportValueRow(rs.getString("row_key"), paymentLabel(rs.getString("row_key")),
+                rs.getInt("order_count"), rs.getBigDecimal("quantity"), rs.getBigDecimal("amount"), BigDecimal.ZERO),
+                range[0], range[1]);
+    }
+
+    public List<RestaurantReportValueRow> reportServiceTypes(LocalDate fromDate, LocalDate toDate) {
+        LocalDate[] range = normalizeDateRange(fromDate, toDate);
+        return jdbcTemplate.query("""
+                SELECT COALESCE(service_type, 'DINE_IN') AS row_key,
+                       COUNT(*) AS order_count,
+                       0 AS quantity,
+                       COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0) + COALESCE(service_charge, 0)), 0) AS amount
+                FROM restaurant_order
+                WHERE paid_at IS NOT NULL AND DATE(paid_at) BETWEEN ? AND ?
+                GROUP BY COALESCE(service_type, 'DINE_IN')
+                ORDER BY amount DESC
+                """, (rs, rowNum) -> reportValueRow(rs.getString("row_key"), serviceTypeLabel(rs.getString("row_key")),
+                rs.getInt("order_count"), rs.getBigDecimal("quantity"), rs.getBigDecimal("amount"), BigDecimal.ZERO),
+                range[0], range[1]);
+    }
+
+    public List<RestaurantReportValueRow> reportProducts(LocalDate fromDate, LocalDate toDate) {
+        LocalDate[] range = normalizeDateRange(fromDate, toDate);
+        return jdbcTemplate.query("""
+                SELECT COALESCE(CAST(oi.product_id AS CHAR), CONCAT('NAME:', oi.product_name)) AS row_key,
+                       oi.product_name AS row_label,
+                       COUNT(DISTINCT o.id) AS order_count,
+                       COALESCE(SUM(oi.quantity), 0) AS quantity,
+                       COALESCE(SUM(oi.line_total), 0) AS amount,
+                       COALESCE(SUM((SELECT COALESCE(SUM(a.quantity_reserved * i.unit_cost), 0)
+                                     FROM restaurant_order_item_ingredient a
+                                     JOIN restaurant_ingredient i ON i.id = a.ingredient_id
+                                     WHERE a.order_item_id = oi.id)), 0) AS estimated_cost
+                FROM restaurant_order o
+                JOIN restaurant_order_item oi ON oi.order_id = o.id
+                WHERE o.paid_at IS NOT NULL AND DATE(o.paid_at) BETWEEN ? AND ?
+                GROUP BY oi.product_id, oi.product_name
+                ORDER BY quantity DESC, amount DESC, row_label
+                LIMIT 100
+                """, (rs, rowNum) -> reportValueRow(rs.getString("row_key"), rs.getString("row_label"),
+                rs.getInt("order_count"), rs.getBigDecimal("quantity"), rs.getBigDecimal("amount"),
+                rs.getBigDecimal("estimated_cost")), range[0], range[1]);
+    }
+
+    public List<RestaurantReportValueRow> reportCategories(LocalDate fromDate, LocalDate toDate) {
+        LocalDate[] range = normalizeDateRange(fromDate, toDate);
+        return jdbcTemplate.query("""
+                SELECT COALESCE(CAST(c.id AS CHAR), 'NO_CATEGORY') AS row_key,
+                       COALESCE(c.name, 'Sin categoría') AS row_label,
+                       COUNT(DISTINCT o.id) AS order_count,
+                       COALESCE(SUM(oi.quantity), 0) AS quantity,
+                       COALESCE(SUM(oi.line_total), 0) AS amount
+                FROM restaurant_order o
+                JOIN restaurant_order_item oi ON oi.order_id = o.id
+                LEFT JOIN product p ON p.id = oi.product_id
+                LEFT JOIN category c ON c.id = p.category_id
+                WHERE o.paid_at IS NOT NULL AND DATE(o.paid_at) BETWEEN ? AND ?
+                GROUP BY c.id, c.name
+                ORDER BY amount DESC, row_label
+                """, (rs, rowNum) -> reportValueRow(rs.getString("row_key"), rs.getString("row_label"),
+                rs.getInt("order_count"), rs.getBigDecimal("quantity"), rs.getBigDecimal("amount"), BigDecimal.ZERO),
+                range[0], range[1]);
+    }
+
+    public List<RestaurantReportValueRow> reportCreatedBy(LocalDate fromDate, LocalDate toDate) {
+        return reportUsersByColumn(fromDate, toDate, "created_by", "Sin usuario");
+    }
+
+    public List<RestaurantReportValueRow> reportPaidBy(LocalDate fromDate, LocalDate toDate) {
+        return reportUsersByColumn(fromDate, toDate, "paid_by", "Sin cajero");
+    }
+
+    public List<RestaurantIngredientReportRow> reportIngredientConsumption(LocalDate fromDate, LocalDate toDate) {
+        LocalDate[] range = normalizeDateRange(fromDate, toDate);
+        if (!tableExists("restaurant_ingredient_movement")) {
+            return List.of();
+        }
+        return jdbcTemplate.query("""
+                SELECT i.id, i.name, i.unit_code,
+                       COALESCE(SUM(CASE WHEN m.movement_type = 'CONSUMPTION' THEN ABS(m.quantity_change) ELSE 0 END), 0) AS consumed_quantity,
+                       COALESCE(SUM(CASE WHEN m.movement_type = 'RETURN' THEN m.quantity_change ELSE 0 END), 0) AS returned_quantity,
+                       COALESCE(SUM(CASE WHEN m.movement_type = 'CONSUMPTION' THEN ABS(m.quantity_change) * i.unit_cost ELSE 0 END), 0) AS estimated_cost
+                FROM restaurant_ingredient i
+                LEFT JOIN restaurant_ingredient_movement m ON m.ingredient_id = i.id
+                     AND DATE(m.created_at) BETWEEN ? AND ?
+                GROUP BY i.id, i.name, i.unit_code
+                HAVING consumed_quantity > 0 OR returned_quantity > 0
+                ORDER BY estimated_cost DESC, i.name
+                """, (rs, rowNum) -> new RestaurantIngredientReportRow(
+                rs.getLong("id"), rs.getString("name"), rs.getString("unit_code"),
+                rs.getBigDecimal("consumed_quantity"), rs.getBigDecimal("returned_quantity"),
+                rs.getBigDecimal("estimated_cost")), range[0], range[1]);
+    }
+
+    public String reportCsv(LocalDate fromDate, LocalDate toDate) {
+        RestaurantReportSummary summary = reportSummary(fromDate, toDate);
+        StringBuilder csv = new StringBuilder();
+        csv.append("Section;Key;Label;Orders;Quantity;Amount;Estimated cost;Gross profit\n");
+        appendCsvRow(csv, "SUMMARY", "PERIOD", summary.fromDate() + " to " + summary.toDate(),
+                summary.paidOrders(), BigDecimal.ZERO, summary.safeTotalSales(),
+                summary.safeEstimatedCost(), summary.safeGrossProfit());
+        appendReportRows(csv, "PAYMENT", reportPayments(fromDate, toDate));
+        appendReportRows(csv, "SERVICE", reportServiceTypes(fromDate, toDate));
+        appendReportRows(csv, "PRODUCT", reportProducts(fromDate, toDate));
+        appendReportRows(csv, "CATEGORY", reportCategories(fromDate, toDate));
+        appendReportRows(csv, "CREATED_BY", reportCreatedBy(fromDate, toDate));
+        appendReportRows(csv, "PAID_BY", reportPaidBy(fromDate, toDate));
+        return csv.toString();
+    }
+
+    private List<RestaurantReportValueRow> reportUsersByColumn(LocalDate fromDate,
+                                                                LocalDate toDate,
+                                                                String column,
+                                                                String fallbackLabel) {
+        LocalDate[] range = normalizeDateRange(fromDate, toDate);
+        if (!List.of("created_by", "paid_by").contains(column)) {
+            throw new IllegalArgumentException("Invalid report column.");
+        }
+        String sql = """
+                SELECT COALESCE(NULLIF(%s, ''), ?) AS row_key,
+                       COUNT(*) AS order_count,
+                       0 AS quantity,
+                       COALESCE(SUM(subtotal + COALESCE(delivery_fee, 0) + COALESCE(service_charge, 0)), 0) AS amount
+                FROM restaurant_order
+                WHERE paid_at IS NOT NULL AND DATE(paid_at) BETWEEN ? AND ?
+                GROUP BY COALESCE(NULLIF(%s, ''), ?)
+                ORDER BY amount DESC, row_key
+                """.formatted(column, column);
+        return jdbcTemplate.query(sql, (rs, rowNum) -> reportValueRow(rs.getString("row_key"), rs.getString("row_key"),
+                rs.getInt("order_count"), rs.getBigDecimal("quantity"), rs.getBigDecimal("amount"), BigDecimal.ZERO),
+                fallbackLabel, range[0], range[1], fallbackLabel);
+    }
+
+    private RestaurantReportValueRow reportValueRow(String key,
+                                                     String label,
+                                                     int orderCount,
+                                                     BigDecimal quantity,
+                                                     BigDecimal amount,
+                                                     BigDecimal estimatedCost) {
+        BigDecimal safeAmount = amount == null ? BigDecimal.ZERO : amount;
+        BigDecimal safeCost = estimatedCost == null ? BigDecimal.ZERO : estimatedCost;
+        return new RestaurantReportValueRow(key, label, orderCount,
+                quantity == null ? BigDecimal.ZERO : quantity,
+                safeAmount, safeCost, safeAmount.subtract(safeCost));
+    }
+
+    private RestaurantCashSessionRow lockOpenCashSession(Long sessionId) {
+        if (sessionId == null) {
+            throw new IllegalArgumentException("Selecciona una jornada de caja válida.");
+        }
+        try {
+            RestaurantCashSessionRow session = jdbcTemplate.queryForObject("""
+                    SELECT id, business_date, status, opening_amount, opened_by, opened_at,
+                           closing_amount, expected_cash, difference_amount, closed_by, closed_at, notes
+                    FROM restaurant_cash_session
+                    WHERE id = ?
+                    FOR UPDATE
+                    """, cashSessionMapper(), sessionId);
+            if (session == null || !session.isOpen()) {
+                throw new IllegalArgumentException("La jornada de caja ya está cerrada.");
+            }
+            return session;
+        } catch (EmptyResultDataAccessException ex) {
+            throw new IllegalArgumentException("La jornada de caja seleccionada no existe.");
+        }
+    }
+
+    private BigDecimal cashMovementTotal(Long sessionId, String movementType) {
+        return amount("""
+                SELECT COALESCE(SUM(amount), 0)
+                FROM restaurant_cash_movement
+                WHERE cash_session_id = ? AND movement_type = ?
+                """, sessionId, movementType);
+    }
+
+    private void assertCashPaymentAllowed() {
+        if (!tableExists("restaurant_cash_session")) {
+            return;
+        }
+        try {
+            String status = jdbcTemplate.queryForObject("""
+                    SELECT status
+                    FROM restaurant_cash_session
+                    WHERE business_date = CURDATE()
+                    FOR UPDATE
+                    """, String.class);
+            if ("CLOSED".equalsIgnoreCase(status)) {
+                throw new IllegalArgumentException("La caja del día ya fue cerrada. No se pueden registrar nuevos cobros.");
+            }
+        } catch (EmptyResultDataAccessException ignored) {
+            // Payments remain compatible until the first daily cash session is opened.
+        }
+    }
+
+    private LocalDate[] normalizeDateRange(LocalDate fromDate, LocalDate toDate) {
+        LocalDate to = toDate == null ? LocalDate.now() : toDate;
+        LocalDate from = fromDate == null ? to.withDayOfMonth(1) : fromDate;
+        if (from.isAfter(to)) {
+            LocalDate swap = from;
+            from = to;
+            to = swap;
+        }
+        if (from.isBefore(to.minusYears(5))) {
+            throw new IllegalArgumentException("El rango máximo permitido es de cinco años.");
+        }
+        return new LocalDate[]{from, to};
+    }
+
+    private BigDecimal moneyNonNegative(BigDecimal value) {
+        BigDecimal clean = value == null ? BigDecimal.ZERO : value.setScale(2, RoundingMode.HALF_UP);
+        if (clean.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("El importe no puede ser negativo.");
+        }
+        return clean;
+    }
+
+    private BigDecimal moneyPositive(BigDecimal value, String message) {
+        BigDecimal clean = moneyNonNegative(value);
+        if (clean.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException(message);
+        }
+        return clean;
+    }
+
+    private String safeUsername(String username) {
+        String clean = limitText(username, 120);
+        return clean.isBlank() ? currentUsername() : clean;
+    }
+
+    private String currentUsername() {
+        try {
+            org.springframework.security.core.Authentication authentication =
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.isAuthenticated()
+                    && authentication.getName() != null && !authentication.getName().isBlank()) {
+                return limitText(authentication.getName(), 120);
+            }
+        } catch (RuntimeException ignored) {
+            // The public QR flow can execute without an authenticated user.
+        }
+        return "SYSTEM";
+    }
+
+    private String paymentLabel(String paymentMethod) {
+        return switch (paymentMethod == null ? "OTHER" : paymentMethod.toUpperCase()) {
+            case "CASH" -> "Efectivo";
+            case "CARD" -> "Tarjeta";
+            case "YAPE" -> "Yape";
+            case "PLIN" -> "Plin";
+            case "TRANSFER" -> "Transferencia";
+            default -> "Otro";
+        };
+    }
+
+    private String serviceTypeLabel(String serviceType) {
+        return switch (serviceType == null ? "DINE_IN" : serviceType.toUpperCase()) {
+            case "TAKEAWAY" -> "Para llevar";
+            case "DELIVERY" -> "Delivery";
+            default -> "Mesa / salón";
+        };
+    }
+
+    private void appendReportRows(StringBuilder csv, String section, List<RestaurantReportValueRow> rows) {
+        for (RestaurantReportValueRow row : rows) {
+            appendCsvRow(csv, section, row.key(), row.label(), row.orderCount(), row.safeQuantity(),
+                    row.safeAmount(), row.safeEstimatedCost(), row.safeGrossProfit());
+        }
+    }
+
+    private void appendCsvRow(StringBuilder csv,
+                              String section,
+                              String key,
+                              String label,
+                              int orderCount,
+                              BigDecimal quantity,
+                              BigDecimal amount,
+                              BigDecimal estimatedCost,
+                              BigDecimal grossProfit) {
+        csv.append(csvCell(section)).append(';')
+                .append(csvCell(key)).append(';')
+                .append(csvCell(label)).append(';')
+                .append(orderCount).append(';')
+                .append(decimalCsv(quantity)).append(';')
+                .append(decimalCsv(amount)).append(';')
+                .append(decimalCsv(estimatedCost)).append(';')
+                .append(decimalCsv(grossProfit)).append('\n');
+    }
+
+    private String csvCell(String value) {
+        String clean = value == null ? "" : value.replace("\"", "\"\"");
+        return "\"" + clean + "\"";
+    }
+
+    private String decimalCsv(BigDecimal value) {
+        return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP).toPlainString();
+    }
+
+    private RowMapper<RestaurantCashSessionRow> cashSessionMapper() {
+        return (rs, rowNum) -> new RestaurantCashSessionRow(
+                rs.getLong("id"),
+                rs.getObject("business_date", LocalDate.class),
+                rs.getString("status"),
+                rs.getBigDecimal("opening_amount"),
+                rs.getString("opened_by"),
+                toLocalDateTime(rs.getTimestamp("opened_at")),
+                rs.getBigDecimal("closing_amount"),
+                rs.getBigDecimal("expected_cash"),
+                rs.getBigDecimal("difference_amount"),
+                rs.getString("closed_by"),
+                toLocalDateTime(rs.getTimestamp("closed_at")),
+                rs.getString("notes")
+        );
+    }
+
+    private RowMapper<RestaurantCashMovementRow> cashMovementMapper() {
+        return (rs, rowNum) -> new RestaurantCashMovementRow(
+                rs.getLong("id"),
+                rs.getLong("cash_session_id"),
+                rs.getString("movement_type"),
+                rs.getBigDecimal("amount"),
+                rs.getString("description"),
+                rs.getString("created_by"),
+                toLocalDateTime(rs.getTimestamp("created_at"))
+        );
     }
 
     private int count(String sql, Object... args) {

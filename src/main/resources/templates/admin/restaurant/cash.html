@@ -33,6 +33,21 @@
                 </div>
             </form>
 
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                    <div th:if="${cashSession == null}">
+                        <div class="fw-semibold">La jornada de caja aún no fue abierta.</div>
+                        <div class="small text-muted">Puedes revisar y cobrar pedidos, pero conviene registrar el fondo inicial antes de operar.</div>
+                    </div>
+                    <div th:if="${cashSession != null}">
+                        <div class="fw-semibold">Jornada <span th:text="${cashSession.statusLabel()}">Abierta</span></div>
+                        <div class="small text-muted">Fondo inicial: <span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(cashSession.safeOpeningAmount())}">0.00</span><span th:if="${cashCloseSummary != null}"> · Efectivo esperado: <span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(cashCloseSummary.safeExpectedCash())}">0.00</span></span></div>
+                    </div>
+                    <a th:href="${cashSession == null ? '/admin/restaurant/cash-sessions' : '/admin/restaurant/cash-sessions/' + cashSession.id()}" class="btn btn-outline-dark btn-sm">
+                        <i class="bi bi-safe"></i> Gestionar cierre
+                    </a>
+                </div>
+            </div>
 
             <div class="card shadow-sm border-0 mb-3" th:if="${pendingBillRequestCount > 0}">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">

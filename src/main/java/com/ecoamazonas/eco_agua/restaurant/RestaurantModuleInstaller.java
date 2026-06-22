@@ -16,6 +16,7 @@ public class RestaurantModuleInstaller {
     private final PlatformSettingService platformSettingService;
     private final PlatformSettingRepository platformSettingRepository;
     private final RestaurantSettingsService restaurantSettingsService;
+    private volatile Boolean installationState;
 
     public RestaurantModuleInstaller(JdbcTemplate jdbcTemplate,
                                      PlatformSettingService platformSettingService,
@@ -28,28 +29,48 @@ public class RestaurantModuleInstaller {
     }
 
     public boolean isInstalled() {
-        Integer count = jdbcTemplate.queryForObject("""
+        Boolean cached = installationState;
+        if (cached != null) {
+            return cached;
+        }
+        Integer tableCount = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
                 FROM information_schema.tables
                 WHERE table_schema = DATABASE()
                   AND table_name IN ('restaurant_table', 'restaurant_order', 'restaurant_order_item', 'restaurant_table_request',
                                      'restaurant_qr_order', 'restaurant_qr_order_item', 'restaurant_reservation',
                                      'restaurant_ingredient', 'restaurant_recipe_item', 'restaurant_ingredient_movement',
-                                     'restaurant_order_item_ingredient')
+                                     'restaurant_order_item_ingredient', 'restaurant_cash_session', 'restaurant_cash_movement')
                 """, Integer.class);
-        return count != null && count == 11;
+        Integer columnCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'restaurant_order'
+                  AND column_name IN ('created_by', 'paid_by', 'kitchen_started_at', 'ready_at', 'delivered_at', 'cancelled_at')
+                """, Integer.class);
+        boolean installed = tableCount != null && tableCount == 13
+                && columnCount != null && columnCount == 6;
+        installationState = installed;
+        return installed;
     }
 
     @Transactional
     public void installAndActivate(boolean demoData) {
+        ensureInstalled(demoData);
+        enable();
+    }
+
+    @Transactional
+    public void ensureInstalled(boolean demoData) {
         createTables();
         ensureModuleCatalog();
         ensurePublicLabels();
         restaurantSettingsService.ensureDefaults();
-        enable();
         if (demoData) {
             seedDemoData();
         }
+        installationState = true;
     }
 
     @Transactional
@@ -159,6 +180,12 @@ public class RestaurantModuleInstaller {
                     notes TEXT NULL,
                     payment_method VARCHAR(30) NULL,
                     paid_at DATETIME NULL,
+                    created_by VARCHAR(120) NULL,
+                    paid_by VARCHAR(120) NULL,
+                    kitchen_started_at DATETIME NULL,
+                    ready_at DATETIME NULL,
+                    delivered_at DATETIME NULL,
+                    cancelled_at DATETIME NULL,
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     PRIMARY KEY (id),
@@ -321,6 +348,46 @@ public class RestaurantModuleInstaller {
                     CONSTRAINT fk_restaurant_reservation_order FOREIGN KEY (order_id) REFERENCES restaurant_order(id) ON DELETE SET NULL
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS restaurant_cash_session (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    business_date DATE NOT NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+                    opening_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+                    opened_by VARCHAR(120) NOT NULL,
+                    opened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    closing_amount DECIMAL(12,2) NULL,
+                    expected_cash DECIMAL(12,2) NULL,
+                    difference_amount DECIMAL(12,2) NULL,
+                    closed_by VARCHAR(120) NULL,
+                    closed_at DATETIME NULL,
+                    notes VARCHAR(1000) NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_restaurant_cash_session_date (business_date),
+                    KEY idx_restaurant_cash_session_status (status),
+                    KEY idx_restaurant_cash_session_opened (opened_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS restaurant_cash_movement (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    cash_session_id BIGINT NOT NULL,
+                    movement_type VARCHAR(20) NOT NULL,
+                    amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+                    description VARCHAR(500) NOT NULL,
+                    created_by VARCHAR(120) NOT NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    KEY idx_restaurant_cash_movement_session (cash_session_id, created_at),
+                    KEY idx_restaurant_cash_movement_type (movement_type),
+                    CONSTRAINT fk_restaurant_cash_movement_session FOREIGN KEY (cash_session_id)
+                        REFERENCES restaurant_cash_session(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
     }
 
 
@@ -360,6 +427,18 @@ public class RestaurantModuleInstaller {
         ensureColumn("restaurant_order", "scheduled_at", "ALTER TABLE restaurant_order ADD COLUMN scheduled_at DATETIME NULL AFTER delivery_reference");
         ensureColumn("restaurant_order", "payment_method", "ALTER TABLE restaurant_order ADD COLUMN payment_method VARCHAR(30) NULL AFTER notes");
         ensureColumn("restaurant_order", "paid_at", "ALTER TABLE restaurant_order ADD COLUMN paid_at DATETIME NULL AFTER payment_method");
+        ensureColumn("restaurant_order", "created_by", "ALTER TABLE restaurant_order ADD COLUMN created_by VARCHAR(120) NULL AFTER paid_at");
+        ensureColumn("restaurant_order", "paid_by", "ALTER TABLE restaurant_order ADD COLUMN paid_by VARCHAR(120) NULL AFTER created_by");
+        ensureColumn("restaurant_order", "kitchen_started_at", "ALTER TABLE restaurant_order ADD COLUMN kitchen_started_at DATETIME NULL AFTER paid_by");
+        ensureColumn("restaurant_order", "ready_at", "ALTER TABLE restaurant_order ADD COLUMN ready_at DATETIME NULL AFTER kitchen_started_at");
+        ensureColumn("restaurant_order", "delivered_at", "ALTER TABLE restaurant_order ADD COLUMN delivered_at DATETIME NULL AFTER ready_at");
+        ensureColumn("restaurant_order", "cancelled_at", "ALTER TABLE restaurant_order ADD COLUMN cancelled_at DATETIME NULL AFTER delivered_at");
+        ensureIndex("restaurant_order", "idx_restaurant_order_paid_at",
+                "ALTER TABLE restaurant_order ADD INDEX idx_restaurant_order_paid_at (paid_at)");
+        ensureIndex("restaurant_order", "idx_restaurant_order_created_by",
+                "ALTER TABLE restaurant_order ADD INDEX idx_restaurant_order_created_by (created_by)");
+        ensureIndex("restaurant_order", "idx_restaurant_order_paid_by",
+                "ALTER TABLE restaurant_order ADD INDEX idx_restaurant_order_paid_by (paid_by)");
         ensureIndex("restaurant_order", "idx_restaurant_order_service_status",
                 "ALTER TABLE restaurant_order ADD INDEX idx_restaurant_order_service_status (service_type, status)");
         ensureIndex("restaurant_order", "idx_restaurant_order_scheduled",
@@ -443,7 +522,7 @@ public class RestaurantModuleInstaller {
                 INSERT INTO platform_module_catalog
                 (`module_key`, `name`, `area`, `description`, `default_enabled`, `configurable`, `active`, `display_order`, `created_at`, `updated_at`)
                 VALUES ('restaurant', 'Restaurante / carta y comandas', 'Operación restaurante',
-                        'Carta digital, reservas, mesas, comandas, pedidos para llevar, delivery, ingredientes, recetas, inventario por ingredientes y cocina.', 0, 1, 1, 10, NOW(), NOW())
+                        'Carta digital, reservas, mesas, comandas, pedidos para llevar, delivery, ingredientes, recetas, caja, reportes e inventario por ingredientes.', 0, 1, 1, 10, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
                     `name` = VALUES(`name`),
                     area = VALUES(area),

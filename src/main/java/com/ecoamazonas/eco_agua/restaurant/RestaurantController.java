@@ -2,6 +2,7 @@ package com.ecoamazonas.eco_agua.restaurant;
 
 import com.ecoamazonas.eco_agua.config.BusinessProperties;
 import com.ecoamazonas.eco_agua.config.PlatformSettingService;
+import com.ecoamazonas.eco_agua.config.SystemModuleService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.net.URLEncoder;
@@ -30,21 +33,27 @@ public class RestaurantController {
     private final PlatformSettingService platformSettingService;
     private final BusinessProperties businessProperties;
     private final RestaurantSettingsService restaurantSettingsService;
+    private final SystemModuleService systemModuleService;
 
     public RestaurantController(RestaurantService restaurantService,
                                 RestaurantModuleInstaller restaurantModuleInstaller,
                                 PlatformSettingService platformSettingService,
                                 BusinessProperties businessProperties,
-                                RestaurantSettingsService restaurantSettingsService) {
+                                RestaurantSettingsService restaurantSettingsService,
+                                SystemModuleService systemModuleService) {
         this.restaurantService = restaurantService;
         this.restaurantModuleInstaller = restaurantModuleInstaller;
         this.platformSettingService = platformSettingService;
         this.businessProperties = businessProperties;
         this.restaurantSettingsService = restaurantSettingsService;
+        this.systemModuleService = systemModuleService;
     }
 
     @ModelAttribute
     public void addRestaurantSettingsAttributes(Model model) {
+        if (!systemModuleService.isEnabled("restaurant")) {
+            return;
+        }
         RestaurantSettings settings = restaurantSettingsService.getSettings();
         model.addAttribute("restaurantSettings", settings);
         model.addAttribute("currencySymbol", settings.safeCurrencySymbol());
@@ -835,6 +844,9 @@ public class RestaurantController {
         model.addAttribute("openOrders", restaurantService.openOrdersForCash());
         model.addAttribute("pendingTableRequests", restaurantService.pendingTableRequests());
         model.addAttribute("pendingBillRequestCount", restaurantService.pendingBillRequestCount());
+        RestaurantCashSessionRow cashSession = restaurantService.cashSessionForDate(businessDate);
+        model.addAttribute("cashSession", cashSession);
+        model.addAttribute("cashCloseSummary", cashSession == null ? null : restaurantService.cashCloseSummary(cashSession.id()));
         return "admin/restaurant/cash";
     }
 
@@ -851,6 +863,161 @@ public class RestaurantController {
         model.addAttribute("openOrders", restaurantService.openOrdersForCash());
         model.addAttribute("generatedAt", java.time.LocalDateTime.now());
         return "admin/restaurant/daily_report";
+    }
+
+
+    @GetMapping("/admin/restaurant/cash-sessions")
+    public String cashSessions(Model model) {
+        ensureRestaurantRuntimeReady();
+        LocalDate today = LocalDate.now();
+        List<RestaurantCashSessionListItem> cashSessions = restaurantService.cashSessions().stream()
+                .map(RestaurantCashSessionListItem::from)
+                .toList();
+        RestaurantCashSessionListItem todayCashSession = RestaurantCashSessionListItem.from(
+                restaurantService.cashSessionForDate(today)
+        );
+
+        model.addAttribute("activePage", "restaurant_cash_sessions");
+        model.addAttribute("cashSessions", cashSessions);
+        model.addAttribute("hasCashSessions", !cashSessions.isEmpty());
+        model.addAttribute("today", today);
+        model.addAttribute("todayCashSession", todayCashSession);
+        return "admin/restaurant/cash_sessions";
+    }
+
+    @PostMapping("/admin/restaurant/cash-sessions/open")
+    public String openCashSession(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate businessDate,
+                                  @RequestParam(defaultValue = "0.00") BigDecimal openingAmount,
+                                  org.springframework.security.core.Authentication authentication,
+                                  RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            Long sessionId = restaurantService.openCashSession(
+                    businessDate == null ? LocalDate.now() : businessDate,
+                    openingAmount,
+                    authentication == null ? null : authentication.getName()
+            );
+            redirectAttributes.addFlashAttribute("successMessage", "Caja abierta correctamente.");
+            return "redirect:/admin/restaurant/cash-sessions/" + sessionId;
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            return "redirect:/admin/restaurant/cash-sessions";
+        }
+    }
+
+    @GetMapping("/admin/restaurant/cash-sessions/{id}")
+    public String cashSessionDetail(@PathVariable Long id,
+                                    Model model,
+                                    RedirectAttributes redirectAttributes) {
+        ensureRestaurantRuntimeReady();
+        RestaurantCashSessionRow session = restaurantService.cashSession(id);
+        if (session == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "La jornada de caja seleccionada no existe.");
+            return "redirect:/admin/restaurant/cash-sessions";
+        }
+        model.addAttribute("activePage", "restaurant_cash_sessions");
+        model.addAttribute("cashSession", session);
+        model.addAttribute("closeSummary", restaurantService.cashCloseSummary(id));
+        model.addAttribute("movements", restaurantService.cashMovements(id));
+        model.addAttribute("paymentBreakdown", restaurantService.paymentBreakdown(session.businessDate()));
+        model.addAttribute("paidOrders", restaurantService.paidOrdersForDate(session.businessDate()));
+        return "admin/restaurant/cash_session_detail";
+    }
+
+    @PostMapping("/admin/restaurant/cash-sessions/{id}/movement")
+    public String addCashMovement(@PathVariable Long id,
+                                  @RequestParam String movementType,
+                                  @RequestParam BigDecimal amount,
+                                  @RequestParam String description,
+                                  org.springframework.security.core.Authentication authentication,
+                                  RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.addCashMovement(id, movementType, amount, description,
+                    authentication == null ? null : authentication.getName());
+            redirectAttributes.addFlashAttribute("successMessage", "Movimiento de caja registrado.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/cash-sessions/" + id;
+    }
+
+    @PostMapping("/admin/restaurant/cash-sessions/{id}/close")
+    public String closeCashSession(@PathVariable Long id,
+                                   @RequestParam BigDecimal countedCash,
+                                   @RequestParam(required = false) String notes,
+                                   org.springframework.security.core.Authentication authentication,
+                                   RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            restaurantService.closeCashSession(id, countedCash, notes,
+                    authentication == null ? null : authentication.getName());
+            redirectAttributes.addFlashAttribute("successMessage", "Caja cerrada correctamente.");
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/admin/restaurant/cash-sessions/" + id;
+    }
+
+    @GetMapping("/admin/restaurant/cash-sessions/{id}/print")
+    public String printCashSession(@PathVariable Long id,
+                                   Model model,
+                                   RedirectAttributes redirectAttributes) {
+        ensureRestaurantRuntimeReady();
+        RestaurantCashSessionRow session = restaurantService.cashSession(id);
+        if (session == null) {
+            redirectAttributes.addFlashAttribute("errorMessage", "La jornada de caja seleccionada no existe.");
+            return "redirect:/admin/restaurant/cash-sessions";
+        }
+        model.addAttribute("cashSession", session);
+        model.addAttribute("closeSummary", restaurantService.cashCloseSummary(id));
+        model.addAttribute("movements", restaurantService.cashMovements(id));
+        model.addAttribute("paymentBreakdown", restaurantService.paymentBreakdown(session.businessDate()));
+        model.addAttribute("generatedAt", LocalDateTime.now());
+        addPrintableRestaurantAttributes(model);
+        return "admin/restaurant/cash_session_print";
+    }
+
+    @GetMapping("/admin/restaurant/reports")
+    public String reports(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                          Model model,
+                          RedirectAttributes redirectAttributes) {
+        try {
+            ensureRestaurantRuntimeReady();
+            LocalDate end = to == null ? LocalDate.now() : to;
+            LocalDate start = from == null ? end.withDayOfMonth(1) : from;
+            RestaurantReportSummary summary = restaurantService.reportSummary(start, end);
+            model.addAttribute("activePage", "restaurant_reports");
+            model.addAttribute("fromDate", summary.fromDate());
+            model.addAttribute("toDate", summary.toDate());
+            model.addAttribute("summary", summary);
+            model.addAttribute("paymentRows", restaurantService.reportPayments(summary.fromDate(), summary.toDate()));
+            model.addAttribute("serviceRows", restaurantService.reportServiceTypes(summary.fromDate(), summary.toDate()));
+            model.addAttribute("productRows", restaurantService.reportProducts(summary.fromDate(), summary.toDate()));
+            model.addAttribute("categoryRows", restaurantService.reportCategories(summary.fromDate(), summary.toDate()));
+            model.addAttribute("createdByRows", restaurantService.reportCreatedBy(summary.fromDate(), summary.toDate()));
+            model.addAttribute("paidByRows", restaurantService.reportPaidBy(summary.fromDate(), summary.toDate()));
+            model.addAttribute("ingredientRows", restaurantService.reportIngredientConsumption(summary.fromDate(), summary.toDate()));
+            return "admin/restaurant/reports";
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            return "redirect:/admin/restaurant/reports";
+        }
+    }
+
+    @GetMapping("/admin/restaurant/reports/export.csv")
+    public void exportReportsCsv(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                 jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        ensureRestaurantRuntimeReady();
+        LocalDate end = to == null ? LocalDate.now() : to;
+        LocalDate start = from == null ? end.withDayOfMonth(1) : from;
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType("text/csv;charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=restaurant-report-" + start + "-" + end + ".csv");
+        response.getWriter().write('\ufeff');
+        response.getWriter().write(restaurantService.reportCsv(start, end));
     }
 
     @PostMapping("/admin/restaurant/tables/{id}/status")
@@ -1102,7 +1269,15 @@ public class RestaurantController {
     }
 
     private void ensureRestaurantRuntimeReady() {
-        restaurantModuleInstaller.installAndActivate(true);
+        if (!systemModuleService.isEnabled("restaurant")) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Restaurant module is disabled.");
+        }
+        if (!restaurantModuleInstaller.isInstalled()) {
+            throw new ResponseStatusException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Restaurant module schema is not installed. Run the module installer before using it."
+            );
+        }
     }
 
 

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Comprobante de cierre')"></head>
+<body class="bg-white">
+<main class="container py-4" style="max-width: 900px">
+    <div class="d-flex justify-content-between no-print mb-3"><a th:href="@{/admin/restaurant/cash-sessions/{id}(id=${cashSession.id()})}" class="btn btn-outline-secondary">Volver</a><button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button></div>
+    <div class="text-center border-bottom pb-3 mb-4">
+        <img th:if="${ticketShowLogo and platformLogo != null and !#strings.isEmpty(platformLogo)}" th:src="${platformLogo}" alt="Logo" style="max-height:70px" class="mb-2">
+        <h1 class="h4 mb-1" th:text="${businessName}">Restaurante</h1>
+        <div class="small" th:if="${businessRuc != null and !#strings.isEmpty(businessRuc)}">RUC: <span th:text="${businessRuc}"></span></div>
+        <div class="small text-muted">Comprobante de cierre diario de caja</div>
+    </div>
+    <div class="row g-3 mb-4">
+        <div class="col-6"><strong>Fecha:</strong> <span th:text="${#temporals.format(cashSession.businessDate(), 'dd/MM/yyyy')}"></span></div>
+        <div class="col-6"><strong>Estado:</strong> <span th:text="${cashSession.statusLabel()}"></span></div>
+        <div class="col-6"><strong>Abierta por:</strong> <span th:text="${cashSession.openedBy()}"></span></div>
+        <div class="col-6"><strong>Cerrada por:</strong> <span th:text="${cashSession.closedBy() ?: '-'}"></span></div>
+    </div>
+    <table class="table table-bordered mb-4"><tbody>
+    <tr><th>Fondo inicial</th><td class="text-end"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(cashSession.safeOpeningAmount())}">0.00</span></td></tr>
+    <tr><th>Ventas en efectivo</th><td class="text-end"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(closeSummary.safeCashSales())}">0.00</span></td></tr>
+    <tr><th>Ingresos manuales</th><td class="text-end"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(closeSummary.safeManualIncome())}">0.00</span></td></tr>
+    <tr><th>Egresos manuales</th><td class="text-end">-<span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(closeSummary.safeManualExpense())}">0.00</span></td></tr>
+    <tr class="table-light"><th>Efectivo esperado</th><td class="text-end fw-bold"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(closeSummary.safeExpectedCash())}">0.00</span></td></tr>
+    <tr><th>Efectivo contado</th><td class="text-end"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(closeSummary.safeCountedCash())}">0.00</span></td></tr>
+    <tr><th>Diferencia</th><td class="text-end fw-bold" th:classappend="${closeSummary.safeDifference().signum() < 0 ? ' text-danger' : (closeSummary.safeDifference().signum() > 0 ? ' text-success' : '')}"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(closeSummary.safeDifference())}">0.00</span></td></tr>
+    </tbody></table>
+    <h2 class="h6">Movimientos manuales</h2>
+    <table class="table table-sm table-bordered mb-4"><thead class="table-light"><tr><th>Hora</th><th>Tipo</th><th>Descripción</th><th class="text-end">Importe</th></tr></thead><tbody><tr th:each="movement : ${movements}"><td th:text="${#temporals.format(movement.createdAt(), 'HH:mm')}"></td><td th:text="${movement.movementLabel()}"></td><td th:text="${movement.description()}"></td><td class="text-end"><span th:text="${movement.isExpense() ? '-' : '+'}"></span><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(movement.safeAmount())}"></span></td></tr><tr th:if="${movements.isEmpty()}"><td colspan="4" class="text-center text-muted">Sin movimientos manuales.</td></tr></tbody></table>
+    <div th:if="${cashSession.notes() != null and !#strings.isEmpty(cashSession.notes())}" class="border rounded p-3 mb-4"><strong>Observaciones:</strong><div th:text="${cashSession.notes()}"></div></div>
+    <div class="text-center text-muted small">Generado el <span th:text="${#temporals.format(generatedAt, 'dd/MM/yyyy HH:mm')}"></span></div>
+    <style>@media print {.no-print{display:none!important}.container{max-width:100%!important;padding:0!important}}</style>
+</main>
+<div th:replace="fragments/scripts_admin :: adminScripts"></div>
+</body>
+</html>

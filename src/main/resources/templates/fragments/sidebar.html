@@ -96,6 +96,8 @@
           or activePage == 'restaurant_orders_new'
           or activePage == 'restaurant_kitchen'
           or activePage == 'restaurant_cash'
+            or activePage == 'restaurant_cash_sessions'
+            or activePage == 'restaurant_reports'
             or activePage == 'restaurant_settings'}"
       >
         <input
@@ -224,12 +226,22 @@
 
           <a
             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')"
-            th:href="@{/admin/restaurant/reports/daily}"
-            target="_blank"
+            th:href="@{/admin/restaurant/cash-sessions}"
             class="menu-link submenu"
+            th:classappend="${activePage == 'restaurant_cash_sessions' ? ' active' : ''}"
           >
-            <span class="icon"><i class="bi bi-printer"></i></span>
-            <span>Reporte diario</span>
+            <span class="icon"><i class="bi bi-safe"></i></span>
+            <span>Cierre de caja</span>
+          </a>
+
+          <a
+            sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')"
+            th:href="@{/admin/restaurant/reports}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'restaurant_reports' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-bar-chart-line"></i></span>
+            <span>Reportes</span>
           </a>
 
           <a
@@ -592,6 +604,8 @@
           or activePage == 'restaurant_orders_new'
             or activePage == 'restaurant_kitchen'
             or activePage == 'restaurant_cash'
+            or activePage == 'restaurant_cash_sessions'
+            or activePage == 'restaurant_reports'
             or activePage == 'restaurant_settings'}"
         >
           <input
@@ -674,6 +688,15 @@
               <span>Pedidos QR</span>
             </a>
             <a
+              sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"
+              th:href="@{/admin/restaurant/external-orders}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'restaurant_external_orders' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-truck"></i></span>
+              <span>Pedidos externos</span>
+            </a>
+            <a
               sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','administra_restaurante','restaurante_mozo')"
               th:href="@{/admin/restaurant/orders/new}"
               class="menu-link submenu"
@@ -700,6 +723,24 @@
             >
               <span class="icon"><i class="bi bi-cash-coin"></i></span>
               <span>Caja diaria</span>
+            </a>
+            <a
+              sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')"
+              th:href="@{/admin/restaurant/cash-sessions}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'restaurant_cash_sessions' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-safe"></i></span>
+              <span>Cierre de caja</span>
+            </a>
+            <a
+              sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')"
+              th:href="@{/admin/restaurant/reports}"
+              class="menu-link submenu"
+              th:classappend="${activePage == 'restaurant_reports' ? ' active' : ''}"
+            >
+              <span class="icon"><i class="bi bi-bar-chart-line"></i></span>
+              <span>Reportes</span>
             </a>
             <a
               sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','administra_restaurante')"

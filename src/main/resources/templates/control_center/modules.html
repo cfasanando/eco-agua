@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{control_center/fragments/head :: head('Módulos')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Catálogo de módulos', 'Vista central de las capacidades declaradas por cada instancia.')}"></header>
+
+        <main class="matrix26-main">
+            <div class="matrix26-alert-safe">
+                <i class="bi bi-grid-3x3-gap"></i>
+                <div>
+                    <strong>Catálogo informativo en esta fase.</strong>
+                    <p>Las asignaciones se muestran como inventario técnico. La activación, instalación o desinstalación de módulos se habilitará en una fase posterior con validaciones y respaldo.</p>
+                </div>
+            </div>
+
+            <section class="matrix26-module-catalog mt-4">
+                <article th:each="module : ${modules}">
+                    <span class="matrix26-module-icon"><i class="bi bi-box"></i></span>
+                    <div>
+                        <small th:text="${module.area}">Área</small>
+                        <h2 th:text="${module.name}">Módulo</h2>
+                        <p th:text="${module.description}">Descripción</p>
+                        <code th:text="${module.moduleKey}">module_key</code>
+                    </div>
+                </article>
+            </section>
+
+            <section class="matrix26-panel mt-4">
+                <div class="matrix26-panel-header">
+                    <div><span>Matriz técnica</span><h2>Módulos por instancia</h2></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table matrix26-module-matrix">
+                        <thead>
+                        <tr>
+                            <th>Módulo</th>
+                            <th th:each="instance : ${instances}" th:text="${instance.businessName}">Instancia</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="module : ${modules}">
+                            <td><strong th:text="${module.name}">Módulo</strong><small><code th:text="${module.moduleKey}">key</code></small></td>
+                            <td th:each="instance : ${instances}">
+                                <span th:if="${moduleKeysByInstance.get(instance.id).contains(module.moduleKey)}" class="matrix26-module-check is-enabled"><i class="bi bi-check-lg"></i> Activo</span>
+                                <span th:unless="${moduleKeysByInstance.get(instance.id).contains(module.moduleKey)}" class="matrix26-module-check"><i class="bi bi-dash-lg"></i> No declarado</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

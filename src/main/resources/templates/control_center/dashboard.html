@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{control_center/fragments/head :: head('Dashboard')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Dashboard', 'Estado general de las instancias administradas por Matrix26.')}"></header>
+
+        <main class="matrix26-main">
+            <div class="matrix26-banner">
+                <div>
+                    <span class="matrix26-banner-icon"><i class="bi bi-diagram-3"></i></span>
+                    <div>
+                        <strong>Panel central independiente</strong>
+                        <p>Matrix26 consulta únicamente disponibilidad, puertos, módulos declarados y metadatos técnicos. Las ventas, clientes y operaciones permanecen en las bases independientes de cada negocio.</p>
+                    </div>
+                </div>
+                <a class="btn btn-light" th:href="@{/control-center(refresh=1)}">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Actualizar estado
+                </a>
+            </div>
+
+            <section class="matrix26-stats">
+                <article class="matrix26-stat-card">
+                    <span class="matrix26-stat-icon is-primary"><i class="bi bi-building"></i></span>
+                    <div><small>Instancias</small><strong th:text="${summary.totalInstances()}">3</strong></div>
+                </article>
+                <article class="matrix26-stat-card">
+                    <span class="matrix26-stat-icon is-success"><i class="bi bi-wifi"></i></span>
+                    <div><small>En línea</small><strong th:text="${summary.onlineInstances()}">0</strong></div>
+                </article>
+                <article class="matrix26-stat-card">
+                    <span class="matrix26-stat-icon is-danger"><i class="bi bi-wifi-off"></i></span>
+                    <div><small>Fuera de línea</small><strong th:text="${summary.offlineInstances()}">0</strong></div>
+                </article>
+                <article class="matrix26-stat-card">
+                    <span class="matrix26-stat-icon is-warning"><i class="bi bi-shield-lock"></i></span>
+                    <div><small>Protegidas</small><strong th:text="${summary.protectedInstances()}">3</strong></div>
+                </article>
+                <article class="matrix26-stat-card">
+                    <span class="matrix26-stat-icon is-info"><i class="bi bi-grid"></i></span>
+                    <div><small>Módulos registrados</small><strong th:text="${summary.totalModules()}">0</strong></div>
+                </article>
+            </section>
+
+            <div class="matrix26-section-heading">
+                <div>
+                    <span>Instancias protegidas</span>
+                    <h2>Portales administrados</h2>
+                </div>
+                <a th:href="@{/control-center/instances}">Ver detalle <i class="bi bi-arrow-right"></i></a>
+            </div>
+
+            <section class="matrix26-instance-grid">
+                <article class="matrix26-instance-card" th:each="status : ${statuses}">
+                    <div class="matrix26-instance-accent" th:style="|background:${status.instance().primaryColor != null ? status.instance().primaryColor : '#172554'}|"></div>
+                    <div class="matrix26-instance-card-header">
+                        <div class="matrix26-instance-avatar"
+                             th:style="|--instance-color:${status.instance().primaryColor != null ? status.instance().primaryColor : '#172554'}|">
+                            <i class="bi" th:classappend="${status.instance().businessType == 'restaurant'} ? ' bi-cup-hot' : (${status.instance().businessType == 'water_delivery'} ? ' bi-droplet' : ' bi-basket')"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <h3 th:text="${status.instance().businessName}">Instancia</h3>
+                                <span class="badge text-bg-primary" th:if="${status.instance().protectedInstance}">Protegida</span>
+                            </div>
+                            <p><code th:text="${status.instance().runtimeProfile}">profile</code></p>
+                        </div>
+                        <span class="badge rounded-pill" th:classappend="${status.badgeClass()}" th:text="${status.statusLabel()}">En línea</span>
+                    </div>
+
+                    <div class="matrix26-instance-metrics">
+                        <div><span>Puerto</span><strong th:text="${status.instance().runtimePort}">8081</strong></div>
+                        <div><span>Respuesta</span><strong th:text="${status.responseTimeMs() != null ? status.responseTimeMs() + ' ms' : '—'}">—</strong></div>
+                        <div><span>HTTP</span><strong th:text="${status.httpStatus() != null ? status.httpStatus() : '—'}">—</strong></div>
+                    </div>
+
+                    <dl class="matrix26-instance-details">
+                        <div><dt>Base</dt><dd><code th:text="${status.instance().databaseName}">database</code></dd></div>
+                        <div><dt>URL</dt><dd th:text="${status.instance().publicUrl}">http://localhost</dd></div>
+                        <div><dt>Último chequeo</dt><dd th:text="${status.checkedAt() != null ? #temporals.format(status.checkedAt(), 'dd/MM/yyyy HH:mm:ss') : 'Pendiente'}">Pendiente</dd></div>
+                    </dl>
+
+                    <div class="matrix26-module-chips">
+                        <span th:each="assignment : ${modulesByInstance.get(status.instance().id)}"
+                              th:text="${assignment.module.name}">Módulo</span>
+                    </div>
+
+                    <div class="matrix26-instance-actions">
+                        <a class="btn btn-primary" th:href="${status.instance().publicUrl}" target="_blank" rel="noopener">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>Abrir portal
+                        </a>
+                        <a class="btn btn-outline-secondary" th:href="@{/control-center/instances}">
+                            <i class="bi bi-info-circle me-1"></i>Detalles
+                        </a>
+                    </div>
+                </article>
+            </section>
+
+            <section class="matrix26-panel mt-4">
+                <div class="matrix26-panel-header">
+                    <div>
+                        <span>Auditoría técnica</span>
+                        <h2>Comprobaciones recientes</h2>
+                    </div>
+                    <small th:if="${summary.lastCheckedAt() != null}" th:text="|Última actualización: ${#temporals.format(summary.lastCheckedAt(), 'dd/MM/yyyy HH:mm:ss')}|">Última actualización</small>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Instancia</th><th>Estado</th><th>HTTP</th><th>Respuesta</th><th>Fecha</th></tr></thead>
+                        <tbody>
+                        <tr th:each="check : ${recentChecks}">
+                            <td><strong th:text="${check.instanceName()}">Instancia</strong><small th:text="${check.instanceCode()}">code</small></td>
+                            <td><span class="badge" th:classappend="${check.badgeClass()}" th:text="${check.statusLabel()}">Estado</span></td>
+                            <td th:text="${check.httpStatus() != null ? check.httpStatus() : '—'}">—</td>
+                            <td th:text="${check.responseTimeMs() != null ? check.responseTimeMs() + ' ms' : '—'}">—</td>
+                            <td th:text="${#temporals.format(check.checkedAt(), 'dd/MM/yyyy HH:mm:ss')}">Fecha</td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(recentChecks)}"><td colspan="5" class="text-center text-muted py-4">Todavía no hay comprobaciones registradas.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

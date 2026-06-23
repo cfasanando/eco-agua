@@ -1,5 +1,6 @@
 package com.ecoamazonas.eco_agua.config;
 
+import com.ecoamazonas.eco_agua.platform.control.Matrix26ControlCenterProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -64,15 +65,25 @@ public class SystemModuleAccessFilter extends OncePerRequestFilter {
     );
 
     private final SystemModuleService systemModuleService;
+    private final Matrix26ControlCenterProperties controlCenterProperties;
 
-    public SystemModuleAccessFilter(SystemModuleService systemModuleService) {
+    public SystemModuleAccessFilter(
+            SystemModuleService systemModuleService,
+            Matrix26ControlCenterProperties controlCenterProperties
+    ) {
         this.systemModuleService = systemModuleService;
+        this.controlCenterProperties = controlCenterProperties;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        if (controlCenterProperties.isEnabled()) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String path = normalizedPath(request);
         ModuleRoute matchedRoute = findRoute(path);
 

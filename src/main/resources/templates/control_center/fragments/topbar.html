@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<header th:fragment="topbar(pageTitle, pageSubtitle)" class="matrix26-topbar">
+    <div>
+        <div class="matrix26-eyebrow">Matrix26 Business Platform</div>
+        <h1 th:text="${pageTitle}">Control Center</h1>
+        <p th:text="${pageSubtitle}">Administración central</p>
+    </div>
+    <div class="matrix26-topbar-actions">
+        <span class="matrix26-readonly-badge">
+            <i class="bi bi-eye"></i>
+            Solo lectura
+        </span>
+        <div class="dropdown">
+            <button class="btn btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-person-circle me-1"></i>
+                <span sec:authentication="name">matrix_admin</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                <li>
+                    <form th:action="@{/logout}" method="post" class="px-2">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                        <button type="submit" class="dropdown-item rounded">
+                            <i class="bi bi-box-arrow-right me-2"></i>Cerrar sesión
+                        </button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    </div>
+</header>
+</html>

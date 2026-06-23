@@ -2,6 +2,9 @@ package com.ecoamazonas.eco_agua.security;
 
 import com.ecoamazonas.eco_agua.config.SystemModuleAccessFilter;
 import com.ecoamazonas.eco_agua.config.ClientFeatureProperties;
+import com.ecoamazonas.eco_agua.platform.control.Matrix26ControlCenterAccessFilter;
+import com.ecoamazonas.eco_agua.platform.control.Matrix26ControlCenterProperties;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -404,19 +407,32 @@ public class SecurityConfig {
     private final DatabaseUserDetailsService userDetailsService;
     private final SystemModuleAccessFilter systemModuleAccessFilter;
     private final ClientFeatureProperties clientFeatureProperties;
+    private final Matrix26ControlCenterProperties controlCenterProperties;
+    private final ObjectProvider<Matrix26ControlCenterAccessFilter> controlCenterAccessFilterProvider;
 
-    public SecurityConfig(DatabaseUserDetailsService userDetailsService,
-                          SystemModuleAccessFilter systemModuleAccessFilter,
-                          ClientFeatureProperties clientFeatureProperties) {
+    public SecurityConfig(
+            DatabaseUserDetailsService userDetailsService,
+            SystemModuleAccessFilter systemModuleAccessFilter,
+            ClientFeatureProperties clientFeatureProperties,
+            Matrix26ControlCenterProperties controlCenterProperties,
+            ObjectProvider<Matrix26ControlCenterAccessFilter> controlCenterAccessFilterProvider
+    ) {
         this.userDetailsService = userDetailsService;
         this.systemModuleAccessFilter = systemModuleAccessFilter;
         this.clientFeatureProperties = clientFeatureProperties;
+        this.controlCenterProperties = controlCenterProperties;
+        this.controlCenterAccessFilterProvider = controlCenterAccessFilterProvider;
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http.addFilterBefore(systemModuleAccessFilter, AuthorizationFilter.class);
+        Matrix26ControlCenterAccessFilter controlCenterAccessFilter = controlCenterAccessFilterProvider.getIfAvailable();
+        if (controlCenterAccessFilter != null) {
+            http.addFilterBefore(controlCenterAccessFilter, SystemModuleAccessFilter.class);
+        }
+
         http
-            .addFilterBefore(systemModuleAccessFilter, AuthorizationFilter.class)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/portal", "/catalogo", "/catalogo/**", "/order/whatsapp", "/robots.txt", "/sitemap.xml").permitAll()
                 .requestMatchers("/blog", "/blog/**").permitAll()
@@ -428,6 +444,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/password-reset/request", "/password-reset").permitAll()
                 .requestMatchers(HttpMethod.POST, "/password-reset/request", "/password-reset").permitAll()
 
+                .requestMatchers("/control-center/**").hasAnyAuthority(PLATFORM_ADMIN)
                 .requestMatchers("/home").hasAnyAuthority(DASHBOARD_VIEW)
                 .requestMatchers("/dashboard/widget-preferences/**").hasAnyAuthority(DASHBOARD_VIEW)
                 .requestMatchers("/dashboard/business", "/dashboard/areas").hasAnyAuthority(REPORTS_VIEW)
@@ -537,7 +554,7 @@ public class SecurityConfig {
                 .rememberMeParameter("remember-me")
                 .rememberMeCookieName("remember-me")
                 .tokenValiditySeconds(REMEMBER_ME_VALIDITY_SECONDS)
-                .key("eco-agua-remember-me-v1")
+                .key(controlCenterProperties.isEnabled() ? "matrix26-control-center-remember-me-v1" : "eco-agua-remember-me-v1")
                 .userDetailsService(userDetailsService)
             )
             .logout(logout -> logout
@@ -560,6 +577,10 @@ public class SecurityConfig {
     }
 
     private String loginSuccessUrl(Authentication authentication) {
+        if (controlCenterProperties.isEnabled()) {
+            return "/control-center";
+        }
+
         Set<String> authorities = new LinkedHashSet<>();
         authentication.getAuthorities().forEach(authority -> authorities.add(authority.getAuthority()));
 

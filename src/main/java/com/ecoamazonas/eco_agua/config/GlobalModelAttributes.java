@@ -1,6 +1,7 @@
 package com.ecoamazonas.eco_agua.config;
 
 import com.ecoamazonas.eco_agua.dashboard.DashboardWidgetAccessService;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import com.ecoamazonas.eco_agua.dashboard.DashboardAreaWidgetService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
@@ -16,6 +17,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @ControllerAdvice
+@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "false", matchIfMissing = true)
 public class GlobalModelAttributes {
 
     private final BusinessProperties businessProperties;

@@ -267,6 +267,49 @@
       </div>
     </th:block>
 
+    <th:block sec:authorize="hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_OWNER','ADMIN_PRINC','ADMIN','admin_config')">
+      <div class="menu-section-title">Plataforma</div>
+
+      <div
+        class="menu-group"
+        th:with="isModuleAdministrationActive=${activePage == 'system_modules'
+          or activePage == 'system_module_installations'}"
+      >
+        <input
+          type="checkbox"
+          id="menu-platform-modules-toggle"
+          class="menu-toggle"
+          th:checked="${isModuleAdministrationActive}"
+        >
+
+        <label class="menu-link has-children" for="menu-platform-modules-toggle">
+          <span class="icon"><i class="bi bi-boxes"></i></span>
+          <span>Administración técnica</span>
+          <span class="caret"><i class="bi bi-chevron-right"></i></span>
+        </label>
+
+        <div class="submenu-container">
+          <a
+            th:href="@{/admin/system-modules}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'system_modules' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-ui-checks-grid"></i></span>
+            <span>Módulos del sistema</span>
+          </a>
+
+          <a
+            th:href="@{/admin/system-modules/installations}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'system_module_installations' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-database-gear"></i></span>
+            <span>Instalaciones de módulos</span>
+          </a>
+        </div>
+      </div>
+    </th:block>
+
     <th:block th:if="${!restaurantRuntime and (moduleBusinessOverviewEnabled or moduleMonthlyFollowupEnabled)}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ADMIN_MKT','ADMIN_RRHH','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_MARKETING','ROLE_SALES','ROLE_LOGISTICS','ROLE_HR','ROLE_READONLY')">
       <a
         th:if="${moduleBusinessOverviewEnabled}"
@@ -1634,7 +1677,6 @@
           or activePage == 'job_positions'
           or (activePage == 'personnel_payments' or activePage == 'personnel_payment_receipt')
           or activePage == 'admin_roles_permissions'
-          or activePage == 'system_modules'
           or activePage == 'dashboard_widgets'}"
       >
         <input
@@ -1661,21 +1703,6 @@
               <span>Configuración</span>
             </a>
           </th:block>
-
-
-          <th:block th:if="${modulePlatformSettingsEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ROLE_OWNER','ROLE_MANAGEMENT')">
-            <a
-              th:href="@{/admin/system-modules}"
-              class="menu-link submenu"
-              th:classappend="${activePage == 'system_modules' ? ' active' : ''}"
-            >
-              <span class="icon"><i class="bi bi-ui-checks-grid"></i></span>
-              <span>Módulos del sistema</span>
-            </a>
-          </th:block>
-
-
-
           <th:block th:if="${moduleDashboardEnabled}" sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ROLE_OWNER','ROLE_MANAGEMENT')">
             <a
               th:href="@{/admin/dashboard-widgets}"

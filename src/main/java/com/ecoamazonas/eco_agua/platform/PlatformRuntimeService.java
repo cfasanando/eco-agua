@@ -170,6 +170,7 @@ public class PlatformRuntimeService {
         out.append("ecoagua.platform.client-code=").append(valueOrEmpty(client.getCode())).append("\n");
         out.append("ecoagua.platform.runtime-profile=").append(profile).append("\n");
         out.append("ecoagua.platform.public-url=").append(publicUrl).append("\n");
+        out.append("ecoagua.modules.installation-allowed=").append(moduleInstallationAllowed(client)).append("\n");
         out.append("ecoagua.whatsapp.number=").append(whatsapp).append("\n\n");
         out.append("ecoagua.business.profile-code=").append(profile).append("\n");
         out.append("ecoagua.business.name=").append(escapeProperty(businessName)).append("\n");
@@ -240,6 +241,11 @@ public class PlatformRuntimeService {
         return flags;
     }
 
+
+    private boolean moduleInstallationAllowed(PlatformBusinessClient client) {
+        String managementMode = valueOrEmpty(client.getManagementMode()).trim();
+        return !client.isProtectedInstance() && !"PROTECTED".equalsIgnoreCase(managementMode);
+    }
 
     private boolean isRestaurantClient(PlatformBusinessClient client) {
         String type = valueOrEmpty(client.getBusinessType()).toLowerCase(Locale.ROOT);

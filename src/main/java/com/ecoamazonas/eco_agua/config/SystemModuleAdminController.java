@@ -1,9 +1,11 @@
 package com.ecoamazonas.eco_agua.config;
 
-import com.ecoamazonas.eco_agua.restaurant.RestaurantModuleInstaller;
+import com.ecoamazonas.eco_agua.platform.module.PlatformModuleInstallationStatus;
+import com.ecoamazonas.eco_agua.platform.module.PlatformModuleManager;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -16,12 +18,12 @@ import java.util.Map;
 public class SystemModuleAdminController {
 
     private final SystemModuleService systemModuleService;
-    private final RestaurantModuleInstaller restaurantModuleInstaller;
+    private final PlatformModuleManager platformModuleManager;
 
     public SystemModuleAdminController(SystemModuleService systemModuleService,
-                                       RestaurantModuleInstaller restaurantModuleInstaller) {
+                                       PlatformModuleManager platformModuleManager) {
         this.systemModuleService = systemModuleService;
-        this.restaurantModuleInstaller = restaurantModuleInstaller;
+        this.platformModuleManager = platformModuleManager;
     }
 
     @GetMapping
@@ -30,14 +32,29 @@ public class SystemModuleAdminController {
 
         var modules = systemModuleService.getModuleDefinitions();
         long enabledCount = modules.stream().filter(SystemModuleService.ModuleDefinition::enabled).count();
+        PlatformModuleInstallationStatus restaurantStatus = platformModuleManager.getStatus("restaurant");
+
         model.addAttribute("activePage", "system_modules");
         model.addAttribute("moduleGroups", systemModuleService.getModuleGroups());
         model.addAttribute("moduleTotalCount", modules.size());
         model.addAttribute("moduleEnabledCount", enabledCount);
-        model.addAttribute("restaurantInstalled", restaurantModuleInstaller.isInstalled());
-        model.addAttribute("restaurantEnabled", systemModuleService.isEnabled("restaurant"));
+        model.addAttribute("restaurantInstalled", restaurantStatus.schemaInstalled());
+        model.addAttribute("restaurantEnabled", restaurantStatus.enabled());
+        model.addAttribute("restaurantInstallationStatus", restaurantStatus);
+        model.addAttribute("installationStatuses", platformModuleManager.listStatuses());
+        model.addAttribute("moduleInstallationAllowed", platformModuleManager.isInstallationAllowed());
+        model.addAttribute("moduleInstallationDatabase", platformModuleManager.currentDatabaseName());
 
         return "admin/system_modules";
+    }
+
+    @GetMapping("/installations")
+    public String showInstallations(Model model) {
+        model.addAttribute("activePage", "system_module_installations");
+        model.addAttribute("installationStatuses", platformModuleManager.listStatuses());
+        model.addAttribute("moduleInstallationAllowed", platformModuleManager.isInstallationAllowed());
+        model.addAttribute("moduleInstallationDatabase", platformModuleManager.currentDatabaseName());
+        return "admin/system_modules/installations";
     }
 
     @PostMapping
@@ -50,11 +67,15 @@ public class SystemModuleAdminController {
                 }
 
                 boolean enabled = requestParams.containsKey(inputName(module.key()));
-                if ("restaurant".equals(module.key())) {
+                if (platformModuleManager.supports(module.key())) {
+                    PlatformModuleInstallationStatus currentStatus = platformModuleManager.getStatus(module.key());
+                    if (enabled == currentStatus.enabled()) {
+                        continue;
+                    }
                     if (enabled) {
-                        restaurantModuleInstaller.installAndActivate(false);
+                        platformModuleManager.installAndActivate(module.key(), false);
                     } else {
-                        restaurantModuleInstaller.disable();
+                        platformModuleManager.disable(module.key());
                     }
                     continue;
                 }
@@ -62,40 +83,57 @@ public class SystemModuleAdminController {
                 systemModuleService.updateModuleFlag(module.key(), enabled);
             }
 
-            redirectAttributes.addFlashAttribute("successMessage", "Módulos del sistema actualizados correctamente.");
+            redirectAttributes.addFlashAttribute("successMessage", "System modules were updated successfully.");
         } catch (RuntimeException ex) {
-            redirectAttributes.addFlashAttribute("errorMessage", "Error actualizando módulos: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("errorMessage", "Could not update system modules: " + safeMessage(ex));
         }
 
         return "redirect:/admin/system-modules";
     }
 
-    @PostMapping("/restaurant/install")
-    public String installRestaurant(@RequestParam(defaultValue = "true") boolean demoData,
+    @PostMapping("/{moduleKey}/install")
+    public String installModule(@PathVariable String moduleKey,
+                                @RequestParam(defaultValue = "false") boolean demoData,
+                                RedirectAttributes redirectAttributes) {
+        try {
+            platformModuleManager.installAndActivate(moduleKey, demoData);
+            redirectAttributes.addFlashAttribute("successMessage", "Module installed and activated successfully.");
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", safeMessage(ex));
+        }
+        return "redirect:/admin/system-modules/installations";
+    }
+
+    @PostMapping("/{moduleKey}/synchronize")
+    public String synchronizeModule(@PathVariable String moduleKey,
                                     RedirectAttributes redirectAttributes) {
         try {
-            restaurantModuleInstaller.installAndActivate(demoData);
-            redirectAttributes.addFlashAttribute("successMessage", "Módulo Restaurante instalado y activado correctamente.");
+            platformModuleManager.synchronizeInstalledModule(moduleKey);
+            redirectAttributes.addFlashAttribute("successMessage", "Existing module installation was synchronized successfully.");
         } catch (RuntimeException ex) {
-            redirectAttributes.addFlashAttribute("errorMessage", "No se pudo instalar Restaurante: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("errorMessage", safeMessage(ex));
         }
-
-        return "redirect:/admin/system-modules";
+        return "redirect:/admin/system-modules/installations";
     }
 
-    @PostMapping("/restaurant/disable")
-    public String disableRestaurant(RedirectAttributes redirectAttributes) {
+    @PostMapping("/{moduleKey}/disable")
+    public String disableModule(@PathVariable String moduleKey,
+                                RedirectAttributes redirectAttributes) {
         try {
-            restaurantModuleInstaller.disable();
-            redirectAttributes.addFlashAttribute("successMessage", "Módulo Restaurante desactivado para esta base de datos.");
+            platformModuleManager.disable(moduleKey);
+            redirectAttributes.addFlashAttribute("successMessage", "Module disabled. Existing data was preserved.");
         } catch (RuntimeException ex) {
-            redirectAttributes.addFlashAttribute("errorMessage", "No se pudo desactivar Restaurante: " + ex.getMessage());
+            redirectAttributes.addFlashAttribute("errorMessage", safeMessage(ex));
         }
-
-        return "redirect:/admin/system-modules";
+        return "redirect:/admin/system-modules/installations";
     }
 
     private String inputName(String moduleKey) {
         return "module_" + moduleKey;
+    }
+
+    private String safeMessage(RuntimeException ex) {
+        String message = ex.getMessage();
+        return message == null || message.isBlank() ? "Unexpected module operation error." : message;
     }
 }

@@ -3,20 +3,27 @@ package com.ecoamazonas.eco_agua.restaurant;
 import com.ecoamazonas.eco_agua.config.PlatformSetting;
 import com.ecoamazonas.eco_agua.config.PlatformSettingRepository;
 import com.ecoamazonas.eco_agua.config.PlatformSettingService;
+import com.ecoamazonas.eco_agua.platform.module.PlatformModuleInstallStep;
+import com.ecoamazonas.eco_agua.platform.module.PlatformModuleInstaller;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@Service
-public class RestaurantModuleInstaller {
+import java.util.ArrayList;
+import java.util.List;
 
+@Service
+public class RestaurantModuleInstaller implements PlatformModuleInstaller {
+
+    private static final String MODULE_KEY = "restaurant";
     private static final String MODULE_SETTING = "module.restaurant.enabled";
+    private static final String CURRENT_VERSION = "2026.06.22.1";
 
     private final JdbcTemplate jdbcTemplate;
     private final PlatformSettingService platformSettingService;
     private final PlatformSettingRepository platformSettingRepository;
     private final RestaurantSettingsService restaurantSettingsService;
-    private volatile Boolean installationState;
+    private volatile boolean installationConfirmed;
 
     public RestaurantModuleInstaller(JdbcTemplate jdbcTemplate,
                                      PlatformSettingService platformSettingService,
@@ -28,10 +35,25 @@ public class RestaurantModuleInstaller {
         this.restaurantSettingsService = restaurantSettingsService;
     }
 
+    @Override
+    public String moduleKey() {
+        return MODULE_KEY;
+    }
+
+    @Override
+    public String displayName() {
+        return "Restaurante";
+    }
+
+    @Override
+    public String currentVersion() {
+        return CURRENT_VERSION;
+    }
+
+    @Override
     public boolean isInstalled() {
-        Boolean cached = installationState;
-        if (cached != null) {
-            return cached;
+        if (installationConfirmed) {
+            return true;
         }
         Integer tableCount = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
@@ -51,38 +73,35 @@ public class RestaurantModuleInstaller {
                 """, Integer.class);
         boolean installed = tableCount != null && tableCount == 13
                 && columnCount != null && columnCount == 6;
-        installationState = installed;
+        if (installed) {
+            installationConfirmed = true;
+        }
         return installed;
     }
 
-    @Transactional
-    public void installAndActivate(boolean demoData) {
-        ensureInstalled(demoData);
-        enable();
+    @Override
+    public boolean isEnabled() {
+        return Boolean.parseBoolean(platformSettingService.get(MODULE_SETTING, "false"));
     }
 
-    @Transactional
-    public void ensureInstalled(boolean demoData) {
-        createTables();
-        ensureModuleCatalog();
-        ensurePublicLabels();
-        restaurantSettingsService.ensureDefaults();
+    @Override
+    public List<PlatformModuleInstallStep> installationSteps(boolean demoData) {
+        List<PlatformModuleInstallStep> steps = new ArrayList<>();
+        steps.add(new PlatformModuleInstallStep("01-schema", "Create or update restaurant schema", this::createTables));
+        steps.add(new PlatformModuleInstallStep("02-catalog", "Register restaurant module catalog", this::ensureModuleCatalog));
+        steps.add(new PlatformModuleInstallStep("03-settings", "Create restaurant default settings", () -> {
+            ensurePublicLabels();
+            restaurantSettingsService.ensureDefaults();
+        }));
         if (demoData) {
-            seedDemoData();
+            steps.add(new PlatformModuleInstallStep("04-demo-data", "Load idempotent restaurant demo data", this::seedDemoData));
         }
-        installationState = true;
+        return List.copyOf(steps);
     }
 
+    @Override
     @Transactional
-    public void disable() {
-        setEnabled(false);
-    }
-
-    private void enable() {
-        setEnabled(true);
-    }
-
-    private void setEnabled(boolean enabled) {
+    public void setEnabled(boolean enabled) {
         PlatformSetting setting = platformSettingService.ensure(
                 MODULE_SETTING,
                 "false",

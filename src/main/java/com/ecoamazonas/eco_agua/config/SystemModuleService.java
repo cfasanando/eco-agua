@@ -54,9 +54,6 @@ public class SystemModuleService {
         if (isLocked(key)) {
             return true;
         }
-        if (isRuntimeForcedEnabled(key)) {
-            return true;
-        }
         return isEnabled(key, defaultValueFor(key));
     }
 
@@ -110,13 +107,6 @@ public class SystemModuleService {
     private boolean isEnabled(String key, boolean defaultValue) {
         String rawValue = platformSettingService.get(settingName(key), Boolean.toString(defaultValue));
         return parseBoolean(rawValue, defaultValue);
-    }
-
-    private boolean isRuntimeForcedEnabled(String key) {
-        return switch (key) {
-            case "restaurant" -> clientFeatureProperties.isRestaurant();
-            default -> false;
-        };
     }
 
     private boolean parseBoolean(String value, boolean defaultValue) {

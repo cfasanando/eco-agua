@@ -872,6 +872,29 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """,
                 """
+                CREATE TABLE IF NOT EXISTS matrix26_instance_appearance_draft (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    instance_id BIGINT NOT NULL,
+                    public_theme_code VARCHAR(80) NOT NULL,
+                    public_layout_code VARCHAR(80) NOT NULL,
+                    admin_theme_code VARCHAR(80) NOT NULL,
+                    admin_layout_code VARCHAR(80) NOT NULL,
+                    login_layout_code VARCHAR(80) NOT NULL,
+                    overrides_json TEXT NOT NULL,
+                    status VARCHAR(30) NOT NULL,
+                    draft_version INT NOT NULL,
+                    updated_by VARCHAR(120) NOT NULL,
+                    reason VARCHAR(500) NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    updated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_matrix26_instance_appearance_draft_instance (instance_id),
+                    KEY idx_matrix26_instance_appearance_draft_status (status),
+                    CONSTRAINT fk_matrix26_instance_appearance_draft_instance FOREIGN KEY (instance_id)
+                        REFERENCES platform_business_client (id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """,
+                """
                 CREATE TABLE IF NOT EXISTS matrix26_instance_appearance_history (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     instance_id BIGINT NOT NULL,

@@ -23,6 +23,7 @@ public class Matrix26AppearanceCatalogService {
     private final Matrix26LayoutCatalogRepository layoutRepository;
     private final Matrix26InstanceAppearanceRepository appearanceRepository;
     private final Matrix26InstanceAppearanceHistoryRepository historyRepository;
+    private final Matrix26InstanceAppearanceDraftRepository draftRepository;
     private final PlatformBusinessClientRepository clientRepository;
 
     public Matrix26AppearanceCatalogService(
@@ -30,19 +31,21 @@ public class Matrix26AppearanceCatalogService {
             Matrix26LayoutCatalogRepository layoutRepository,
             Matrix26InstanceAppearanceRepository appearanceRepository,
             Matrix26InstanceAppearanceHistoryRepository historyRepository,
+            Matrix26InstanceAppearanceDraftRepository draftRepository,
             PlatformBusinessClientRepository clientRepository
     ) {
         this.themeRepository = themeRepository;
         this.layoutRepository = layoutRepository;
         this.appearanceRepository = appearanceRepository;
         this.historyRepository = historyRepository;
+        this.draftRepository = draftRepository;
         this.clientRepository = clientRepository;
     }
 
     public Matrix26AppearanceOverview overview() {
         List<Matrix26InstanceAppearance> appearances = appearanceRepository.findAll();
         long published = appearances.stream().filter(item -> "PUBLISHED".equals(item.getStatus())).count();
-        long drafts = appearances.stream().filter(item -> "DRAFT".equals(item.getStatus())).count();
+        long drafts = draftRepository.count();
         return new Matrix26AppearanceOverview(
                 themeRepository.count(),
                 layoutRepository.count(),

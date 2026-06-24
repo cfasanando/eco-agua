@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Editor de apariencia')}"></head>
+<body class="matrix26-body" data-theme="matrix26-classic" data-admin-layout="admin-sidebar-classic">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Editor de apariencia', 'Prepara themes, layouts y overrides sin alterar la versión publicada.')} "></header>
+        <main class="matrix26-main">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                <div>
+                    <a class="matrix26-back-link" th:href="@{/control-center/instances/{id}/appearance(id=${editor.instance().id})}">
+                        <i class="bi bi-arrow-left"></i> Volver a la apariencia
+                    </a>
+                    <h2 class="mt-2 mb-1" th:text="${editor.instance().businessName}">Instancia</h2>
+                    <code th:text="${editor.instance().code}">instance-code</code>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <span class="badge text-bg-primary" th:text="|Publicada v${editor.publishedAppearance().publishedVersion}|">Publicada v1</span>
+                    <span class="badge text-bg-warning" th:if="${editor.draft() != null}" th:text="|Borrador v${editor.draft().draftVersion}|">Borrador</span>
+                </div>
+            </div>
+
+            <div class="matrix26-alert-safe mb-4">
+                <i class="bi bi-shield-check"></i>
+                <div>
+                    <strong>Edición segura</strong>
+                    <p>La vista previa y el borrador se guardan únicamente en Matrix26. Esta fase todavía no publica cambios en el portal de la instancia.</p>
+                </div>
+            </div>
+
+            <form th:action="@{/control-center/instances/{id}/appearance/draft(id=${editor.instance().id})}"
+                  th:object="${appearanceForm}" method="post" id="appearance-editor-form">
+                <div class="alert alert-danger" th:if="${#fields.hasGlobalErrors()}" th:each="error : ${#fields.globalErrors()}" th:text="${error}">Error</div>
+                <div class="matrix26-appearance-editor-grid">
+                    <div class="matrix26-appearance-editor-fields">
+                        <section class="matrix26-panel">
+                            <div class="matrix26-panel-header">
+                                <div><span>Frontend público</span><h2>Theme público</h2></div>
+                                <small>Identidad visual del catálogo y páginas públicas.</small>
+                            </div>
+                            <div class="matrix26-choice-grid matrix26-choice-grid-themes">
+                                <label class="matrix26-visual-choice" th:each="theme : ${editor.publicThemes()}" th:classappend="${appearanceForm.publicThemeCode == theme.code} ? 'is-selected' : ''">
+                                    <input type="radio" th:field="*{publicThemeCode}" th:value="${theme.code}" data-preview-field="public-theme">
+                                    <span class="theme-preview mini" th:classappend="${theme.code}">
+                                        <span class="theme-preview-sidebar"></span>
+                                        <span class="theme-preview-workspace"><i></i><i></i><i></i></span>
+                                    </span>
+                                    <strong th:text="${theme.name}">Theme</strong>
+                                    <small th:text="${theme.description}">Descripción</small>
+                                </label>
+                            </div>
+                            <div class="text-danger small mt-2" th:errors="*{publicThemeCode}"></div>
+                        </section>
+
+                        <section class="matrix26-panel">
+                            <div class="matrix26-panel-header">
+                                <div><span>Frontend público</span><h2>Layout público</h2></div>
+                                <small>Distribución del contenido visible para clientes.</small>
+                            </div>
+                            <div class="matrix26-choice-grid">
+                                <label class="matrix26-layout-choice" th:each="layout : ${editor.publicLayouts()}" th:classappend="${appearanceForm.publicLayoutCode == layout.code} ? 'is-selected' : ''">
+                                    <input type="radio" th:field="*{publicLayoutCode}" th:value="${layout.code}" data-preview-field="public-layout">
+                                    <span class="matrix26-layout-icon"><i class="bi bi-layout-wtf"></i></span>
+                                    <span><strong th:text="${layout.name}">Layout</strong><small th:text="${layout.description}">Descripción</small></span>
+                                </label>
+                            </div>
+                            <div class="text-danger small mt-2" th:errors="*{publicLayoutCode}"></div>
+                        </section>
+
+                        <section class="matrix26-panel">
+                            <div class="matrix26-panel-header">
+                                <div><span>Backoffice</span><h2>Theme administrativo</h2></div>
+                                <small>Colores y componentes del área autenticada.</small>
+                            </div>
+                            <div class="matrix26-choice-grid matrix26-choice-grid-themes">
+                                <label class="matrix26-visual-choice" th:each="theme : ${editor.adminThemes()}" th:classappend="${appearanceForm.adminThemeCode == theme.code} ? 'is-selected' : ''">
+                                    <input type="radio" th:field="*{adminThemeCode}" th:value="${theme.code}" data-preview-field="admin-theme">
+                                    <span class="theme-preview mini" th:classappend="${theme.code}">
+                                        <span class="theme-preview-sidebar"></span>
+                                        <span class="theme-preview-workspace"><i></i><i></i><i></i></span>
+                                    </span>
+                                    <strong th:text="${theme.name}">Theme</strong>
+                                    <small th:text="${theme.description}">Descripción</small>
+                                </label>
+                            </div>
+                            <div class="text-danger small mt-2" th:errors="*{adminThemeCode}"></div>
+                        </section>
+
+                        <section class="matrix26-panel">
+                            <div class="matrix26-panel-header">
+                                <div><span>Backoffice</span><h2>Workspace y login</h2></div>
+                                <small>Distribución administrativa y acceso.</small>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-12 col-lg-7">
+                                    <label class="form-label">Layout administrativo</label>
+                                    <select class="form-select" th:field="*{adminLayoutCode}" data-preview-field="admin-layout">
+                                        <option th:each="layout : ${editor.adminLayouts()}" th:value="${layout.code}" th:text="${layout.name}">Layout</option>
+                                    </select>
+                                    <div class="text-danger small mt-1" th:errors="*{adminLayoutCode}"></div>
+                                </div>
+                                <div class="col-12 col-lg-5">
+                                    <label class="form-label">Layout de login</label>
+                                    <select class="form-select" th:field="*{loginLayoutCode}" data-preview-field="login-layout">
+                                        <option th:each="layout : ${editor.loginLayouts()}" th:value="${layout.code}" th:text="${layout.name}">Login</option>
+                                    </select>
+                                    <div class="text-danger small mt-1" th:errors="*{loginLayoutCode}"></div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="matrix26-panel">
+                            <div class="matrix26-panel-header">
+                                <div><span>Overrides seguros</span><h2>Paleta personalizada</h2></div>
+                                <small>Solo se aceptan colores hexadecimales validados.</small>
+                            </div>
+                            <div class="matrix26-color-grid">
+                                <label><span>Principal</span><input type="color" th:field="*{primaryColor}" data-preview-color="--theme-primary"><code th:text="*{primaryColor}">#2563EB</code></label>
+                                <label><span>Secundario</span><input type="color" th:field="*{secondaryColor}" data-preview-color="--theme-secondary"><code th:text="*{secondaryColor}">#172554</code></label>
+                                <label><span>Acento</span><input type="color" th:field="*{accentColor}" data-preview-color="--theme-accent"><code th:text="*{accentColor}">#0891B2</code></label>
+                                <label><span>Fondo</span><input type="color" th:field="*{backgroundColor}" data-preview-color="--theme-background"><code th:text="*{backgroundColor}">#F4F7FB</code></label>
+                                <label><span>Superficie</span><input type="color" th:field="*{surfaceColor}" data-preview-color="--theme-surface"><code th:text="*{surfaceColor}">#FFFFFF</code></label>
+                                <label><span>Texto</span><input type="color" th:field="*{textColor}" data-preview-color="--theme-text"><code th:text="*{textColor}">#172033</code></label>
+                            </div>
+                            <div class="text-danger small mt-2" th:if="${#fields.hasErrors('primaryColor') or #fields.hasErrors('secondaryColor') or #fields.hasErrors('accentColor') or #fields.hasErrors('backgroundColor') or #fields.hasErrors('surfaceColor') or #fields.hasErrors('textColor')}">Revisa los colores seleccionados.</div>
+                        </section>
+
+                        <section class="matrix26-panel">
+                            <div class="matrix26-panel-header">
+                                <div><span>Comportamiento visual</span><h2>Densidad y composición</h2></div>
+                                <small>Opciones controladas sin CSS libre.</small>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6 col-xl-4"><label class="form-label">Sidebar</label><select class="form-select" th:field="*{sidebarMode}" data-preview-option="sidebar"><option value="THEME">Según theme</option><option value="LIGHT">Claro</option><option value="DARK">Oscuro</option></select></div>
+                                <div class="col-md-6 col-xl-4"><label class="form-label">Bordes</label><select class="form-select" th:field="*{borderRadius}" data-preview-option="radius"><option value="SMALL">Discretos</option><option value="MEDIUM">Equilibrados</option><option value="LARGE">Amplios</option></select></div>
+                                <div class="col-md-6 col-xl-4"><label class="form-label">Tablas</label><select class="form-select" th:field="*{tableDensity}" data-preview-option="density"><option value="COMPACT">Compactas</option><option value="COMFORTABLE">Cómodas</option><option value="SPACIOUS">Espaciosas</option></select></div>
+                                <div class="col-md-6 col-xl-6"><label class="form-label">Ancho de contenido</label><select class="form-select" th:field="*{contentWidth}" data-preview-option="width"><option value="STANDARD">Estándar</option><option value="WIDE">Amplio</option><option value="FULL">Completo</option></select></div>
+                                <div class="col-md-6 col-xl-6"><label class="form-label">Estilo de títulos</label><select class="form-select" th:field="*{headingStyle}" data-preview-option="heading"><option value="SYSTEM">Sistema</option><option value="STRONG">Corporativo fuerte</option><option value="EDITORIAL">Editorial</option></select></div>
+                            </div>
+                        </section>
+
+                        <section class="matrix26-panel">
+                            <div class="matrix26-panel-header"><div><span>Trazabilidad</span><h2>Motivo del borrador</h2></div><small>Quedará registrado en el historial.</small></div>
+                            <textarea class="form-control" rows="3" th:field="*{reason}" maxlength="500" placeholder="Ejemplo: propuesta visual cálida para el nuevo restaurante."></textarea>
+                            <div class="text-danger small mt-1" th:errors="*{reason}"></div>
+                        </section>
+                    </div>
+
+                    <aside class="matrix26-editor-preview-column">
+                        <section class="matrix26-panel matrix26-editor-preview-card">
+                            <div class="matrix26-panel-header"><div><span>Vista previa en vivo</span><h2>Backoffice</h2></div><span class="badge text-bg-secondary" id="preview-admin-layout-label">Layout</span></div>
+                            <div id="appearance-live-preview" class="matrix26-live-preview" th:classappend="${appearanceForm.adminThemeCode}" th:attr="data-admin-layout=${appearanceForm.adminLayoutCode}">
+                                <div class="matrix26-live-sidebar"><i class="bi bi-grid-1x2-fill"></i><span></span><span></span><span></span><span></span></div>
+                                <div class="matrix26-live-workspace">
+                                    <div class="matrix26-live-topbar"><span></span><i></i></div>
+                                    <div class="matrix26-live-stats"><span></span><span></span><span></span></div>
+                                    <div class="matrix26-live-content"><div></div><div></div></div>
+                                    <div class="matrix26-live-table"><span></span><span></span><span></span></div>
+                                </div>
+                            </div>
+                            <div class="matrix26-live-preview-meta"><span id="preview-admin-theme-label" th:text="${editor.themeNames()[appearanceForm.adminThemeCode]}">Theme</span><span id="preview-density-label" th:text="${appearanceForm.tableDensity}">Density</span></div>
+                        </section>
+
+                        <section class="matrix26-panel matrix26-editor-preview-card">
+                            <div class="matrix26-panel-header"><div><span>Vista previa en vivo</span><h2>Frontend público</h2></div><span class="badge text-bg-secondary" id="preview-public-layout-label">Layout</span></div>
+                            <div id="appearance-public-preview" class="matrix26-public-live-preview" th:classappend="${appearanceForm.publicThemeCode}" th:attr="data-public-layout=${appearanceForm.publicLayoutCode}">
+                                <div class="matrix26-public-preview-header"></div>
+                                <div class="matrix26-public-preview-hero"><span></span><i></i></div>
+                                <div class="matrix26-public-preview-categories"><span></span><span></span><span></span></div>
+                                <div class="matrix26-public-preview-products"><article></article><article></article><article></article></div>
+                            </div>
+                            <div class="matrix26-live-preview-meta"><span id="preview-public-theme-label" th:text="${editor.themeNames()[appearanceForm.publicThemeCode]}">Theme</span><span>Responsive</span></div>
+                        </section>
+
+                        <div class="matrix26-editor-actions">
+                            <button class="btn btn-outline-primary" type="submit" th:formaction="@{/control-center/instances/{id}/appearance/preview(id=${editor.instance().id})}">
+                                <i class="bi bi-eye me-1"></i> Vista previa completa
+                            </button>
+                            <button class="btn btn-primary" type="submit">
+                                <i class="bi bi-save me-1"></i> Guardar borrador
+                            </button>
+                        </div>
+                    </aside>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+    window.matrix26AppearanceNames = {
+        themes: /*[[${editor.themeNames()}]]*/ {},
+        layouts: /*[[${editor.layoutNames()}]]*/ {},
+        presets: /*[[${editor.themePresets()}]]*/ {}
+    };
+</script>
+<script th:src="@{/js/matrix26-appearance-editor.js}"></script>
+</body>
+</html>

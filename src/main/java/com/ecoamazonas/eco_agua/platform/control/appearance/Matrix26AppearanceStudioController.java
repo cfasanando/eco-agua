@@ -13,9 +13,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class Matrix26AppearanceStudioController {
 
     private final Matrix26AppearanceCatalogService appearanceService;
+    private final Matrix26AppearanceEditorService editorService;
 
-    public Matrix26AppearanceStudioController(Matrix26AppearanceCatalogService appearanceService) {
+    public Matrix26AppearanceStudioController(
+            Matrix26AppearanceCatalogService appearanceService,
+            Matrix26AppearanceEditorService editorService
+    ) {
         this.appearanceService = appearanceService;
+        this.editorService = editorService;
     }
 
     @GetMapping("/appearance")
@@ -69,6 +74,7 @@ public class Matrix26AppearanceStudioController {
         model.addAttribute("activePage", "matrix26_instance_appearance");
         model.addAttribute("view", view);
         model.addAttribute("history", appearanceService.history(id));
+        model.addAttribute("draft", editorService.draft(id));
         return "control_center/appearance/instance_detail";
     }
 }

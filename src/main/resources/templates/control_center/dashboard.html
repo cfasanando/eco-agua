@@ -102,6 +102,39 @@
             <section class="matrix26-panel mt-4">
                 <div class="matrix26-panel-header">
                     <div>
+                        <span>Fase 3A</span>
+                        <h2>Planes de aprovisionamiento</h2>
+                    </div>
+                    <a class="btn btn-sm btn-primary" th:href="@{/control-center/provisioning/new}">
+                        <i class="bi bi-plus-lg me-1"></i>Nuevo Dry Run
+                    </a>
+                </div>
+                <div class="matrix26-provisioning-dashboard-summary">
+                    <span><strong th:text="${provisioningSummary.total()}">0</strong> planes</span>
+                    <span class="is-ready"><strong th:text="${provisioningSummary.ready()}">0</strong> listos</span>
+                    <span class="is-blocked"><strong th:text="${provisioningSummary.blocked()}">0</strong> bloqueados</span>
+                </div>
+                <div class="table-responsive mt-3">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Referencia</th><th>Instancia</th><th>Destino</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+                        <tbody>
+                        <tr th:each="job : ${recentProvisioningJobs}">
+                            <td><code th:text="${job.referenceCode}">DRY</code></td>
+                            <td><strong th:text="${job.businessName}">Empresa</strong><small th:text="${job.instanceCode}">code</small></td>
+                            <td><strong th:text="|Puerto ${job.runtimePort}|">Puerto</strong><small><code th:text="${job.databaseName}">db</code></small></td>
+                            <td><span class="badge" th:classappend="${job.status == 'READY'} ? ' text-bg-success' : ' text-bg-danger'" th:text="${job.status == 'READY' ? 'Listo' : 'Bloqueado'}">Estado</span></td>
+                            <td th:text="${#temporals.format(job.createdAt, 'dd/MM/yyyy HH:mm')}">Fecha</td>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/provisioning/{id}(id=${job.id})}"><i class="bi bi-eye"></i></a></td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(recentProvisioningJobs)}"><td colspan="6" class="text-center text-muted py-4">Todavía no hay planes Dry Run.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="matrix26-panel mt-4">
+                <div class="matrix26-panel-header">
+                    <div>
                         <span>Auditoría técnica</span>
                         <h2>Comprobaciones recientes</h2>
                     </div>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Aprovisionamiento')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Aprovisionamiento', 'Planes seguros de creación de nuevas instancias empresariales.')}" ></header>
+
+        <main class="matrix26-main">
+            <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}"></div>
+            <div th:if="${warningMessage}" class="alert alert-warning" th:text="${warningMessage}"></div>
+            <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}"></div>
+
+            <div class="matrix26-alert-safe mb-4">
+                <i class="bi bi-shield-check"></i>
+                <div>
+                    <strong>Fase 3A: Dry Run únicamente</strong>
+                    <p>Matrix26 valida nombres, puertos, runtimes, bases y módulos, y guarda el plan en <code>matrix26_platform_control</code>. No crea bases, no genera runtimes y no modifica ningún portal.</p>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
+                <div class="matrix26-inline-summary">
+                    <span><strong th:text="${provisioningSummary.total()}">0</strong> planes</span>
+                    <span class="text-success"><strong th:text="${provisioningSummary.ready()}">0</strong> listos</span>
+                    <span class="text-danger"><strong th:text="${provisioningSummary.blocked()}">0</strong> bloqueados</span>
+                </div>
+                <a class="btn btn-primary" th:href="@{/control-center/provisioning/new}">
+                    <i class="bi bi-diagram-3 me-1"></i>Nuevo Dry Run
+                </a>
+            </div>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header">
+                    <div><span>Historial</span><h2>Planes de aprovisionamiento</h2></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead>
+                        <tr>
+                            <th>Referencia</th>
+                            <th>Instancia</th>
+                            <th>Destino</th>
+                            <th>Estado</th>
+                            <th>Solicitado por</th>
+                            <th>Fecha</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="job : ${jobs}">
+                            <td><code th:text="${job.referenceCode}">DRY-...</code></td>
+                            <td>
+                                <strong th:text="${job.businessName}">Empresa</strong>
+                                <small><code th:text="${job.instanceCode}">instance-code</code></small>
+                            </td>
+                            <td>
+                                <strong th:text="|Puerto ${job.runtimePort}|">Puerto</strong>
+                                <small><code th:text="${job.databaseName}">database</code></small>
+                            </td>
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${job.status == 'READY'} ? ' text-bg-success' : ' text-bg-danger'"
+                                      th:text="${job.status == 'READY' ? 'Listo' : 'Bloqueado'}">Estado</span>
+                                <small>Dry Run</small>
+                            </td>
+                            <td th:text="${job.requestedBy}">matrix_admin</td>
+                            <td class="text-nowrap" th:text="${#temporals.format(job.createdAt, 'dd/MM/yyyy HH:mm:ss')}">Fecha</td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/provisioning/{id}(id=${job.id})}" title="Ver plan">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(jobs)}">
+                            <td colspan="7" class="text-center text-muted py-5">Todavía no hay planes de aprovisionamiento.</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

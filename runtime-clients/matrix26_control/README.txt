@@ -20,14 +20,16 @@ Override secrets without editing the file:
   export MATRIX26_ADMIN_PASSWORD='YourSecurePassword'
   bash scripts/run-matrix26-control.sh
 
-Phase 2 capabilities:
+Capabilities through Phase 3A:
 
 - register and edit instance metadata;
 - validate duplicate code, port, database, and runtime profile;
 - enable or pause monitoring;
 - execute manual health checks;
 - maintain module declarations;
-- audit administrative changes.
+- audit administrative changes;
+- create and revalidate provisioning Dry Runs;
+- validate installer availability without executing installers.
 
 Matrix26 writes only to matrix26_platform_control. It does not modify eco_agua,
 productos_selva_belen, restaurante_buen_sabor, or any other operational database.

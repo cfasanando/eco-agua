@@ -38,6 +38,7 @@ public class Matrix26ControlCenterController {
     private final PlatformModuleCatalogRepository moduleRepository;
     private final PlatformClientModuleRepository clientModuleRepository;
     private final Matrix26ControlCenterProperties properties;
+    private final Matrix26ProvisioningService provisioningService;
 
     public Matrix26ControlCenterController(
             Matrix26InstanceHealthService healthService,
@@ -45,7 +46,8 @@ public class Matrix26ControlCenterController {
             PlatformBusinessClientRepository clientRepository,
             PlatformModuleCatalogRepository moduleRepository,
             PlatformClientModuleRepository clientModuleRepository,
-            Matrix26ControlCenterProperties properties
+            Matrix26ControlCenterProperties properties,
+            Matrix26ProvisioningService provisioningService
     ) {
         this.healthService = healthService;
         this.managementService = managementService;
@@ -53,6 +55,7 @@ public class Matrix26ControlCenterController {
         this.moduleRepository = moduleRepository;
         this.clientModuleRepository = clientModuleRepository;
         this.properties = properties;
+        this.provisioningService = provisioningService;
     }
 
     @GetMapping({"", "/dashboard"})
@@ -71,6 +74,8 @@ public class Matrix26ControlCenterController {
         model.addAttribute("modulesByInstance", modulesByInstance);
         model.addAttribute("summary", healthService.buildSummary(statuses, totalModules));
         model.addAttribute("recentChecks", healthService.recentChecks());
+        model.addAttribute("recentProvisioningJobs", provisioningService.recentJobs());
+        model.addAttribute("provisioningSummary", provisioningService.summary());
         model.addAttribute("controlProperties", properties);
         return "control_center/dashboard";
     }
@@ -248,6 +253,77 @@ public class Matrix26ControlCenterController {
         return "redirect:/control-center/instances/" + id;
     }
 
+
+    @GetMapping("/provisioning")
+    public String provisioning(Model model) {
+        model.addAttribute("activePage", "matrix26_provisioning");
+        model.addAttribute("jobs", provisioningService.listJobs());
+        model.addAttribute("provisioningSummary", provisioningService.summary());
+        return "control_center/provisioning";
+    }
+
+    @GetMapping("/provisioning/new")
+    public String newProvisioningPlan(Model model) {
+        addProvisioningFormModel(model, provisioningService.newForm());
+        return "control_center/provisioning_form";
+    }
+
+    @PostMapping("/provisioning/dry-run")
+    public String createProvisioningDryRun(
+            @Valid @ModelAttribute("provisioningForm") Matrix26ProvisioningPlanForm form,
+            BindingResult bindingResult,
+            Authentication authentication,
+            Model model,
+            RedirectAttributes redirectAttributes
+    ) {
+        if (bindingResult.hasErrors()) {
+            addProvisioningFormModel(model, form);
+            return "control_center/provisioning_form";
+        }
+
+        try {
+            Matrix26ProvisioningJob job = provisioningService.createDryRun(form, actor(authentication));
+            redirectAttributes.addFlashAttribute(
+                    "READY".equals(job.getStatus()) ? "successMessage" : "warningMessage",
+                    "READY".equals(job.getStatus())
+                            ? "Dry Run validado correctamente. No se ejecutó ninguna operación real."
+                            : "Dry Run guardado con observaciones. Revisa los bloqueos antes de continuar."
+            );
+            return "redirect:/control-center/provisioning/" + job.getId();
+        } catch (RuntimeException ex) {
+            bindingResult.reject("provisioning", safeMessage(ex));
+            addProvisioningFormModel(model, form);
+            return "control_center/provisioning_form";
+        }
+    }
+
+    @GetMapping("/provisioning/{id}")
+    public String provisioningDetail(@PathVariable Long id, Model model) {
+        model.addAttribute("activePage", "matrix26_provisioning");
+        model.addAttribute("plan", provisioningService.getPlan(id));
+        return "control_center/provisioning_detail";
+    }
+
+    @PostMapping("/provisioning/{id}/revalidate")
+    public String revalidateProvisioningPlan(
+            @PathVariable Long id,
+            Authentication authentication,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            Matrix26ProvisioningJob job = provisioningService.revalidate(id, actor(authentication));
+            redirectAttributes.addFlashAttribute(
+                    "READY".equals(job.getStatus()) ? "successMessage" : "warningMessage",
+                    "READY".equals(job.getStatus())
+                            ? "El plan continúa listo para una futura confirmación."
+                            : "El plan mantiene bloqueos pendientes."
+            );
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", safeMessage(ex));
+        }
+        return "redirect:/control-center/provisioning/" + id;
+    }
+
     @GetMapping("/modules")
     public String modules(Model model) {
         List<PlatformBusinessClient> instances = managementService.listInstances();
@@ -274,7 +350,15 @@ public class Matrix26ControlCenterController {
         model.addAttribute("instanceCount", clientRepository.count());
         model.addAttribute("moduleCount", moduleRepository.count());
         model.addAttribute("auditCount", managementService.auditCount());
+        model.addAttribute("provisioningCount", provisioningService.summary().total());
         return "control_center/settings";
+    }
+
+
+    private void addProvisioningFormModel(Model model, Matrix26ProvisioningPlanForm form) {
+        model.addAttribute("activePage", "matrix26_provisioning");
+        model.addAttribute("provisioningForm", form);
+        model.addAttribute("groupedProvisioningModules", provisioningService.groupedModuleOptions());
     }
 
     private void addInstanceFormModel(

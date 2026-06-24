@@ -425,6 +425,69 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """,
                 """
+                CREATE TABLE IF NOT EXISTS matrix26_provisioning_job (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    reference_code VARCHAR(40) NOT NULL,
+                    status VARCHAR(30) NOT NULL,
+                    business_name VARCHAR(160) NOT NULL,
+                    legal_name VARCHAR(180) NULL,
+                    business_type VARCHAR(100) NULL,
+                    instance_code VARCHAR(80) NOT NULL,
+                    database_name VARCHAR(120) NOT NULL,
+                    runtime_profile VARCHAR(120) NOT NULL,
+                    runtime_port INT NOT NULL,
+                    public_url VARCHAR(500) NOT NULL,
+                    city VARCHAR(120) NULL,
+                    admin_username VARCHAR(20) NOT NULL,
+                    admin_email VARCHAR(180) NULL,
+                    demo_data_enabled BIT NOT NULL DEFAULT 0,
+                    validation_summary TEXT NULL,
+                    notes TEXT NULL,
+                    requested_by VARCHAR(120) NOT NULL,
+                    validated_at DATETIME(6) NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    updated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_matrix26_provisioning_reference (reference_code),
+                    KEY idx_matrix26_provisioning_status_created (status, created_at),
+                    KEY idx_matrix26_provisioning_instance_code (instance_code)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """,
+                """
+                CREATE TABLE IF NOT EXISTS matrix26_provisioning_step (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    job_id BIGINT NOT NULL,
+                    step_code VARCHAR(80) NOT NULL,
+                    display_order INT NOT NULL,
+                    label VARCHAR(180) NOT NULL,
+                    status VARCHAR(30) NOT NULL,
+                    detail VARCHAR(1000) NULL,
+                    safety_scope VARCHAR(80) NOT NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_matrix26_provisioning_step_job_order (job_id, display_order),
+                    CONSTRAINT fk_matrix26_provisioning_step_job FOREIGN KEY (job_id)
+                        REFERENCES matrix26_provisioning_job (id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """,
+                """
+                CREATE TABLE IF NOT EXISTS matrix26_provisioning_module (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    job_id BIGINT NOT NULL,
+                    module_key VARCHAR(80) NOT NULL,
+                    module_name VARCHAR(150) NOT NULL,
+                    status VARCHAR(30) NOT NULL,
+                    installer_available BIT NOT NULL DEFAULT 0,
+                    installer_version VARCHAR(50) NULL,
+                    detail VARCHAR(500) NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_matrix26_provisioning_module_job (job_id, module_key),
+                    CONSTRAINT fk_matrix26_provisioning_module_job FOREIGN KEY (job_id)
+                        REFERENCES matrix26_provisioning_job (id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """,
+                """
                 CREATE TABLE IF NOT EXISTS matrix26_instance_health_check (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     instance_id BIGINT NOT NULL,

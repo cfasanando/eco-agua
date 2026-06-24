@@ -5,40 +5,118 @@
     if (!form || !adminPreview || !publicPreview) return;
 
     const names = window.matrix26AppearanceNames || { themes: {}, layouts: {}, presets: {} };
+    const HEX = /^#[0-9A-F]{6}$/i;
     const value = (name) => form.querySelector(`[name="${name}"]:checked`)?.value
         || form.querySelector(`[name="${name}"]`)?.value
         || '';
+
+    const normalizeHex = (raw) => {
+        const clean = String(raw || '').trim().toUpperCase();
+        if (/^[0-9A-F]{6}$/.test(clean)) return `#${clean}`;
+        return clean;
+    };
+
+    const channel = (value) => {
+        const normalized = value / 255;
+        return normalized <= 0.03928
+            ? normalized / 12.92
+            : Math.pow((normalized + 0.055) / 1.055, 2.4);
+    };
+
+    const luminance = (color) => {
+        if (!HEX.test(color)) return 0;
+        const red = parseInt(color.slice(1, 3), 16);
+        const green = parseInt(color.slice(3, 5), 16);
+        const blue = parseInt(color.slice(5, 7), 16);
+        return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue);
+    };
+
+    const contrastRatio = (first, second) => {
+        const a = luminance(first);
+        const b = luminance(second);
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    };
+
+    const contrastText = (background) => {
+        const white = contrastRatio('#FFFFFF', background);
+        const dark = contrastRatio('#111827', background);
+        return white >= dark ? '#FFFFFF' : '#111827';
+    };
+
+    const darken = (color, factor = 0.15) => {
+        if (!HEX.test(color)) return color;
+        const components = [1, 3, 5].map(index => Math.round(parseInt(color.slice(index, index + 2), 16) * (1 - factor)));
+        return `#${components.map(item => item.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+    };
 
     const replaceThemeClass = (element, theme) => {
         ['matrix26-classic', 'matrix26-nature', 'matrix26-warm'].forEach(item => element.classList.remove(item));
         if (theme) element.classList.add(theme);
     };
 
+    const syncColorField = (field, source) => {
+        const picker = field.querySelector('[data-color-picker-for]');
+        const text = field.querySelector('[data-preview-color]');
+        if (!picker || !text) return;
+
+        if (source === picker) {
+            text.value = picker.value.toUpperCase();
+        } else {
+            const normalized = normalizeHex(text.value);
+            if (HEX.test(normalized)) {
+                text.value = normalized;
+                picker.value = normalized;
+            }
+        }
+    };
 
     const applyThemePreset = (themeCode) => {
         const preset = names.presets?.[themeCode];
         if (!preset) return;
-        const mapping = {
-            primaryColor: 'primaryColor',
-            secondaryColor: 'secondaryColor',
-            accentColor: 'accentColor',
-            backgroundColor: 'backgroundColor',
-            surfaceColor: 'surfaceColor',
-            textColor: 'textColor'
-        };
-        Object.entries(mapping).forEach(([presetKey, fieldName]) => {
+        const fields = ['primaryColor', 'secondaryColor', 'accentColor', 'backgroundColor', 'surfaceColor', 'textColor'];
+        fields.forEach(fieldName => {
             const input = form.querySelector(`[name="${fieldName}"]`);
-            if (input && preset[presetKey]) input.value = preset[presetKey];
+            if (!input || !preset[fieldName]) return;
+            input.value = preset[fieldName].toUpperCase();
+            const picker = form.querySelector(`[data-color-picker-for="${fieldName}"]`);
+            if (picker) picker.value = input.value;
         });
     };
 
+    const setPreviewVariable = (name, color) => {
+        [adminPreview, publicPreview].forEach(preview => preview.style.setProperty(name, color));
+    };
+
     const updateColors = () => {
+        const colors = {};
         form.querySelectorAll('[data-preview-color]').forEach(input => {
-            const cssVariable = input.dataset.previewColor;
-            adminPreview.style.setProperty(cssVariable, input.value);
-            publicPreview.style.setProperty(cssVariable, input.value);
-            const code = input.parentElement?.querySelector('code');
-            if (code) code.textContent = input.value.toUpperCase();
+            const normalized = normalizeHex(input.value);
+            if (!HEX.test(normalized)) {
+                input.classList.add('is-invalid');
+                return;
+            }
+            input.classList.remove('is-invalid');
+            input.value = normalized;
+            colors[input.name] = normalized;
+            setPreviewVariable(input.dataset.previewColor, normalized);
+        });
+
+        if (colors.primaryColor) {
+            const hover = darken(colors.primaryColor);
+            setPreviewVariable('--theme-primary-hover', hover);
+            setPreviewVariable('--theme-on-primary', contrastText(colors.primaryColor));
+            setPreviewVariable('--theme-on-primary-hover', contrastText(hover));
+        }
+        if (colors.secondaryColor) setPreviewVariable('--theme-on-secondary', contrastText(colors.secondaryColor));
+        if (colors.accentColor) setPreviewVariable('--theme-on-accent', contrastText(colors.accentColor));
+
+        form.querySelectorAll('[data-color-field]').forEach(field => {
+            const input = field.querySelector('[data-preview-color]');
+            const label = field.querySelector('[data-contrast-label]');
+            if (!input || !label || !HEX.test(input.value)) return;
+            const foreground = contrastText(input.value);
+            label.textContent = foreground === '#FFFFFF' ? 'Texto claro automático' : 'Texto oscuro automático';
+            label.style.color = input.value;
         });
     };
 
@@ -53,10 +131,10 @@
             item.style.setProperty('--theme-content-width', width);
         });
 
-        const sidebarMode = value('sidebarMode');
-        adminPreview.dataset.sidebarMode = sidebarMode;
+        adminPreview.dataset.sidebarMode = value('sidebarMode');
         adminPreview.dataset.headingStyle = value('headingStyle');
-        document.getElementById('preview-density-label').textContent = value('tableDensity');
+        const densityLabel = document.getElementById('preview-density-label');
+        if (densityLabel) densityLabel.textContent = value('tableDensity');
     };
 
     const updateSelections = () => {
@@ -87,7 +165,27 @@
         updateOptions();
     };
 
-    form.addEventListener('input', refresh);
+    form.querySelectorAll('[data-color-field]').forEach(field => {
+        const picker = field.querySelector('[data-color-picker-for]');
+        const text = field.querySelector('[data-preview-color]');
+        if (!picker || !text) return;
+        picker.addEventListener('input', () => {
+            syncColorField(field, picker);
+            refresh();
+        });
+        text.addEventListener('input', () => {
+            syncColorField(field, text);
+            refresh();
+        });
+        text.addEventListener('blur', () => {
+            syncColorField(field, text);
+            refresh();
+        });
+    });
+
+    form.addEventListener('input', (event) => {
+        if (!event.target.closest('[data-color-field]')) refresh();
+    });
     form.addEventListener('change', (event) => {
         if (event.target?.name === 'adminThemeCode') {
             applyThemePreset(event.target.value);

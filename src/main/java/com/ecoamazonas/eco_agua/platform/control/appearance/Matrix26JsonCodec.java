@@ -13,12 +13,12 @@ import java.util.Map;
  * It supports the JSON structures used by themes, layouts, overrides and
  * appearance history without adding a separate serialization dependency.
  */
-final class Matrix26JsonCodec {
+public final class Matrix26JsonCodec {
 
     private Matrix26JsonCodec() {
     }
 
-    static Map<String, String> readFlatObject(String json) {
+    public static Map<String, String> readFlatObject(String json) {
         Map<String, String> result = new LinkedHashMap<>();
         if (json == null || json.isBlank()) {
             return result;
@@ -41,7 +41,31 @@ final class Matrix26JsonCodec {
         }
     }
 
-    static String write(Object value) {
+
+    public static Map<String, Object> readObject(String json) {
+        if (json == null || json.isBlank()) {
+            return new LinkedHashMap<>();
+        }
+
+        try {
+            Object parsed = new Parser(json).parse();
+            if (!(parsed instanceof Map<?, ?> source)) {
+                return new LinkedHashMap<>();
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            source.forEach((key, value) -> {
+                if (key != null) {
+                    result.put(String.valueOf(key), value);
+                }
+            });
+            return result;
+        } catch (IllegalArgumentException ex) {
+            return new LinkedHashMap<>();
+        }
+    }
+
+    public static String write(Object value) {
         StringBuilder output = new StringBuilder();
         appendValue(output, value);
         return output.toString();

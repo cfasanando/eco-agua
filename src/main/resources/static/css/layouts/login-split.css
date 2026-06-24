@@ -1,1 +1,154 @@
-[data-login-layout="login-split"] { --login-panel-width: 460px; --login-brand-ratio: 1.2fr; }
+[data-login-layout="login-split"] {
+    --login-panel-width: 460px;
+}
+
+[data-login-layout="login-split"] .login-page-shell {
+    width: min(100%, 1480px);
+    margin-inline: auto;
+    display: grid;
+    grid-template-columns: minmax(440px, 1fr) minmax(380px, var(--login-panel-width));
+    gap: clamp(34px, 6vw, 96px);
+    align-items: center;
+    justify-content: center;
+    padding: clamp(56px, 7vh, 92px) clamp(24px, 5vw, 84px);
+}
+
+[data-login-layout="login-split"] .login-brand-panel {
+    position: relative;
+    display: flex;
+    min-height: min(66vh, 620px);
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--theme-primary) 26%, transparent);
+    border-radius: clamp(28px, 3vw, 42px);
+    background:
+        linear-gradient(
+            145deg,
+            color-mix(in srgb, var(--theme-secondary) 88%, transparent),
+            color-mix(in srgb, var(--theme-primary) 80%, transparent)
+        );
+    box-shadow: var(--theme-shadow-large);
+    isolation: isolate;
+}
+
+[data-login-layout="login-split"] .login-brand-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    background-image: var(--login-brand-image);
+    background-position: center;
+    background-size: cover;
+    opacity: .28;
+    transform: scale(1.03);
+}
+
+[data-login-layout="login-split"] .login-brand-panel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+        radial-gradient(circle at 82% 15%, rgba(255,255,255,.28), transparent 28%),
+        linear-gradient(135deg, rgba(15,23,42,.18), rgba(15,23,42,.52));
+}
+
+[data-login-layout="login-split"] .login-brand-panel-content {
+    width: min(100%, 640px);
+    align-self: flex-end;
+    padding: clamp(34px, 5vw, 70px);
+    color: var(--theme-on-secondary, #ffffff);
+    text-shadow: 0 2px 18px rgba(15,23,42,.24);
+}
+
+[data-login-layout="login-split"] .login-brand-eyebrow {
+    display: inline-flex;
+    margin-bottom: 18px;
+    padding: 8px 12px;
+    border: 1px solid rgba(255,255,255,.34);
+    border-radius: 999px;
+    background: rgba(255,255,255,.13);
+    text-transform: uppercase;
+    letter-spacing: .13em;
+    font-size: .7rem;
+    font-weight: 800;
+}
+
+[data-login-layout="login-split"] .login-brand-panel h2 {
+    max-width: 700px;
+    margin: 0 0 14px;
+    color: inherit;
+    font-family: var(--theme-font-heading);
+    font-size: clamp(2rem, 4vw, 4.4rem);
+    line-height: 1.02;
+    letter-spacing: -.04em;
+}
+
+[data-login-layout="login-split"] .login-brand-panel p {
+    max-width: 620px;
+    margin: 0;
+    color: color-mix(in srgb, currentColor 86%, transparent);
+    font-size: clamp(1rem, 1.35vw, 1.25rem);
+    line-height: 1.65;
+}
+
+[data-login-layout="login-split"] .login-brand-features {
+    display: grid;
+    gap: 10px;
+    margin-top: 28px;
+}
+
+[data-login-layout="login-split"] .login-brand-features span {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: .9rem;
+    font-weight: 650;
+}
+
+[data-login-layout="login-split"] .login-brand-features i {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    background: rgba(255,255,255,.16);
+}
+
+[data-login-layout="login-split"] .login-card {
+    width: 100%;
+    max-width: var(--login-panel-width);
+    margin: 0;
+    justify-self: end;
+}
+
+@media (max-width: 1100px) {
+    [data-login-layout="login-split"] .login-page-shell {
+        grid-template-columns: minmax(360px, 1fr) minmax(360px, 430px);
+        gap: 34px;
+        padding-inline: 28px;
+    }
+
+    [data-login-layout="login-split"] .login-brand-panel-content {
+        padding: 38px;
+    }
+}
+
+@media (max-width: 900px) {
+    [data-login-layout="login-split"] .login-page-shell {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        padding: 78px 18px 32px;
+    }
+
+    [data-login-layout="login-split"] .login-brand-panel {
+        display: none;
+    }
+
+    [data-login-layout="login-split"] .login-card {
+        width: 100%;
+        max-width: 460px;
+        justify-self: auto;
+    }
+}

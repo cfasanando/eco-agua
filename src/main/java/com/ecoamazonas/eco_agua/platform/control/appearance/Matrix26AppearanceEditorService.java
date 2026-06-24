@@ -221,8 +221,9 @@ public class Matrix26AppearanceEditorService {
                 "El texto y el fondo general no alcanzan un contraste accesible.");
         requireContrast(values.get("textColor"), values.get("surfaceColor"), 4.5,
                 "El texto y las tarjetas no alcanzan un contraste accesible.");
-        requireContrast("#FFFFFF", values.get("primaryColor"), 3.0,
-                "El color principal es demasiado claro para botones con texto blanco.");
+        String automaticButtonText = contrastText(values.get("primaryColor"));
+        requireContrast(automaticButtonText, values.get("primaryColor"), 4.5,
+                "El color principal no permite generar un texto de botón con contraste suficiente.");
     }
 
     @Transactional(readOnly = true)
@@ -234,7 +235,69 @@ public class Matrix26AppearanceEditorService {
         values.put("contentWidthValue", contentWidthValue(form.getContentWidth()));
         values.put("sidebarBackground", sidebarBackground(form.getSidebarMode(), values));
         values.put("sidebarText", "LIGHT".equals(form.getSidebarMode()) ? "#172033" : "#FFFFFF");
+        values.put("primaryTextColor", contrastText(values.get("primaryColor")));
+        values.put("primaryHoverColor", darken(values.get("primaryColor"), 0.15));
+        values.put("primaryHoverTextColor", contrastText(values.get("primaryHoverColor")));
+        values.put("secondaryTextColor", contrastText(values.get("secondaryColor")));
+        values.put("accentTextColor", contrastText(values.get("accentColor")));
         return values;
+    }
+
+
+    @Transactional(readOnly = true)
+    public Matrix26InstanceAppearance publishedAppearance(Long instanceId) {
+        return requirePublished(instanceId);
+    }
+
+    @Transactional(readOnly = true)
+    public Matrix26AppearanceEditorForm formFromSnapshot(String snapshotJson) {
+        Map<String, Object> snapshot = Matrix26JsonCodec.readObject(snapshotJson);
+        Map<String, Object> overrideValues = new LinkedHashMap<>();
+        Object rawOverrides = snapshot.get("overrides");
+        if (rawOverrides instanceof Map<?, ?> source) {
+            source.forEach((key, value) -> {
+                if (key != null && value != null) {
+                    overrideValues.put(String.valueOf(key), value);
+                }
+            });
+        }
+
+        return fromValues(
+                stringValue(snapshot.get("publicTheme"), "matrix26-classic"),
+                stringValue(snapshot.get("publicLayout"), "public-classic-grid"),
+                stringValue(snapshot.get("adminTheme"), "matrix26-classic"),
+                stringValue(snapshot.get("adminLayout"), "admin-sidebar-classic"),
+                stringValue(snapshot.get("loginLayout"), "login-split"),
+                writeJson(overrideValues),
+                null
+        );
+    }
+
+    public String serializedOverrides(Matrix26AppearanceEditorForm form) {
+        validate(form);
+        return writeJson(overrides(form));
+    }
+
+    public String serializedSnapshot(
+            Matrix26AppearanceEditorForm form,
+            String status,
+            int version
+    ) {
+        validate(form);
+        return snapshotJson(form, status, version);
+    }
+
+    @Transactional(readOnly = true)
+    public int nextVersion(Long instanceId) {
+        return nextHistoryVersion(instanceId);
+    }
+
+    private String stringValue(Object value, String fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        String clean = String.valueOf(value).trim();
+        return clean.isBlank() ? fallback : clean;
     }
 
     private Matrix26AppearanceEditorForm fromValues(
@@ -283,7 +346,7 @@ public class Matrix26AppearanceEditorService {
         result.put("tableDensity", normalizeOption(form.getTableDensity()));
         result.put("contentWidth", normalizeOption(form.getContentWidth()));
         result.put("headingStyle", normalizeOption(form.getHeadingStyle()));
-        result.put("source", "matrix26-appearance-studio-phase3c2");
+        result.put("source", "matrix26-appearance-studio-phase3c4");
         return result;
     }
 
@@ -387,6 +450,22 @@ public class Matrix26AppearanceEditorService {
         if (contrastRatio(foreground, background) < minimum) {
             throw new IllegalArgumentException(message);
         }
+    }
+
+    private String contrastText(String background) {
+        double whiteContrast = contrastRatio("#FFFFFF", background);
+        double darkContrast = contrastRatio("#111827", background);
+        return whiteContrast >= darkContrast ? "#FFFFFF" : "#111827";
+    }
+
+    private String darken(String color, double factor) {
+        int red = Integer.parseInt(color.substring(1, 3), 16);
+        int green = Integer.parseInt(color.substring(3, 5), 16);
+        int blue = Integer.parseInt(color.substring(5, 7), 16);
+        red = (int) Math.round(red * (1.0 - factor));
+        green = (int) Math.round(green * (1.0 - factor));
+        blue = (int) Math.round(blue * (1.0 - factor));
+        return String.format("#%02X%02X%02X", red, green, blue);
     }
 
     private double contrastRatio(String first, String second) {

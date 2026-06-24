@@ -20,6 +20,13 @@
                     <span class="badge text-bg-success fs-6" th:text="${view.appearance().status}">PUBLISHED</span>
                     <span class="badge text-bg-primary fs-6" th:text="|v${view.appearance().publishedVersion}|">v1</span>
                     <span class="badge text-bg-warning fs-6" th:if="${draft != null}" th:text="|Borrador v${draft.draftVersion}|">Draft</span>
+                    <a class="btn btn-outline-secondary"
+                       th:if="${view.instance().publicUrl != null and !#strings.isEmpty(view.instance().publicUrl)}"
+                       th:href="${view.instance().publicUrl}"
+                       target="_blank"
+                       rel="noopener">
+                        <i class="bi bi-box-arrow-up-right me-1"></i> Abrir portal
+                    </a>
                     <a class="btn btn-primary" th:href="@{/control-center/instances/{id}/appearance/edit(id=${view.instance().id})}"><i class="bi bi-sliders me-1"></i> Editar apariencia</a>
                 </div>
             </div>
@@ -33,6 +40,85 @@
                     <form th:action="@{/control-center/instances/{id}/appearance/draft/discard(id=${view.instance().id})}" method="post" onsubmit="return confirm('¿Descartar este borrador? La versión publicada permanecerá intacta.');">
                         <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i> Descartar</button>
                     </form>
+                </div>
+            </section>
+
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header">
+                    <div>
+                        <span>Publicación local</span>
+                        <h2>Sincronización con el portal administrado</h2>
+                    </div>
+                    <span class="badge"
+                          th:classappend="${publicationState.synchronizedWithMatrix26()} ? 'text-bg-success' : (${publicationState.allowed()} ? 'text-bg-warning' : 'text-bg-secondary')"
+                          th:text="${publicationState.synchronizedWithMatrix26()} ? 'Sincronizado' : (${publicationState.allowed()} ? 'Pendiente' : 'Bloqueado')">
+                        Estado
+                    </span>
+                </div>
+
+                <div class="matrix26-publication-status">
+                    <div>
+                        <strong th:text="${publicationState.message()}">Estado de publicación</strong>
+                        <span th:if="${publicationState.targetPublishedVersion() != null}"
+                              th:text="|Versión local detectada: v${publicationState.targetPublishedVersion()}|">
+                            Versión local
+                        </span>
+                        <span th:unless="${publicationState.targetPublishedVersion() != null}">
+                            La instancia conserva su apariencia actual hasta publicar un borrador.
+                        </span>
+                    </div>
+                </div>
+
+                <form class="matrix26-publication-form mt-3"
+                      th:if="${draft != null and publicationState.allowed()}"
+                      th:action="@{/control-center/instances/{id}/appearance/publish(id=${view.instance().id})}"
+                      method="post"
+                      onsubmit="return confirm('¿Publicar este borrador en el portal administrado?');">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-lg-7">
+                            <label class="form-label" for="appearanceConfirmationCode">
+                                Escribe el código de la instancia para confirmar
+                            </label>
+                            <input id="appearanceConfirmationCode"
+                                   name="confirmationCode"
+                                   type="text"
+                                   class="form-control"
+                                   th:placeholder="${view.instance().code}"
+                                   autocomplete="off"
+                                   required>
+                        </div>
+                        <div class="col-lg-5">
+                            <div class="form-check mb-2">
+                                <input id="appearanceAcknowledged"
+                                       name="acknowledged"
+                                       value="true"
+                                       class="form-check-input"
+                                       type="checkbox"
+                                       required>
+                                <label class="form-check-label" for="appearanceAcknowledged">
+                                    Revisé themes, layouts y colores.
+                                </label>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="bi bi-cloud-arrow-up me-1"></i> Publicar en el portal
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-text mt-2">
+                        La publicación crea o actualiza únicamente la configuración visual local de esta instancia.
+                    </div>
+                </form>
+
+                <div class="alert alert-secondary mt-3 mb-0"
+                     th:if="${draft != null and !publicationState.allowed()}">
+                    <i class="bi bi-shield-lock me-1"></i>
+                    Esta instancia no está autorizada para publicación real durante la fase de laboratorio.
+                </div>
+
+                <div class="alert alert-light border mt-3 mb-0"
+                     th:if="${draft == null}">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Crea un borrador para habilitar la publicación.
                 </div>
             </section>
 
@@ -66,7 +152,7 @@
             </div>
 
             <section class="matrix26-panel mt-4">
-                <div class="matrix26-panel-header"><div><span>Overrides publicados</span><h2>Personalización activa registrada</h2></div><small>La publicación local llegará en 3C.3.</small></div>
+                <div class="matrix26-panel-header"><div><span>Overrides publicados</span><h2>Personalización activa registrada</h2></div><small th:text="${publicationState.synchronizedWithMatrix26()} ? 'Aplicada en el portal' : 'Registrada en Matrix26'">Estado</small></div>
                 <div class="matrix26-token-code"><pre th:text="${view.appearance().overridesJson != null ? view.appearance().overridesJson : '{}'}">{}</pre></div>
             </section>
 
@@ -74,7 +160,7 @@
                 <div class="matrix26-panel-header"><div><span>Trazabilidad</span><h2>Historial de apariencia</h2></div></div>
                 <div class="table-responsive">
                     <table class="table align-middle mb-0 matrix26-table">
-                        <thead><tr><th>Versión</th><th>Estado</th><th>Responsable</th><th>Motivo</th><th>Fecha</th></tr></thead>
+                        <thead><tr><th>Versión</th><th>Estado</th><th>Responsable</th><th>Motivo</th><th>Fecha</th><th class="text-end">Acciones</th></tr></thead>
                         <tbody>
                         <tr th:each="item : ${history}">
                             <td><strong th:text="|v${item.version}|">v1</strong></td>
@@ -82,6 +168,25 @@
                             <td th:text="${item.actorUsername}">system</td>
                             <td th:text="${item.reason}">Motivo</td>
                             <td th:text="${#temporals.format(item.createdAt, 'dd/MM/yyyy HH:mm:ss')}">Fecha</td>
+                            <td class="text-end">
+                                <form th:if="${publicationState.allowed()
+                                             and item.status == 'PUBLISHED'
+                                             and item.version != view.appearance().publishedVersion}"
+                                      th:action="@{/control-center/instances/{instanceId}/appearance/rollback/{historyId}(instanceId=${view.instance().id},historyId=${item.id})}"
+                                      method="post"
+                                      class="d-inline"
+                                      onsubmit="return confirm('¿Restaurar esta versión? Se publicará como una nueva versión.');">
+                                    <input type="hidden" name="confirmationCode" th:value="${view.instance().code}">
+                                    <input type="hidden" name="acknowledged" value="true">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-arrow-counterclockwise me-1"></i> Restaurar
+                                    </button>
+                                </form>
+                                <span class="text-muted small"
+                                      th:if="${item.version == view.appearance().publishedVersion}">
+                                    Activa
+                                </span>
+                            </td>
                         </tr>
                         </tbody>
                     </table>

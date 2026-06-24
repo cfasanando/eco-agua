@@ -19,6 +19,8 @@ public class Matrix26ControlCenterProperties {
     private boolean provisioningExecutionEnabled;
     private String provisioningTemplateDatabase = "restaurante_buen_sabor";
     private String provisioningRuntimeDirectory = "runtime-clients";
+    private boolean appearancePublishingEnabled;
+    private String appearancePublishAllowedInstanceCodes = "matrix26-restaurant-lab";
 
     public boolean isEnabled() {
         return enabled;
@@ -113,6 +115,23 @@ public class Matrix26ControlCenterProperties {
 
     public void setProvisioningRuntimeDirectory(String provisioningRuntimeDirectory) {
         this.provisioningRuntimeDirectory = provisioningRuntimeDirectory;
+    }
+
+
+    public boolean isAppearancePublishingEnabled() {
+        return appearancePublishingEnabled;
+    }
+
+    public void setAppearancePublishingEnabled(boolean appearancePublishingEnabled) {
+        this.appearancePublishingEnabled = appearancePublishingEnabled;
+    }
+
+    public String getAppearancePublishAllowedInstanceCodes() {
+        return appearancePublishAllowedInstanceCodes;
+    }
+
+    public void setAppearancePublishAllowedInstanceCodes(String appearancePublishAllowedInstanceCodes) {
+        this.appearancePublishAllowedInstanceCodes = appearancePublishAllowedInstanceCodes;
     }
 
 }

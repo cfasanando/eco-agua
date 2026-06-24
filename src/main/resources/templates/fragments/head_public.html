@@ -42,4 +42,17 @@
 
     <link rel="stylesheet" th:href="@{/css/admin.css}" />
     <link rel="stylesheet" th:href="@{/css/public.css}" />
+
+    <th:block th:if="${appearanceManaged == true}">
+        <link rel="stylesheet" th:href="@{/css/appearance/tokens.css}" />
+        <link rel="stylesheet" th:href="${appearancePublicThemeCss}" />
+        <link rel="stylesheet" th:href="${appearancePublicLayoutCss}" />
+        <link rel="stylesheet" th:href="@{/css/appearance/runtime.css}" />
+        <style th:utext="${appearanceCssVariables}"></style>
+        <script th:inline="javascript">
+            document.documentElement.dataset.theme = /*[[${appearancePublicThemeCode}]]*/ 'matrix26-classic';
+            document.documentElement.dataset.publicLayout = /*[[${appearancePublicLayoutCode}]]*/ 'public-classic-grid';
+            document.documentElement.dataset.appearanceManaged = 'true';
+        </script>
+    </th:block>
 </head>

@@ -1,41 +1,51 @@
 <!DOCTYPE html>
-<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{control_center/fragments/head :: head('Instancias')}"></head>
 <body class="matrix26-body">
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('Instancias', 'Inventario técnico de los portales conectados a Matrix26.')}"></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Instancias', 'Registro central y monitoreo seguro de portales empresariales.')}" ></header>
 
         <main class="matrix26-main">
+            <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}"></div>
+            <div th:if="${warningMessage}" class="alert alert-warning" th:text="${warningMessage}"></div>
+            <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}"></div>
+
             <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
                 <div class="matrix26-inline-summary">
                     <span><strong th:text="${summary.totalInstances()}">3</strong> registradas</span>
                     <span class="text-success"><strong th:text="${summary.onlineInstances()}">0</strong> en línea</span>
                     <span class="text-danger"><strong th:text="${summary.offlineInstances()}">0</strong> fuera de línea</span>
                 </div>
-                <a class="btn btn-primary" th:href="@{/control-center/instances(refresh=1)}">
-                    <i class="bi bi-arrow-clockwise me-1"></i>Comprobar ahora
-                </a>
-            </div>
-
-            <div class="matrix26-alert-safe">
-                <i class="bi bi-shield-lock"></i>
-                <div>
-                    <strong>Las tres instancias están protegidas.</strong>
-                    <p>Esta fase no permite borrar, reinstalar, detener ni cambiar sus bases. Matrix26 solo registra metadatos y verifica la disponibilidad HTTP.</p>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-primary" th:href="@{/control-center/instances(refresh=1)}">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Comprobar monitoreo
+                    </a>
+                    <a class="btn btn-primary" th:href="@{/control-center/instances/new}">
+                        <i class="bi bi-plus-lg me-1"></i>Registrar instancia
+                    </a>
                 </div>
             </div>
 
-            <section class="matrix26-panel mt-4">
+            <div class="matrix26-alert-safe mb-4">
+                <i class="bi bi-shield-lock"></i>
+                <div>
+                    <strong>Administración central sin acceso a datos operativos</strong>
+                    <p>Los cambios de esta pantalla se guardan únicamente en <code>matrix26_platform_control</code>. Registrar o editar una instancia no altera sus pedidos, ventas, productos, clientes ni base operativa.</p>
+                </div>
+            </div>
+
+            <section class="matrix26-panel">
                 <div class="table-responsive">
                     <table class="table align-middle mb-0 matrix26-table matrix26-instance-table">
                         <thead>
                         <tr>
                             <th>Instancia</th>
-                            <th>Estado</th>
                             <th>Runtime</th>
-                            <th>Base independiente</th>
+                            <th>Base</th>
+                            <th>Estado</th>
+                            <th>Seguridad</th>
                             <th>Módulos</th>
                             <th class="text-end">Acciones</th>
                         </tr>
@@ -43,10 +53,10 @@
                         <tbody>
                         <tr th:each="status : ${statuses}">
                             <td>
-                                <div class="d-flex align-items-center gap-3">
+                                <div class="d-flex align-items-center gap-2">
                                     <span class="matrix26-table-avatar"
                                           th:style="|--instance-color:${status.instance().primaryColor != null ? status.instance().primaryColor : '#172554'}|">
-                                        <i class="bi" th:classappend="${status.instance().businessType == 'restaurant'} ? ' bi-cup-hot' : (${status.instance().businessType == 'water_delivery'} ? ' bi-droplet' : ' bi-basket')"></i>
+                                        <i class="bi bi-building"></i>
                                     </span>
                                     <div>
                                         <strong th:text="${status.instance().businessName}">Instancia</strong>
@@ -55,44 +65,49 @@
                                 </div>
                             </td>
                             <td>
-                                <span class="badge" th:classappend="${status.badgeClass()}" th:text="${status.statusLabel()}">Estado</span>
-                                <small th:text="${status.responseTimeMs() != null ? status.responseTimeMs() + ' ms' : 'Sin respuesta'}">Sin respuesta</small>
-                            </td>
-                            <td>
                                 <strong th:text="|Puerto ${status.instance().runtimePort}|">Puerto</strong>
-                                <small><code th:text="${status.instance().runtimeProfile}">profile</code></small>
+                                <small><code th:text="${status.instance().runtimeProfile}">runtime</code></small>
                             </td>
                             <td>
                                 <code th:text="${status.instance().databaseName}">database</code>
-                                <small>Datos operativos aislados</small>
+                                <small th:text="${status.instance().publicUrl}">URL</small>
+                            </td>
+                            <td>
+                                <span class="badge" th:classappend="${status.badgeClass()}" th:text="${status.statusLabel()}">Estado</span>
+                                <small th:if="${status.checkedAt() != null}" th:text="${#temporals.format(status.checkedAt(), 'dd/MM/yyyy HH:mm:ss')}">Fecha</small>
+                            </td>
+                            <td>
+                                <span class="badge text-bg-primary" th:if="${status.instance().protectedInstance}"><i class="bi bi-shield-lock me-1"></i>Protegida</span>
+                                <span class="badge text-bg-secondary" th:unless="${status.instance().protectedInstance}">Registrada</span>
+                                <small th:text="${status.monitoringEnabled() ? 'Monitoreo activo' : 'Monitoreo pausado'}">Monitoreo</small>
                             </td>
                             <td>
                                 <div class="matrix26-module-chips compact">
                                     <span th:each="assignment : ${modulesByInstance.get(status.instance().id)}"
+                                          th:if="${assignment.enabled}"
                                           th:text="${assignment.module.name}">Módulo</span>
+                                    <span th:if="${#lists.isEmpty(modulesByInstance.get(status.instance().id))}" class="text-muted">Sin módulos</span>
                                 </div>
                             </td>
                             <td class="text-end">
-                                <a class="btn btn-sm btn-outline-primary" th:href="${status.instance().publicUrl}" target="_blank" rel="noopener">
-                                    <i class="bi bi-box-arrow-up-right me-1"></i>Abrir
-                                </a>
+                                <div class="btn-group btn-group-sm">
+                                    <a class="btn btn-outline-secondary" th:href="@{/control-center/instances/{id}(id=${status.instance().id})}" title="Ver detalle">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a class="btn btn-outline-secondary" th:href="@{/control-center/instances/{id}/edit(id=${status.instance().id})}" title="Editar metadatos">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a class="btn btn-outline-primary" th:href="${status.instance().publicUrl}" target="_blank" rel="noopener" title="Abrir portal">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                    </a>
+                                </div>
                             </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(statuses)}">
+                            <td colspan="7" class="text-center text-muted py-5">No hay instancias registradas.</td>
                         </tr>
                         </tbody>
                     </table>
-                </div>
-            </section>
-
-            <section class="matrix26-panel mt-4">
-                <div class="matrix26-panel-header">
-                    <div><span>Mapa de aislamiento</span><h2>Separación de datos</h2></div>
-                </div>
-                <div class="matrix26-isolation-grid">
-                    <article th:each="status : ${statuses}">
-                        <div class="matrix26-isolation-node is-control"><i class="bi bi-diagram-3"></i><strong>Matrix26</strong><small>matrix26_platform_control</small></div>
-                        <span class="matrix26-isolation-arrow"><i class="bi bi-arrow-right"></i></span>
-                        <div class="matrix26-isolation-node"><i class="bi bi-database"></i><strong th:text="${status.instance().businessName}">Negocio</strong><small th:text="${status.instance().databaseName}">database</small></div>
-                    </article>
                 </div>
             </section>
         </main>

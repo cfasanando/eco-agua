@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{control_center/fragments/head :: head('Configuración')}"></head>
 <body class="matrix26-body">
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('Configuración', 'Identidad y límites de seguridad del Control Center.')}"></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Configuración', 'Identidad y límites de seguridad del Control Center.')}" ></header>
 
         <main class="matrix26-main">
             <div class="row g-4">
@@ -18,9 +18,10 @@
                             <div><dt>Puerto</dt><dd><code>8091</code></dd></div>
                             <div><dt>URL</dt><dd><code th:text="${controlProperties.portalUrl}">http://localhost:8091</code></dd></div>
                             <div><dt>Base exclusiva</dt><dd><code th:text="${controlProperties.databaseName}">matrix26_platform_control</code></dd></div>
-                            <div><dt>Modo</dt><dd><span class="badge text-bg-primary">Solo lectura</span></dd></div>
+                            <div><dt>Modo</dt><dd><span class="badge text-bg-primary">Administración de metadatos</span></dd></div>
                             <div><dt>Instancias registradas</dt><dd th:text="${instanceCount}">3</dd></div>
                             <div><dt>Módulos registrados</dt><dd th:text="${moduleCount}">10</dd></div>
+                            <div><dt>Movimientos auditados</dt><dd th:text="${auditCount}">0</dd></div>
                         </dl>
                     </section>
                 </div>
@@ -30,21 +31,31 @@
                         <div class="matrix26-panel-header"><div><span>Seguridad</span><h2>Reglas activas</h2></div></div>
                         <ul class="matrix26-check-list">
                             <li><i class="bi bi-check-circle-fill"></i><span>Login propio y usuario de plataforma independiente.</span></li>
-                            <li><i class="bi bi-check-circle-fill"></i><span>Base de control separada de los tres negocios.</span></li>
+                            <li><i class="bi bi-check-circle-fill"></i><span>Base de control separada de los negocios.</span></li>
                             <li><i class="bi bi-check-circle-fill"></i><span>Rutas operativas bloqueadas en el runtime 8091.</span></li>
                             <li><i class="bi bi-check-circle-fill"></i><span>Sin consultas a pedidos, clientes, ventas o inventario.</span></li>
-                            <li><i class="bi bi-check-circle-fill"></i><span>Instancias existentes marcadas como protegidas.</span></li>
-                            <li><i class="bi bi-check-circle-fill"></i><span>Historial de comprobaciones guardado solo en Matrix26.</span></li>
+                            <li><i class="bi bi-check-circle-fill"></i><span>Validación de códigos, bases, runtimes y puertos duplicados.</span></li>
+                            <li><i class="bi bi-check-circle-fill"></i><span>Auditoría de usuario, fecha y cambios administrativos.</span></li>
                         </ul>
                     </section>
                 </div>
             </div>
 
             <section class="matrix26-panel mt-4">
-                <div class="matrix26-panel-header"><div><span>Roadmap</span><h2>Funciones bloqueadas hasta futuras fases</h2></div></div>
+                <div class="matrix26-panel-header"><div><span>Alcance de la Fase 2</span><h2>Funciones habilitadas</h2></div></div>
+                <div class="matrix26-roadmap-grid">
+                    <article><i class="bi bi-building-add"></i><strong>Registro de instancias</strong><span>Crear y editar metadatos técnicos desde la interfaz.</span><em>Disponible</em></article>
+                    <article><i class="bi bi-activity"></i><strong>Monitoreo manual</strong><span>Comprobar una instancia y consultar su historial.</span><em>Disponible</em></article>
+                    <article><i class="bi bi-boxes"></i><strong>Declaración de módulos</strong><span>Documentar módulos sin instalar ni desinstalar.</span><em>Disponible</em></article>
+                    <article><i class="bi bi-clock-history"></i><strong>Auditoría</strong><span>Registrar quién realizó cada cambio administrativo.</span><em>Disponible</em></article>
+                </div>
+            </section>
+
+            <section class="matrix26-panel mt-4">
+                <div class="matrix26-panel-header"><div><span>Bloqueado por seguridad</span><h2>Operaciones para futuras fases</h2></div></div>
                 <div class="matrix26-roadmap-grid">
                     <article><i class="bi bi-database-add"></i><strong>Aprovisionamiento</strong><span>Crear bases e instancias desde la interfaz.</span><em>Fase futura</em></article>
-                    <article><i class="bi bi-boxes"></i><strong>Gestión de módulos</strong><span>Instalar, activar y actualizar módulos con auditoría.</span><em>Fase futura</em></article>
+                    <article><i class="bi bi-download"></i><strong>Instalación real</strong><span>Ejecutar instaladores de módulos sobre una instancia.</span><em>Fase futura</em></article>
                     <article><i class="bi bi-arrow-repeat"></i><strong>Control de runtimes</strong><span>Iniciar, detener y reiniciar servicios.</span><em>Fase futura</em></article>
                     <article><i class="bi bi-cloud-arrow-down"></i><strong>Backups</strong><span>Respaldos, validación y restauración controlada.</span><em>Fase futura</em></article>
                 </div>

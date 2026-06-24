@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 public record Matrix26InstanceStatus(
         PlatformBusinessClient instance,
+        boolean monitoringEnabled,
         boolean online,
         Integer httpStatus,
         Long responseTimeMs,

@@ -10,4 +10,6 @@ public interface Matrix26InstanceHealthCheckRepository extends JpaRepository<Mat
     Optional<Matrix26InstanceHealthCheck> findTopByInstance_IdOrderByCheckedAtDesc(Long instanceId);
 
     List<Matrix26InstanceHealthCheck> findTop20ByOrderByCheckedAtDesc();
+
+    List<Matrix26InstanceHealthCheck> findTop50ByInstance_IdOrderByCheckedAtDesc(Long instanceId);
 }

@@ -9,9 +9,29 @@ public interface PlatformBusinessClientRepository extends JpaRepository<Platform
 
     List<PlatformBusinessClient> findAllByOrderByCreatedAtDescIdDesc();
 
+    List<PlatformBusinessClient> findAllByOrderByBusinessNameAsc();
+
     List<PlatformBusinessClient> findByMonitorVisibleTrueOrderByCreatedAtDescIdDesc();
 
     Optional<PlatformBusinessClient> findByCode(String code);
 
+    Optional<PlatformBusinessClient> findByCodeIgnoreCase(String code);
+
     boolean existsByCode(String code);
+
+    boolean existsByCodeIgnoreCase(String code);
+
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);
+
+    boolean existsByRuntimePort(Integer runtimePort);
+
+    boolean existsByRuntimePortAndIdNot(Integer runtimePort, Long id);
+
+    boolean existsByDatabaseNameIgnoreCase(String databaseName);
+
+    boolean existsByDatabaseNameIgnoreCaseAndIdNot(String databaseName, Long id);
+
+    boolean existsByRuntimeProfileIgnoreCase(String runtimeProfile);
+
+    boolean existsByRuntimeProfileIgnoreCaseAndIdNot(String runtimeProfile, Long id);
 }

@@ -6,14 +6,22 @@ import com.ecoamazonas.eco_agua.platform.PlatformClientModule;
 import com.ecoamazonas.eco_agua.platform.PlatformClientModuleRepository;
 import com.ecoamazonas.eco_agua.platform.PlatformModuleCatalog;
 import com.ecoamazonas.eco_agua.platform.PlatformModuleCatalogRepository;
+import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +33,7 @@ import java.util.stream.Collectors;
 public class Matrix26ControlCenterController {
 
     private final Matrix26InstanceHealthService healthService;
+    private final Matrix26InstanceManagementService managementService;
     private final PlatformBusinessClientRepository clientRepository;
     private final PlatformModuleCatalogRepository moduleRepository;
     private final PlatformClientModuleRepository clientModuleRepository;
@@ -32,12 +41,14 @@ public class Matrix26ControlCenterController {
 
     public Matrix26ControlCenterController(
             Matrix26InstanceHealthService healthService,
+            Matrix26InstanceManagementService managementService,
             PlatformBusinessClientRepository clientRepository,
             PlatformModuleCatalogRepository moduleRepository,
             PlatformClientModuleRepository clientModuleRepository,
             Matrix26ControlCenterProperties properties
     ) {
         this.healthService = healthService;
+        this.managementService = managementService;
         this.clientRepository = clientRepository;
         this.moduleRepository = moduleRepository;
         this.clientModuleRepository = clientModuleRepository;
@@ -82,17 +93,178 @@ public class Matrix26ControlCenterController {
         return "control_center/instances";
     }
 
+    @GetMapping("/instances/new")
+    public String newInstance(Model model) {
+        addInstanceFormModel(model, managementService.newForm(), null, Set.of());
+        return "control_center/instance_form";
+    }
+
+    @PostMapping("/instances")
+    public String createInstance(
+            @Valid @ModelAttribute("instanceForm") Matrix26InstanceForm form,
+            BindingResult bindingResult,
+            @RequestParam(value = "selectedModules", required = false) List<String> selectedModules,
+            Authentication authentication,
+            Model model,
+            RedirectAttributes redirectAttributes
+    ) {
+        Set<String> selected = selectedSet(selectedModules);
+        if (bindingResult.hasErrors()) {
+            addInstanceFormModel(model, form, null, selected);
+            return "control_center/instance_form";
+        }
+
+        try {
+            PlatformBusinessClient created = managementService.create(form, selectedModules, actor(authentication));
+            redirectAttributes.addFlashAttribute("successMessage", "Instancia registrada correctamente. No se modificó ninguna base operativa.");
+            return "redirect:/control-center/instances/" + created.getId();
+        } catch (IllegalArgumentException ex) {
+            bindingResult.reject("instance", ex.getMessage());
+            addInstanceFormModel(model, form, null, selected);
+            return "control_center/instance_form";
+        }
+    }
+
+    @GetMapping("/instances/{id}")
+    public String instanceDetail(@PathVariable Long id, Model model) {
+        PlatformBusinessClient instance = managementService.getInstance(id);
+        model.addAttribute("activePage", "matrix26_instances");
+        model.addAttribute("instance", instance);
+        model.addAttribute("status", healthService.currentStatus(id, false));
+        model.addAttribute("healthHistory", healthService.history(id));
+        model.addAttribute("auditHistory", managementService.auditForInstance(id));
+        model.addAttribute("groupedModules", managementService.groupedModules());
+        model.addAttribute("selectedModuleKeys", managementService.assignedModuleKeys(id));
+        return "control_center/instance_detail";
+    }
+
+    @GetMapping("/instances/{id}/edit")
+    public String editInstance(@PathVariable Long id, Model model) {
+        PlatformBusinessClient instance = managementService.getInstance(id);
+        addInstanceFormModel(
+                model,
+                managementService.editForm(id),
+                instance,
+                managementService.assignedModuleKeys(id)
+        );
+        return "control_center/instance_form";
+    }
+
+    @PostMapping("/instances/{id}")
+    public String updateInstance(
+            @PathVariable Long id,
+            @Valid @ModelAttribute("instanceForm") Matrix26InstanceForm form,
+            BindingResult bindingResult,
+            @RequestParam(value = "selectedModules", required = false) List<String> selectedModules,
+            Authentication authentication,
+            Model model,
+            RedirectAttributes redirectAttributes
+    ) {
+        PlatformBusinessClient instance = managementService.getInstance(id);
+        Set<String> selected = selectedSet(selectedModules);
+        if (bindingResult.hasErrors()) {
+            addInstanceFormModel(model, form, instance, selected);
+            return "control_center/instance_form";
+        }
+
+        try {
+            managementService.update(id, form, selectedModules, actor(authentication));
+            redirectAttributes.addFlashAttribute("successMessage", "Metadatos de la instancia actualizados correctamente.");
+            return "redirect:/control-center/instances/" + id;
+        } catch (IllegalArgumentException ex) {
+            bindingResult.reject("instance", ex.getMessage());
+            addInstanceFormModel(model, form, instance, selected);
+            return "control_center/instance_form";
+        }
+    }
+
+    @PostMapping("/instances/{id}/check")
+    public String checkInstance(
+            @PathVariable Long id,
+            Authentication authentication,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            Matrix26InstanceStatus status = healthService.refreshInstance(id);
+            managementService.recordManualHealthCheck(id, actor(authentication), status);
+            redirectAttributes.addFlashAttribute(
+                    status.online() ? "successMessage" : "warningMessage",
+                    "Comprobación completada: " + status.statusLabel() + "."
+            );
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", safeMessage(ex));
+        }
+        return "redirect:/control-center/instances/" + id;
+    }
+
+    @PostMapping("/instances/{id}/monitoring")
+    public String toggleMonitoring(
+            @PathVariable Long id,
+            Authentication authentication,
+            RedirectAttributes redirectAttributes
+    ) {
+        PlatformBusinessClient instance = managementService.toggleMonitoring(id, actor(authentication));
+        redirectAttributes.addFlashAttribute(
+                "successMessage",
+                instance.isMonitorVisible() ? "Monitoreo automático activado." : "Monitoreo automático pausado."
+        );
+        return "redirect:/control-center/instances/" + id;
+    }
+
+    @PostMapping("/instances/{id}/protection")
+    public String toggleProtection(
+            @PathVariable Long id,
+            Authentication authentication,
+            RedirectAttributes redirectAttributes
+    ) {
+        PlatformBusinessClient instance = managementService.toggleProtection(id, actor(authentication));
+        redirectAttributes.addFlashAttribute(
+                "successMessage",
+                instance.isProtectedInstance() ? "Instancia marcada como protegida." : "Protección administrativa desactivada."
+        );
+        return "redirect:/control-center/instances/" + id;
+    }
+
+    @PostMapping("/instances/{id}/modules")
+    public String updateInstanceModules(
+            @PathVariable Long id,
+            @RequestParam(value = "selectedModules", required = false) List<String> selectedModules,
+            @RequestParam(value = "returnTo", required = false) String returnTo,
+            Authentication authentication,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            managementService.updateModules(id, selectedModules, actor(authentication));
+            redirectAttributes.addFlashAttribute(
+                    "successMessage",
+                    "Declaraciones de módulos actualizadas. Los portales operativos no fueron modificados."
+            );
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", safeMessage(ex));
+        }
+        if ("modules".equals(returnTo)) {
+            return "redirect:/control-center/modules#instance-" + id;
+        }
+        return "redirect:/control-center/instances/" + id;
+    }
+
     @GetMapping("/modules")
     public String modules(Model model) {
-        List<PlatformBusinessClient> instances = clientRepository.findByMonitorVisibleTrueOrderByCreatedAtDescIdDesc();
-        List<PlatformModuleCatalog> modules = moduleRepository.findAllByActiveTrueOrderByAreaAscDisplayOrderAscNameAsc();
+        List<PlatformBusinessClient> instances = managementService.listInstances();
+        List<PlatformModuleCatalog> modules = managementService.listModules();
         model.addAttribute("activePage", "matrix26_modules");
         model.addAttribute("instances", instances);
         model.addAttribute("modules", modules);
-        Map<Long, List<PlatformClientModule>> modulesByInstance = modulesByInstance(instances);
-        model.addAttribute("modulesByInstance", modulesByInstance);
-        model.addAttribute("moduleKeysByInstance", moduleKeysByInstance(modulesByInstance));
+        model.addAttribute("groupedModules", managementService.groupedModules());
+        model.addAttribute("moduleKeysByInstance", managementService.assignedModuleKeysByInstance(instances));
         return "control_center/modules";
+    }
+
+    @GetMapping("/audit")
+    public String audit(Model model) {
+        model.addAttribute("activePage", "matrix26_audit");
+        model.addAttribute("auditLogs", managementService.recentAudit());
+        return "control_center/audit";
     }
 
     @GetMapping("/settings")
@@ -101,7 +273,42 @@ public class Matrix26ControlCenterController {
         model.addAttribute("controlProperties", properties);
         model.addAttribute("instanceCount", clientRepository.count());
         model.addAttribute("moduleCount", moduleRepository.count());
+        model.addAttribute("auditCount", managementService.auditCount());
         return "control_center/settings";
+    }
+
+    private void addInstanceFormModel(
+            Model model,
+            Matrix26InstanceForm form,
+            PlatformBusinessClient instance,
+            Set<String> selectedModuleKeys
+    ) {
+        model.addAttribute("activePage", "matrix26_instances");
+        model.addAttribute("instanceForm", form);
+        model.addAttribute("instance", instance);
+        model.addAttribute("editing", instance != null);
+        model.addAttribute("groupedModules", managementService.groupedModules());
+        model.addAttribute("selectedModuleKeys", selectedModuleKeys);
+    }
+
+    private Set<String> selectedSet(List<String> selectedModules) {
+        return selectedModules == null
+                ? Set.of()
+                : selectedModules.stream().collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private String actor(Authentication authentication) {
+        return authentication == null || authentication.getName() == null
+                ? "system"
+                : authentication.getName();
+    }
+
+    private String safeMessage(RuntimeException ex) {
+        String message = ex.getMessage();
+        if (message == null || message.isBlank()) {
+            return "No se pudo completar la operación.";
+        }
+        return message.length() > 450 ? message.substring(0, 450) : message;
     }
 
     private Map<Long, Set<String>> moduleKeysByInstance(Map<Long, List<PlatformClientModule>> assignments) {
@@ -111,7 +318,7 @@ public class Matrix26ControlCenterController {
                 values.stream()
                         .filter(PlatformClientModule::isEnabled)
                         .map(item -> item.getModule().getModuleKey())
-                        .collect(Collectors.toCollection(java.util.LinkedHashSet::new))
+                        .collect(Collectors.toCollection(LinkedHashSet::new))
         ));
         return result;
     }

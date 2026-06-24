@@ -156,7 +156,7 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
             module.setArea(seed.area());
             module.setDescription(seed.description());
             module.setDefaultEnabled(false);
-            module.setConfigurable(false);
+            module.setConfigurable(true);
             module.setActive(true);
             module.setDisplayOrder(seed.displayOrder());
             result.put(seed.key(), moduleRepository.save(module));
@@ -213,7 +213,11 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
     }
 
     private void seedInstance(InstanceSeed seed, Map<String, PlatformModuleCatalog> modules) {
-        PlatformBusinessClient client = clientRepository.findByCode(seed.code()).orElseGet(PlatformBusinessClient::new);
+        if (clientRepository.findByCode(seed.code()).isPresent()) {
+            return;
+        }
+
+        PlatformBusinessClient client = new PlatformBusinessClient();
         client.setCode(seed.code());
         client.setBusinessName(seed.name());
         client.setLegalName(seed.name());
@@ -237,15 +241,7 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
         client.setNotes("Existing protected instance registered by Matrix26 Control Center. Operational data remains isolated in its own database.");
         PlatformBusinessClient saved = clientRepository.save(client);
 
-        Set<String> assignedKeys = new LinkedHashSet<>();
-        for (PlatformClientModule assignment : clientModuleRepository.findClientModules(saved.getId())) {
-            assignedKeys.add(assignment.getModule().getModuleKey());
-        }
-
         for (String moduleKey : seed.moduleKeys()) {
-            if (assignedKeys.contains(moduleKey)) {
-                continue;
-            }
             PlatformModuleCatalog module = modules.get(moduleKey);
             if (module == null) {
                 continue;
@@ -255,7 +251,7 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
             assignment.setModule(module);
             assignment.setEnabled(true);
             assignment.setSelectionSource("MATRIX26_PHASE1_SEED");
-            assignment.setNotes("Read-only module declaration for the protected instance.");
+            assignment.setNotes("Initial Matrix26 module declaration for the protected instance.");
             clientModuleRepository.save(assignment);
         }
     }
@@ -410,6 +406,22 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
                     KEY idx_matrix26_client_module_module (module_id),
                     CONSTRAINT fk_matrix26_client_module_client FOREIGN KEY (client_id) REFERENCES platform_business_client (id),
                     CONSTRAINT fk_matrix26_client_module_module FOREIGN KEY (module_id) REFERENCES platform_module_catalog (id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """,
+                """
+                CREATE TABLE IF NOT EXISTS matrix26_instance_audit_log (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    instance_id BIGINT NULL,
+                    action VARCHAR(80) NOT NULL,
+                    actor_username VARCHAR(120) NOT NULL,
+                    summary VARCHAR(500) NOT NULL,
+                    before_snapshot TEXT NULL,
+                    after_snapshot TEXT NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_matrix26_audit_instance_created (instance_id, created_at),
+                    KEY idx_matrix26_audit_created (created_at),
+                    CONSTRAINT fk_matrix26_audit_instance FOREIGN KEY (instance_id) REFERENCES platform_business_client (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """,
                 """

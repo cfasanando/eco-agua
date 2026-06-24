@@ -21,7 +21,7 @@ public class Matrix26AppearanceEditorService {
 
     private static final String ACTIVE = "ACTIVE";
     private static final Set<String> SIDEBAR_MODES = Set.of("THEME", "LIGHT", "DARK");
-    private static final Set<String> BORDER_RADII = Set.of("SMALL", "MEDIUM", "LARGE");
+    private static final Set<String> BORDER_RADII = Set.of("THEME", "SMALL", "MEDIUM", "LARGE");
     private static final Set<String> TABLE_DENSITIES = Set.of("COMPACT", "COMFORTABLE", "SPACIOUS");
     private static final Set<String> CONTENT_WIDTHS = Set.of("STANDARD", "WIDE", "FULL");
     private static final Set<String> HEADING_STYLES = Set.of("SYSTEM", "STRONG", "EDITORIAL");
@@ -216,21 +216,25 @@ public class Matrix26AppearanceEditorService {
         requireAllowed("ancho del contenido", form.getContentWidth(), CONTENT_WIDTHS);
         requireAllowed("estilo de títulos", form.getHeadingStyle(), HEADING_STYLES);
 
-        Map<String, String> values = effectiveColors(form);
-        requireContrast(values.get("textColor"), values.get("backgroundColor"), 4.5,
-                "El texto y el fondo general no alcanzan un contraste accesible.");
-        requireContrast(values.get("textColor"), values.get("surfaceColor"), 4.5,
-                "El texto y las tarjetas no alcanzan un contraste accesible.");
-        String automaticButtonText = contrastText(values.get("primaryColor"));
-        requireContrast(automaticButtonText, values.get("primaryColor"), 4.5,
-                "El color principal no permite generar un texto de botón con contraste suficiente.");
+        validateThemeContrast(form, form.getPublicThemeCode());
+        if (!form.getAdminThemeCode().equals(form.getPublicThemeCode())) {
+            validateThemeContrast(form, form.getAdminThemeCode());
+        }
     }
 
     @Transactional(readOnly = true)
     public Map<String, String> previewVariables(Matrix26AppearanceEditorForm form) {
+        return previewVariables(form, form.getAdminThemeCode());
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, String> previewVariables(Matrix26AppearanceEditorForm form, String themeCode) {
         validate(form);
-        Map<String, String> values = effectiveColors(form);
-        values.put("radiusValue", radiusValue(form.getBorderRadius()));
+        Map<String, String> values = effectiveColors(form, themeCode);
+        Map<String, String> radii = radiusValues(form.getBorderRadius(), themeCode);
+        values.put("radiusSmallValue", radii.get("small"));
+        values.put("radiusMediumValue", radii.get("medium"));
+        values.put("radiusLargeValue", radii.get("large"));
         values.put("tableDensityValue", densityValue(form.getTableDensity()));
         values.put("contentWidthValue", contentWidthValue(form.getContentWidth()));
         values.put("sidebarBackground", sidebarBackground(form.getSidebarMode(), values));
@@ -319,6 +323,7 @@ public class Matrix26AppearanceEditorService {
 
         Map<String, String> overrides = readMap(overridesJson);
         Map<String, String> defaults = themeDefaults(adminTheme);
+        form.setCustomPalette(hasPaletteOverrides(overrides));
         form.setPrimaryColor(value(overrides, "primaryColor", defaults.get("primaryColor")));
         form.setSecondaryColor(value(overrides, "secondaryColor", defaults.get("secondaryColor")));
         form.setAccentColor(value(overrides, "accentColor", defaults.get("accentColor")));
@@ -326,7 +331,7 @@ public class Matrix26AppearanceEditorService {
         form.setSurfaceColor(value(overrides, "surfaceColor", defaults.get("surfaceColor")));
         form.setTextColor(value(overrides, "textColor", defaults.get("textColor")));
         form.setSidebarMode(value(overrides, "sidebarMode", "THEME"));
-        form.setBorderRadius(value(overrides, "borderRadius", radiusOption(defaults.get("radius"))));
+        form.setBorderRadius(value(overrides, "borderRadius", "THEME"));
         form.setTableDensity(value(overrides, "tableDensity", "COMFORTABLE"));
         form.setContentWidth(value(overrides, "contentWidth", "STANDARD"));
         form.setHeadingStyle(value(overrides, "headingStyle", "SYSTEM"));
@@ -335,31 +340,81 @@ public class Matrix26AppearanceEditorService {
 
     private Map<String, String> overrides(Matrix26AppearanceEditorForm form) {
         Map<String, String> result = new LinkedHashMap<>();
-        result.put("primaryColor", normalizeColor(form.getPrimaryColor()));
-        result.put("secondaryColor", normalizeColor(form.getSecondaryColor()));
-        result.put("accentColor", normalizeColor(form.getAccentColor()));
-        result.put("backgroundColor", normalizeColor(form.getBackgroundColor()));
-        result.put("surfaceColor", normalizeColor(form.getSurfaceColor()));
-        result.put("textColor", normalizeColor(form.getTextColor()));
+        result.put("customPalette", Boolean.toString(form.isCustomPalette()));
+        if (form.isCustomPalette()) {
+            result.put("primaryColor", normalizeColor(form.getPrimaryColor()));
+            result.put("secondaryColor", normalizeColor(form.getSecondaryColor()));
+            result.put("accentColor", normalizeColor(form.getAccentColor()));
+            result.put("backgroundColor", normalizeColor(form.getBackgroundColor()));
+            result.put("surfaceColor", normalizeColor(form.getSurfaceColor()));
+            result.put("textColor", normalizeColor(form.getTextColor()));
+        }
         result.put("sidebarMode", normalizeOption(form.getSidebarMode()));
         result.put("borderRadius", normalizeOption(form.getBorderRadius()));
         result.put("tableDensity", normalizeOption(form.getTableDensity()));
         result.put("contentWidth", normalizeOption(form.getContentWidth()));
         result.put("headingStyle", normalizeOption(form.getHeadingStyle()));
-        result.put("source", "matrix26-appearance-studio-phase3c4");
+        result.put("source", "matrix26-appearance-studio-phase3c7");
         return result;
     }
 
-    private Map<String, String> effectiveColors(Matrix26AppearanceEditorForm form) {
-        Map<String, String> defaults = themeDefaults(form.getAdminThemeCode());
+    private Map<String, String> effectiveColors(Matrix26AppearanceEditorForm form, String themeCode) {
+        Map<String, String> defaults = themeDefaults(themeCode);
         Map<String, String> result = new LinkedHashMap<>();
-        result.put("primaryColor", colorOrDefault(form.getPrimaryColor(), defaults.get("primaryColor")));
-        result.put("secondaryColor", colorOrDefault(form.getSecondaryColor(), defaults.get("secondaryColor")));
-        result.put("accentColor", colorOrDefault(form.getAccentColor(), defaults.get("accentColor")));
-        result.put("backgroundColor", colorOrDefault(form.getBackgroundColor(), defaults.get("backgroundColor")));
-        result.put("surfaceColor", colorOrDefault(form.getSurfaceColor(), defaults.get("surfaceColor")));
-        result.put("textColor", colorOrDefault(form.getTextColor(), defaults.get("textColor")));
+        result.put("primaryColor", form.isCustomPalette()
+                ? colorOrDefault(form.getPrimaryColor(), defaults.get("primaryColor"))
+                : defaults.get("primaryColor"));
+        result.put("secondaryColor", form.isCustomPalette()
+                ? colorOrDefault(form.getSecondaryColor(), defaults.get("secondaryColor"))
+                : defaults.get("secondaryColor"));
+        result.put("accentColor", form.isCustomPalette()
+                ? colorOrDefault(form.getAccentColor(), defaults.get("accentColor"))
+                : defaults.get("accentColor"));
+        result.put("backgroundColor", form.isCustomPalette()
+                ? colorOrDefault(form.getBackgroundColor(), defaults.get("backgroundColor"))
+                : defaults.get("backgroundColor"));
+        result.put("surfaceColor", form.isCustomPalette()
+                ? colorOrDefault(form.getSurfaceColor(), defaults.get("surfaceColor"))
+                : defaults.get("surfaceColor"));
+        result.put("textColor", form.isCustomPalette()
+                ? colorOrDefault(form.getTextColor(), defaults.get("textColor"))
+                : defaults.get("textColor"));
         return result;
+    }
+
+    private boolean hasPaletteOverrides(Map<String, String> overrides) {
+        String explicitMode = overrides.get("customPalette");
+        if (explicitMode != null && !explicitMode.isBlank()) {
+            return Boolean.parseBoolean(explicitMode);
+        }
+
+        long colorOverrideCount = List.of(
+                "primaryColor",
+                "secondaryColor",
+                "accentColor",
+                "backgroundColor",
+                "surfaceColor",
+                "textColor"
+        ).stream()
+                .filter(overrides::containsKey)
+                .map(overrides::get)
+                .filter(value -> value != null && !value.isBlank())
+                .count();
+
+        // Phase 3C.1 stored only the client primary color. Treat that legacy
+        // baseline as a theme accent, not as a complete shared palette.
+        return colorOverrideCount >= 2;
+    }
+
+    private void validateThemeContrast(Matrix26AppearanceEditorForm form, String themeCode) {
+        Map<String, String> values = effectiveColors(form, themeCode);
+        requireContrast(values.get("textColor"), values.get("backgroundColor"), 4.5,
+                "El texto y el fondo general no alcanzan un contraste accesible.");
+        requireContrast(values.get("textColor"), values.get("surfaceColor"), 4.5,
+                "El texto y las tarjetas no alcanzan un contraste accesible.");
+        String automaticButtonText = contrastText(values.get("primaryColor"));
+        requireContrast(automaticButtonText, values.get("primaryColor"), 4.5,
+                "El color principal no permite generar un texto de botón con contraste suficiente.");
     }
 
     private Map<String, String> themeDefaults(String themeCode) {
@@ -373,6 +428,9 @@ public class Matrix26AppearanceEditorService {
         defaults.put("surfaceColor", value(raw, "surface", "#FFFFFF"));
         defaults.put("textColor", value(raw, "text", "#172033"));
         defaults.put("radius", value(raw, "radius", "16px"));
+        defaults.put("radiusSmall", value(raw, "radiusSmall", "10px"));
+        defaults.put("radiusMedium", value(raw, "radiusMedium", defaults.get("radius")));
+        defaults.put("radiusLarge", value(raw, "radiusLarge", "20px"));
         return defaults;
     }
 
@@ -500,11 +558,20 @@ public class Matrix26AppearanceEditorService {
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 
-    private String radiusValue(String option) {
+    private Map<String, String> radiusValues(String option, String themeCode) {
+        if ("THEME".equals(normalizeOption(option))) {
+            Map<String, String> defaults = themeDefaults(themeCode);
+            return Map.of(
+                    "small", defaults.get("radiusSmall"),
+                    "medium", defaults.get("radiusMedium"),
+                    "large", defaults.get("radiusLarge")
+            );
+        }
+
         return switch (normalizeOption(option)) {
-            case "SMALL" -> "10px";
-            case "LARGE" -> "24px";
-            default -> "16px";
+            case "SMALL" -> Map.of("small", "8px", "medium", "10px", "large", "14px");
+            case "LARGE" -> Map.of("small", "14px", "medium", "24px", "large", "30px");
+            default -> Map.of("small", "10px", "medium", "16px", "large", "20px");
         };
     }
 
@@ -530,24 +597,6 @@ public class Matrix26AppearanceEditorService {
             case "DARK" -> "#111827";
             default -> values.get("secondaryColor");
         };
-    }
-
-    private String radiusOption(String radius) {
-        if (radius == null) {
-            return "MEDIUM";
-        }
-        String digits = radius.replaceAll("[^0-9]", "");
-        if (digits.isBlank()) {
-            return "MEDIUM";
-        }
-        int value = Integer.parseInt(digits);
-        if (value <= 12) {
-            return "SMALL";
-        }
-        if (value >= 20) {
-            return "LARGE";
-        }
-        return "MEDIUM";
     }
 
     private String fallbackAccent(String themeCode) {

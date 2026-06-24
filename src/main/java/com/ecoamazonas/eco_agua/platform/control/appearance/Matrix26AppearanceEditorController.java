@@ -119,7 +119,14 @@ public class Matrix26AppearanceEditorController {
         model.addAttribute("activePage", "matrix26_instance_appearance");
         model.addAttribute("editor", editorService.editorView(instanceId));
         model.addAttribute("appearanceForm", form);
-        model.addAttribute("previewVariables", editorService.previewVariables(form));
+        model.addAttribute(
+                "publicPreviewVariables",
+                editorService.previewVariables(form, form.getPublicThemeCode())
+        );
+        model.addAttribute(
+                "adminPreviewVariables",
+                editorService.previewVariables(form, form.getAdminThemeCode())
+        );
     }
 
     private String actor(Authentication authentication) {

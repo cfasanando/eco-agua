@@ -67,6 +67,23 @@ public class Matrix26AppearanceStudioController {
         return "control_center/appearance/layouts";
     }
 
+
+    @GetMapping("/appearance/quality-lab")
+    public String qualityLab(Model model) {
+        model.addAttribute("activePage", "matrix26_appearance_quality");
+        model.addAttribute("themes", appearanceService.activeThemes());
+        model.addAttribute("publicLayouts", appearanceService.activeLayouts().stream()
+                .filter(layout -> "PUBLIC".equals(layout.getArea()))
+                .toList());
+        model.addAttribute("adminLayouts", appearanceService.activeLayouts().stream()
+                .filter(layout -> "ADMIN".equals(layout.getArea()))
+                .toList());
+        model.addAttribute("loginLayouts", appearanceService.activeLayouts().stream()
+                .filter(layout -> "LOGIN".equals(layout.getArea()))
+                .toList());
+        return "control_center/appearance/quality_lab";
+    }
+
     @GetMapping("/appearance/instances")
     public String instanceAppearances(Model model) {
         model.addAttribute("activePage", "matrix26_instance_appearance");

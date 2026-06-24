@@ -112,10 +112,20 @@
 
                         <section class="matrix26-panel">
                             <div class="matrix26-panel-header">
-                                <div><span>Overrides seguros</span><h2>Paleta personalizada</h2></div>
-                                <small>Solo se aceptan colores hexadecimales validados.</small>
+                                <div><span>Safe overrides</span><h2>Instance palette</h2></div>
+                                <small>Keep each theme palette or apply one shared custom palette.</small>
                             </div>
-                            <div class="matrix26-color-grid">
+                            <div class="matrix26-palette-mode">
+                                <div>
+                                    <strong>Use one custom palette for public and admin areas</strong>
+                                    <span>When disabled, each selected theme keeps its own original colors.</span>
+                                </div>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" role="switch" th:field="*{customPalette}" data-custom-palette-toggle>
+                                    <label class="form-check-label" for="customPalette">Custom palette</label>
+                                </div>
+                            </div>
+                            <div class="matrix26-color-grid" data-custom-palette-fields>
                                 <div class="matrix26-color-field" data-color-field data-color-role="primary">
                                     <div class="matrix26-color-field-head"><span>Principal</span><small data-contrast-label>Texto automático</small></div>
                                     <div class="matrix26-color-control"><input type="color" class="matrix26-color-picker" th:value="*{primaryColor}" data-color-picker-for="primaryColor" aria-label="Seleccionar color principal"><input type="text" class="form-control matrix26-color-hex" th:field="*{primaryColor}" data-preview-color="--theme-primary" maxlength="7" placeholder="#2563EB" spellcheck="false"></div>
@@ -141,7 +151,7 @@
                                     <div class="matrix26-color-control"><input type="color" class="matrix26-color-picker" th:value="*{textColor}" data-color-picker-for="textColor" aria-label="Seleccionar color de texto"><input type="text" class="form-control matrix26-color-hex" th:field="*{textColor}" data-preview-color="--theme-text" maxlength="7" placeholder="#172033" spellcheck="false"></div>
                                 </div>
                             </div>
-                            <p class="matrix26-color-help mb-0 mt-2"><i class="bi bi-info-circle me-1"></i> Puedes usar el selector o escribir directamente un hexadecimal como <code>#6244A7</code>. El color del texto de los botones se calcula automáticamente para mantener contraste.</p>
+                            <p class="matrix26-color-help mb-0 mt-2"><i class="bi bi-info-circle me-1"></i> Enter a hexadecimal value such as <code>#6244A7</code>. Button text contrast is calculated automatically. Theme colors are not overwritten unless the custom palette switch is enabled.</p>
                             <div class="text-danger small mt-2" th:if="${#fields.hasErrors('primaryColor') or #fields.hasErrors('secondaryColor') or #fields.hasErrors('accentColor') or #fields.hasErrors('backgroundColor') or #fields.hasErrors('surfaceColor') or #fields.hasErrors('textColor')}">Revisa los colores seleccionados.</div>
                         </section>
 
@@ -152,7 +162,7 @@
                             </div>
                             <div class="row g-3">
                                 <div class="col-md-6 col-xl-4"><label class="form-label">Sidebar</label><select class="form-select" th:field="*{sidebarMode}" data-preview-option="sidebar"><option value="THEME">Según theme</option><option value="LIGHT">Claro</option><option value="DARK">Oscuro</option></select></div>
-                                <div class="col-md-6 col-xl-4"><label class="form-label">Bordes</label><select class="form-select" th:field="*{borderRadius}" data-preview-option="radius"><option value="SMALL">Discretos</option><option value="MEDIUM">Equilibrados</option><option value="LARGE">Amplios</option></select></div>
+                                <div class="col-md-6 col-xl-4"><label class="form-label">Bordes</label><select class="form-select" th:field="*{borderRadius}" data-preview-option="radius"><option value="THEME">Según theme</option><option value="SMALL">Discretos</option><option value="MEDIUM">Equilibrados</option><option value="LARGE">Amplios</option></select></div>
                                 <div class="col-md-6 col-xl-4"><label class="form-label">Tablas</label><select class="form-select" th:field="*{tableDensity}" data-preview-option="density"><option value="COMPACT">Compactas</option><option value="COMFORTABLE">Cómodas</option><option value="SPACIOUS">Espaciosas</option></select></div>
                                 <div class="col-md-6 col-xl-6"><label class="form-label">Ancho de contenido</label><select class="form-select" th:field="*{contentWidth}" data-preview-option="width"><option value="STANDARD">Estándar</option><option value="WIDE">Amplio</option><option value="FULL">Completo</option></select></div>
                                 <div class="col-md-6 col-xl-6"><label class="form-label">Estilo de títulos</label><select class="form-select" th:field="*{headingStyle}" data-preview-option="heading"><option value="SYSTEM">Sistema</option><option value="STRONG">Corporativo fuerte</option><option value="EDITORIAL">Editorial</option></select></div>

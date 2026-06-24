@@ -21,7 +21,7 @@ public class InstanceAppearanceModelAdvice {
 
     private static final Pattern HEX_COLOR = Pattern.compile("^#[0-9A-Fa-f]{6}$");
     private static final Set<String> SIDEBAR_MODES = Set.of("THEME", "LIGHT", "DARK");
-    private static final Set<String> BORDER_RADII = Set.of("SMALL", "MEDIUM", "LARGE");
+    private static final Set<String> BORDER_RADII = Set.of("THEME", "SMALL", "MEDIUM", "LARGE");
     private static final Set<String> TABLE_DENSITIES = Set.of("COMPACT", "COMFORTABLE", "SPACIOUS");
     private static final Set<String> CONTENT_WIDTHS = Set.of("STANDARD", "WIDE", "FULL");
     private static final Set<String> HEADING_STYLES = Set.of("SYSTEM", "STRONG", "EDITORIAL");
@@ -50,39 +50,50 @@ public class InstanceAppearanceModelAdvice {
         String adminLayout = layoutResolver.resolveAdmin(configuration.adminLayoutCode());
         String loginLayout = layoutResolver.resolveLogin(configuration.loginLayoutCode());
 
-        Map<String, String> values = effectiveValues(adminTheme, configuration.overrides());
-        String cssVariables = cssVariables(values);
+        Map<String, String> publicValues = effectiveValues(publicTheme, configuration.overrides());
+        Map<String, String> adminValues = effectiveValues(adminTheme, configuration.overrides());
+        String publicCssVariables = cssVariables(publicValues);
+        String adminCssVariables = cssVariables(adminValues);
 
         model.addAttribute("appearanceManaged", configuration.managed());
         model.addAttribute("appearancePublicThemeCode", publicTheme);
         model.addAttribute("appearancePublicThemeCss", themeResolver.cssPath(publicTheme));
         model.addAttribute("appearancePublicLayoutCode", publicLayout);
         model.addAttribute("appearancePublicLayoutCss", layoutResolver.publicCssPath(publicLayout));
+        model.addAttribute("appearancePublicCssVariables", publicCssVariables);
 
         model.addAttribute("appearanceAdminThemeCode", adminTheme);
         model.addAttribute("appearanceAdminThemeCss", themeResolver.cssPath(adminTheme));
         model.addAttribute("appearanceAdminLayoutCode", adminLayout);
         model.addAttribute("appearanceAdminLayoutCss", layoutResolver.adminCssPath(adminLayout));
+        model.addAttribute("appearanceAdminCssVariables", adminCssVariables);
 
         model.addAttribute("appearanceLoginLayoutCode", loginLayout);
         model.addAttribute("appearanceLoginLayoutCss", layoutResolver.loginCssPath(loginLayout));
-        model.addAttribute("appearanceCssVariables", cssVariables);
-        model.addAttribute("appearancePrimaryColor", values.get("primaryColor"));
-        model.addAttribute("appearancePrimaryHoverColor", values.get("primaryHoverColor"));
+
+        // Kept for backward compatibility with templates outside the shared head fragments.
+        model.addAttribute("appearanceCssVariables", adminCssVariables);
+        model.addAttribute("appearancePrimaryColor", adminValues.get("primaryColor"));
+        model.addAttribute("appearancePrimaryHoverColor", adminValues.get("primaryHoverColor"));
         model.addAttribute("appearancePublishedVersion", configuration.publishedVersion());
         model.addAttribute("appearancePublishedAt", configuration.publishedAt());
         model.addAttribute("appearancePublishedBy", configuration.publishedBy());
     }
 
-    private Map<String, String> effectiveValues(String adminTheme, Map<String, String> overrides) {
-        Map<String, String> values = new LinkedHashMap<>(themeResolver.defaults(adminTheme));
+    private Map<String, String> effectiveValues(String themeCode, Map<String, String> overrides) {
+        Map<String, String> values = new LinkedHashMap<>(themeResolver.defaults(themeCode));
 
-        putColor(values, "primaryColor", overrides.get("primaryColor"));
-        putColor(values, "secondaryColor", overrides.get("secondaryColor"));
-        putColor(values, "accentColor", overrides.get("accentColor"));
-        putColor(values, "backgroundColor", overrides.get("backgroundColor"));
-        putColor(values, "surfaceColor", overrides.get("surfaceColor"));
-        putColor(values, "textColor", overrides.get("textColor"));
+        boolean explicitPaletteMode = overrides.containsKey("customPalette");
+        boolean applyPaletteOverrides = !explicitPaletteMode
+                || Boolean.parseBoolean(overrides.get("customPalette"));
+        if (applyPaletteOverrides) {
+            putColor(values, "primaryColor", overrides.get("primaryColor"));
+            putColor(values, "secondaryColor", overrides.get("secondaryColor"));
+            putColor(values, "accentColor", overrides.get("accentColor"));
+            putColor(values, "backgroundColor", overrides.get("backgroundColor"));
+            putColor(values, "surfaceColor", overrides.get("surfaceColor"));
+            putColor(values, "textColor", overrides.get("textColor"));
+        }
 
         values.put("primaryHoverColor", darken(values.get("primaryColor"), 0.15));
         values.put("primaryTextColor", contrastText(values.get("primaryColor")));
@@ -91,7 +102,7 @@ public class InstanceAppearanceModelAdvice {
         values.put("accentTextColor", contrastText(values.get("accentColor")));
         values.put("surfaceTextColor", contrastText(values.get("surfaceColor")));
         values.put("sidebarMode", allowedOption(overrides.get("sidebarMode"), SIDEBAR_MODES, "THEME"));
-        values.put("borderRadius", allowedOption(overrides.get("borderRadius"), BORDER_RADII, "MEDIUM"));
+        values.put("borderRadius", allowedOption(overrides.get("borderRadius"), BORDER_RADII, "THEME"));
         values.put("tableDensity", allowedOption(overrides.get("tableDensity"), TABLE_DENSITIES, "COMFORTABLE"));
         values.put("contentWidth", allowedOption(overrides.get("contentWidth"), CONTENT_WIDTHS, "STANDARD"));
         values.put("headingStyle", allowedOption(overrides.get("headingStyle"), HEADING_STYLES, "SYSTEM"));
@@ -101,11 +112,28 @@ public class InstanceAppearanceModelAdvice {
     }
 
     private void applyComposition(Map<String, String> values) {
-        values.put("radiusValue", switch (values.get("borderRadius")) {
-            case "SMALL" -> "10px";
-            case "LARGE" -> "24px";
-            default -> "16px";
-        });
+        switch (values.get("borderRadius")) {
+            case "SMALL" -> {
+                values.put("radiusSmallValue", "8px");
+                values.put("radiusMediumValue", "10px");
+                values.put("radiusLargeValue", "14px");
+            }
+            case "MEDIUM" -> {
+                values.put("radiusSmallValue", "10px");
+                values.put("radiusMediumValue", "16px");
+                values.put("radiusLargeValue", "20px");
+            }
+            case "LARGE" -> {
+                values.put("radiusSmallValue", "14px");
+                values.put("radiusMediumValue", "24px");
+                values.put("radiusLargeValue", "30px");
+            }
+            default -> {
+                values.put("radiusSmallValue", values.get("radiusSmall"));
+                values.put("radiusMediumValue", values.get("radiusMedium"));
+                values.put("radiusLargeValue", values.get("radiusLarge"));
+            }
+        }
         values.put("tableDensityValue", switch (values.get("tableDensity")) {
             case "COMPACT" -> "8px";
             case "SPACIOUS" -> "18px";
@@ -186,9 +214,9 @@ public class InstanceAppearanceModelAdvice {
                 values.get("sidebarBackground"),
                 values.get("sidebarBackgroundEnd"),
                 values.get("sidebarText"),
-                values.get("radiusValue"),
-                values.get("radiusValue"),
-                values.get("radiusValue"),
+                values.get("radiusSmallValue"),
+                values.get("radiusMediumValue"),
+                values.get("radiusLargeValue"),
                 values.get("tableDensityValue"),
                 values.get("contentWidthValue"),
                 values.get("headingFont"),

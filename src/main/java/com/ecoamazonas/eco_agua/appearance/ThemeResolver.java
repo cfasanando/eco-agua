@@ -30,7 +30,7 @@ public class ThemeResolver {
         Map<String, String> result = new LinkedHashMap<>();
         switch (resolved) {
             case "matrix26-nature" -> {
-                result.put("primaryColor", "#138A63");
+                result.put("primaryColor", "#117A57");
                 result.put("primaryHoverColor", "#0F6F51");
                 result.put("secondaryColor", "#145A4A");
                 result.put("accentColor", "#2AA7A1");
@@ -43,6 +43,9 @@ public class ThemeResolver {
                 result.put("sidebarBackgroundEnd", "#0D2F28");
                 result.put("sidebarText", "#D6EFE6");
                 result.put("radius", "18px");
+                result.put("radiusSmall", "12px");
+                result.put("radiusMedium", "18px");
+                result.put("radiusLarge", "24px");
             }
             case "matrix26-warm" -> {
                 result.put("primaryColor", "#B4532A");
@@ -58,6 +61,9 @@ public class ThemeResolver {
                 result.put("sidebarBackgroundEnd", "#29140F");
                 result.put("sidebarText", "#F7E5D9");
                 result.put("radius", "18px");
+                result.put("radiusSmall", "11px");
+                result.put("radiusMedium", "18px");
+                result.put("radiusLarge", "22px");
             }
             default -> {
                 result.put("primaryColor", "#2563EB");
@@ -73,6 +79,9 @@ public class ThemeResolver {
                 result.put("sidebarBackgroundEnd", "#111827");
                 result.put("sidebarText", "#CBD5E1");
                 result.put("radius", "16px");
+                result.put("radiusSmall", "10px");
+                result.put("radiusMedium", "16px");
+                result.put("radiusLarge", "20px");
             }
         }
         return result;

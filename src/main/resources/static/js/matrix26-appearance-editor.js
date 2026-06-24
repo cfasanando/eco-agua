@@ -5,10 +5,28 @@
     if (!form || !adminPreview || !publicPreview) return;
 
     const names = window.matrix26AppearanceNames || { themes: {}, layouts: {}, presets: {} };
+    const customPaletteToggle = form.querySelector('[data-custom-palette-toggle]');
+    const customPaletteFields = form.querySelector('[data-custom-palette-fields]');
     const HEX = /^#[0-9A-F]{6}$/i;
+    const COLOR_VARIABLES = [
+        '--theme-primary',
+        '--theme-primary-hover',
+        '--theme-on-primary',
+        '--theme-on-primary-hover',
+        '--theme-secondary',
+        '--theme-on-secondary',
+        '--theme-accent',
+        '--theme-on-accent',
+        '--theme-background',
+        '--theme-surface',
+        '--theme-text'
+    ];
+
     const value = (name) => form.querySelector(`[name="${name}"]:checked`)?.value
         || form.querySelector(`[name="${name}"]`)?.value
         || '';
+
+    const customPaletteEnabled = () => Boolean(customPaletteToggle?.checked);
 
     const normalizeHex = (raw) => {
         const clean = String(raw || '').trim().toUpperCase();
@@ -87,7 +105,36 @@
         [adminPreview, publicPreview].forEach(preview => preview.style.setProperty(name, color));
     };
 
+    const clearCustomPaletteVariables = () => {
+        [adminPreview, publicPreview].forEach(preview => {
+            COLOR_VARIABLES.forEach(variable => preview.style.removeProperty(variable));
+        });
+    };
+
+    const updatePaletteFieldState = () => {
+        const enabled = customPaletteEnabled();
+        customPaletteFields?.classList.toggle('is-disabled', !enabled);
+        customPaletteFields?.setAttribute('aria-disabled', String(!enabled));
+        form.querySelectorAll('[data-color-picker-for]').forEach(input => {
+            input.disabled = !enabled;
+        });
+        form.querySelectorAll('[data-preview-color]').forEach(input => {
+            input.readOnly = !enabled;
+            input.setAttribute('aria-readonly', String(!enabled));
+        });
+    };
+
     const updateColors = () => {
+        updatePaletteFieldState();
+        if (!customPaletteEnabled()) {
+            clearCustomPaletteVariables();
+            form.querySelectorAll('[data-contrast-label]').forEach(label => {
+                label.textContent = 'Theme default';
+                label.style.removeProperty('color');
+            });
+            return;
+        }
+
         const colors = {};
         form.querySelectorAll('[data-preview-color]').forEach(input => {
             const normalized = normalizeHex(input.value);
@@ -115,18 +162,31 @@
             const label = field.querySelector('[data-contrast-label]');
             if (!input || !label || !HEX.test(input.value)) return;
             const foreground = contrastText(input.value);
-            label.textContent = foreground === '#FFFFFF' ? 'Texto claro automático' : 'Texto oscuro automático';
+            label.textContent = foreground === '#FFFFFF' ? 'Automatic light text' : 'Automatic dark text';
             label.style.color = input.value;
         });
     };
 
     const updateOptions = () => {
-        const radius = { SMALL: '10px', MEDIUM: '16px', LARGE: '24px' }[value('borderRadius')] || '16px';
+        const radiusMode = value('borderRadius');
+        const radiusSets = {
+            SMALL: { small: '8px', medium: '10px', large: '14px' },
+            MEDIUM: { small: '10px', medium: '16px', large: '20px' },
+            LARGE: { small: '14px', medium: '24px', large: '30px' }
+        };
         const density = { COMPACT: '8px', COMFORTABLE: '13px', SPACIOUS: '18px' }[value('tableDensity')] || '13px';
         const width = { STANDARD: '1600px', WIDE: '1800px', FULL: '100%' }[value('contentWidth')] || '1600px';
         [adminPreview, publicPreview].forEach(item => {
-            item.style.setProperty('--theme-radius-medium', radius);
-            item.style.setProperty('--theme-radius-large', radius);
+            if (radiusMode === 'THEME') {
+                item.style.removeProperty('--theme-radius-small');
+                item.style.removeProperty('--theme-radius-medium');
+                item.style.removeProperty('--theme-radius-large');
+            } else {
+                const radii = radiusSets[radiusMode] || radiusSets.MEDIUM;
+                item.style.setProperty('--theme-radius-small', radii.small);
+                item.style.setProperty('--theme-radius-medium', radii.medium);
+                item.style.setProperty('--theme-radius-large', radii.large);
+            }
             item.style.setProperty('--theme-table-density', density);
             item.style.setProperty('--theme-content-width', width);
         });
@@ -187,7 +247,7 @@
         if (!event.target.closest('[data-color-field]')) refresh();
     });
     form.addEventListener('change', (event) => {
-        if (event.target?.name === 'adminThemeCode') {
+        if (event.target?.name === 'adminThemeCode' && !customPaletteEnabled()) {
             applyThemePreset(event.target.value);
         }
         refresh();

@@ -3,6 +3,22 @@
     --public-section-gap: 56px;
 }
 
+[data-public-layout="public-classic-grid"] main > section {
+    margin-bottom: var(--public-section-gap);
+}
+
+[data-public-layout="public-classic-grid"] .hero-section {
+    min-height: 540px;
+    display: flex;
+    align-items: center;
+}
+
+[data-public-layout="public-classic-grid"] .hero-section .container,
+[data-public-layout="public-classic-grid"] main > section > .container,
+[data-public-layout="public-classic-grid"] main > .container {
+    width: min(100% - 2rem, var(--theme-content-width));
+}
+
 [data-public-layout="public-classic-grid"] .product-grid,
 [data-public-layout="public-classic-grid"] .catalog-grid {
     display: grid;
@@ -11,14 +27,36 @@
 }
 
 [data-public-layout="public-classic-grid"] .product-card,
+[data-public-layout="public-classic-grid"] .home-product-card,
+[data-public-layout="public-classic-grid"] .restaurant-featured-card,
+[data-public-layout="public-classic-grid"] .restaurant-menu-item-card,
 [data-public-layout="public-classic-grid"] .public-catalog-body .card {
-    transition: transform .18s ease, box-shadow .18s ease;
+    border: 1px solid var(--theme-border) !important;
+    transition:
+        transform var(--theme-transition-fast),
+        box-shadow var(--theme-transition-fast),
+        border-color var(--theme-transition-fast);
 }
 
 [data-public-layout="public-classic-grid"] .product-card:hover,
+[data-public-layout="public-classic-grid"] .home-product-card:hover,
+[data-public-layout="public-classic-grid"] .restaurant-featured-card:hover,
+[data-public-layout="public-classic-grid"] .restaurant-menu-item-card:hover,
 [data-public-layout="public-classic-grid"] .public-catalog-body .card:hover {
     transform: translateY(-4px);
+    border-color: color-mix(in srgb, var(--theme-primary) 30%, var(--theme-border)) !important;
     box-shadow: var(--theme-shadow-medium);
+}
+
+[data-public-layout="public-classic-grid"] .hero-card,
+[data-public-layout="public-classic-grid"] .info-pill,
+[data-public-layout="public-classic-grid"] .home-category-panel,
+[data-public-layout="public-classic-grid"] .home-shop-copy {
+    border-radius: var(--theme-radius-medium);
+}
+
+[data-public-layout="public-classic-grid"] .restaurant-menu-item-card .card-body {
+    align-items: flex-start;
 }
 
 @media (max-width: 1199.98px) {
@@ -30,19 +68,12 @@
 @media (max-width: 767.98px) {
     [data-public-layout="public-classic-grid"] {
         --public-product-columns: 2;
+        --public-section-gap: 38px;
     }
-}
 
-[data-public-layout="public-classic-grid"] .hero-section .container,
-[data-public-layout="public-classic-grid"] main > section > .container {
-    width: min(100% - 2rem, var(--theme-content-width));
-}
-
-[data-public-layout="public-classic-grid"] .hero-card,
-[data-public-layout="public-classic-grid"] .info-pill,
-[data-public-layout="public-classic-grid"] .home-category-panel,
-[data-public-layout="public-classic-grid"] .home-shop-copy {
-    border-radius: var(--theme-radius-medium);
+    [data-public-layout="public-classic-grid"] .hero-section {
+        min-height: auto;
+    }
 }
 
 @media (max-width: 575.98px) {
@@ -51,7 +82,8 @@
     }
 
     [data-public-layout="public-classic-grid"] .hero-section .container,
-    [data-public-layout="public-classic-grid"] main > section > .container {
+    [data-public-layout="public-classic-grid"] main > section > .container,
+    [data-public-layout="public-classic-grid"] main > .container {
         width: min(100% - 1.25rem, var(--theme-content-width));
     }
 }

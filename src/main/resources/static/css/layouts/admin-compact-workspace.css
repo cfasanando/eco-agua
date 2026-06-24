@@ -1,18 +1,20 @@
 [data-admin-layout="admin-compact-workspace"] {
     --admin-sidebar-width: 88px;
-    --admin-content-gap: 22px;
+    --admin-content-gap: 20px;
     --theme-table-density: 8px;
 }
 
 [data-admin-layout="admin-compact-workspace"] .sidebar {
     width: 88px;
+    flex: 0 0 88px;
+    overflow: visible;
     z-index: 1040;
 }
 
 [data-admin-layout="admin-compact-workspace"] .sidebar:hover,
 [data-admin-layout="admin-compact-workspace"] .sidebar:focus-within {
-    width: 270px;
-    box-shadow: 12px 0 32px rgba(15, 23, 42, .22);
+    width: 282px;
+    box-shadow: 14px 0 38px rgba(15, 23, 42, .25);
 }
 
 [data-admin-layout="admin-compact-workspace"] .sidebar-brand {
@@ -23,12 +25,16 @@
 [data-admin-layout="admin-compact-workspace"] .sidebar-brand-copy,
 [data-admin-layout="admin-compact-workspace"] .menu-section-title,
 [data-admin-layout="admin-compact-workspace"] .menu-link > span:not(.icon) {
-    opacity: 0;
     width: 0;
+    min-width: 0;
+    opacity: 0;
     overflow: hidden;
     white-space: nowrap;
     visibility: hidden;
-    transition: opacity .16s ease;
+    pointer-events: none;
+    transition:
+        opacity var(--theme-transition-fast),
+        width var(--theme-transition-fast);
 }
 
 [data-admin-layout="admin-compact-workspace"] .sidebar:hover .sidebar-brand-copy,
@@ -37,13 +43,24 @@
 [data-admin-layout="admin-compact-workspace"] .sidebar:focus-within .menu-section-title,
 [data-admin-layout="admin-compact-workspace"] .sidebar:hover .menu-link > span:not(.icon),
 [data-admin-layout="admin-compact-workspace"] .sidebar:focus-within .menu-link > span:not(.icon) {
-    opacity: 1;
     width: auto;
+    min-width: initial;
+    opacity: 1;
     visibility: visible;
+    pointer-events: auto;
+}
+
+[data-admin-layout="admin-compact-workspace"] .sidebar-collapse-button {
+    display: none;
+}
+
+[data-admin-layout="admin-compact-workspace"] .sidebar-nav {
+    overflow-x: hidden;
 }
 
 [data-admin-layout="admin-compact-workspace"] .menu-link {
     justify-content: center;
+    min-width: 0;
     padding-inline: 13px;
 }
 
@@ -53,29 +70,80 @@
 }
 
 [data-admin-layout="admin-compact-workspace"] .menu-link .icon {
-    width: 28px;
-    font-size: 1.15rem;
+    width: 30px;
+    min-width: 30px;
+    font-size: 1.12rem;
+}
+
+[data-admin-layout="admin-compact-workspace"] .menu-link.has-children .caret {
+    display: none;
+}
+
+[data-admin-layout="admin-compact-workspace"] .sidebar:hover .menu-link.has-children .caret,
+[data-admin-layout="admin-compact-workspace"] .sidebar:focus-within .menu-link.has-children .caret {
+    display: inline-flex;
 }
 
 [data-admin-layout="admin-compact-workspace"] .submenu-container {
+    display: none;
     position: static;
+}
+
+[data-admin-layout="admin-compact-workspace"] .sidebar:hover .menu-toggle:checked + .menu-link.has-children + .submenu-container,
+[data-admin-layout="admin-compact-workspace"] .sidebar:focus-within .menu-toggle:checked + .menu-link.has-children + .submenu-container {
+    display: block;
 }
 
 [data-admin-layout="admin-compact-workspace"] .content-wrapper,
 [data-admin-layout="admin-compact-workspace"] #page-content-wrapper > main {
-    padding-inline: 22px;
+    padding-inline: clamp(16px, 2vw, 28px);
+}
+
+[data-admin-layout="admin-compact-workspace"] .topbar {
+    min-height: 58px;
+}
+
+[data-admin-layout="admin-compact-workspace"] body.sidebar-collapsed .sidebar {
+    width: 88px;
+    flex-basis: 88px;
 }
 
 @media (max-width: 991.98px) {
-    [data-admin-layout="admin-compact-workspace"] .sidebar {
+    [data-admin-layout="admin-compact-workspace"] .sidebar,
+    [data-admin-layout="admin-compact-workspace"] .sidebar:hover,
+    [data-admin-layout="admin-compact-workspace"] .sidebar:focus-within {
         width: 270px;
+        flex-basis: 270px;
+        box-shadow: 6px 0 24px rgba(15, 23, 42, .18);
+    }
+
+    [data-admin-layout="admin-compact-workspace"] .sidebar-brand {
+        justify-content: flex-start;
     }
 
     [data-admin-layout="admin-compact-workspace"] .sidebar-brand-copy,
     [data-admin-layout="admin-compact-workspace"] .menu-section-title,
     [data-admin-layout="admin-compact-workspace"] .menu-link > span:not(.icon) {
-        opacity: 1;
         width: auto;
+        min-width: initial;
+        opacity: 1;
         visibility: visible;
+        pointer-events: auto;
+    }
+
+    [data-admin-layout="admin-compact-workspace"] .menu-link {
+        justify-content: flex-start;
+    }
+
+    [data-admin-layout="admin-compact-workspace"] .menu-link.has-children .caret {
+        display: inline-flex;
+    }
+
+    [data-admin-layout="admin-compact-workspace"] .menu-toggle:checked + .menu-link.has-children + .submenu-container {
+        display: block;
+    }
+
+    [data-admin-layout="admin-compact-workspace"] .sidebar-collapse-button {
+        display: inline-flex;
     }
 }

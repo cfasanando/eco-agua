@@ -106,7 +106,7 @@ public class Matrix26ProvisioningAppearanceService {
                         "matrix26-nature",
                         "admin-sidebar-classic",
                         "login-split",
-                        "#138A63",
+                        "#117A57",
                         "#145A4A",
                         "#2AA7A1",
                         "#F3F8F3",
@@ -481,6 +481,7 @@ public class Matrix26ProvisioningAppearanceService {
 
     private Map<String, String> overrides(Matrix26ProvisioningPlanForm form) {
         Map<String, String> result = new LinkedHashMap<>();
+        result.put("customPalette", "true");
         result.put("primaryColor", upper(form.getPrimaryColor()));
         result.put("secondaryColor", upper(form.getSecondaryColor()));
         result.put("accentColor", upper(form.getAccentColor()));
@@ -492,7 +493,7 @@ public class Matrix26ProvisioningAppearanceService {
         result.put("tableDensity", upper(form.getTableDensity()));
         result.put("contentWidth", upper(form.getContentWidth()));
         result.put("headingStyle", upper(form.getHeadingStyle()));
-        result.put("source", "matrix26-provisioning-phase3c6");
+        result.put("source", "matrix26-provisioning-phase3c7");
         return result;
     }
 

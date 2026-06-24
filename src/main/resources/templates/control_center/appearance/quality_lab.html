@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Appearance Quality Lab')}"></head>
+<body class="matrix26-body" data-theme="matrix26-classic" data-admin-layout="admin-sidebar-classic">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Appearance Quality Lab', 'Compare themes, layouts, components and responsive behavior before publishing.')}"></header>
+
+        <main class="matrix26-main">
+            <section class="matrix26-quality-hero">
+                <div>
+                    <small>Matrix26 Appearance Studio · Phase 3C.7</small>
+                    <h2>Visual compatibility and acceptance lab</h2>
+                    <p>Use the same visual sample to compare every theme and layout combination without modifying any instance.</p>
+                </div>
+                <a class="btn btn-light" th:href="@{/control-center/appearance}">
+                    <i class="bi bi-arrow-left"></i>
+                    Back to Appearance Studio
+                </a>
+            </section>
+
+            <section class="matrix26-panel matrix26-quality-controls">
+                <div class="matrix26-quality-selectors">
+                    <label>
+                        <span>Public theme</span>
+                        <select id="quality-public-theme" class="form-select">
+                            <option th:each="theme : ${themes}"
+                                    th:value="${theme.code}"
+                                    th:text="${theme.name}">
+                                Matrix26 Classic
+                            </option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Admin and login theme</span>
+                        <select id="quality-admin-theme" class="form-select">
+                            <option th:each="theme : ${themes}"
+                                    th:value="${theme.code}"
+                                    th:text="${theme.name}">
+                                Matrix26 Classic
+                            </option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Public layout</span>
+                        <select id="quality-public-layout" class="form-select">
+                            <option th:each="layout : ${publicLayouts}"
+                                    th:value="${layout.code}"
+                                    th:text="${layout.name}">
+                                Public Classic Grid
+                            </option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Admin layout</span>
+                        <select id="quality-admin-layout" class="form-select">
+                            <option th:each="layout : ${adminLayouts}"
+                                    th:value="${layout.code}"
+                                    th:text="${layout.name}">
+                                Admin Sidebar Classic
+                            </option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Login layout</span>
+                        <select id="quality-login-layout" class="form-select">
+                            <option th:each="layout : ${loginLayouts}"
+                                    th:value="${layout.code}"
+                                    th:text="${layout.name}">
+                                Login Split
+                            </option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="matrix26-quality-viewports" role="group" aria-label="Preview viewport">
+                    <button type="button" class="btn btn-sm btn-primary is-active" data-quality-viewport="desktop">
+                        <i class="bi bi-display"></i>
+                        Desktop
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-quality-viewport="tablet">
+                        <i class="bi bi-tablet"></i>
+                        Tablet
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-quality-viewport="mobile">
+                        <i class="bi bi-phone"></i>
+                        Mobile
+                    </button>
+                </div>
+            </section>
+
+            <section class="matrix26-quality-status" aria-live="polite">
+                <span><i class="bi bi-globe2"></i><strong id="quality-public-theme-label">Matrix26 Classic</strong></span>
+                <span><i class="bi bi-palette"></i><strong id="quality-admin-theme-label">Matrix26 Classic</strong></span>
+                <span><i class="bi bi-window"></i><strong id="quality-public-label">Public Classic Grid</strong></span>
+                <span><i class="bi bi-layout-sidebar"></i><strong id="quality-admin-label">Admin Sidebar Classic</strong></span>
+                <span><i class="bi bi-shield-lock"></i><strong id="quality-login-label">Login Split</strong></span>
+            </section>
+
+            <div class="matrix26-section-heading">
+                <div>
+                    <span>Shared design system</span>
+                    <h2>Tokens and component states</h2>
+                </div>
+            </div>
+
+            <section id="quality-components" class="matrix26-quality-components matrix26-classic" data-theme="matrix26-classic">
+                <article class="matrix26-quality-card">
+                    <h3>Actions</h3>
+                    <div class="matrix26-quality-row">
+                        <button type="button" class="btn btn-primary">Primary action</button>
+                        <button type="button" class="btn btn-success">Success action</button>
+                        <button type="button" class="btn btn-danger">Danger action</button>
+                        <button type="button" class="btn btn-outline-primary">Outline action</button>
+                        <button type="button" class="btn btn-primary" disabled>Disabled</button>
+                    </div>
+                </article>
+
+                <article class="matrix26-quality-card">
+                    <h3>Status and feedback</h3>
+                    <div class="matrix26-quality-row">
+                        <span class="badge text-bg-primary">Primary</span>
+                        <span class="badge text-bg-success">Success</span>
+                        <span class="badge text-bg-warning">Warning</span>
+                        <span class="badge text-bg-danger">Danger</span>
+                        <span class="badge text-bg-info">Information</span>
+                    </div>
+                    <div class="alert alert-success mb-0">The operation completed successfully.</div>
+                </article>
+
+                <article class="matrix26-quality-card">
+                    <h3>Forms</h3>
+                    <div class="matrix26-quality-form">
+                        <label class="form-label" for="quality-name">Display name</label>
+                        <input id="quality-name" class="form-control" value="Matrix26 Demo Portal">
+                        <label class="form-label" for="quality-category">Business type</label>
+                        <select id="quality-category" class="form-select">
+                            <option>Restaurant</option>
+                            <option>Retail</option>
+                        </select>
+                    </div>
+                </article>
+
+                <article class="matrix26-quality-card">
+                    <h3>Surface and typography</h3>
+                    <p class="mb-2">Readable body text must remain stable across custom colors and layouts.</p>
+                    <p class="text-muted mb-3">Muted text provides context without losing accessibility.</p>
+                    <a href="#">Accessible example link</a>
+                </article>
+            </section>
+
+            <div class="matrix26-section-heading mt-4">
+                <div>
+                    <span>Customer-facing experience</span>
+                    <h2>Public portal preview</h2>
+                </div>
+            </div>
+
+            <section class="matrix26-quality-stage" data-quality-stage>
+                <div id="quality-public-preview"
+                     class="matrix26-public-full-preview matrix26-classic"
+                     data-theme="matrix26-classic"
+                     data-public-layout="public-classic-grid">
+                    <nav>
+                        <strong>Matrix26 Demo</strong>
+                        <span>Home</span>
+                        <span>Catalog</span>
+                        <span>Contact</span>
+                        <button type="button">Sign in</button>
+                    </nav>
+                    <div class="matrix26-public-full-hero">
+                        <div>
+                            <small>Amazon business experience</small>
+                            <h2>Products with a clear visual identity</h2>
+                            <p>Theme, layout and branding work together without duplicating the portal templates.</p>
+                            <button type="button">Explore catalog</button>
+                        </div>
+                        <div class="matrix26-quality-hero-art">
+                            <i class="bi bi-stars"></i>
+                        </div>
+                    </div>
+                    <div class="matrix26-public-full-products">
+                        <article><div></div><small>Featured</small><strong>Amazon product</strong><span>S/ 24.90</span><button type="button">View</button></article>
+                        <article><div></div><small>Natural</small><strong>Regional product</strong><span>S/ 18.50</span><button type="button">View</button></article>
+                        <article><div></div><small>Popular</small><strong>Customer favorite</strong><span>S/ 32.00</span><button type="button">View</button></article>
+                        <article><div></div><small>New</small><strong>Seasonal option</strong><span>S/ 15.00</span><button type="button">View</button></article>
+                    </div>
+                </div>
+            </section>
+
+            <div class="matrix26-section-heading mt-4">
+                <div>
+                    <span>Authenticated workspace</span>
+                    <h2>Admin portal preview</h2>
+                </div>
+            </div>
+
+            <section class="matrix26-quality-stage" data-quality-stage>
+                <div id="quality-admin-preview"
+                     class="matrix26-admin-full-preview matrix26-classic"
+                     data-theme="matrix26-classic"
+                     data-admin-layout="admin-sidebar-classic">
+                    <aside>
+                        <strong>M26</strong>
+                        <span><i class="bi bi-speedometer2"></i>Dashboard</span>
+                        <span><i class="bi bi-receipt"></i>Orders</span>
+                        <span><i class="bi bi-box-seam"></i>Inventory</span>
+                        <span><i class="bi bi-bar-chart"></i>Reports</span>
+                    </aside>
+                    <div class="matrix26-admin-preview-workspace">
+                        <header>
+                            <div><small>Operations</small><h3>Business dashboard</h3></div>
+                            <button type="button"><i class="bi bi-person"></i></button>
+                        </header>
+                        <main>
+                            <div class="matrix26-admin-preview-stats">
+                                <article><span>Sales today</span><strong>S/ 1,240</strong></article>
+                                <article><span>Open orders</span><strong>18</strong></article>
+                                <article><span>Low stock</span><strong>4</strong></article>
+                            </div>
+                            <section>
+                                <div class="matrix26-admin-preview-chart"></div>
+                                <div class="matrix26-admin-preview-table"><span></span><span></span><span></span><span></span></div>
+                            </section>
+                        </main>
+                    </div>
+                </div>
+            </section>
+
+            <div class="matrix26-section-heading mt-4">
+                <div>
+                    <span>Authentication experience</span>
+                    <h2>Login preview</h2>
+                </div>
+            </div>
+
+            <section class="matrix26-quality-stage" data-quality-stage>
+                <div id="quality-login-preview"
+                     class="matrix26-login-full-preview matrix26-classic"
+                     data-theme="matrix26-classic"
+                     data-login-layout="login-split">
+                    <div class="matrix26-login-brand">
+                        <small>Matrix26 Business Platform</small>
+                        <h2>Your business, your identity</h2>
+                        <p>Secure access with branding managed independently for every instance.</p>
+                    </div>
+                    <div class="matrix26-login-panel">
+                        <strong>Welcome back</strong>
+                        <label>Username<input value="admin_demo"></label>
+                        <label>Password<input type="password" value="Matrix26"></label>
+                        <button type="button">Sign in</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="matrix26-panel mt-4">
+                <div class="matrix26-section-heading mt-0">
+                    <div>
+                        <span>Acceptance checklist</span>
+                        <h2>Manual verification</h2>
+                    </div>
+                </div>
+                <div class="matrix26-quality-checklist">
+                    <label><input type="checkbox"> Primary text is readable before hover.</label>
+                    <label><input type="checkbox"> Focus indicators are visible with keyboard navigation.</label>
+                    <label><input type="checkbox"> Public hero keeps the selected branding image.</label>
+                    <label><input type="checkbox"> Cards and tables remain inside the selected viewport.</label>
+                    <label><input type="checkbox"> Compact sidebar does not move the workspace when expanded.</label>
+                    <label><input type="checkbox"> Login panel remains balanced on wide and mobile screens.</label>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/matrix26-appearance-quality-lab.js}"></script>
+</body>
+</html>

@@ -23,6 +23,8 @@ public class Matrix26AppearanceEditorForm {
     @NotBlank(message = "Selecciona un layout de login.")
     private String loginLayoutCode;
 
+    private boolean customPalette;
+
     @Pattern(regexp = HEX_OR_EMPTY, message = "Usa un color hexadecimal como #2563EB.")
     private String primaryColor;
 
@@ -45,7 +47,7 @@ public class Matrix26AppearanceEditorForm {
     private String sidebarMode = "THEME";
 
     @NotBlank(message = "Selecciona el radio de bordes.")
-    private String borderRadius = "MEDIUM";
+    private String borderRadius = "THEME";
 
     @NotBlank(message = "Selecciona la densidad de tablas.")
     private String tableDensity = "COMFORTABLE";
@@ -69,6 +71,8 @@ public class Matrix26AppearanceEditorForm {
     public void setAdminLayoutCode(String adminLayoutCode) { this.adminLayoutCode = adminLayoutCode; }
     public String getLoginLayoutCode() { return loginLayoutCode; }
     public void setLoginLayoutCode(String loginLayoutCode) { this.loginLayoutCode = loginLayoutCode; }
+    public boolean isCustomPalette() { return customPalette; }
+    public void setCustomPalette(boolean customPalette) { this.customPalette = customPalette; }
     public String getPrimaryColor() { return primaryColor; }
     public void setPrimaryColor(String primaryColor) { this.primaryColor = primaryColor; }
     public String getSecondaryColor() { return secondaryColor; }

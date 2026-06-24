@@ -16,6 +16,9 @@ public class Matrix26ControlCenterProperties {
     private String bootstrapAdminUsername = "matrix_admin";
     private String bootstrapAdminPassword = "Matrix26Demo123!";
     private long healthCacheSeconds = 30;
+    private boolean provisioningExecutionEnabled;
+    private String provisioningTemplateDatabase = "restaurante_buen_sabor";
+    private String provisioningRuntimeDirectory = "runtime-clients";
 
     public boolean isEnabled() {
         return enabled;
@@ -88,4 +91,28 @@ public class Matrix26ControlCenterProperties {
     public void setHealthCacheSeconds(long healthCacheSeconds) {
         this.healthCacheSeconds = healthCacheSeconds;
     }
+    public boolean isProvisioningExecutionEnabled() {
+        return provisioningExecutionEnabled;
+    }
+
+    public void setProvisioningExecutionEnabled(boolean provisioningExecutionEnabled) {
+        this.provisioningExecutionEnabled = provisioningExecutionEnabled;
+    }
+
+    public String getProvisioningTemplateDatabase() {
+        return provisioningTemplateDatabase;
+    }
+
+    public void setProvisioningTemplateDatabase(String provisioningTemplateDatabase) {
+        this.provisioningTemplateDatabase = provisioningTemplateDatabase;
+    }
+
+    public String getProvisioningRuntimeDirectory() {
+        return provisioningRuntimeDirectory;
+    }
+
+    public void setProvisioningRuntimeDirectory(String provisioningRuntimeDirectory) {
+        this.provisioningRuntimeDirectory = provisioningRuntimeDirectory;
+    }
+
 }

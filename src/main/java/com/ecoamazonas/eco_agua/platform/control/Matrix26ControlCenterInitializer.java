@@ -86,6 +86,116 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
         for (String statement : schemaStatements()) {
             jdbcTemplate.execute(statement);
         }
+        ensureProvisioningExecutionColumns();
+        ensureProvisioningDiagnosticCapacity();
+    }
+
+    private void ensureProvisioningExecutionColumns() {
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "executed_by",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN executed_by VARCHAR(120) NULL AFTER requested_by"
+        );
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "execution_started_at",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN execution_started_at DATETIME(6) NULL AFTER validated_at"
+        );
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "execution_completed_at",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN execution_completed_at DATETIME(6) NULL AFTER execution_started_at"
+        );
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "last_error",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN last_error VARCHAR(2000) NULL AFTER execution_completed_at"
+        );
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "registered_instance_id",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN registered_instance_id BIGINT NULL AFTER last_error"
+        );
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "runtime_folder",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN runtime_folder VARCHAR(500) NULL AFTER registered_instance_id"
+        );
+        ensureColumn(
+                "matrix26_provisioning_step",
+                "started_at",
+                "ALTER TABLE matrix26_provisioning_step ADD COLUMN started_at DATETIME(6) NULL AFTER safety_scope"
+        );
+        ensureColumn(
+                "matrix26_provisioning_step",
+                "completed_at",
+                "ALTER TABLE matrix26_provisioning_step ADD COLUMN completed_at DATETIME(6) NULL AFTER started_at"
+        );
+        ensureColumn(
+                "matrix26_provisioning_step",
+                "last_error",
+                "ALTER TABLE matrix26_provisioning_step ADD COLUMN last_error VARCHAR(2000) NULL AFTER completed_at"
+        );
+        ensureColumn(
+                "matrix26_provisioning_step",
+                "attempt_count",
+                "ALTER TABLE matrix26_provisioning_step ADD COLUMN attempt_count INT NOT NULL DEFAULT 0 AFTER last_error"
+        );
+    }
+
+    private void ensureProvisioningDiagnosticCapacity() {
+        ensureTextCapacity(
+                "matrix26_provisioning_module",
+                "detail",
+                4000,
+                "ALTER TABLE matrix26_provisioning_module MODIFY COLUMN detail TEXT NULL"
+        );
+    }
+
+    private void ensureTextCapacity(
+            String tableName,
+            String columnName,
+            long minimumLength,
+            String alterSql
+    ) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = ?
+                  AND COLUMN_NAME = ?
+                  AND (
+                    DATA_TYPE IN ('text', 'mediumtext', 'longtext')
+                    OR COALESCE(CHARACTER_MAXIMUM_LENGTH, 0) >= ?
+                  )
+                """,
+                Integer.class,
+                tableName,
+                columnName,
+                minimumLength
+        );
+        if (count == null || count == 0) {
+            jdbcTemplate.execute(alterSql);
+        }
+    }
+
+    private void ensureColumn(String tableName, String columnName, String alterSql) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = ?
+                  AND COLUMN_NAME = ?
+                """,
+                Integer.class,
+                tableName,
+                columnName
+        );
+        if (count == null || count == 0) {
+            jdbcTemplate.execute(alterSql);
+        }
     }
 
     private void seedBranding() {
@@ -444,7 +554,13 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
                     validation_summary TEXT NULL,
                     notes TEXT NULL,
                     requested_by VARCHAR(120) NOT NULL,
+                    executed_by VARCHAR(120) NULL,
                     validated_at DATETIME(6) NULL,
+                    execution_started_at DATETIME(6) NULL,
+                    execution_completed_at DATETIME(6) NULL,
+                    last_error VARCHAR(2000) NULL,
+                    registered_instance_id BIGINT NULL,
+                    runtime_folder VARCHAR(500) NULL,
                     created_at DATETIME(6) NOT NULL,
                     updated_at DATETIME(6) NOT NULL,
                     PRIMARY KEY (id),
@@ -463,6 +579,10 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
                     status VARCHAR(30) NOT NULL,
                     detail VARCHAR(1000) NULL,
                     safety_scope VARCHAR(80) NOT NULL,
+                    started_at DATETIME(6) NULL,
+                    completed_at DATETIME(6) NULL,
+                    last_error VARCHAR(2000) NULL,
+                    attempt_count INT NOT NULL DEFAULT 0,
                     created_at DATETIME(6) NOT NULL,
                     PRIMARY KEY (id),
                     KEY idx_matrix26_provisioning_step_job_order (job_id, display_order),
@@ -479,7 +599,7 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
                     status VARCHAR(30) NOT NULL,
                     installer_available BIT NOT NULL DEFAULT 0,
                     installer_version VARCHAR(50) NULL,
-                    detail VARCHAR(500) NULL,
+                    detail TEXT NULL,
                     created_at DATETIME(6) NOT NULL,
                     PRIMARY KEY (id),
                     KEY idx_matrix26_provisioning_module_job (job_id, module_key),

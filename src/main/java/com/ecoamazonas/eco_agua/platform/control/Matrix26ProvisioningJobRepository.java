@@ -11,6 +11,8 @@ public interface Matrix26ProvisioningJobRepository extends JpaRepository<Matrix2
 
     List<Matrix26ProvisioningJob> findTop6ByOrderByCreatedAtDescIdDesc();
 
+    List<Matrix26ProvisioningJob> findByStatusOrderByUpdatedAtAsc(String status);
+
     Optional<Matrix26ProvisioningJob> findByReferenceCode(String referenceCode);
 
     long countByStatus(String status);

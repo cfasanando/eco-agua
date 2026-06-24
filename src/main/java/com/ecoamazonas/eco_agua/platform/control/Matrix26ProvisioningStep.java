@@ -47,6 +47,18 @@ public class Matrix26ProvisioningStep {
     @Column(name = "safety_scope", nullable = false, length = 80)
     private String safetyScope;
 
+    @Column(name = "started_at")
+    private LocalDateTime startedAt;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @Column(name = "last_error", length = 2000)
+    private String lastError;
+
+    @Column(name = "attempt_count", nullable = false)
+    private int attemptCount;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -115,6 +127,39 @@ public class Matrix26ProvisioningStep {
 
     public void setSafetyScope(String safetyScope) {
         this.safetyScope = safetyScope;
+    }
+
+
+    public LocalDateTime getStartedAt() {
+        return startedAt;
+    }
+
+    public void setStartedAt(LocalDateTime startedAt) {
+        this.startedAt = startedAt;
+    }
+
+    public LocalDateTime getCompletedAt() {
+        return completedAt;
+    }
+
+    public void setCompletedAt(LocalDateTime completedAt) {
+        this.completedAt = completedAt;
+    }
+
+    public String getLastError() {
+        return lastError;
+    }
+
+    public void setLastError(String lastError) {
+        this.lastError = lastError;
+    }
+
+    public int getAttemptCount() {
+        return attemptCount;
+    }
+
+    public void setAttemptCount(int attemptCount) {
+        this.attemptCount = attemptCount;
     }
 
     public LocalDateTime getCreatedAt() {

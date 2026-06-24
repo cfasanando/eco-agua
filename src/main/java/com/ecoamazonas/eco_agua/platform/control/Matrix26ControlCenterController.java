@@ -39,6 +39,7 @@ public class Matrix26ControlCenterController {
     private final PlatformClientModuleRepository clientModuleRepository;
     private final Matrix26ControlCenterProperties properties;
     private final Matrix26ProvisioningService provisioningService;
+    private final Matrix26ProvisioningExecutionService provisioningExecutionService;
 
     public Matrix26ControlCenterController(
             Matrix26InstanceHealthService healthService,
@@ -47,7 +48,8 @@ public class Matrix26ControlCenterController {
             PlatformModuleCatalogRepository moduleRepository,
             PlatformClientModuleRepository clientModuleRepository,
             Matrix26ControlCenterProperties properties,
-            Matrix26ProvisioningService provisioningService
+            Matrix26ProvisioningService provisioningService,
+            Matrix26ProvisioningExecutionService provisioningExecutionService
     ) {
         this.healthService = healthService;
         this.managementService = managementService;
@@ -56,6 +58,7 @@ public class Matrix26ControlCenterController {
         this.clientModuleRepository = clientModuleRepository;
         this.properties = properties;
         this.provisioningService = provisioningService;
+        this.provisioningExecutionService = provisioningExecutionService;
     }
 
     @GetMapping({"", "/dashboard"})
@@ -299,9 +302,38 @@ public class Matrix26ControlCenterController {
 
     @GetMapping("/provisioning/{id}")
     public String provisioningDetail(@PathVariable Long id, Model model) {
-        model.addAttribute("activePage", "matrix26_provisioning");
-        model.addAttribute("plan", provisioningService.getPlan(id));
+        addProvisioningDetailModel(model, id, new Matrix26ProvisioningExecutionForm());
         return "control_center/provisioning_detail";
+    }
+
+    @PostMapping("/provisioning/{id}/execute")
+    public String executeProvisioningPlan(
+            @PathVariable Long id,
+            @Valid @ModelAttribute("executionForm") Matrix26ProvisioningExecutionForm form,
+            BindingResult bindingResult,
+            Authentication authentication,
+            Model model,
+            RedirectAttributes redirectAttributes
+    ) {
+        if (bindingResult.hasErrors()) {
+            clearExecutionSecrets(form);
+            addProvisioningDetailModel(model, id, form);
+            return "control_center/provisioning_detail";
+        }
+
+        try {
+            Matrix26ProvisioningJob job = provisioningExecutionService.execute(id, form, actor(authentication));
+            redirectAttributes.addFlashAttribute(
+                    "successMessage",
+                    "Aprovisionamiento completado. La base y el runtime fueron generados y la instancia quedó protegida."
+            );
+            return "redirect:/control-center/provisioning/" + job.getId();
+        } catch (RuntimeException ex) {
+            bindingResult.reject("execution", safeMessage(ex));
+            clearExecutionSecrets(form);
+            addProvisioningDetailModel(model, id, form);
+            return "control_center/provisioning_detail";
+        }
     }
 
     @PostMapping("/provisioning/{id}/revalidate")
@@ -315,7 +347,7 @@ public class Matrix26ControlCenterController {
             redirectAttributes.addFlashAttribute(
                     "READY".equals(job.getStatus()) ? "successMessage" : "warningMessage",
                     "READY".equals(job.getStatus())
-                            ? "El plan continúa listo para una futura confirmación."
+                            ? "El plan continúa listo para ejecución confirmada."
                             : "El plan mantiene bloqueos pendientes."
             );
         } catch (RuntimeException ex) {
@@ -359,6 +391,24 @@ public class Matrix26ControlCenterController {
         model.addAttribute("activePage", "matrix26_provisioning");
         model.addAttribute("provisioningForm", form);
         model.addAttribute("groupedProvisioningModules", provisioningService.groupedModuleOptions());
+    }
+
+    private void addProvisioningDetailModel(
+            Model model,
+            Long id,
+            Matrix26ProvisioningExecutionForm executionForm
+    ) {
+        Matrix26ProvisioningPlanView plan = provisioningService.getPlan(id);
+        model.addAttribute("activePage", "matrix26_provisioning");
+        model.addAttribute("plan", plan);
+        model.addAttribute("executionForm", executionForm);
+        model.addAttribute("executionEnabled", provisioningExecutionService.isExecutionEnabled());
+        model.addAttribute("canExecute", provisioningExecutionService.canExecute(plan.job()));
+    }
+
+    private void clearExecutionSecrets(Matrix26ProvisioningExecutionForm form) {
+        form.setAdminPassword("");
+        form.setAdminPasswordConfirmation("");
     }
 
     private void addInstanceFormModel(

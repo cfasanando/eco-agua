@@ -20,16 +20,36 @@ Override secrets without editing the file:
   export MATRIX26_ADMIN_PASSWORD='YourSecurePassword'
   bash scripts/run-matrix26-control.sh
 
-Capabilities through Phase 3A:
+Capabilities through Phase 3B:
 
 - register and edit instance metadata;
-- validate duplicate code, port, database, and runtime profile;
+- validate duplicate code, port, database, runtime profile, and runtime folder;
 - enable or pause monitoring;
 - execute manual health checks;
 - maintain module declarations;
 - audit administrative changes;
-- create and revalidate provisioning Dry Runs;
-- validate installer availability without executing installers.
+- create and revalidate provisioning plans;
+- execute READY plans after explicit confirmation;
+- create a new isolated database through Spring JDBC;
+- copy structural core tables without operational data;
+- create the initial administrator without storing the plaintext password in Matrix26;
+- execute target-compatible module installers;
+- generate a dedicated runtime folder and register the new protected instance;
+- resume a FAILED plan from its pending or failed step.
 
-Matrix26 writes only to matrix26_platform_control. It does not modify eco_agua,
-productos_selva_belen, restaurante_buen_sabor, or any other operational database.
+Provisioning configuration:
+
+  matrix26.control-center.provisioning-execution-enabled=true
+  matrix26.control-center.provisioning-template-database=restaurante_buen_sabor
+  matrix26.control-center.provisioning-runtime-directory=runtime-clients
+
+The source template is read only. Matrix26 never copies its business data. A target
+database that already contains tables is rejected unless it belongs to the same
+resumable provisioning plan.
+
+The generated runtime is not started automatically. Start it from the repository root:
+
+  bash runtime-clients/<runtime-profile>/run.sh
+
+Matrix26 does not modify eco_agua, productos_selva_belen, or restaurante_buen_sabor.
+The template database is queried only to read table definitions.

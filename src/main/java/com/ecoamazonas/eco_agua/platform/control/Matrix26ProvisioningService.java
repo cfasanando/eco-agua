@@ -9,6 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -86,7 +89,10 @@ public class Matrix26ProvisioningService {
         return new Matrix26ProvisioningSummary(
                 jobRepository.count(),
                 jobRepository.countByStatus(STATUS_READY),
-                jobRepository.countByStatus(STATUS_BLOCKED)
+                jobRepository.countByStatus(STATUS_BLOCKED),
+                jobRepository.countByStatus("RUNNING"),
+                jobRepository.countByStatus("COMPLETED"),
+                jobRepository.countByStatus("FAILED")
         );
     }
 
@@ -106,7 +112,7 @@ public class Matrix26ProvisioningService {
                 continue;
             }
             PlatformModuleInstaller installer = installers.get(normalizeKey(module.getModuleKey()));
-            boolean available = installer != null;
+            boolean available = installer != null && installer.supportsTargetInstallation();
             Matrix26ProvisioningModuleOption option = new Matrix26ProvisioningModuleOption(
                     module.getModuleKey(),
                     module.getName(),
@@ -136,6 +142,9 @@ public class Matrix26ProvisioningService {
     @Transactional
     public Matrix26ProvisioningJob revalidate(Long id, String actor) {
         Matrix26ProvisioningJob job = getJob(id);
+        if ("RUNNING".equals(job.getStatus()) || "COMPLETED".equals(job.getStatus())) {
+            throw new IllegalArgumentException("Los planes en ejecución o completados no pueden revalidarse.");
+        }
         Set<String> moduleKeys = provisioningModuleRepository.findByJob_IdOrderByModuleNameAscIdAsc(id).stream()
                 .map(Matrix26ProvisioningModule::getModuleKey)
                 .filter(key -> !CORE_MODULE_KEY.equals(normalizeKey(key)))
@@ -154,7 +163,7 @@ public class Matrix26ProvisioningService {
         job.setStatus(ready ? STATUS_READY : STATUS_BLOCKED);
         job.setValidatedAt(LocalDateTime.now());
         job.setValidationSummary(ready
-                ? "Plan validado. No se ejecutó ninguna operación sobre bases o runtimes."
+                ? "Plan validado. Puede ejecutarse con confirmación explícita desde Matrix26."
                 : issues.stream().map(ValidationIssue::message).distinct().reduce((left, right) -> left + "\n" + right).orElse("Plan bloqueado."));
         Matrix26ProvisioningJob saved = jobRepository.save(job);
 
@@ -173,6 +182,19 @@ public class Matrix26ProvisioningService {
         }
         if (clientRepository.existsByRuntimeProfileIgnoreCase(job.getRuntimeProfile())) {
             issues.add(new ValidationIssue("RUNTIME", "El runtime " + job.getRuntimeProfile() + " ya está registrado."));
+        }
+        Path runtimeBase = Paths.get(properties.getProvisioningRuntimeDirectory()).toAbsolutePath().normalize();
+        Path runtimeFolder = runtimeBase.resolve(job.getRuntimeProfile()).normalize();
+        if (!runtimeFolder.startsWith(runtimeBase)) {
+            issues.add(new ValidationIssue("RUNTIME", "El runtime genera una ruta fuera del directorio permitido."));
+        } else if (Files.exists(runtimeFolder)) {
+            try (var entries = Files.list(runtimeFolder)) {
+                if (entries.findAny().isPresent()) {
+                    issues.add(new ValidationIssue("RUNTIME", "La carpeta runtime " + runtimeFolder + " ya existe y contiene archivos."));
+                }
+            } catch (Exception ex) {
+                issues.add(new ValidationIssue("RUNTIME", "No se pudo validar la carpeta runtime propuesta."));
+            }
         }
         if (clientRepository.existsByRuntimePort(job.getRuntimePort())) {
             issues.add(new ValidationIssue("PORT", "El puerto " + job.getRuntimePort() + " ya está registrado en otra instancia."));
@@ -213,10 +235,11 @@ public class Matrix26ProvisioningService {
                 issues.add(new ValidationIssue("MODULE:" + key, "El módulo " + key + " no existe o está inactivo."));
                 continue;
             }
-            if (!installers.containsKey(key)) {
+            PlatformModuleInstaller installer = installers.get(key);
+            if (installer == null || !installer.supportsTargetInstallation()) {
                 issues.add(new ValidationIssue(
                         "MODULE:" + key,
-                        "El módulo " + module.getName() + " todavía no tiene un instalador ejecutable registrado."
+                        "El módulo " + module.getName() + " todavía no admite instalación sobre una nueva instancia."
                 ));
             }
         }
@@ -246,13 +269,14 @@ public class Matrix26ProvisioningService {
             item.setJob(job);
             item.setModuleKey(key);
             item.setModuleName(catalog == null ? key : catalog.getName());
-            item.setInstallerAvailable(installer != null);
-            item.setInstallerVersion(installer == null ? null : clean(installer.currentVersion()));
-            boolean blocked = hasIssue(issues, "MODULE:" + key) || catalog == null || installer == null;
+            boolean targetInstallAvailable = installer != null && installer.supportsTargetInstallation();
+            item.setInstallerAvailable(targetInstallAvailable);
+            item.setInstallerVersion(targetInstallAvailable ? clean(installer.currentVersion()) : null);
+            boolean blocked = hasIssue(issues, "MODULE:" + key) || catalog == null || !targetInstallAvailable;
             item.setStatus(blocked ? STATUS_BLOCKED : STATUS_READY);
             item.setDetail(blocked
                     ? firstIssue(issues, "MODULE:" + key, "Instalador no disponible.")
-                    : "Instalador detectado y apto para una futura ejecución confirmada.");
+                    : "Instalador detectado y apto para ejecución confirmada sobre una nueva instancia.");
             provisioningModuleRepository.save(item);
         }
     }

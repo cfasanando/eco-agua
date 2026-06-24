@@ -1,61 +1,75 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{control_center/fragments/head :: head('Detalle del Dry Run')}"></head>
+<head th:replace="~{control_center/fragments/head :: head('Detalle del aprovisionamiento')}"></head>
 <body class="matrix26-body">
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('Detalle del Dry Run', 'Plan revisable de una futura instancia, sin ejecución real.')}" ></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Detalle del aprovisionamiento', 'Plan validado, ejecución controlada y recuperación por pasos.')}"></header>
 
         <main class="matrix26-main">
             <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}"></div>
             <div th:if="${warningMessage}" class="alert alert-warning" th:text="${warningMessage}"></div>
             <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}"></div>
 
-            <div class="matrix26-provisioning-hero" th:classappend="${plan.job().status == 'READY'} ? ' is-ready' : ' is-blocked'">
+            <div class="matrix26-provisioning-hero"
+                 th:classappend="${plan.job().status == 'READY'} ? ' is-ready' : (${plan.job().status == 'COMPLETED'} ? ' is-completed' : (${plan.job().status == 'RUNNING'} ? ' is-running' : ' is-blocked'))">
                 <div>
                     <span class="matrix26-provisioning-icon"><i class="bi bi-diagram-3"></i></span>
                     <div>
-                        <div class="matrix26-eyebrow">Dry Run <code th:text="${plan.job().referenceCode}">DRY</code></div>
+                        <div class="matrix26-eyebrow">Plan <code th:text="${plan.job().referenceCode}">M26</code></div>
                         <h2 th:text="${plan.job().businessName}">Empresa</h2>
                         <p th:text="|${plan.job().instanceCode} · ${plan.job().databaseName} · puerto ${plan.job().runtimePort}|">Destino</p>
                     </div>
                 </div>
                 <div class="text-end">
                     <span class="badge fs-6"
-                          th:classappend="${plan.job().status == 'READY'} ? ' text-bg-success' : ' text-bg-danger'"
-                          th:text="${plan.job().status == 'READY' ? 'LISTO' : 'BLOQUEADO'}">Estado</span>
-                    <small th:text="|Validado: ${#temporals.format(plan.job().validatedAt, 'dd/MM/yyyy HH:mm:ss')}|">Fecha</small>
+                          th:classappend="${plan.job().status == 'READY'} ? ' text-bg-success' : (${plan.job().status == 'COMPLETED'} ? ' text-bg-primary' : (${plan.job().status == 'RUNNING'} ? ' text-bg-warning' : ' text-bg-danger'))"
+                          th:text="${plan.job().status == 'READY'} ? 'LISTO' : (${plan.job().status == 'COMPLETED'} ? 'COMPLETADO' : (${plan.job().status == 'RUNNING'} ? 'EN EJECUCIÓN' : (${plan.job().status == 'FAILED'} ? 'FALLIDO' : 'BLOQUEADO'))) ">Estado</span>
+                    <small th:if="${plan.job().validatedAt != null}"
+                           th:text="|Validado: ${#temporals.format(plan.job().validatedAt, 'dd/MM/yyyy HH:mm:ss')}|">Fecha</small>
                 </div>
             </div>
 
             <div class="matrix26-alert-safe my-4">
-                <i class="bi bi-database-lock"></i>
+                <i class="bi bi-shield-lock"></i>
                 <div>
-                    <strong>No se ejecutó ninguna operación real</strong>
-                    <p>Este registro solo contiene metadatos, validaciones y pasos propuestos dentro de <code>matrix26_platform_control</code>.</p>
+                    <strong>Aislamiento obligatorio</strong>
+                    <p>La ejecución solo puede crear la base y el runtime indicados en este plan. Las bases protegidas de Eco Agua, Selva Belén y Restaurante no se reutilizan ni se modifican.</p>
                 </div>
+            </div>
+
+            <div th:if="${plan.job().lastError != null and !#strings.isEmpty(plan.job().lastError)}" class="alert alert-danger">
+                <strong>Último error:</strong>
+                <span th:text="${plan.job().lastError}">Error</span>
             </div>
 
             <div class="row g-4">
                 <div class="col-12 col-xl-8">
                     <section class="matrix26-panel h-100">
                         <div class="matrix26-panel-header">
-                            <div><span>Plan generado</span><h2>Secuencia de aprovisionamiento</h2></div>
-                            <span class="badge text-bg-secondary">Sin ejecución</span>
+                            <div><span>Flujo persistente</span><h2>Secuencia de aprovisionamiento</h2></div>
+                            <span class="badge text-bg-secondary">Reanudable</span>
                         </div>
                         <div class="matrix26-provisioning-timeline">
-                            <article th:each="step, stat : ${plan.steps()}" th:classappend="${step.status == 'READY'} ? ' is-ready' : ' is-blocked'">
+                            <article th:each="step, stat : ${plan.steps()}"
+                                     th:classappend="${step.status == 'COMPLETED'} ? ' is-completed' : (${step.status == 'RUNNING'} ? ' is-running' : (${step.status == 'SKIPPED'} ? ' is-skipped' : (${step.status == 'FAILED' or step.status == 'BLOCKED'} ? ' is-blocked' : ' is-ready'))) ">
                                 <span class="matrix26-step-number" th:text="${stat.count}">1</span>
                                 <div>
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
                                         <strong th:text="${step.label}">Paso</strong>
                                         <span class="badge"
-                                              th:classappend="${step.status == 'READY'} ? ' text-bg-success' : ' text-bg-danger'"
-                                              th:text="${step.status == 'READY' ? 'Listo' : 'Bloqueado'}">Estado</span>
+                                              th:classappend="${step.status == 'COMPLETED'} ? ' text-bg-success' : (${step.status == 'RUNNING'} ? ' text-bg-warning' : (${step.status == 'SKIPPED'} ? ' text-bg-secondary' : (${step.status == 'FAILED' or step.status == 'BLOCKED'} ? ' text-bg-danger' : ' text-bg-info')))"
+                                              th:text="${step.status == 'COMPLETED'} ? 'Completado' : (${step.status == 'RUNNING'} ? 'Ejecutando' : (${step.status == 'SKIPPED'} ? 'Pendiente de inicio' : (${step.status == 'FAILED'} ? 'Fallido' : (${step.status == 'BLOCKED'} ? 'Bloqueado' : 'Preparado'))))">Estado</span>
+                                        <small th:if="${step.attemptCount > 0}" th:text="|Intentos: ${step.attemptCount}|">Intentos</small>
                                     </div>
                                     <p th:text="${step.detail}">Detalle</p>
-                                    <code th:text="${step.safetyScope}">scope</code>
+                                    <div th:if="${step.lastError != null and !#strings.isEmpty(step.lastError)}" class="matrix26-step-error" th:text="${step.lastError}">Error</div>
+                                    <div class="d-flex gap-3 flex-wrap align-items-center">
+                                        <code th:text="${step.safetyScope}">scope</code>
+                                        <small th:if="${step.startedAt != null}" th:text="|Inicio: ${#temporals.format(step.startedAt, 'dd/MM/yyyy HH:mm:ss')}|">Inicio</small>
+                                        <small th:if="${step.completedAt != null}" th:text="|Fin: ${#temporals.format(step.completedAt, 'dd/MM/yyyy HH:mm:ss')}|">Fin</small>
+                                    </div>
                                 </div>
                             </article>
                         </div>
@@ -66,7 +80,8 @@
                     <section class="matrix26-panel mb-4">
                         <div class="matrix26-panel-header"><div><span>Validación</span><h2>Resultado</h2></div></div>
                         <p class="matrix26-validation-summary" th:text="${plan.job().validationSummary}">Resumen</p>
-                        <form th:action="@{/control-center/provisioning/{id}/revalidate(id=${plan.job().id})}" method="post">
+                        <form th:if="${plan.job().status == 'READY' or plan.job().status == 'BLOCKED'}"
+                              th:action="@{/control-center/provisioning/{id}/revalidate(id=${plan.job().id})}" method="post">
                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                             <button class="btn btn-outline-primary w-100" type="submit">
                                 <i class="bi bi-arrow-repeat me-1"></i>Revalidar plan
@@ -78,20 +93,28 @@
                         <div class="matrix26-panel-header"><div><span>Destino</span><h2>Datos técnicos</h2></div></div>
                         <dl class="matrix26-settings-list">
                             <div><dt>Código</dt><dd><code th:text="${plan.job().instanceCode}">code</code></dd></div>
-                            <div><dt>Base</dt><dd><code th:text="${plan.job().databaseName}">database</code></dd></div>
+                            <div><dt>Base nueva</dt><dd><code th:text="${plan.job().databaseName}">database</code></dd></div>
                             <div><dt>Runtime</dt><dd><code th:text="${plan.job().runtimeProfile}">runtime</code></dd></div>
                             <div><dt>Puerto</dt><dd th:text="${plan.job().runtimePort}">8092</dd></div>
                             <div><dt>URL</dt><dd th:text="${plan.job().publicUrl}">URL</dd></div>
                             <div><dt>Administrador</dt><dd><code th:text="${plan.job().adminUsername}">admin</code></dd></div>
                             <div><dt>Datos demo</dt><dd th:text="${plan.job().demoDataEnabled ? 'Solicitados' : 'No solicitados'}">No</dd></div>
+                            <div th:if="${plan.job().runtimeFolder != null}"><dt>Carpeta generada</dt><dd><code th:text="${plan.job().runtimeFolder}">runtime</code></dd></div>
                         </dl>
+                        <a th:if="${plan.job().registeredInstanceId != null}"
+                           class="btn btn-outline-primary w-100"
+                           th:href="@{/control-center/instances/{id}(id=${plan.job().registeredInstanceId})}">
+                            <i class="bi bi-hdd-stack me-1"></i>Ver instancia registrada
+                        </a>
                     </section>
 
                     <section class="matrix26-panel">
-                        <div class="matrix26-panel-header"><div><span>Instaladores</span><h2>Módulos propuestos</h2></div></div>
+                        <div class="matrix26-panel-header"><div><span>Instaladores</span><h2>Módulos seleccionados</h2></div></div>
                         <div class="matrix26-provisioning-modules">
-                            <article th:each="item : ${plan.modules()}" th:classappend="${item.status == 'READY'} ? ' is-ready' : ' is-blocked'">
-                                <i class="bi" th:classappend="${item.status == 'READY'} ? ' bi-check-circle-fill' : ' bi-exclamation-triangle-fill'"></i>
+                            <article th:each="item : ${plan.modules()}"
+                                     th:classappend="${item.status == 'COMPLETED'} ? ' is-ready' : (${item.status == 'FAILED' or item.status == 'BLOCKED'} ? ' is-blocked' : ' is-ready')">
+                                <i class="bi"
+                                   th:classappend="${item.status == 'FAILED' or item.status == 'BLOCKED'} ? ' bi-exclamation-triangle-fill' : ' bi-check-circle-fill'"></i>
                                 <div>
                                     <strong th:text="${item.moduleName}">Módulo</strong>
                                     <small th:text="${item.detail}">Detalle</small>
@@ -103,13 +126,82 @@
                 </div>
             </div>
 
-            <div class="matrix26-no-execution mt-4">
+            <section th:if="${executionEnabled and canExecute}" class="matrix26-panel matrix26-execution-panel mt-4">
+                <div class="matrix26-panel-header">
+                    <div><span>Confirmación explícita</span><h2 th:text="${plan.job().status == 'FAILED' ? 'Reintentar desde el paso fallido' : 'Ejecutar aprovisionamiento real'}">Ejecutar</h2></div>
+                    <span class="badge text-bg-warning">Operación real</span>
+                </div>
+
+                <div class="matrix26-execution-warning">
+                    <i class="bi bi-exclamation-octagon-fill"></i>
+                    <div>
+                        <strong>Matrix26 creará recursos nuevos</strong>
+                        <span>Se creará <code th:text="${plan.job().databaseName}">database</code>, se generará el runtime <code th:text="${plan.job().runtimeProfile}">runtime</code> y se registrará una nueva instancia protegida. El runtime no se inicia automáticamente.</span>
+                    </div>
+                </div>
+
+                <form th:action="@{/control-center/provisioning/{id}/execute(id=${plan.job().id})}"
+                      th:object="${executionForm}" method="post" class="row g-3 mt-1" autocomplete="off">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+
+                    <div th:if="${#fields.hasGlobalErrors()}" class="col-12">
+                        <div class="alert alert-danger mb-0" th:each="error : ${#fields.globalErrors()}" th:text="${error}">Error</div>
+                    </div>
+
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label" for="confirmationReference">Escribe la referencia</label>
+                        <input id="confirmationReference" type="text" class="form-control"
+                               th:field="*{confirmationReference}"
+                               th:placeholder="${plan.job().referenceCode}" autocomplete="off">
+                        <div class="form-text">Debe coincidir exactamente con <code th:text="${plan.job().referenceCode}">M26</code>.</div>
+                        <div class="text-danger small mt-1" th:errors="*{confirmationReference}"></div>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label" for="adminPassword">Contraseña inicial</label>
+                        <input id="adminPassword" name="adminPassword" type="password" class="form-control" autocomplete="new-password" value="">
+                        <div class="form-text">Se cifra directamente en la nueva base y no se guarda en Matrix26.</div>
+                        <div class="text-danger small mt-1" th:errors="*{adminPassword}"></div>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label" for="adminPasswordConfirmation">Confirmar contraseña</label>
+                        <input id="adminPasswordConfirmation" name="adminPasswordConfirmation" type="password" class="form-control" autocomplete="new-password" value="">
+                        <div class="text-danger small mt-1" th:errors="*{adminPasswordConfirmation}"></div>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check matrix26-confirm-check">
+                            <input id="acknowledged" class="form-check-input" type="checkbox" th:field="*{acknowledged}">
+                            <label class="form-check-label" for="acknowledged">
+                                Revisé la base, el puerto, el runtime y los módulos. Confirmo que deseo crear esta nueva instancia.
+                            </label>
+                        </div>
+                        <div class="text-danger small mt-1" th:errors="*{acknowledged}"></div>
+                    </div>
+                    <div class="col-12 d-flex justify-content-end gap-2">
+                        <a class="btn btn-outline-secondary" th:href="@{/control-center/provisioning}">Cancelar</a>
+                        <button class="btn btn-danger" type="submit">
+                            <i class="bi bi-play-circle-fill me-1"></i>
+                            <span th:text="${plan.job().status == 'FAILED' ? 'Reintentar aprovisionamiento' : 'Crear instancia ahora'}">Crear</span>
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <div th:if="${!executionEnabled}" class="matrix26-no-execution mt-4">
                 <i class="bi bi-lock-fill"></i>
                 <div>
-                    <strong>Ejecución deshabilitada en la Fase 3A</strong>
-                    <span>La futura Fase 3B requerirá confirmación explícita, credenciales seguras y recuperación ante errores.</span>
+                    <strong>Ejecución deshabilitada en este runtime</strong>
+                    <span>Activa la propiedad de aprovisionamiento únicamente en Matrix26 Control Center.</span>
                 </div>
                 <a class="btn btn-outline-secondary" th:href="@{/control-center/provisioning}">Volver a planes</a>
+            </div>
+
+            <div th:if="${plan.job().status == 'COMPLETED'}" class="matrix26-completed-box mt-4">
+                <i class="bi bi-check-circle-fill"></i>
+                <div>
+                    <strong>Aprovisionamiento completado</strong>
+                    <span>La instancia fue registrada y protegida. Para iniciarla, ejecuta el <code>run.sh</code> generado en su carpeta runtime y luego usa “Comprobar ahora”.</span>
+                </div>
+                <a class="btn btn-outline-primary" th:href="@{/control-center/provisioning}">Volver a planes</a>
             </div>
         </main>
     </div>

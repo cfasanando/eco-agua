@@ -80,6 +80,24 @@ public class Matrix26ProvisioningJob {
     @Column(name = "validated_at")
     private LocalDateTime validatedAt;
 
+    @Column(name = "executed_by", length = 120)
+    private String executedBy;
+
+    @Column(name = "execution_started_at")
+    private LocalDateTime executionStartedAt;
+
+    @Column(name = "execution_completed_at")
+    private LocalDateTime executionCompletedAt;
+
+    @Column(name = "last_error", length = 2000)
+    private String lastError;
+
+    @Column(name = "registered_instance_id")
+    private Long registeredInstanceId;
+
+    @Column(name = "runtime_folder", length = 500)
+    private String runtimeFolder;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -248,6 +266,55 @@ public class Matrix26ProvisioningJob {
 
     public void setValidatedAt(LocalDateTime validatedAt) {
         this.validatedAt = validatedAt;
+    }
+
+
+    public String getExecutedBy() {
+        return executedBy;
+    }
+
+    public void setExecutedBy(String executedBy) {
+        this.executedBy = executedBy;
+    }
+
+    public LocalDateTime getExecutionStartedAt() {
+        return executionStartedAt;
+    }
+
+    public void setExecutionStartedAt(LocalDateTime executionStartedAt) {
+        this.executionStartedAt = executionStartedAt;
+    }
+
+    public LocalDateTime getExecutionCompletedAt() {
+        return executionCompletedAt;
+    }
+
+    public void setExecutionCompletedAt(LocalDateTime executionCompletedAt) {
+        this.executionCompletedAt = executionCompletedAt;
+    }
+
+    public String getLastError() {
+        return lastError;
+    }
+
+    public void setLastError(String lastError) {
+        this.lastError = lastError;
+    }
+
+    public Long getRegisteredInstanceId() {
+        return registeredInstanceId;
+    }
+
+    public void setRegisteredInstanceId(Long registeredInstanceId) {
+        this.registeredInstanceId = registeredInstanceId;
+    }
+
+    public String getRuntimeFolder() {
+        return runtimeFolder;
+    }
+
+    public void setRuntimeFolder(String runtimeFolder) {
+        this.runtimeFolder = runtimeFolder;
     }
 
     public LocalDateTime getCreatedAt() {

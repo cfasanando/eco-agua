@@ -44,7 +44,7 @@ public class Matrix26ProvisioningModule {
     @Column(name = "installer_version", length = 50)
     private String installerVersion;
 
-    @Column(length = 500)
+    @Column(columnDefinition = "TEXT")
     private String detail;
 
     @Column(name = "created_at", nullable = false)

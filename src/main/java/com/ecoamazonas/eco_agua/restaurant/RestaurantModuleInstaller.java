@@ -23,6 +23,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
     private final PlatformSettingService platformSettingService;
     private final PlatformSettingRepository platformSettingRepository;
     private final RestaurantSettingsService restaurantSettingsService;
+    private final ThreadLocal<JdbcTemplate> targetJdbcTemplate = new ThreadLocal<>();
     private volatile boolean installationConfirmed;
 
     public RestaurantModuleInstaller(JdbcTemplate jdbcTemplate,
@@ -52,10 +53,11 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
 
     @Override
     public boolean isInstalled() {
-        if (installationConfirmed) {
+        boolean targetInstallation = targetJdbcTemplate.get() != null;
+        if (!targetInstallation && installationConfirmed) {
             return true;
         }
-        Integer tableCount = jdbcTemplate.queryForObject("""
+        Integer tableCount = jdbc().queryForObject("""
                 SELECT COUNT(*)
                 FROM information_schema.tables
                 WHERE table_schema = DATABASE()
@@ -64,7 +66,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                                      'restaurant_ingredient', 'restaurant_recipe_item', 'restaurant_ingredient_movement',
                                      'restaurant_order_item_ingredient', 'restaurant_cash_session', 'restaurant_cash_movement')
                 """, Integer.class);
-        Integer columnCount = jdbcTemplate.queryForObject("""
+        Integer columnCount = jdbc().queryForObject("""
                 SELECT COUNT(*)
                 FROM information_schema.columns
                 WHERE table_schema = DATABASE()
@@ -73,7 +75,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                 """, Integer.class);
         boolean installed = tableCount != null && tableCount == 13
                 && columnCount != null && columnCount == 6;
-        if (installed) {
+        if (installed && !targetInstallation) {
             installationConfirmed = true;
         }
         return installed;
@@ -100,6 +102,35 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
     }
 
     @Override
+    public boolean supportsTargetInstallation() {
+        return true;
+    }
+
+    @Override
+    public void installOnTarget(JdbcTemplate targetJdbcTemplate, boolean demoData) {
+        if (targetJdbcTemplate == null) {
+            throw new IllegalArgumentException("Target JdbcTemplate is required.");
+        }
+
+        this.targetJdbcTemplate.set(targetJdbcTemplate);
+        try {
+            createTables();
+            ensureModuleCatalog();
+            ensureTargetRestaurantSettings();
+            if (demoData) {
+                seedDemoData();
+            }
+            setTargetEnabled(true);
+            ensureTargetModuleRegistry();
+            if (!isInstalled()) {
+                throw new IllegalStateException("Restaurant target schema validation failed after installation.");
+            }
+        } finally {
+            this.targetJdbcTemplate.remove();
+        }
+    }
+
+    @Override
     @Transactional
     public void setEnabled(boolean enabled) {
         PlatformSetting setting = platformSettingService.ensure(
@@ -111,6 +142,93 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
         );
         setting.setValue(Boolean.toString(enabled));
         platformSettingRepository.save(setting);
+    }
+
+    private JdbcTemplate jdbc() {
+        JdbcTemplate target = targetJdbcTemplate.get();
+        return target == null ? jdbcTemplate : target;
+    }
+
+    private void ensureTargetRestaurantSettings() {
+        upsertTargetSetting("public.nav.restaurant_label", "Carta", "string", "public_site", "Etiqueta para la carta digital de restaurante");
+        upsertTargetSetting(MODULE_SETTING, "true", "boolean", "system_modules", "Módulo Restaurante / carta digital, reservas, mesas, comandas, recetas y cocina");
+        upsertTargetSetting("restaurant.identity.trade_name", "Restaurante", "string", "restaurant", "Nombre comercial del restaurante");
+        upsertTargetSetting("restaurant.identity.legal_name", "Restaurante", "string", "restaurant", "Razón social impresa en cuentas y recibos");
+        upsertTargetSetting("restaurant.identity.ruc", "", "string", "restaurant", "RUC del restaurante");
+        upsertTargetSetting("restaurant.identity.address", "Iquitos", "string", "restaurant", "Dirección comercial");
+        upsertTargetSetting("restaurant.identity.phone", "", "string", "restaurant", "Teléfono del restaurante");
+        upsertTargetSetting("restaurant.identity.whatsapp", "", "string", "restaurant", "WhatsApp del restaurante");
+        upsertTargetSetting("restaurant.identity.logo", "/img/logo3-transparente.png", "image", "restaurant", "Ruta del logo del restaurante");
+        upsertTargetSetting("restaurant.currency.symbol", "S/", "string", "restaurant", "Símbolo de moneda usado en Restaurante");
+        upsertTargetSetting("restaurant.tax.igv_enabled", "false", "boolean", "restaurant", "Mostrar desglose de IGV incluido");
+        upsertTargetSetting("restaurant.tax.igv_rate", "18.00", "decimal", "restaurant", "Porcentaje de IGV incluido");
+        upsertTargetSetting("restaurant.service_charge.enabled", "false", "boolean", "restaurant", "Aplicar cargo por servicio a pedidos en mesa");
+        upsertTargetSetting("restaurant.service_charge.rate", "10.00", "decimal", "restaurant", "Porcentaje de cargo por servicio para pedidos en mesa");
+        upsertTargetSetting("restaurant.order.prefix", "CMD", "string", "restaurant", "Prefijo de comandas y pedidos");
+        upsertTargetSetting("restaurant.preparation.minutes", "30", "integer", "restaurant", "Tiempo estimado de preparación en minutos");
+        upsertTargetSetting("restaurant.hours.open", "09:00", "time", "restaurant", "Hora de apertura");
+        upsertTargetSetting("restaurant.hours.close", "23:00", "time", "restaurant", "Hora de cierre");
+        upsertTargetSetting("restaurant.public.welcome_message", "Explora nuestros platos, bebidas y promociones.", "text", "restaurant", "Mensaje principal de la carta QR");
+        upsertTargetSetting("restaurant.receipt.footer", "Gracias por tu preferencia.", "text", "restaurant", "Texto al pie de la cuenta y el recibo");
+        upsertTargetSetting("restaurant.qr_orders.enabled", "true", "boolean", "restaurant", "Permitir pedidos desde la carta QR");
+        upsertTargetSetting("restaurant.table_requests.enabled", "true", "boolean", "restaurant", "Permitir solicitudes de atención desde mesa");
+        upsertTargetSetting("restaurant.takeaway.enabled", "true", "boolean", "restaurant", "Habilitar pedidos para llevar");
+        upsertTargetSetting("restaurant.delivery.enabled", "true", "boolean", "restaurant", "Habilitar pedidos delivery");
+        upsertTargetSetting("restaurant.delivery.default_fee", "0.00", "decimal", "restaurant", "Costo de delivery predeterminado");
+        upsertTargetSetting("restaurant.qr.max_items", "20", "integer", "restaurant", "Máximo de platos distintos por pedido QR");
+        upsertTargetSetting("restaurant.qr.max_quantity_per_item", "10", "integer", "restaurant", "Cantidad máxima por plato en un pedido QR");
+        upsertTargetSetting("restaurant.ticket.show_logo", "true", "boolean", "restaurant", "Mostrar logo en cuenta, ticket y recibo");
+    }
+
+    private void upsertTargetSetting(String variable, String value, String type, String category, String description) {
+        jdbc().update("""
+                INSERT INTO platform_setting (`variable`, `value`, `type`, `category`, `description`)
+                VALUES (?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    `value` = VALUES(`value`),
+                    `type` = VALUES(`type`),
+                    `category` = VALUES(`category`),
+                    `description` = VALUES(`description`)
+                """, variable, value, type, category, description);
+    }
+
+    private void setTargetEnabled(boolean enabled) {
+        upsertTargetSetting(MODULE_SETTING, Boolean.toString(enabled), "boolean", "system_modules",
+                "Módulo Restaurante / carta digital, reservas, mesas, comandas, recetas y cocina");
+    }
+
+    private void ensureTargetModuleRegistry() {
+        jdbc().execute("""
+                CREATE TABLE IF NOT EXISTS platform_module_installation (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    module_key VARCHAR(80) NOT NULL,
+                    installed_version VARCHAR(50) NULL,
+                    target_version VARCHAR(50) NULL,
+                    status VARCHAR(30) NOT NULL DEFAULT 'NOT_INSTALLED',
+                    enabled TINYINT(1) NOT NULL DEFAULT 0,
+                    current_step VARCHAR(255) NULL,
+                    last_error VARCHAR(2000) NULL,
+                    started_at DATETIME NULL,
+                    completed_at DATETIME NULL,
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_platform_module_installation_key (module_key)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        jdbc().update("""
+                INSERT INTO platform_module_installation
+                    (module_key, installed_version, target_version, status, enabled, current_step, last_error, started_at, completed_at, updated_at)
+                VALUES (?, ?, ?, 'ACTIVE', 1, NULL, NULL, NOW(), NOW(), NOW())
+                ON DUPLICATE KEY UPDATE
+                    installed_version = VALUES(installed_version),
+                    target_version = VALUES(target_version),
+                    status = 'ACTIVE',
+                    enabled = 1,
+                    current_step = NULL,
+                    last_error = NULL,
+                    completed_at = NOW(),
+                    updated_at = NOW()
+                """, MODULE_KEY, CURRENT_VERSION, CURRENT_VERSION);
     }
 
     private void ensurePublicLabels() {
@@ -126,7 +244,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
     private void createTables() {
         ensureProductTableForRestaurant();
 
-        jdbcTemplate.execute("""
+        jdbc().execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_ingredient (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     name VARCHAR(180) NOT NULL,
@@ -145,7 +263,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
 
-        jdbcTemplate.execute("""
+        jdbc().execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_recipe_item (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     product_id BIGINT NOT NULL,
@@ -162,7 +280,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
 
-        jdbcTemplate.execute("""
+        jdbc().execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_table (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     code VARCHAR(50) NOT NULL,
@@ -181,7 +299,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
 
-        jdbcTemplate.execute("""
+        jdbc().execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_order (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     order_code VARCHAR(80) NOT NULL,
@@ -220,7 +338,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
 
         ensureRestaurantOperationalColumns();
 
-        jdbcTemplate.execute("""
+        jdbc().execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_order_item (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     order_id BIGINT NOT NULL,
@@ -240,7 +358,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
 
         ensureRestaurantOrderItemStockColumns();
 
-        jdbcTemplate.execute("""
+        jdbc().execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_order_item_ingredient (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     order_item_id BIGINT NOT NULL,
@@ -262,7 +380,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
 
-        jdbcTemplate.execute("""
+        jdbc().execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_ingredient_movement (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     ingredient_id BIGINT NOT NULL,
@@ -284,7 +402,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
 
         seedOpeningIngredientMovements();
 
-        jdbcTemplate.execute("""
+        jdbc().execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_table_request (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     table_id BIGINT NOT NULL,
@@ -304,7 +422,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                 """);
 
 
-        jdbcTemplate.execute("""
+        jdbc().execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_qr_order (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     table_id BIGINT NOT NULL,
@@ -324,7 +442,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
 
-        jdbcTemplate.execute("""
+        jdbc().execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_qr_order_item (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     qr_order_id BIGINT NOT NULL,
@@ -341,7 +459,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                 """);
 
 
-        jdbcTemplate.execute("""
+        jdbc().execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_reservation (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     reservation_code VARCHAR(80) NOT NULL,
@@ -368,7 +486,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
 
-        jdbcTemplate.execute("""
+        jdbc().execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_cash_session (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     business_date DATE NOT NULL,
@@ -391,7 +509,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
 
-        jdbcTemplate.execute("""
+        jdbc().execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_cash_movement (
                     id BIGINT NOT NULL AUTO_INCREMENT,
                     cash_session_id BIGINT NOT NULL,
@@ -422,7 +540,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
         if (!tableExists("restaurant_ingredient") || !tableExists("restaurant_ingredient_movement")) {
             return;
         }
-        jdbcTemplate.update("""
+        jdbc().update("""
                 INSERT INTO restaurant_ingredient_movement
                 (ingredient_id, movement_type, quantity_change, balance_after, notes, created_at)
                 SELECT i.id, 'OPENING', i.stock, i.stock, 'Saldo inicial registrado al instalar el control de ingredientes', NOW()
@@ -465,7 +583,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
     }
 
     private void ensureColumn(String tableName, String columnName, String alterSql) {
-        Integer count = jdbcTemplate.queryForObject("""
+        Integer count = jdbc().queryForObject("""
                 SELECT COUNT(*)
                 FROM information_schema.columns
                 WHERE table_schema = DATABASE()
@@ -473,13 +591,13 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                   AND column_name = ?
                 """, Integer.class, tableName, columnName);
         if (count == null || count == 0) {
-            jdbcTemplate.execute(alterSql);
+            jdbc().execute(alterSql);
         }
     }
 
 
     private void ensureIndex(String tableName, String indexName, String alterSql) {
-        Integer count = jdbcTemplate.queryForObject("""
+        Integer count = jdbc().queryForObject("""
                 SELECT COUNT(*)
                 FROM information_schema.statistics
                 WHERE table_schema = DATABASE()
@@ -487,14 +605,14 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                   AND index_name = ?
                 """, Integer.class, tableName, indexName);
         if (count == null || count == 0) {
-            jdbcTemplate.execute(alterSql);
+            jdbc().execute(alterSql);
         }
     }
 
 
     private void ensureProductTableForRestaurant() {
         if (!tableExists("product")) {
-            jdbcTemplate.execute("""
+            jdbc().execute("""
                     CREATE TABLE IF NOT EXISTS product (
                         id BIGINT NOT NULL AUTO_INCREMENT,
                         name VARCHAR(200) NOT NULL,
@@ -537,7 +655,7 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
             return;
         }
 
-        jdbcTemplate.update("""
+        jdbc().update("""
                 INSERT INTO platform_module_catalog
                 (`module_key`, `name`, `area`, `description`, `default_enabled`, `configurable`, `active`, `display_order`, `created_at`, `updated_at`)
                 VALUES ('restaurant', 'Restaurante / carta y comandas', 'Operación restaurante',
@@ -577,12 +695,12 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
                                         boolean featured,
                                         String stock,
                                         String minimumStock) {
-        Integer exists = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM product WHERE name = ?", Integer.class, name);
+        Integer exists = jdbc().queryForObject("SELECT COUNT(*) FROM product WHERE name = ?", Integer.class, name);
         if (exists != null && exists > 0) {
             return;
         }
 
-        jdbcTemplate.update("""
+        jdbc().update("""
                 INSERT INTO product (`name`, `description`, `image_path`, `price`, `active`, `featured`, `stock`, `minimum_stock`, `restaurant_visible`, `restaurant_available`, `restaurant_sort_order`)
                 VALUES (?, ?, ?, ?, true, ?, ?, ?, true, true, 0)
                 """, name, description, imagePath, price, featured, stock, minimumStock);
@@ -596,18 +714,18 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
     }
 
     private void insertTableIfMissing(String code, String name, String area, int seats, String status, String notes) {
-        Integer exists = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM restaurant_table WHERE code = ?", Integer.class, code);
+        Integer exists = jdbc().queryForObject("SELECT COUNT(*) FROM restaurant_table WHERE code = ?", Integer.class, code);
         if (exists != null && exists > 0) {
             return;
         }
-        jdbcTemplate.update("""
+        jdbc().update("""
                 INSERT INTO restaurant_table (`code`, `name`, `area`, `seats`, `status`, `active`, `notes`)
                 VALUES (?, ?, ?, ?, ?, true, ?)
                 """, code, name, area, seats, status, notes);
     }
 
     private void seedDemoOrder() {
-        Integer exists = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM restaurant_order WHERE order_code = 'CMD-DEMO-001'", Integer.class);
+        Integer exists = jdbc().queryForObject("SELECT COUNT(*) FROM restaurant_order WHERE order_code = 'CMD-DEMO-001'", Integer.class);
         if (exists != null && exists > 0) {
             return;
         }
@@ -618,10 +736,10 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
             return;
         }
 
-        String productName = jdbcTemplate.query("SELECT name FROM product WHERE id = ?", rs -> rs.next() ? rs.getString(1) : "Plato demo", productId);
-        java.math.BigDecimal price = jdbcTemplate.query("SELECT price FROM product WHERE id = ?", rs -> rs.next() ? rs.getBigDecimal(1) : java.math.BigDecimal.valueOf(18), productId);
+        String productName = jdbc().query("SELECT name FROM product WHERE id = ?", rs -> rs.next() ? rs.getString(1) : "Plato demo", productId);
+        java.math.BigDecimal price = jdbc().query("SELECT price FROM product WHERE id = ?", rs -> rs.next() ? rs.getBigDecimal(1) : java.math.BigDecimal.valueOf(18), productId);
 
-        jdbcTemplate.update("""
+        jdbc().update("""
                 INSERT INTO restaurant_order (`order_code`, `service_type`, `table_id`, `customer_name`, `customer_phone`, `status`, `subtotal`, `notes`)
                 VALUES ('CMD-DEMO-001', 'DINE_IN', ?, 'Cliente demo salón', '+51966666666', 'IN_KITCHEN', ?, 'Comanda demo para cocina')
                 """, tableId, price);
@@ -629,14 +747,14 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
         if (orderId == null) {
             return;
         }
-        jdbcTemplate.update("""
+        jdbc().update("""
                 INSERT INTO restaurant_order_item (`order_id`, `product_id`, `product_name`, `quantity`, `unit_price`, `line_total`, `kitchen_status`)
                 VALUES (?, ?, ?, 1, ?, ?, 'PENDING')
                 """, orderId, productId, productName, price, price);
     }
 
     private boolean tableExists(String tableName) {
-        Integer count = jdbcTemplate.queryForObject("""
+        Integer count = jdbc().queryForObject("""
                 SELECT COUNT(*)
                 FROM information_schema.tables
                 WHERE table_schema = DATABASE()
@@ -646,6 +764,6 @@ public class RestaurantModuleInstaller implements PlatformModuleInstaller {
     }
 
     private Long queryLong(String sql) {
-        return jdbcTemplate.query(sql, rs -> rs.next() ? rs.getLong(1) : null);
+        return jdbc().query(sql, rs -> rs.next() ? rs.getLong(1) : null);
     }
 }

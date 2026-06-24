@@ -5,7 +5,7 @@
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('Aprovisionamiento', 'Planes seguros de creación de nuevas instancias empresariales.')}" ></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Aprovisionamiento', 'Planes validados y ejecución controlada de nuevas instancias empresariales.')}" ></header>
 
         <main class="matrix26-main">
             <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}"></div>
@@ -15,8 +15,8 @@
             <div class="matrix26-alert-safe mb-4">
                 <i class="bi bi-shield-check"></i>
                 <div>
-                    <strong>Fase 3A: Dry Run únicamente</strong>
-                    <p>Matrix26 valida nombres, puertos, runtimes, bases y módulos, y guarda el plan en <code>matrix26_platform_control</code>. No crea bases, no genera runtimes y no modifica ningún portal.</p>
+                    <strong>Fase 3B: aprovisionamiento controlado</strong>
+                    <p>Matrix26 valida el plan y solo ejecuta con confirmación explícita. Cada paso queda registrado y puede reintentarse después de un error. Las instancias existentes permanecen protegidas.</p>
                 </div>
             </div>
 
@@ -25,9 +25,11 @@
                     <span><strong th:text="${provisioningSummary.total()}">0</strong> planes</span>
                     <span class="text-success"><strong th:text="${provisioningSummary.ready()}">0</strong> listos</span>
                     <span class="text-danger"><strong th:text="${provisioningSummary.blocked()}">0</strong> bloqueados</span>
+                    <span class="text-primary"><strong th:text="${provisioningSummary.completed()}">0</strong> completados</span>
+                    <span class="text-warning"><strong th:text="${provisioningSummary.failed()}">0</strong> fallidos</span>
                 </div>
                 <a class="btn btn-primary" th:href="@{/control-center/provisioning/new}">
-                    <i class="bi bi-diagram-3 me-1"></i>Nuevo Dry Run
+                    <i class="bi bi-diagram-3 me-1"></i>Nuevo plan
                 </a>
             </div>
 
@@ -61,9 +63,9 @@
                             </td>
                             <td>
                                 <span class="badge"
-                                      th:classappend="${job.status == 'READY'} ? ' text-bg-success' : ' text-bg-danger'"
-                                      th:text="${job.status == 'READY' ? 'Listo' : 'Bloqueado'}">Estado</span>
-                                <small>Dry Run</small>
+                                      th:classappend="${job.status == 'READY'} ? ' text-bg-success' : (${job.status == 'COMPLETED'} ? ' text-bg-primary' : (${job.status == 'RUNNING'} ? ' text-bg-warning' : ' text-bg-danger'))"
+                                      th:text="${job.status == 'READY'} ? 'Listo' : (${job.status == 'COMPLETED'} ? 'Completado' : (${job.status == 'RUNNING'} ? 'En ejecución' : (${job.status == 'FAILED'} ? 'Fallido' : 'Bloqueado'))) ">Estado</span>
+                                <small th:text="${job.status == 'COMPLETED'} ? 'Instancia creada' : (${job.status == 'FAILED'} ? 'Reintento disponible' : 'Plan persistente')">Plan</small>
                             </td>
                             <td th:text="${job.requestedBy}">matrix_admin</td>
                             <td class="text-nowrap" th:text="${#temporals.format(job.createdAt, 'dd/MM/yyyy HH:mm:ss')}">Fecha</td>

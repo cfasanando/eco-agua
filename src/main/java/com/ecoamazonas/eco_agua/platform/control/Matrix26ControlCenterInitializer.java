@@ -76,6 +76,8 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
         seedAdministrator();
         Map<String, PlatformModuleCatalog> modules = seedModuleCatalog();
         seedProtectedInstances(modules);
+        seedAppearanceCatalog();
+        seedInstanceAppearances();
 
         LOGGER.info("Matrix26 Control Center initialized on {} using database {}.",
                 properties.getPortalUrl(), properties.getDatabaseName());
@@ -370,6 +372,189 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
         platformSettingService.ensure(variable, value, type, category, description);
     }
 
+    private void seedAppearanceCatalog() {
+        seedTheme(
+                "matrix26-classic",
+                "Matrix26 Classic",
+                "Diseño empresarial limpio y neutral basado en la experiencia actual de Matrix26.",
+                "1.0.0",
+                "classic",
+                true,
+                true,
+                "public-classic-grid",
+                "admin-sidebar-classic",
+                "{\"primary\":\"#2563eb\",\"secondary\":\"#172554\",\"background\":\"#f4f7fb\",\"surface\":\"#ffffff\",\"text\":\"#172033\",\"radius\":\"16px\"}",
+                10
+        );
+        seedTheme(
+                "matrix26-nature",
+                "Matrix26 Nature",
+                "Identidad amazónica con verdes, turquesas y tonos naturales para marcas sostenibles.",
+                "1.0.0",
+                "nature",
+                true,
+                true,
+                "public-nature-editorial",
+                "admin-sidebar-classic",
+                "{\"primary\":\"#138a63\",\"secondary\":\"#145a4a\",\"background\":\"#f3f8f3\",\"surface\":\"#ffffff\",\"text\":\"#173c32\",\"radius\":\"20px\"}",
+                20
+        );
+        seedTheme(
+                "matrix26-warm",
+                "Matrix26 Warm",
+                "Apariencia gastronómica cálida con terracota, crema y mayor protagonismo visual.",
+                "1.0.0",
+                "warm",
+                true,
+                true,
+                "public-restaurant-visual",
+                "admin-sidebar-classic",
+                "{\"primary\":\"#b4532a\",\"secondary\":\"#5f2d1d\",\"background\":\"#fff8f1\",\"surface\":\"#ffffff\",\"text\":\"#3f241b\",\"radius\":\"18px\"}",
+                30
+        );
+
+        String allThemes = "matrix26-classic,matrix26-nature,matrix26-warm";
+        seedLayout("public-classic-grid", "Public Classic Grid", "PUBLIC", "Catálogo con filtros laterales y grid uniforme de productos.", "1.0.0", "public-grid", allThemes, "{\"columns\":4,\"filterPosition\":\"left\",\"hero\":\"standard\"}", 10);
+        seedLayout("public-nature-editorial", "Public Nature Editorial", "PUBLIC", "Experiencia editorial con historia, imágenes amplias y contenido cultural.", "1.0.0", "public-editorial", allThemes, "{\"hero\":\"wide\",\"storySection\":true,\"productDensity\":\"relaxed\"}", 20);
+        seedLayout("public-restaurant-visual", "Public Restaurant Visual", "PUBLIC", "Carta gastronómica móvil con categorías horizontales, precios y acciones de pedido.", "1.0.0", "public-restaurant", allThemes, "{\"hero\":\"food\",\"categoryNavigation\":\"horizontal\",\"priceEmphasis\":true}", 30);
+        seedLayout("admin-sidebar-classic", "Admin Sidebar Classic", "ADMIN", "Sidebar completo, topbar y área estable para módulos administrativos complejos.", "1.0.0", "admin-sidebar", allThemes, "{\"sidebar\":\"expanded\",\"density\":\"comfortable\",\"topbar\":true}", 40);
+        seedLayout("admin-compact-workspace", "Admin Compact Workspace", "ADMIN", "Sidebar compacto de iconos y mayor área útil para operaciones intensivas.", "1.0.0", "admin-compact", allThemes, "{\"sidebar\":\"compact\",\"density\":\"compact\",\"tooltips\":true}", 50);
+        seedLayout("login-split", "Login Split", "LOGIN", "Acceso dividido con identidad de marca, imagen y panel de autenticación.", "1.0.0", "login-split", allThemes, "{\"variant\":\"split\",\"brandPanel\":true,\"responsive\":true}", 60);
+    }
+
+    private void seedTheme(
+            String code,
+            String name,
+            String description,
+            String version,
+            String previewStyle,
+            boolean supportsPublic,
+            boolean supportsAdmin,
+            String defaultPublicLayout,
+            String defaultAdminLayout,
+            String tokensJson,
+            int displayOrder
+    ) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO matrix26_theme_catalog (
+                    code, name, description, version, status, preview_style,
+                    supports_public, supports_admin, default_public_layout_code,
+                    default_admin_layout_code, tokens_json, display_order, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?, ?, ?, ?, ?, NOW(6), NOW(6))
+                ON DUPLICATE KEY UPDATE
+                    name = VALUES(name),
+                    description = VALUES(description),
+                    version = VALUES(version),
+                    status = 'ACTIVE',
+                    preview_style = VALUES(preview_style),
+                    supports_public = VALUES(supports_public),
+                    supports_admin = VALUES(supports_admin),
+                    default_public_layout_code = VALUES(default_public_layout_code),
+                    default_admin_layout_code = VALUES(default_admin_layout_code),
+                    tokens_json = VALUES(tokens_json),
+                    display_order = VALUES(display_order),
+                    updated_at = NOW(6)
+                """,
+                code, name, description, version, previewStyle, supportsPublic, supportsAdmin,
+                defaultPublicLayout, defaultAdminLayout, tokensJson, displayOrder
+        );
+    }
+
+    private void seedLayout(
+            String code,
+            String name,
+            String area,
+            String description,
+            String version,
+            String previewStyle,
+            String compatibleThemes,
+            String configurationJson,
+            int displayOrder
+    ) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO matrix26_layout_catalog (
+                    code, name, description, area, version, status, preview_style,
+                    compatible_themes, configuration_json, display_order, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, ?, NOW(6), NOW(6))
+                ON DUPLICATE KEY UPDATE
+                    name = VALUES(name),
+                    description = VALUES(description),
+                    area = VALUES(area),
+                    version = VALUES(version),
+                    status = 'ACTIVE',
+                    preview_style = VALUES(preview_style),
+                    compatible_themes = VALUES(compatible_themes),
+                    configuration_json = VALUES(configuration_json),
+                    display_order = VALUES(display_order),
+                    updated_at = NOW(6)
+                """,
+                code, name, description, area, version, previewStyle,
+                compatibleThemes, configurationJson, displayOrder
+        );
+    }
+
+    private void seedInstanceAppearances() {
+        List<Map<String, Object>> instances = jdbcTemplate.queryForList(
+                "SELECT id, code, business_type, primary_color FROM platform_business_client ORDER BY id"
+        );
+        for (Map<String, Object> instance : instances) {
+            long instanceId = ((Number) instance.get("id")).longValue();
+            String code = String.valueOf(instance.get("code"));
+            String businessType = instance.get("business_type") == null ? "" : String.valueOf(instance.get("business_type"));
+            String primaryColor = instance.get("primary_color") == null ? "#2563eb" : String.valueOf(instance.get("primary_color"));
+
+            String publicTheme = "matrix26-classic";
+            String publicLayout = "public-classic-grid";
+            if ("restaurant".equalsIgnoreCase(businessType)) {
+                publicTheme = "matrix26-warm";
+                publicLayout = "public-restaurant-visual";
+            } else if ("jungle_products".equalsIgnoreCase(businessType)) {
+                publicTheme = "matrix26-nature";
+                publicLayout = "public-nature-editorial";
+            } else if ("water_delivery".equalsIgnoreCase(businessType)) {
+                publicTheme = "matrix26-nature";
+            }
+
+            String overrides = "{\"primaryColor\":\"" + primaryColor + "\",\"source\":\"phase3c1-default\"}";
+            jdbcTemplate.update(
+                    """
+                    INSERT INTO matrix26_instance_appearance (
+                        instance_id, public_theme_code, public_layout_code,
+                        admin_theme_code, admin_layout_code, login_layout_code,
+                        overrides_json, status, published_version, published_at,
+                        published_by, created_at, updated_at
+                    ) VALUES (?, ?, ?, 'matrix26-classic', 'admin-sidebar-classic', 'login-split',
+                              ?, 'PUBLISHED', 1, NOW(6), 'system', NOW(6), NOW(6))
+                    ON DUPLICATE KEY UPDATE instance_id = VALUES(instance_id)
+                    """,
+                    instanceId, publicTheme, publicLayout, overrides
+            );
+
+            Integer historyCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM matrix26_instance_appearance_history WHERE instance_id = ?",
+                    Integer.class,
+                    instanceId
+            );
+            if (historyCount == null || historyCount == 0) {
+                String snapshot = "{\"instanceCode\":\"" + code + "\",\"publicTheme\":\"" + publicTheme
+                        + "\",\"publicLayout\":\"" + publicLayout
+                        + "\",\"adminTheme\":\"matrix26-classic\",\"adminLayout\":\"admin-sidebar-classic\",\"loginLayout\":\"login-split\"}";
+                jdbcTemplate.update(
+                        """
+                        INSERT INTO matrix26_instance_appearance_history (
+                            instance_id, version, status, snapshot_json,
+                            actor_username, reason, created_at
+                        ) VALUES (?, 1, 'PUBLISHED', ?, 'system', 'Initial Phase 3C.1 appearance baseline', NOW(6))
+                        """,
+                        instanceId,
+                        snapshot
+                );
+            }
+        }
+    }
+
     private List<String> schemaStatements() {
         return List.of(
                 """
@@ -620,6 +805,87 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
                     KEY idx_matrix26_health_instance_checked (instance_id, checked_at),
                     KEY idx_matrix26_health_checked (checked_at),
                     CONSTRAINT fk_matrix26_health_instance FOREIGN KEY (instance_id) REFERENCES platform_business_client (id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """,
+                """
+                CREATE TABLE IF NOT EXISTS matrix26_theme_catalog (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    code VARCHAR(80) NOT NULL,
+                    name VARCHAR(140) NOT NULL,
+                    description TEXT NULL,
+                    version VARCHAR(30) NOT NULL,
+                    status VARCHAR(30) NOT NULL,
+                    preview_style VARCHAR(80) NULL,
+                    supports_public BIT NOT NULL DEFAULT 0,
+                    supports_admin BIT NOT NULL DEFAULT 0,
+                    default_public_layout_code VARCHAR(80) NULL,
+                    default_admin_layout_code VARCHAR(80) NULL,
+                    tokens_json TEXT NULL,
+                    display_order INT NOT NULL DEFAULT 100,
+                    created_at DATETIME(6) NOT NULL,
+                    updated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_matrix26_theme_code (code)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """,
+                """
+                CREATE TABLE IF NOT EXISTS matrix26_layout_catalog (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    code VARCHAR(80) NOT NULL,
+                    name VARCHAR(150) NOT NULL,
+                    description TEXT NULL,
+                    area VARCHAR(20) NOT NULL,
+                    version VARCHAR(30) NOT NULL,
+                    status VARCHAR(30) NOT NULL,
+                    preview_style VARCHAR(80) NULL,
+                    compatible_themes VARCHAR(500) NULL,
+                    configuration_json TEXT NULL,
+                    display_order INT NOT NULL DEFAULT 100,
+                    created_at DATETIME(6) NOT NULL,
+                    updated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_matrix26_layout_code (code),
+                    KEY idx_matrix26_layout_area_order (area, display_order)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """,
+                """
+                CREATE TABLE IF NOT EXISTS matrix26_instance_appearance (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    instance_id BIGINT NOT NULL,
+                    public_theme_code VARCHAR(80) NOT NULL,
+                    public_layout_code VARCHAR(80) NOT NULL,
+                    admin_theme_code VARCHAR(80) NOT NULL,
+                    admin_layout_code VARCHAR(80) NOT NULL,
+                    login_layout_code VARCHAR(80) NOT NULL,
+                    overrides_json TEXT NULL,
+                    status VARCHAR(30) NOT NULL,
+                    published_version INT NOT NULL DEFAULT 1,
+                    published_at DATETIME(6) NULL,
+                    published_by VARCHAR(120) NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    updated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_matrix26_instance_appearance_instance (instance_id),
+                    KEY idx_matrix26_instance_appearance_status (status),
+                    CONSTRAINT fk_matrix26_instance_appearance_instance FOREIGN KEY (instance_id)
+                        REFERENCES platform_business_client (id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """,
+                """
+                CREATE TABLE IF NOT EXISTS matrix26_instance_appearance_history (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    instance_id BIGINT NOT NULL,
+                    version INT NOT NULL,
+                    status VARCHAR(30) NOT NULL,
+                    snapshot_json TEXT NOT NULL,
+                    actor_username VARCHAR(120) NOT NULL,
+                    reason VARCHAR(500) NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_matrix26_appearance_history_version (instance_id, version),
+                    KEY idx_matrix26_appearance_history_instance (instance_id, version),
+                    CONSTRAINT fk_matrix26_appearance_history_instance FOREIGN KEY (instance_id)
+                        REFERENCES platform_business_client (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """
         );

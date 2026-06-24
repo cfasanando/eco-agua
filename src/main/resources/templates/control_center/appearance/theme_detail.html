@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Detalle de theme')}"></head>
+<body class="matrix26-body" data-theme="matrix26-classic" data-admin-layout="admin-sidebar-classic">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Detalle de theme', 'Especificación visual y compatibilidad de layouts.')}"></header>
+        <main class="matrix26-main">
+            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
+                <div><a class="matrix26-back-link" th:href="@{/control-center/themes}"><i class="bi bi-arrow-left"></i> Volver a themes</a><h2 class="mt-2 mb-1" th:text="${theme.name}">Theme</h2><code th:text="${theme.code}">code</code></div>
+                <span class="badge text-bg-success fs-6" th:text="|${theme.status} · v${theme.version}|">ACTIVE</span>
+            </div>
+            <div class="row g-4">
+                <div class="col-12 col-xl-7"><section class="matrix26-panel h-100"><div class="theme-preview theme-preview-detail" th:classappend="${theme.code}"><div class="theme-preview-sidebar"><i class="bi bi-grid-1x2-fill"></i><span></span><span></span><span></span><span></span></div><div class="theme-preview-workspace"><div class="theme-preview-topbar"></div><div class="theme-preview-hero"></div><div class="theme-preview-cards"><span></span><span></span><span></span></div><div class="theme-preview-table"></div></div></div></section></div>
+                <div class="col-12 col-xl-5"><section class="matrix26-panel h-100"><div class="matrix26-panel-header"><div><span>Especificación</span><h2>Theme versionado</h2></div></div><p class="text-muted" th:text="${theme.description}">Descripción</p><dl class="matrix26-settings-list"><div><dt>Soporte público</dt><dd th:text="${theme.supportsPublic ? 'Sí' : 'No'}">Sí</dd></div><div><dt>Soporte administrativo</dt><dd th:text="${theme.supportsAdmin ? 'Sí' : 'No'}">Sí</dd></div><div><dt>Layout público predeterminado</dt><dd><code th:text="${theme.defaultPublicLayoutCode}">layout</code></dd></div><div><dt>Layout admin predeterminado</dt><dd><code th:text="${theme.defaultAdminLayoutCode}">layout</code></dd></div></dl><div class="matrix26-token-code"><strong>Tokens registrados</strong><pre th:text="${theme.tokensJson}">{}</pre></div></section></div>
+            </div>
+            <section class="matrix26-panel mt-4"><div class="matrix26-panel-header"><div><span>Compatibilidad</span><h2>Layouts disponibles</h2></div></div><div class="matrix26-layout-mini-grid"><article th:each="layout : ${compatibleLayouts}"><span class="matrix26-layout-type" th:text="${layout.area}">PUBLIC</span><i class="bi bi-layout-wtf"></i><strong th:text="${layout.name}">Layout</strong><small th:text="${layout.description}">Descripción</small></article></div></section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

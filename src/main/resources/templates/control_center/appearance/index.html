@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Appearance Studio')}"></head>
+<body class="matrix26-body" data-theme="matrix26-classic" data-admin-layout="admin-sidebar-classic">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Appearance Studio', 'Themes, layouts y apariencia independiente para cada instancia.')}"></header>
+        <main class="matrix26-main">
+            <section class="matrix26-appearance-hero">
+                <div>
+                    <span class="matrix26-banner-icon"><i class="bi bi-palette2"></i></span>
+                    <div>
+                        <small>Matrix26 Theme & Layout Manager</small>
+                        <h2>Una plataforma, múltiples identidades visuales</h2>
+                        <p>La apariencia se administra por instancia sin duplicar vistas ni mezclar datos operativos. Esta fundación registra themes, layouts y versiones publicadas.</p>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-light" th:href="@{/control-center/themes}"><i class="bi bi-palette me-1"></i>Explorar themes</a>
+                    <a class="btn btn-outline-light" th:href="@{/control-center/layouts}"><i class="bi bi-layout-wtf me-1"></i>Explorar layouts</a>
+                </div>
+            </section>
+
+            <section class="matrix26-stats matrix26-appearance-stats">
+                <article class="matrix26-stat-card"><span class="matrix26-stat-icon is-primary"><i class="bi bi-palette"></i></span><div><small>Themes</small><strong th:text="${overview.themes()}">3</strong></div></article>
+                <article class="matrix26-stat-card"><span class="matrix26-stat-icon is-info"><i class="bi bi-layout-wtf"></i></span><div><small>Layouts</small><strong th:text="${overview.layouts()}">6</strong></div></article>
+                <article class="matrix26-stat-card"><span class="matrix26-stat-icon is-success"><i class="bi bi-building-check"></i></span><div><small>Instancias</small><strong th:text="${overview.instances()}">4</strong></div></article>
+                <article class="matrix26-stat-card"><span class="matrix26-stat-icon is-warning"><i class="bi bi-cloud-check"></i></span><div><small>Publicadas</small><strong th:text="${overview.published()}">4</strong></div></article>
+                <article class="matrix26-stat-card"><span class="matrix26-stat-icon is-danger"><i class="bi bi-pencil-square"></i></span><div><small>Borradores</small><strong th:text="${overview.drafts()}">0</strong></div></article>
+            </section>
+
+            <div class="matrix26-section-heading">
+                <div><span>Catálogo inicial</span><h2>Themes disponibles</h2></div>
+                <a th:href="@{/control-center/themes}">Ver catálogo <i class="bi bi-arrow-right"></i></a>
+            </div>
+            <section class="matrix26-theme-grid">
+                <article class="matrix26-theme-card" th:each="usage : ${themes}">
+                    <div class="theme-preview" th:classappend="${usage.theme().code}">
+                        <div class="theme-preview-sidebar"><i class="bi bi-grid-1x2-fill"></i><span></span><span></span><span></span></div>
+                        <div class="theme-preview-workspace">
+                            <div class="theme-preview-topbar"></div>
+                            <div class="theme-preview-hero"></div>
+                            <div class="theme-preview-cards"><span></span><span></span><span></span></div>
+                        </div>
+                    </div>
+                    <div class="matrix26-theme-card-body">
+                        <div class="d-flex justify-content-between gap-2 align-items-start">
+                            <div><small th:text="|Versión ${usage.theme().version}|">Versión</small><h3 th:text="${usage.theme().name}">Theme</h3></div>
+                            <span class="badge text-bg-success" th:text="${usage.theme().status}">ACTIVE</span>
+                        </div>
+                        <p th:text="${usage.theme().description}">Descripción</p>
+                        <div class="matrix26-theme-usage"><span><strong th:text="${usage.publicUsage()}">0</strong> público</span><span><strong th:text="${usage.adminUsage()}">0</strong> admin</span></div>
+                        <a class="btn btn-sm btn-outline-primary w-100" th:href="@{/control-center/themes/{code}(code=${usage.theme().code})}">Ver especificación</a>
+                    </div>
+                </article>
+            </section>
+
+            <div class="matrix26-section-heading mt-4">
+                <div><span>Aislamiento visual</span><h2>Apariencia por instancia</h2></div>
+                <a th:href="@{/control-center/appearance/instances}">Ver todas <i class="bi bi-arrow-right"></i></a>
+            </div>
+            <section class="matrix26-panel">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Instancia</th><th>Theme público</th><th>Layout público</th><th>Área administrativa</th><th>Versión</th><th></th></tr></thead>
+                        <tbody>
+                        <tr th:each="item : ${recentAppearances}">
+                            <td><strong th:text="${item.instance().businessName}">Instancia</strong><small><code th:text="${item.instance().code}">code</code></small></td>
+                            <td><span class="matrix26-theme-dot" th:classappend="${item.appearance().publicThemeCode}"></span><span th:text="${item.publicTheme() != null ? item.publicTheme().name : item.appearance().publicThemeCode}">Theme</span></td>
+                            <td th:text="${item.publicLayout() != null ? item.publicLayout().name : item.appearance().publicLayoutCode}">Layout</td>
+                            <td><strong th:text="${item.adminTheme() != null ? item.adminTheme().name : item.appearance().adminThemeCode}">Admin theme</strong><small th:text="${item.adminLayout() != null ? item.adminLayout().name : item.appearance().adminLayoutCode}">Admin layout</small></td>
+                            <td><span class="badge text-bg-primary" th:text="|v${item.appearance().publishedVersion}|">v1</span></td>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/instances/{id}/appearance(id=${item.instance().id})}"><i class="bi bi-eye"></i></a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="matrix26-appearance-foundation mt-4">
+                <article><i class="bi bi-palette"></i><div><strong>Theme</strong><span>Identidad visual y tokens.</span></div></article>
+                <i class="bi bi-plus-lg"></i>
+                <article><i class="bi bi-layout-wtf"></i><div><strong>Layout</strong><span>Distribución de la experiencia.</span></div></article>
+                <i class="bi bi-plus-lg"></i>
+                <article><i class="bi bi-sliders"></i><div><strong>Overrides</strong><span>Personalización por cliente.</span></div></article>
+                <i class="bi bi-arrow-right"></i>
+                <article class="is-result"><i class="bi bi-building-check"></i><div><strong>Instancia</strong><span>Configuración local e independiente.</span></div></article>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

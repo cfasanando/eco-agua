@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Layouts')}"></head>
+<body class="matrix26-body" data-theme="matrix26-classic" data-admin-layout="admin-sidebar-classic">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Layouts', 'Distribuciones públicas, administrativas y de acceso.')}"></header>
+        <main class="matrix26-main">
+            <div class="matrix26-alert-safe mb-4"><i class="bi bi-columns-gap"></i><div><strong>Theme y layout son conceptos independientes</strong><p>El theme controla identidad y tokens; el layout controla distribución. Una misma paleta podrá combinarse con diferentes experiencias.</p></div></div>
+            <section class="mb-5" th:each="entry : ${layoutsByArea}">
+                <div class="matrix26-section-heading"><div><span th:text="${entry.key}">Área</span><h2 th:text="${entry.key == 'PUBLIC' ? 'Layouts públicos' : (entry.key == 'ADMIN' ? 'Layouts administrativos' : 'Layouts de login')}">Layouts</h2></div><small class="text-muted" th:text="|${#lists.size(entry.value)} opciones|">Opciones</small></div>
+                <div class="matrix26-layout-grid">
+                    <article class="matrix26-layout-card" th:each="layout : ${entry.value}">
+                        <div class="layout-preview" th:classappend="${layout.previewStyle}">
+                            <div class="layout-preview-header"></div><div class="layout-preview-sidebar"></div><div class="layout-preview-main"><span></span><span></span><span></span><span></span></div>
+                        </div>
+                        <div><div class="d-flex justify-content-between gap-2"><span class="matrix26-layout-type" th:text="${layout.area}">PUBLIC</span><span class="badge text-bg-light" th:text="|v${layout.version}|">v1</span></div><h3 th:text="${layout.name}">Layout</h3><p th:text="${layout.description}">Descripción</p><code th:text="${layout.code}">code</code></div>
+                    </article>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

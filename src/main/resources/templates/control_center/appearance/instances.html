@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Apariencia por instancia')}"></head>
+<body class="matrix26-body" data-theme="matrix26-classic" data-admin-layout="admin-sidebar-classic">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Apariencia por instancia', 'Configuración visual aislada y versionada para cada portal.')}"></header>
+        <main class="matrix26-main">
+            <div class="matrix26-alert-safe mb-4"><i class="bi bi-database-check"></i><div><strong>Configuración independiente</strong><p>Esta fase registra la apariencia en <code>matrix26_platform_control</code>. La publicación local hacia cada portal se habilitará en los siguientes bloques.</p></div></div>
+            <section class="matrix26-instance-appearance-grid">
+                <article class="matrix26-instance-appearance-card" th:each="item : ${appearances}">
+                    <div class="matrix26-instance-appearance-head" th:style="|--instance-color:${item.instance().primaryColor != null ? item.instance().primaryColor : '#2563eb'}|"><span><i class="bi bi-building"></i></span><div><h2 th:text="${item.instance().businessName}">Instancia</h2><code th:text="${item.instance().code}">code</code></div><span class="badge text-bg-success" th:text="${item.appearance().status}">PUBLISHED</span></div>
+                    <div class="matrix26-appearance-combination"><div><small>Experiencia pública</small><strong th:text="${item.publicTheme() != null ? item.publicTheme().name : item.appearance().publicThemeCode}">Theme</strong><span th:text="${item.publicLayout() != null ? item.publicLayout().name : item.appearance().publicLayoutCode}">Layout</span></div><i class="bi bi-arrow-left-right"></i><div><small>Área administrativa</small><strong th:text="${item.adminTheme() != null ? item.adminTheme().name : item.appearance().adminThemeCode}">Theme</strong><span th:text="${item.adminLayout() != null ? item.adminLayout().name : item.appearance().adminLayoutCode}">Layout</span></div></div>
+                    <div class="matrix26-appearance-version"><span><i class="bi bi-clock-history"></i> Versión publicada</span><strong th:text="|v${item.appearance().publishedVersion}|">v1</strong></div>
+                    <a class="btn btn-outline-primary w-100" th:href="@{/control-center/instances/{id}/appearance(id=${item.instance().id})}">Ver configuración</a>
+                </article>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

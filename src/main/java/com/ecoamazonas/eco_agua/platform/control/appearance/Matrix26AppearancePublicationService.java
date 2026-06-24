@@ -39,6 +39,7 @@ public class Matrix26AppearancePublicationService {
     private final Matrix26TargetDatabaseService targetDatabaseService;
     private final Matrix26ControlCenterProperties properties;
     private final Matrix26InstanceAuditLogRepository auditRepository;
+    private final Matrix26BrandingService brandingService;
 
     public Matrix26AppearancePublicationService(
             PlatformBusinessClientRepository clientRepository,
@@ -48,7 +49,8 @@ public class Matrix26AppearancePublicationService {
             Matrix26AppearanceEditorService editorService,
             Matrix26TargetDatabaseService targetDatabaseService,
             Matrix26ControlCenterProperties properties,
-            Matrix26InstanceAuditLogRepository auditRepository
+            Matrix26InstanceAuditLogRepository auditRepository,
+            Matrix26BrandingService brandingService
     ) {
         this.clientRepository = clientRepository;
         this.appearanceRepository = appearanceRepository;
@@ -58,6 +60,7 @@ public class Matrix26AppearancePublicationService {
         this.targetDatabaseService = targetDatabaseService;
         this.properties = properties;
         this.auditRepository = auditRepository;
+        this.brandingService = brandingService;
     }
 
     @Transactional(readOnly = true)
@@ -106,8 +109,12 @@ public class Matrix26AppearancePublicationService {
         PlatformBusinessClient instance = requireInstance(instanceId);
         assertPublicationAllowed(instance, confirmationCode, acknowledged);
 
-        Matrix26InstanceAppearanceDraft draft = draftRepository.findByInstance_Id(instanceId)
-                .orElseThrow(() -> new IllegalArgumentException("La instancia no tiene un borrador para publicar."));
+        Matrix26InstanceAppearanceDraft draft = draftRepository.findByInstance_Id(instanceId).orElse(null);
+        boolean brandingDraftPresent = brandingService.draftPresent(instanceId);
+        if (draft == null && !brandingDraftPresent) {
+            throw new IllegalArgumentException("La instancia no tiene un borrador de apariencia o branding para publicar.");
+        }
+
         Matrix26AppearanceEditorForm form = editorService.currentForm(instanceId);
         editorService.validate(form);
 
@@ -118,6 +125,12 @@ public class Matrix26AppearancePublicationService {
         String beforeSnapshot = publishedSnapshot(published);
 
         writeTargetConfiguration(instance, form, overridesJson, version, actor);
+        Matrix26BrandingPublicationResult brandingResult = brandingService.publishToTarget(
+                instance,
+                version,
+                actor
+        );
+        snapshot = mergeBrandingSnapshot(snapshot, brandingResult, version);
         applyPublishedAppearance(published, form, overridesJson, version, actor);
         appearanceRepository.save(published);
 
@@ -127,10 +140,15 @@ public class Matrix26AppearancePublicationService {
         history.setStatus("PUBLISHED");
         history.setSnapshotJson(snapshot);
         history.setActorUsername(safeActor(actor));
-        history.setReason(defaultReason(draft.getReason(), "Appearance draft published"));
+        history.setReason(defaultReason(
+                draft == null ? null : draft.getReason(),
+                brandingResult.published() ? "Appearance and branding published" : "Appearance draft published"
+        ));
         historyRepository.save(history);
 
-        draftRepository.delete(draft);
+        if (draft != null) {
+            draftRepository.delete(draft);
+        }
         saveAudit(
                 instance,
                 "APPEARANCE_PUBLISHED",
@@ -172,6 +190,14 @@ public class Matrix26AppearancePublicationService {
         String beforeSnapshot = publishedSnapshot(published);
 
         writeTargetConfiguration(instance, form, overridesJson, version, actor);
+        brandingService.restoreFromHistory(
+                instance,
+                source.getVersion(),
+                version,
+                source.getSnapshotJson(),
+                actor
+        );
+        snapshot = mergeBrandingSnapshotFromSource(snapshot, source.getSnapshotJson(), version);
         applyPublishedAppearance(published, form, overridesJson, version, actor);
         appearanceRepository.save(published);
 
@@ -366,6 +392,39 @@ public class Matrix26AppearancePublicationService {
         snapshot.put("adminLayout", appearance.getAdminLayoutCode());
         snapshot.put("loginLayout", appearance.getLoginLayoutCode());
         snapshot.put("overrides", Matrix26JsonCodec.readFlatObject(appearance.getOverridesJson()));
+        return Matrix26JsonCodec.write(snapshot);
+    }
+
+    private String mergeBrandingSnapshotFromSource(
+            String appearanceSnapshot,
+            String sourceSnapshot,
+            int version
+    ) {
+        Map<String, Object> result = Matrix26JsonCodec.readObject(appearanceSnapshot);
+        Map<String, Object> source = Matrix26JsonCodec.readObject(sourceSnapshot);
+        if (source.containsKey("branding")) {
+            result.put("branding", source.get("branding"));
+        }
+        if (source.containsKey("assets")) {
+            result.put("assets", source.get("assets"));
+        }
+        if (source.containsKey("branding") || source.containsKey("assets")) {
+            result.put("assetVersion", version);
+        }
+        return Matrix26JsonCodec.write(result);
+    }
+
+    private String mergeBrandingSnapshot(
+            String appearanceSnapshot,
+            Matrix26BrandingPublicationResult branding,
+            int version
+    ) {
+        Map<String, Object> snapshot = Matrix26JsonCodec.readObject(appearanceSnapshot);
+        if (branding != null && branding.published()) {
+            snapshot.put("branding", Matrix26JsonCodec.readObject(branding.brandingJson()));
+            snapshot.put("assets", Matrix26JsonCodec.readObject(branding.assetManifestJson()));
+            snapshot.put("assetVersion", version);
+        }
         return Matrix26JsonCodec.write(snapshot);
     }
 

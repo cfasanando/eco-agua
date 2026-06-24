@@ -15,15 +15,18 @@ public class Matrix26AppearanceStudioController {
     private final Matrix26AppearanceCatalogService appearanceService;
     private final Matrix26AppearanceEditorService editorService;
     private final Matrix26AppearancePublicationService publicationService;
+    private final Matrix26BrandingService brandingService;
 
     public Matrix26AppearanceStudioController(
             Matrix26AppearanceCatalogService appearanceService,
             Matrix26AppearanceEditorService editorService,
-            Matrix26AppearancePublicationService publicationService
+            Matrix26AppearancePublicationService publicationService,
+            Matrix26BrandingService brandingService
     ) {
         this.appearanceService = appearanceService;
         this.editorService = editorService;
         this.publicationService = publicationService;
+        this.brandingService = brandingService;
     }
 
     @GetMapping("/appearance")
@@ -79,6 +82,7 @@ public class Matrix26AppearanceStudioController {
         model.addAttribute("history", appearanceService.history(id));
         model.addAttribute("draft", editorService.draft(id));
         model.addAttribute("publicationState", publicationService.state(id));
+        model.addAttribute("brandingDraftPresent", brandingService.draftPresent(id));
         return "control_center/appearance/instance_detail";
     }
 }

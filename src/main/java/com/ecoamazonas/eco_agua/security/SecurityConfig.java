@@ -438,7 +438,7 @@ public class SecurityConfig {
                 .requestMatchers("/blog", "/blog/**").permitAll()
                 .requestMatchers("/academy", "/academy/**").permitAll()
                 .requestMatchers("/restaurant", "/restaurant/**").permitAll()
-                .requestMatchers("/css/**", "/js/**", "/img/**", "/uploads/**", "/webjars/**").permitAll()
+                .requestMatchers("/css/**", "/js/**", "/img/**", "/uploads/**", "/runtime-assets/**", "/webjars/**").permitAll()
                 .requestMatchers("/login", "/error").permitAll()
                 .requestMatchers(HttpMethod.GET, "/logout").permitAll()
                 .requestMatchers(HttpMethod.GET, "/password-reset/request", "/password-reset").permitAll()

@@ -2,23 +2,37 @@
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/head_public :: publicHead(${publicPageTitle})}"></head>
 
-<body th:style="'--eco-primary:' + ${publicPrimaryColor} + '; --eco-secondary:' + ${publicSecondaryColor} + ';'">
+<body th:with="
+          effectivePublicName=${appearanceBrandDisplayName != null and !#strings.isEmpty(appearanceBrandDisplayName) ? appearanceBrandDisplayName : platformName},
+          effectivePublicTagline=${appearanceBrandTagline != null and !#strings.isEmpty(appearanceBrandTagline) ? appearanceBrandTagline : platformTagline},
+          effectivePublicLogo=${appearanceLogoPrimaryUrl != null and !#strings.isEmpty(appearanceLogoPrimaryUrl) ? appearanceLogoPrimaryUrl : platformLogo},
+          effectiveLocation=${appearanceLocation != null and !#strings.isEmpty(appearanceLocation) ? appearanceLocation : topbarLocation},
+          effectivePhone=${appearanceContactPhone != null and !#strings.isEmpty(appearanceContactPhone) ? appearanceContactPhone : topbarPhone},
+          effectiveWhatsapp=${appearanceWhatsapp != null and !#strings.isEmpty(appearanceWhatsapp) ? appearanceWhatsapp : whatsappNumber},
+          effectiveHeroBackground=${appearanceHeroPrimaryUrl != null and !#strings.isEmpty(appearanceHeroPrimaryUrl) ? appearanceHeroPrimaryUrl : heroBackgroundImage},
+          effectiveHeroImage=${appearanceHeroSecondaryUrl != null and !#strings.isEmpty(appearanceHeroSecondaryUrl) ? appearanceHeroSecondaryUrl : heroInitialImage},
+          effectiveHeroTitle=${appearanceHeroTitle != null and !#strings.isEmpty(appearanceHeroTitle) ? appearanceHeroTitle : heroTitle},
+          effectiveHeroSubtitle=${appearanceHeroSubtitle != null and !#strings.isEmpty(appearanceHeroSubtitle) ? appearanceHeroSubtitle : heroSubtitle},
+          effectivePrimaryCta=${appearancePrimaryCtaLabel != null and !#strings.isEmpty(appearancePrimaryCtaLabel) ? appearancePrimaryCtaLabel : heroPrimaryCtaLabel},
+          effectiveSecondaryCta=${appearanceSecondaryCtaLabel != null and !#strings.isEmpty(appearanceSecondaryCtaLabel) ? appearanceSecondaryCtaLabel : heroSecondaryCtaLabel}
+      "
+      th:style="'--eco-primary:' + ${publicPrimaryColor} + '; --eco-secondary:' + ${publicSecondaryColor} + ';'">
 
 <div class="top-bar text-white py-1">
     <div class="container d-flex flex-wrap justify-content-between align-items-center small">
         <span>
             <i class="bi bi-geo-alt-fill me-1"></i>
-            <span th:text="${topbarLocation}">Atención en Iquitos y alrededores</span>
+            <span th:text="${effectiveLocation}">Atención en Iquitos y alrededores</span>
         </span>
         <span class="d-flex align-items-center">
             <i class="bi bi-telephone-fill me-1"></i>
             <span class="me-3">
                 <span th:text="${topbarPhoneLabel}">Central:</span>
-                <span th:text="${topbarPhone}">(065) 000000</span>
+                <span th:text="${effectivePhone}">(065) 000000</span>
             </span>
             <i class="bi bi-whatsapp me-1"></i>
             <a class="text-white text-decoration-none fw-semibold"
-               th:href="'https://wa.me/' + ${whatsappNumber}"
+               th:href="'https://wa.me/' + ${effectiveWhatsapp}"
                target="_blank">
                 <span th:text="${topbarWhatsappLabel}">Pedidos por WhatsApp</span>
             </a>
@@ -29,13 +43,13 @@
 <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm sticky-top">
     <div class="container">
         <a class="navbar-brand fw-bold d-flex align-items-center" th:href="@{/}">
-            <img th:src="@{${platformLogo}}"
-                 th:alt="${platformName}"
+            <img th:src="${effectivePublicLogo}"
+                 th:alt="${effectivePublicName}"
                  height="40"
                  class="me-2">
             <span>
-                <span class="d-block brand-title" th:text="${platformName}">Eco del Amazonas</span>
-                <span class="d-block brand-subtitle" th:text="${platformTagline}">Agua de mesa</span>
+                <span class="d-block brand-title" th:text="${effectivePublicName}">Eco del Amazonas</span>
+                <span class="d-block brand-subtitle" th:text="${effectivePublicTagline}">Agua de mesa</span>
             </span>
         </a>
 
@@ -61,7 +75,7 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
-                       th:href="'https://wa.me/' + ${whatsappNumber}"
+                       th:href="'https://wa.me/' + ${effectiveWhatsapp}"
                        target="_blank"
                        th:text="${publicNavWhatsappLabel}">
                         Pedir por WhatsApp
@@ -82,7 +96,7 @@
 <main class="bg-light">
 
     <section class="hero-section text-white"
-             th:style="'background-image: linear-gradient(135deg, rgba(14, 116, 144, 0.75), rgba(46, 125, 50, 0.85)), url(' + ${heroBackgroundImage} + ');'">
+             th:style="|background-image: linear-gradient(135deg, rgba(14,116,144,.72), rgba(46,125,50,.82)), url('${effectiveHeroBackground}');|">
         <div class="hero-overlay"></div>
         <div class="container position-relative">
             <div class="row align-items-center g-4 py-5">
@@ -92,9 +106,9 @@
                         <span th:text="${heroPill}">Servicio destacado</span>
                     </span>
 
-                    <h1 class="display-5 fw-bold mb-3" th:text="${heroTitle}">Título principal</h1>
+                    <h1 class="display-5 fw-bold mb-3" th:text="${effectiveHeroTitle}">Título principal</h1>
 
-                    <p class="lead mb-3" th:text="${heroSubtitle}">Subtítulo principal.</p>
+                    <p class="lead mb-3" th:text="${effectiveHeroSubtitle}">Subtítulo principal.</p>
 
                     <ul class="list-unstyled mb-4 hero-bullets">
                         <li>
@@ -113,15 +127,15 @@
 
                     <div class="d-flex flex-wrap gap-2 mb-3">
                         <a class="btn btn-success btn-lg"
-                           th:href="'https://wa.me/' + ${whatsappNumber}"
+                           th:href="'https://wa.me/' + ${effectiveWhatsapp}"
                            target="_blank">
                             <i class="bi bi-whatsapp me-2"></i>
-                            <span th:text="${heroPrimaryCtaLabel}">Pedir por WhatsApp</span>
+                            <span th:text="${effectivePrimaryCta}">Pedir por WhatsApp</span>
                         </a>
                         <a class="btn btn-outline-light btn-lg"
                            th:if="${featurePublicCatalog}"
                            th:href="@{/catalogo}">
-                            <span th:text="${heroSecondaryCtaLabel}">Ver catálogo</span>
+                            <span th:text="${effectiveSecondaryCta}">Ver catálogo</span>
                         </a>
                     </div>
 
@@ -145,7 +159,7 @@
                     <div class="hero-card shadow-lg" id="publicHeroCarousel" data-hero-carousel data-hero-interval="5000">
                         <div class="hero-image-frame mb-3">
                             <img id="heroCarouselMainImage"
-                                 th:src="@{${heroInitialImage}}"
+                                 th:src="${effectiveHeroImage}"
                                  th:alt="${heroInitialAlt}"
                                  class="img-fluid rounded-4 hero-main-image">
                         </div>
@@ -179,7 +193,7 @@
                                 th:each="slide, iter : ${heroCarouselSlides}"
                                 th:classappend="${iter.index == 0} ? ' active' : ''"
                                 data-hero-thumb
-                                th:attr="data-hero-image=@{${slide.image}}, data-hero-alt=${slide.alt}, aria-label=${'Ver imagen ' + (iter.index + 1) + ' de ' + platformName}, aria-pressed=${iter.index == 0 ? 'true' : 'false'}">
+                                th:attr="data-hero-image=@{${slide.image}}, data-hero-alt=${slide.alt}, aria-label=${'Ver imagen ' + (iter.index + 1) + ' de ' + effectivePublicName}, aria-pressed=${iter.index == 0 ? 'true' : 'false'}">
                             <img th:src="@{${slide.image}}"
                                  th:alt="${slide.alt}"
                                  class="rounded-3 hero-thumb">
@@ -402,7 +416,7 @@
                                 </div>
                                 <a id="promoDetailWhatsappLink"
                                    class="btn btn-success w-100 mt-4"
-                                   th:href="'https://wa.me/' + ${whatsappNumber}"
+                                   th:href="'https://wa.me/' + ${effectiveWhatsapp}"
                                    target="_blank">
                                     <i class="bi bi-whatsapp me-2"></i>
                                     Consultar esta promoción
@@ -441,7 +455,7 @@
             <div class="row g-3 g-lg-4" th:if="${!#lists.isEmpty(featuredProducts)}">
                 <div class="col-6 col-md-4 col-lg-3" th:each="product : ${featuredProducts}">
                     <div class="card product-card catalog-product-card catalog-marketplace-card home-product-card border-0 h-100"
-                         th:attr="data-id=${product.id}, data-name=${product.name}, data-price=${#numbers.formatDecimal(product.price, 1, 'POINT', 2, 'POINT')}, data-image=${product.imagePath != null and !#strings.isEmpty(product.imagePath) ? product.imagePath : catalogProductPlaceholderImage}, data-category=${product.category != null ? product.category.name : 'Sin categoría'}">
+                         th:attr="data-id=${product.id}, data-name=${product.name}, data-price=${#numbers.formatDecimal(product.price, 1, 'POINT', 2, 'POINT')}, data-image=${product.imagePath != null and !#strings.isEmpty(product.imagePath) ? product.imagePath : (appearanceProductPlaceholderUrl != null and !#strings.isEmpty(appearanceProductPlaceholderUrl) ? appearanceProductPlaceholderUrl : catalogProductPlaceholderImage)}, data-category=${product.category != null ? product.category.name : 'Sin categoría'}">
                         <div class="catalog-marketplace-image-wrap">
                             <div class="catalog-badge-stack">
                                 <span class="catalog-card-badge catalog-card-badge-featured" th:if="${product.featured}">
@@ -453,7 +467,7 @@
                                     <span th:text="${catalogBadgeAvailabilityLabel}">Consultar disponibilidad</span>
                                 </span>
                             </div>
-                            <img th:src="${product.imagePath != null and !#strings.isEmpty(product.imagePath) ? product.imagePath : catalogProductPlaceholderImage}"
+                            <img th:src="${product.imagePath != null and !#strings.isEmpty(product.imagePath) ? product.imagePath : (appearanceProductPlaceholderUrl != null and !#strings.isEmpty(appearanceProductPlaceholderUrl) ? appearanceProductPlaceholderUrl : catalogProductPlaceholderImage)}"
                                  th:alt="${product.name}"
                                  class="product-card-img catalog-product-image catalog-marketplace-image">
                         </div>
@@ -496,7 +510,7 @@
                                 </a>
                                 <button type="button"
                                         class="btn btn-outline-success btn-sm catalog-inquiry-add-button js-inquiry-add"
-                                        th:attr="data-id=${product.id}, data-name=${product.name}, data-price=${#numbers.formatDecimal(product.price, 1, 'POINT', 2, 'POINT')}, data-image=${product.imagePath != null and !#strings.isEmpty(product.imagePath) ? product.imagePath : catalogProductPlaceholderImage}, data-category=${product.category != null ? product.category.name : 'Sin categoría'}">
+                                        th:attr="data-id=${product.id}, data-name=${product.name}, data-price=${#numbers.formatDecimal(product.price, 1, 'POINT', 2, 'POINT')}, data-image=${product.imagePath != null and !#strings.isEmpty(product.imagePath) ? product.imagePath : (appearanceProductPlaceholderUrl != null and !#strings.isEmpty(appearanceProductPlaceholderUrl) ? appearanceProductPlaceholderUrl : catalogProductPlaceholderImage)}, data-category=${product.category != null ? product.category.name : 'Sin categoría'}">
                                     <i class="bi bi-bag-plus me-1"></i> Agregar
                                 </button>
                                 <button type="button"
@@ -691,7 +705,7 @@
                             <span th:text="${deliveryExtraText}">Texto extra.</span>
                         </div>
 
-                        <a class="btn btn-success mt-3" th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank">
+                        <a class="btn btn-success mt-3" th:href="'https://wa.me/' + ${effectiveWhatsapp}" target="_blank">
                             <i class="bi bi-whatsapp me-2"></i>
                             <span th:text="${deliveryCtaLabel}">Consultar mi zona »</span>
                         </a>
@@ -856,7 +870,7 @@
                     <div class="final-cta p-4 rounded-4 text-white">
                         <h3 class="h4 mb-2" th:text="${finalCtaTitle}">¿Listo para tu pedido?</h3>
                         <p class="small mb-3" th:text="${finalCtaText}">Escríbenos por WhatsApp.</p>
-                        <a class="btn btn-light btn-lg w-100 w-md-auto" th:href="'https://wa.me/' + ${whatsappNumber}" target="_blank">
+                        <a class="btn btn-light btn-lg w-100 w-md-auto" th:href="'https://wa.me/' + ${effectiveWhatsapp}" target="_blank">
                             <i class="bi bi-whatsapp me-2"></i>
                             <span th:text="${finalCtaButtonLabel}">Pedir por WhatsApp</span>
                         </a>

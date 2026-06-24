@@ -20,6 +20,7 @@
                     <span class="badge text-bg-success fs-6" th:text="${view.appearance().status}">PUBLISHED</span>
                     <span class="badge text-bg-primary fs-6" th:text="|v${view.appearance().publishedVersion}|">v1</span>
                     <span class="badge text-bg-warning fs-6" th:if="${draft != null}" th:text="|Borrador v${draft.draftVersion}|">Draft</span>
+                    <span class="badge text-bg-info fs-6" th:if="${brandingDraftPresent}">Branding pendiente</span>
                     <a class="btn btn-outline-secondary"
                        th:if="${view.instance().publicUrl != null and !#strings.isEmpty(view.instance().publicUrl)}"
                        th:href="${view.instance().publicUrl}"
@@ -28,6 +29,10 @@
                         <i class="bi bi-box-arrow-up-right me-1"></i> Abrir portal
                     </a>
                     <a class="btn btn-primary" th:href="@{/control-center/instances/{id}/appearance/edit(id=${view.instance().id})}"><i class="bi bi-sliders me-1"></i> Editar apariencia</a>
+                    <a class="btn btn-outline-primary"
+                       th:href="@{/control-center/instances/{id}/appearance/branding(id=${view.instance().id})}">
+                        <i class="bi bi-images me-1"></i> Branding y recursos
+                    </a>
                 </div>
             </div>
 
@@ -41,6 +46,19 @@
                         <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i> Descartar</button>
                     </form>
                 </div>
+            </section>
+
+            <section class="matrix26-draft-banner mb-4" th:if="${brandingDraftPresent}">
+                <i class="bi bi-images"></i>
+                <div>
+                    <strong>Existe un borrador de branding y recursos</strong>
+                    <span>Textos, logos o imágenes esperan publicación.</span>
+                    <p>Se publicará junto a la próxima versión visual.</p>
+                </div>
+                <a class="btn btn-sm btn-outline-primary"
+                   th:href="@{/control-center/instances/{id}/appearance/branding(id=${view.instance().id})}">
+                    <i class="bi bi-pencil me-1"></i> Continuar branding
+                </a>
             </section>
 
             <section class="matrix26-panel mb-4">
@@ -70,7 +88,7 @@
                 </div>
 
                 <form class="matrix26-publication-form mt-3"
-                      th:if="${draft != null and publicationState.allowed()}"
+                      th:if="${(draft != null or brandingDraftPresent) and publicationState.allowed()}"
                       th:action="@{/control-center/instances/{id}/appearance/publish(id=${view.instance().id})}"
                       method="post"
                       onsubmit="return confirm('¿Publicar este borrador en el portal administrado?');">
@@ -96,7 +114,7 @@
                                        type="checkbox"
                                        required>
                                 <label class="form-check-label" for="appearanceAcknowledged">
-                                    Revisé themes, layouts y colores.
+                                    Revisé themes, layouts, colores y branding.
                                 </label>
                             </div>
                             <button type="submit" class="btn btn-success w-100">
@@ -105,20 +123,20 @@
                         </div>
                     </div>
                     <div class="form-text mt-2">
-                        La publicación crea o actualiza únicamente la configuración visual local de esta instancia.
+                        La publicación actualiza la configuración visual, textos e imágenes locales de esta instancia.
                     </div>
                 </form>
 
                 <div class="alert alert-secondary mt-3 mb-0"
-                     th:if="${draft != null and !publicationState.allowed()}">
+                     th:if="${(draft != null or brandingDraftPresent) and !publicationState.allowed()}">
                     <i class="bi bi-shield-lock me-1"></i>
                     Esta instancia no está autorizada para publicación real durante la fase de laboratorio.
                 </div>
 
                 <div class="alert alert-light border mt-3 mb-0"
-                     th:if="${draft == null}">
+                     th:if="${draft == null and !brandingDraftPresent}">
                     <i class="bi bi-info-circle me-1"></i>
-                    Crea un borrador para habilitar la publicación.
+                    Crea un borrador de apariencia o branding para habilitar la publicación.
                 </div>
             </section>
 

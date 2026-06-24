@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Branding y recursos')}"></head>
+<body class="matrix26-body" data-theme="matrix26-classic" data-admin-layout="admin-sidebar-classic">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Branding y recursos', 'Identidad textual, logos, portadas y recursos visuales por instancia.')} "></header>
+        <main class="matrix26-main">
+            <div class="alert alert-success" th:if="${successMessage}" th:text="${successMessage}">Success</div>
+            <div class="alert alert-danger" th:if="${errorMessage}" th:text="${errorMessage}">Error</div>
+
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                <div>
+                    <a class="matrix26-back-link"
+                       th:href="@{/control-center/instances/{id}/appearance(id=${brandingView.instance().id})}">
+                        <i class="bi bi-arrow-left"></i> Volver a la apariencia
+                    </a>
+                    <h2 class="mt-2 mb-1" th:text="${brandingView.instance().businessName}">Instancia</h2>
+                    <code th:text="${brandingView.instance().code}">instance-code</code>
+                </div>
+                <form th:action="@{/control-center/instances/{id}/appearance/branding/demo-kit(id=${brandingView.instance().id})}"
+                      method="post"
+                      onsubmit="return confirm('¿Cargar el kit demo completo? Reemplazará el borrador actual de branding y recursos.');">
+                    <button class="btn btn-warning" type="submit">
+                        <i class="bi bi-magic me-1"></i> Cargar kit demo completo
+                    </button>
+                </form>
+            </div>
+
+            <div class="matrix26-alert-safe mb-4">
+                <i class="bi bi-shield-check"></i>
+                <div>
+                    <strong>Trabajo aislado por instancia</strong>
+                    <p>Los textos e imágenes quedan en un borrador de Matrix26. Solo se copian al portal al publicar la versión visual.</p>
+                </div>
+            </div>
+
+            <section class="matrix26-panel mb-4 matrix26-branding-demo-note">
+                <div class="matrix26-panel-header">
+                    <div>
+                        <span>Prueba inmediata</span>
+                        <h2>Datos y recursos incluidos</h2>
+                    </div>
+                    <span class="badge text-bg-success">SIN BUSCAR ARCHIVOS</span>
+                </div>
+                <p class="mb-3">
+                    El botón <strong>Cargar kit demo completo</strong> llena automáticamente textos, logo, favicon,
+                    imagen de login, hero principal, hero secundario, placeholder y tarjeta social.
+                </p>
+                <div class="row g-3 small">
+                    <div class="col-md-4"><strong>Nombre:</strong><br>Matrix26 Restaurant Laboratory</div>
+                    <div class="col-md-4"><strong>Eslogan:</strong><br>Sabores amazónicos con una experiencia visual propia</div>
+                    <div class="col-md-4"><strong>WhatsApp:</strong><br>+51 928 527 493</div>
+                </div>
+            </section>
+
+            <form th:action="@{/control-center/instances/{id}/appearance/branding/text(id=${brandingView.instance().id})}"
+                  th:object="${brandingForm}"
+                  method="post">
+                <section class="matrix26-panel mb-4">
+                    <div class="matrix26-panel-header">
+                        <div>
+                            <span>Identidad verbal</span>
+                            <h2>Textos principales</h2>
+                        </div>
+                        <small>Se publican junto al theme, layout y recursos.</small>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-lg-7">
+                            <label class="form-label">Nombre visible</label>
+                            <input class="form-control" th:field="*{displayName}" maxlength="180">
+                            <div class="text-danger small" th:errors="*{displayName}"></div>
+                        </div>
+                        <div class="col-lg-5">
+                            <label class="form-label">Nombre corto</label>
+                            <input class="form-control" th:field="*{shortName}" maxlength="100">
+                            <div class="text-danger small" th:errors="*{shortName}"></div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Eslogan</label>
+                            <input class="form-control" th:field="*{tagline}" maxlength="220">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Mensaje de bienvenida</label>
+                            <textarea class="form-control" th:field="*{welcomeMessage}" rows="2" maxlength="300"></textarea>
+                        </div>
+                        <div class="col-lg-6">
+                            <label class="form-label">Título del hero</label>
+                            <input class="form-control" th:field="*{heroTitle}" maxlength="220">
+                        </div>
+                        <div class="col-lg-6">
+                            <label class="form-label">Subtítulo del hero</label>
+                            <textarea class="form-control" th:field="*{heroSubtitle}" rows="2" maxlength="500"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CTA principal</label>
+                            <input class="form-control" th:field="*{primaryCtaLabel}" maxlength="80">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CTA secundario</label>
+                            <input class="form-control" th:field="*{secondaryCtaLabel}" maxlength="80">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Teléfono</label>
+                            <input class="form-control" th:field="*{contactPhone}" maxlength="80">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">WhatsApp</label>
+                            <input class="form-control" th:field="*{whatsapp}" maxlength="40">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Ubicación</label>
+                            <input class="form-control" th:field="*{location}" maxlength="160">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Motivo del cambio</label>
+                            <input class="form-control" th:field="*{reason}" maxlength="500"
+                                   placeholder="Ej.: Branding inicial del restaurante de laboratorio">
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-4">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="bi bi-save me-1"></i> Guardar textos en borrador
+                        </button>
+                    </div>
+                </section>
+            </form>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header">
+                    <div>
+                        <span>Recursos visuales</span>
+                        <h2>Logos, portadas y banners</h2>
+                    </div>
+                    <small>PNG, JPG, WEBP; favicon PNG o ICO.</small>
+                </div>
+
+                <div class="matrix26-branding-assets-grid">
+                    <article class="matrix26-branding-asset-card"
+                             th:each="asset : ${brandingView.assets()}">
+                        <div class="matrix26-branding-asset-preview">
+                            <img th:if="${asset.present()}"
+                                 th:src="${asset.previewUrl()}"
+                                 th:alt="${asset.label()}">
+                            <div th:unless="${asset.present()}" class="matrix26-branding-empty">
+                                <i class="bi bi-image"></i>
+                                <span>Sin archivo</span>
+                            </div>
+                        </div>
+
+                        <div class="matrix26-branding-asset-copy">
+                            <h3 th:text="${asset.label()}">Recurso</h3>
+                            <p><strong>Recomendado:</strong> <span th:text="${asset.recommendedSize()}">Tamaño</span></p>
+                            <p th:if="${asset.present()}">
+                                <span th:text="${asset.originalName()}">archivo.png</span><br>
+                                <small th:text="|${asset.width()} × ${asset.height()} px · ${#numbers.formatDecimal(asset.sizeBytes() / 1024.0, 1, 1)} KB|">Meta</small>
+                            </p>
+                        </div>
+
+                        <form th:action="@{/control-center/instances/{id}/appearance/branding/asset/{code}(id=${brandingView.instance().id},code=${asset.code()})}"
+                              method="post"
+                              enctype="multipart/form-data"
+                              class="matrix26-branding-upload-form">
+                            <input class="form-control form-control-sm"
+                                   type="file"
+                                   name="file"
+                                   accept=".png,.jpg,.jpeg,.webp,.ico,image/png,image/jpeg,image/webp,image/x-icon"
+                                   required>
+                            <button class="btn btn-sm btn-outline-primary" type="submit">
+                                <i class="bi bi-upload me-1"></i> Subir
+                            </button>
+                        </form>
+
+                        <form th:if="${asset.present()}"
+                              th:action="@{/control-center/instances/{id}/appearance/branding/asset/{code}/remove(id=${brandingView.instance().id},code=${asset.code()})}"
+                              method="post"
+                              onsubmit="return confirm('¿Retirar este recurso del borrador?');">
+                            <button class="btn btn-sm btn-outline-danger w-100" type="submit">
+                                <i class="bi bi-trash me-1"></i> Quitar del borrador
+                            </button>
+                        </form>
+                    </article>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

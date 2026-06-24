@@ -124,6 +124,51 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
                 "ALTER TABLE matrix26_provisioning_job ADD COLUMN runtime_folder VARCHAR(500) NULL AFTER registered_instance_id"
         );
         ensureColumn(
+                "matrix26_provisioning_job",
+                "appearance_preset_code",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN appearance_preset_code VARCHAR(80) NULL AFTER demo_data_enabled"
+        );
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "public_theme_code",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN public_theme_code VARCHAR(80) NULL AFTER appearance_preset_code"
+        );
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "public_layout_code",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN public_layout_code VARCHAR(80) NULL AFTER public_theme_code"
+        );
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "admin_theme_code",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN admin_theme_code VARCHAR(80) NULL AFTER public_layout_code"
+        );
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "admin_layout_code",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN admin_layout_code VARCHAR(80) NULL AFTER admin_theme_code"
+        );
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "login_layout_code",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN login_layout_code VARCHAR(80) NULL AFTER admin_layout_code"
+        );
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "appearance_overrides_json",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN appearance_overrides_json TEXT NULL AFTER login_layout_code"
+        );
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "branding_json",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN branding_json TEXT NULL AFTER appearance_overrides_json"
+        );
+        ensureColumn(
+                "matrix26_provisioning_job",
+                "branding_demo_assets_enabled",
+                "ALTER TABLE matrix26_provisioning_job ADD COLUMN branding_demo_assets_enabled BIT NOT NULL DEFAULT 0 AFTER branding_json"
+        );
+        ensureColumn(
                 "matrix26_provisioning_step",
                 "started_at",
                 "ALTER TABLE matrix26_provisioning_step ADD COLUMN started_at DATETIME(6) NULL AFTER safety_scope"
@@ -736,6 +781,15 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
                     admin_username VARCHAR(20) NOT NULL,
                     admin_email VARCHAR(180) NULL,
                     demo_data_enabled BIT NOT NULL DEFAULT 0,
+                    appearance_preset_code VARCHAR(80) NULL,
+                    public_theme_code VARCHAR(80) NULL,
+                    public_layout_code VARCHAR(80) NULL,
+                    admin_theme_code VARCHAR(80) NULL,
+                    admin_layout_code VARCHAR(80) NULL,
+                    login_layout_code VARCHAR(80) NULL,
+                    appearance_overrides_json TEXT NULL,
+                    branding_json TEXT NULL,
+                    branding_demo_assets_enabled BIT NOT NULL DEFAULT 0,
                     validation_summary TEXT NULL,
                     notes TEXT NULL,
                     requested_by VARCHAR(120) NOT NULL,

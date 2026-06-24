@@ -4,6 +4,7 @@ import com.ecoamazonas.eco_agua.platform.PlatformBusinessClientRepository;
 import com.ecoamazonas.eco_agua.platform.PlatformModuleCatalog;
 import com.ecoamazonas.eco_agua.platform.PlatformModuleCatalogRepository;
 import com.ecoamazonas.eco_agua.platform.module.PlatformModuleInstaller;
+import com.ecoamazonas.eco_agua.platform.control.appearance.Matrix26ProvisioningAppearanceService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,7 @@ public class Matrix26ProvisioningService {
     private final Matrix26ProvisioningModuleRepository provisioningModuleRepository;
     private final Matrix26InstanceAuditLogRepository auditRepository;
     private final Matrix26ControlCenterProperties properties;
+    private final Matrix26ProvisioningAppearanceService appearanceService;
     private final Map<String, PlatformModuleInstaller> installers;
 
     public Matrix26ProvisioningService(
@@ -50,6 +52,7 @@ public class Matrix26ProvisioningService {
             Matrix26ProvisioningModuleRepository provisioningModuleRepository,
             Matrix26InstanceAuditLogRepository auditRepository,
             Matrix26ControlCenterProperties properties,
+            Matrix26ProvisioningAppearanceService appearanceService,
             List<PlatformModuleInstaller> installerList
     ) {
         this.clientRepository = clientRepository;
@@ -59,6 +62,7 @@ public class Matrix26ProvisioningService {
         this.provisioningModuleRepository = provisioningModuleRepository;
         this.auditRepository = auditRepository;
         this.properties = properties;
+        this.appearanceService = appearanceService;
         this.installers = new LinkedHashMap<>();
         for (PlatformModuleInstaller installer : installerList) {
             installers.put(normalizeKey(installer.moduleKey()), installer);
@@ -74,6 +78,7 @@ public class Matrix26ProvisioningService {
         if (installers.containsKey("restaurant")) {
             form.setSelectedModules(List.of("restaurant"));
         }
+        appearanceService.applyDefaultPreset(form);
         return form;
     }
 
@@ -243,6 +248,10 @@ public class Matrix26ProvisioningService {
                 ));
             }
         }
+
+        for (String message : appearanceService.validate(job)) {
+            issues.add(new ValidationIssue("APPEARANCE", message));
+        }
         return issues;
     }
 
@@ -324,6 +333,16 @@ public class Matrix26ProvisioningService {
             order += 10;
         }
 
+        saveStep(job, "install-appearance", order, "Instalar apariencia inicial",
+                hasIssue(issues, "APPEARANCE"),
+                firstIssue(
+                        issues,
+                        "APPEARANCE",
+                        "Se instalarán theme, layouts, branding y recursos visuales como versión v1."
+                ),
+                "FUTURE_TARGET_DATABASE_AND_ASSETS");
+        order += 10;
+
         boolean runtimeBlocked = blockedByAny(issues, Set.of("RUNTIME", "PORT", "URL"));
         saveStep(job, "generate-runtime", order, "Generar configuración runtime",
                 runtimeBlocked,
@@ -337,6 +356,14 @@ public class Matrix26ProvisioningService {
                 issues.isEmpty()
                         ? "La instancia quedaría registrada solo después de completar todas las operaciones reales."
                         : "El registro final permanecería bloqueado hasta resolver todas las validaciones.",
+                "CONTROL_DB_ONLY");
+        order += 10;
+
+        saveStep(job, "register-appearance", order, "Registrar apariencia en Appearance Studio",
+                !issues.isEmpty(),
+                issues.isEmpty()
+                        ? "Theme, layouts y branding quedarán registrados como publicación inicial v1."
+                        : "La apariencia central se registrará cuando el plan sea válido.",
                 "CONTROL_DB_ONLY");
         order += 10;
 
@@ -381,6 +408,7 @@ public class Matrix26ProvisioningService {
         job.setAdminUsername(clean(form.getAdminUsername()));
         job.setAdminEmail(cleanToNull(form.getAdminEmail()));
         job.setDemoDataEnabled(form.isDemoDataEnabled());
+        appearanceService.prepareJob(job, form);
         job.setNotes(cleanToNull(form.getNotes()));
         job.setStatus("VALIDATING");
     }
@@ -394,6 +422,9 @@ public class Matrix26ProvisioningService {
                 + ";database=" + job.getDatabaseName()
                 + ";runtime=" + job.getRuntimeProfile()
                 + ";port=" + job.getRuntimePort()
+                + ";appearancePreset=" + job.getAppearancePresetCode()
+                + ";publicTheme=" + job.getPublicThemeCode()
+                + ";publicLayout=" + job.getPublicLayoutCode()
                 + ";status=" + job.getStatus());
         auditRepository.save(log);
     }

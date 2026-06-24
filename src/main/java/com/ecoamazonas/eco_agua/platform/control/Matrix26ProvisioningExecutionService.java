@@ -7,6 +7,7 @@ import com.ecoamazonas.eco_agua.platform.PlatformClientModuleRepository;
 import com.ecoamazonas.eco_agua.platform.PlatformModuleCatalog;
 import com.ecoamazonas.eco_agua.platform.PlatformModuleCatalogRepository;
 import com.ecoamazonas.eco_agua.platform.module.PlatformModuleInstaller;
+import com.ecoamazonas.eco_agua.platform.control.appearance.Matrix26ProvisioningAppearanceService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,7 @@ public class Matrix26ProvisioningExecutionService {
     private final PlatformClientModuleRepository clientModuleRepository;
     private final Matrix26InstanceHealthService healthService;
     private final Matrix26InstanceAuditLogRepository auditRepository;
+    private final Matrix26ProvisioningAppearanceService appearanceService;
     private final PasswordEncoder passwordEncoder;
     private final Map<String, PlatformModuleInstaller> installers = new LinkedHashMap<>();
     private final Map<Long, ReentrantLock> executionLocks = new ConcurrentHashMap<>();
@@ -61,6 +63,7 @@ public class Matrix26ProvisioningExecutionService {
             PlatformClientModuleRepository clientModuleRepository,
             Matrix26InstanceHealthService healthService,
             Matrix26InstanceAuditLogRepository auditRepository,
+            Matrix26ProvisioningAppearanceService appearanceService,
             PasswordEncoder passwordEncoder,
             List<PlatformModuleInstaller> installerList
     ) {
@@ -75,6 +78,7 @@ public class Matrix26ProvisioningExecutionService {
         this.clientModuleRepository = clientModuleRepository;
         this.healthService = healthService;
         this.auditRepository = auditRepository;
+        this.appearanceService = appearanceService;
         this.passwordEncoder = passwordEncoder;
         for (PlatformModuleInstaller installer : installerList) {
             installers.put(normalizeKey(installer.moduleKey()), installer);
@@ -176,6 +180,10 @@ public class Matrix26ProvisioningExecutionService {
 
             targetDatabaseService.applyFinalBusinessSettings(executionJob, moduleKeys);
 
+            runStep(executionJob, "install-appearance", () ->
+                    appearanceService.installOnTarget(executionJob, actor)
+            );
+
             runStep(executionJob, "generate-runtime", () -> {
                 String runtimeFolder = targetDatabaseService.generateRuntimeFiles(executionJob, moduleKeys);
                 executionJob.setRuntimeFolder(runtimeFolder);
@@ -184,6 +192,10 @@ public class Matrix26ProvisioningExecutionService {
             });
 
             PlatformBusinessClient instance = registerInstanceStep(executionJob, moduleKeys);
+            runStep(executionJob, "register-appearance", () -> {
+                appearanceService.registerCentralAppearance(instance, executionJob, actor);
+                return "Apariencia inicial v1 registrada en Appearance Studio.";
+            });
             processHealthCheck(executionJob, instance);
 
             completeJob(executionJob, actor, instance);
@@ -390,7 +402,7 @@ public class Matrix26ProvisioningExecutionService {
         job.setStatus(STATUS_COMPLETED);
         job.setExecutionCompletedAt(LocalDateTime.now());
         job.setLastError(null);
-        job.setValidationSummary("Aprovisionamiento completado. La base y el runtime fueron generados. La instancia quedó protegida por defecto.");
+        job.setValidationSummary("Aprovisionamiento completado. La base, el runtime y la apariencia inicial fueron generados. La instancia quedó protegida por defecto.");
         jobRepository.saveAndFlush(job);
         saveAudit(job, instance, "PROVISIONING_EXECUTION_COMPLETED", actor,
                 "Aprovisionamiento completado para " + instance.getBusinessName() + ".");
@@ -505,6 +517,9 @@ public class Matrix26ProvisioningExecutionService {
                 + ";database=" + job.getDatabaseName()
                 + ";runtime=" + job.getRuntimeProfile()
                 + ";port=" + job.getRuntimePort()
+                + ";appearancePreset=" + job.getAppearancePresetCode()
+                + ";publicTheme=" + job.getPublicThemeCode()
+                + ";publicLayout=" + job.getPublicLayoutCode()
                 + ";status=" + job.getStatus());
         auditRepository.save(log);
     }

@@ -24,8 +24,9 @@
                 <li><span>4</span><strong>Runtime</strong></li>
                 <li><span>5</span><strong>Administrador</strong></li>
                 <li><span>6</span><strong>Módulos</strong></li>
-                <li><span>7</span><strong>Validación</strong></li>
-                <li><span>8</span><strong>Plan</strong></li>
+                <li><span>7</span><strong>Apariencia</strong></li>
+                <li><span>8</span><strong>Validación</strong></li>
+                <li><span>9</span><strong>Plan</strong></li>
             </ol>
 
             <form th:object="${provisioningForm}"
@@ -163,8 +164,275 @@
                     <div class="text-danger small mt-2" th:errors="*{selectedModules}"></div>
                 </section>
 
+
+                <section class="matrix26-panel matrix26-provisioning-appearance">
+                    <div class="matrix26-panel-header">
+                        <div><span>Paso 7</span><h2>Apariencia inicial</h2></div>
+                        <small>La nueva instancia abrirá por primera vez con esta identidad visual.</small>
+                    </div>
+
+                    <div class="matrix26-provisioning-presets">
+                        <label class="matrix26-provisioning-preset"
+                               th:each="preset : ${appearancePresets}"
+                               th:classappend="${provisioningForm.appearancePresetCode == preset.code()} ? ' is-selected' : ''"
+                               th:attr="data-public-theme=${preset.publicThemeCode()},
+                                        data-public-layout=${preset.publicLayoutCode()},
+                                        data-admin-theme=${preset.adminThemeCode()},
+                                        data-admin-layout=${preset.adminLayoutCode()},
+                                        data-login-layout=${preset.loginLayoutCode()},
+                                        data-primary=${preset.primaryColor()},
+                                        data-secondary=${preset.secondaryColor()},
+                                        data-accent=${preset.accentColor()},
+                                        data-background=${preset.backgroundColor()},
+                                        data-surface=${preset.surfaceColor()},
+                                        data-text=${preset.textColor()},
+                                        data-sidebar=${preset.sidebarMode()},
+                                        data-radius=${preset.borderRadius()},
+                                        data-density=${preset.tableDensity()},
+                                        data-width=${preset.contentWidth()},
+                                        data-heading=${preset.headingStyle()},
+                                        data-demo-assets=${preset.demoAssetsEnabled()}">
+                            <input type="radio"
+                                   th:field="*{appearancePresetCode}"
+                                   th:value="${preset.code()}">
+                            <span class="matrix26-provisioning-preset-swatch"
+                                  th:style="|--preset-primary:${preset.primaryColor()};--preset-secondary:${preset.secondaryColor()};--preset-accent:${preset.accentColor()}|">
+                                <i></i><i></i><i></i>
+                            </span>
+                            <span>
+                                <small th:text="${preset.badge()}">PRESET</small>
+                                <strong th:text="${preset.name()}">Preset</strong>
+                                <em th:text="${preset.description()}">Descripción</em>
+                            </span>
+                        </label>
+                    </div>
+                    <div class="text-danger small mt-2" th:errors="*{appearancePresetCode}"></div>
+
+                    <div class="row g-3 mt-2">
+                        <div class="col-12 col-xl-6">
+                            <div class="matrix26-appearance-config-card">
+                                <span class="matrix26-eyebrow">Experiencia pública</span>
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="publicThemeCode">Theme público</label>
+                                        <select id="publicThemeCode" class="form-select" th:field="*{publicThemeCode}">
+                                            <option th:each="theme : ${appearanceThemes}"
+                                                    th:if="${theme.supportsPublic}"
+                                                    th:value="${theme.code}"
+                                                    th:text="${theme.name}">Theme</option>
+                                        </select>
+                                        <div class="text-danger small mt-1" th:errors="*{publicThemeCode}"></div>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="publicLayoutCode">Layout público</label>
+                                        <select id="publicLayoutCode" class="form-select" th:field="*{publicLayoutCode}">
+                                            <option th:each="layout : ${publicAppearanceLayouts}"
+                                                    th:value="${layout.code}"
+                                                    th:text="${layout.name}">Layout</option>
+                                        </select>
+                                        <div class="text-danger small mt-1" th:errors="*{publicLayoutCode}"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-xl-6">
+                            <div class="matrix26-appearance-config-card">
+                                <span class="matrix26-eyebrow">Área administrativa y login</span>
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="adminThemeCode">Theme admin</label>
+                                        <select id="adminThemeCode" class="form-select" th:field="*{adminThemeCode}">
+                                            <option th:each="theme : ${appearanceThemes}"
+                                                    th:if="${theme.supportsAdmin}"
+                                                    th:value="${theme.code}"
+                                                    th:text="${theme.name}">Theme</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="adminLayoutCode">Workspace</label>
+                                        <select id="adminLayoutCode" class="form-select" th:field="*{adminLayoutCode}">
+                                            <option th:each="layout : ${adminAppearanceLayouts}"
+                                                    th:value="${layout.code}"
+                                                    th:text="${layout.name}">Layout</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="loginLayoutCode">Login</label>
+                                        <select id="loginLayoutCode" class="form-select" th:field="*{loginLayoutCode}">
+                                            <option th:each="layout : ${loginAppearanceLayouts}"
+                                                    th:value="${layout.code}"
+                                                    th:text="${layout.name}">Login</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="matrix26-provisioning-color-grid mt-4">
+                        <div class="matrix26-provisioning-color">
+                            <label for="primaryColor">Principal</label>
+                            <div>
+                                <input id="primaryColor" type="text" class="form-control matrix26-hex-input" th:field="*{primaryColor}">
+                                <input type="color" class="form-control form-control-color matrix26-color-picker" data-target="primaryColor" th:value="*{primaryColor}">
+                            </div>
+                            <div class="text-danger small mt-1" th:errors="*{primaryColor}"></div>
+                        </div>
+                        <div class="matrix26-provisioning-color">
+                            <label for="secondaryColor">Secundario</label>
+                            <div>
+                                <input id="secondaryColor" type="text" class="form-control matrix26-hex-input" th:field="*{secondaryColor}">
+                                <input type="color" class="form-control form-control-color matrix26-color-picker" data-target="secondaryColor" th:value="*{secondaryColor}">
+                            </div>
+                            <div class="text-danger small mt-1" th:errors="*{secondaryColor}"></div>
+                        </div>
+                        <div class="matrix26-provisioning-color">
+                            <label for="accentColor">Acento</label>
+                            <div>
+                                <input id="accentColor" type="text" class="form-control matrix26-hex-input" th:field="*{accentColor}">
+                                <input type="color" class="form-control form-control-color matrix26-color-picker" data-target="accentColor" th:value="*{accentColor}">
+                            </div>
+                            <div class="text-danger small mt-1" th:errors="*{accentColor}"></div>
+                        </div>
+                        <div class="matrix26-provisioning-color">
+                            <label for="backgroundColor">Fondo</label>
+                            <div>
+                                <input id="backgroundColor" type="text" class="form-control matrix26-hex-input" th:field="*{backgroundColor}">
+                                <input type="color" class="form-control form-control-color matrix26-color-picker" data-target="backgroundColor" th:value="*{backgroundColor}">
+                            </div>
+                            <div class="text-danger small mt-1" th:errors="*{backgroundColor}"></div>
+                        </div>
+                        <div class="matrix26-provisioning-color">
+                            <label for="surfaceColor">Superficie</label>
+                            <div>
+                                <input id="surfaceColor" type="text" class="form-control matrix26-hex-input" th:field="*{surfaceColor}">
+                                <input type="color" class="form-control form-control-color matrix26-color-picker" data-target="surfaceColor" th:value="*{surfaceColor}">
+                            </div>
+                            <div class="text-danger small mt-1" th:errors="*{surfaceColor}"></div>
+                        </div>
+                        <div class="matrix26-provisioning-color">
+                            <label for="textColor">Texto</label>
+                            <div>
+                                <input id="textColor" type="text" class="form-control matrix26-hex-input" th:field="*{textColor}">
+                                <input type="color" class="form-control form-control-color matrix26-color-picker" data-target="textColor" th:value="*{textColor}">
+                            </div>
+                            <div class="text-danger small mt-1" th:errors="*{textColor}"></div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mt-1">
+                        <div class="col-6 col-lg">
+                            <label class="form-label" for="sidebarMode">Sidebar</label>
+                            <select id="sidebarMode" class="form-select" th:field="*{sidebarMode}">
+                                <option value="THEME">Según theme</option>
+                                <option value="LIGHT">Claro</option>
+                                <option value="DARK">Oscuro</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-lg">
+                            <label class="form-label" for="borderRadius">Bordes</label>
+                            <select id="borderRadius" class="form-select" th:field="*{borderRadius}">
+                                <option value="SMALL">Pequeños</option>
+                                <option value="MEDIUM">Equilibrados</option>
+                                <option value="LARGE">Amplios</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-lg">
+                            <label class="form-label" for="tableDensity">Tablas</label>
+                            <select id="tableDensity" class="form-select" th:field="*{tableDensity}">
+                                <option value="COMPACT">Compactas</option>
+                                <option value="COMFORTABLE">Cómodas</option>
+                                <option value="SPACIOUS">Espaciosas</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-lg">
+                            <label class="form-label" for="contentWidth">Contenido</label>
+                            <select id="contentWidth" class="form-select" th:field="*{contentWidth}">
+                                <option value="STANDARD">Estándar</option>
+                                <option value="WIDE">Amplio</option>
+                                <option value="FULL">Completo</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-lg">
+                            <label class="form-label" for="headingStyle">Títulos</label>
+                            <select id="headingStyle" class="form-select" th:field="*{headingStyle}">
+                                <option value="SYSTEM">Sistema</option>
+                                <option value="STRONG">Corporativo fuerte</option>
+                                <option value="EDITORIAL">Editorial</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="matrix26-branding-provisioning mt-4">
+                        <div class="matrix26-panel-header">
+                            <div><span>Branding inicial</span><h3>Textos y recursos de la nueva marca</h3></div>
+                            <small>Podrás afinarlos después desde Appearance Studio.</small>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-12 col-lg-5">
+                                <label class="form-label" for="brandingDisplayName">Nombre visible</label>
+                                <input id="brandingDisplayName" class="form-control" th:field="*{brandingDisplayName}">
+                                <div class="text-danger small mt-1" th:errors="*{brandingDisplayName}"></div>
+                            </div>
+                            <div class="col-12 col-lg-3">
+                                <label class="form-label" for="brandingShortName">Nombre corto</label>
+                                <input id="brandingShortName" class="form-control" th:field="*{brandingShortName}">
+                                <div class="text-danger small mt-1" th:errors="*{brandingShortName}"></div>
+                            </div>
+                            <div class="col-12 col-lg-4">
+                                <label class="form-label" for="brandingTagline">Eslogan</label>
+                                <input id="brandingTagline" class="form-control" th:field="*{brandingTagline}">
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label" for="brandingHeroTitle">Título principal</label>
+                                <input id="brandingHeroTitle" class="form-control" th:field="*{brandingHeroTitle}">
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label" for="brandingHeroSubtitle">Subtítulo principal</label>
+                                <input id="brandingHeroSubtitle" class="form-control" th:field="*{brandingHeroSubtitle}">
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label" for="brandingWelcomeMessage">Mensaje de bienvenida</label>
+                                <input id="brandingWelcomeMessage" class="form-control" th:field="*{brandingWelcomeMessage}">
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label" for="brandingPrimaryCtaLabel">CTA principal</label>
+                                <input id="brandingPrimaryCtaLabel" class="form-control" th:field="*{brandingPrimaryCtaLabel}">
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label" for="brandingSecondaryCtaLabel">CTA secundario</label>
+                                <input id="brandingSecondaryCtaLabel" class="form-control" th:field="*{brandingSecondaryCtaLabel}">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label" for="brandingContactPhone">Teléfono</label>
+                                <input id="brandingContactPhone" class="form-control" th:field="*{brandingContactPhone}">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label" for="brandingWhatsapp">WhatsApp</label>
+                                <input id="brandingWhatsapp" class="form-control" th:field="*{brandingWhatsapp}">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label" for="brandingLocation">Ubicación</label>
+                                <input id="brandingLocation" class="form-control" th:field="*{brandingLocation}">
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check form-switch matrix26-switch-card">
+                                    <input id="brandingDemoAssetsEnabled"
+                                           class="form-check-input"
+                                           type="checkbox"
+                                           th:field="*{brandingDemoAssetsEnabled}">
+                                    <label class="form-check-label" for="brandingDemoAssetsEnabled">
+                                        <strong>Instalar kit visual demostrativo</strong>
+                                        <span>Incluye logo, favicon, login, hero, placeholder y social share. No tendrás que buscar imágenes para esta prueba.</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <section class="matrix26-panel">
-                    <div class="matrix26-panel-header"><div><span>Pasos 7–8</span><h2>Validación y generación del plan</h2></div></div>
+                    <div class="matrix26-panel-header"><div><span>Pasos 8–9</span><h2>Validación y generación del plan</h2></div></div>
                     <div class="row g-3">
                         <div class="col-12">
                             <label class="form-label" for="notes">Notas técnicas</label>
@@ -197,11 +465,90 @@
 (() => {
     const port = document.getElementById('runtimePort');
     const url = document.getElementById('publicUrl');
-    if (!port || !url) return;
-    port.addEventListener('input', () => {
-        if (/^http:\/\/localhost:\d+\/?$/.test(url.value.trim())) {
-            url.value = `http://localhost:${port.value}`;
+    if (port && url) {
+        port.addEventListener('input', () => {
+            if (/^http:\/\/localhost:\d+\/?$/.test(url.value.trim())) {
+                url.value = `http://localhost:${port.value}`;
+            }
+        });
+    }
+
+    const businessName = document.getElementById('businessName');
+    const brandingDisplayName = document.getElementById('brandingDisplayName');
+    const brandingShortName = document.getElementById('brandingShortName');
+    const brandingWelcomeMessage = document.getElementById('brandingWelcomeMessage');
+    const brandingHeroTitle = document.getElementById('brandingHeroTitle');
+    if (businessName && brandingDisplayName && brandingShortName) {
+        businessName.addEventListener('input', () => {
+            const value = businessName.value.trim();
+            if (!brandingDisplayName.dataset.edited) {
+                brandingDisplayName.value = value;
+            }
+            if (!brandingShortName.dataset.edited) {
+                brandingShortName.value = value.substring(0, 100);
+            }
+            if (brandingWelcomeMessage && !brandingWelcomeMessage.dataset.edited) {
+                brandingWelcomeMessage.value = `Bienvenido al sistema de gestión de ${value}.`;
+            }
+            if (brandingHeroTitle && !brandingHeroTitle.dataset.edited) {
+                brandingHeroTitle.value = `Descubre ${value}`;
+            }
+        });
+        brandingDisplayName.addEventListener('input', () => brandingDisplayName.dataset.edited = '1');
+        brandingShortName.addEventListener('input', () => brandingShortName.dataset.edited = '1');
+        brandingWelcomeMessage?.addEventListener('input', () => brandingWelcomeMessage.dataset.edited = '1');
+        brandingHeroTitle?.addEventListener('input', () => brandingHeroTitle.dataset.edited = '1');
+    }
+
+    const assign = (id, value) => {
+        const element = document.getElementById(id);
+        if (element && value !== undefined && value !== null) {
+            if (element.type === 'checkbox') {
+                element.checked = String(value) === 'true';
+            } else {
+                element.value = value;
+            }
+            element.dispatchEvent(new Event('change', { bubbles: true }));
         }
+    };
+
+    document.querySelectorAll('.matrix26-provisioning-preset input[type="radio"]').forEach(input => {
+        input.addEventListener('change', () => {
+            if (!input.checked) return;
+            document.querySelectorAll('.matrix26-provisioning-preset').forEach(card => card.classList.remove('is-selected'));
+            const card = input.closest('.matrix26-provisioning-preset');
+            card.classList.add('is-selected');
+            const data = card.dataset;
+            assign('publicThemeCode', data.publicTheme);
+            assign('publicLayoutCode', data.publicLayout);
+            assign('adminThemeCode', data.adminTheme);
+            assign('adminLayoutCode', data.adminLayout);
+            assign('loginLayoutCode', data.loginLayout);
+            assign('primaryColor', data.primary);
+            assign('secondaryColor', data.secondary);
+            assign('accentColor', data.accent);
+            assign('backgroundColor', data.background);
+            assign('surfaceColor', data.surface);
+            assign('textColor', data.text);
+            assign('sidebarMode', data.sidebar);
+            assign('borderRadius', data.radius);
+            assign('tableDensity', data.density);
+            assign('contentWidth', data.width);
+            assign('headingStyle', data.heading);
+            assign('brandingDemoAssetsEnabled', data.demoAssets);
+        });
+    });
+
+    document.querySelectorAll('.matrix26-color-picker').forEach(picker => {
+        const target = document.getElementById(picker.dataset.target);
+        if (!target) return;
+        picker.addEventListener('input', () => target.value = picker.value.toUpperCase());
+        target.addEventListener('input', () => {
+            const value = target.value.trim();
+            if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+                picker.value = value;
+            }
+        });
     });
 })();
 </script>

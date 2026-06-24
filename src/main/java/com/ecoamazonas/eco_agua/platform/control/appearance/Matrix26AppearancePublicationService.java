@@ -350,8 +350,10 @@ public class Matrix26AppearancePublicationService {
         if (!properties.isAppearancePublishingEnabled()) {
             return "La publicación real de apariencia está deshabilitada en este runtime de Matrix26.";
         }
-        if (!allowedInstanceCodes().contains(normalize(instance.getCode()))) {
-            return "Esta fase solo permite publicar en instancias de laboratorio autorizadas.";
+        boolean explicitlyAllowed = allowedInstanceCodes().contains(normalize(instance.getCode()));
+        boolean matrix26Managed = "MATRIX26_MANAGED".equalsIgnoreCase(instance.getManagementMode());
+        if (!explicitlyAllowed && !matrix26Managed) {
+            return "La publicación solo está permitida para instancias administradas por Matrix26 o laboratorios autorizados.";
         }
         if (instance.getRuntimePort() == null || RESERVED_PORTS.contains(instance.getRuntimePort())) {
             return "El puerto de esta instancia está reservado o no es válido para pruebas de apariencia.";

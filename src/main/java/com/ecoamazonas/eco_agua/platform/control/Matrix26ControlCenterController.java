@@ -6,6 +6,7 @@ import com.ecoamazonas.eco_agua.platform.PlatformClientModule;
 import com.ecoamazonas.eco_agua.platform.PlatformClientModuleRepository;
 import com.ecoamazonas.eco_agua.platform.PlatformModuleCatalog;
 import com.ecoamazonas.eco_agua.platform.PlatformModuleCatalogRepository;
+import com.ecoamazonas.eco_agua.platform.control.appearance.Matrix26ProvisioningAppearanceService;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.Authentication;
@@ -40,6 +41,7 @@ public class Matrix26ControlCenterController {
     private final Matrix26ControlCenterProperties properties;
     private final Matrix26ProvisioningService provisioningService;
     private final Matrix26ProvisioningExecutionService provisioningExecutionService;
+    private final Matrix26ProvisioningAppearanceService provisioningAppearanceService;
 
     public Matrix26ControlCenterController(
             Matrix26InstanceHealthService healthService,
@@ -49,7 +51,8 @@ public class Matrix26ControlCenterController {
             PlatformClientModuleRepository clientModuleRepository,
             Matrix26ControlCenterProperties properties,
             Matrix26ProvisioningService provisioningService,
-            Matrix26ProvisioningExecutionService provisioningExecutionService
+            Matrix26ProvisioningExecutionService provisioningExecutionService,
+            Matrix26ProvisioningAppearanceService provisioningAppearanceService
     ) {
         this.healthService = healthService;
         this.managementService = managementService;
@@ -59,6 +62,7 @@ public class Matrix26ControlCenterController {
         this.properties = properties;
         this.provisioningService = provisioningService;
         this.provisioningExecutionService = provisioningExecutionService;
+        this.provisioningAppearanceService = provisioningAppearanceService;
     }
 
     @GetMapping({"", "/dashboard"})
@@ -325,7 +329,7 @@ public class Matrix26ControlCenterController {
             Matrix26ProvisioningJob job = provisioningExecutionService.execute(id, form, actor(authentication));
             redirectAttributes.addFlashAttribute(
                     "successMessage",
-                    "Aprovisionamiento completado. La base y el runtime fueron generados y la instancia quedó protegida."
+                    "Aprovisionamiento completado. La base, el runtime y la apariencia inicial fueron generados; la instancia quedó protegida."
             );
             return "redirect:/control-center/provisioning/" + job.getId();
         } catch (RuntimeException ex) {
@@ -391,6 +395,11 @@ public class Matrix26ControlCenterController {
         model.addAttribute("activePage", "matrix26_provisioning");
         model.addAttribute("provisioningForm", form);
         model.addAttribute("groupedProvisioningModules", provisioningService.groupedModuleOptions());
+        model.addAttribute("appearancePresets", provisioningAppearanceService.presets());
+        model.addAttribute("appearanceThemes", provisioningAppearanceService.activeThemes());
+        model.addAttribute("publicAppearanceLayouts", provisioningAppearanceService.publicLayouts());
+        model.addAttribute("adminAppearanceLayouts", provisioningAppearanceService.adminLayouts());
+        model.addAttribute("loginAppearanceLayouts", provisioningAppearanceService.loginLayouts());
     }
 
     private void addProvisioningDetailModel(
@@ -404,6 +413,7 @@ public class Matrix26ControlCenterController {
         model.addAttribute("executionForm", executionForm);
         model.addAttribute("executionEnabled", provisioningExecutionService.isExecutionEnabled());
         model.addAttribute("canExecute", provisioningExecutionService.canExecute(plan.job()));
+        model.addAttribute("appearanceSummary", provisioningAppearanceService.summary(plan.job()));
     }
 
     private void clearExecutionSecrets(Matrix26ProvisioningExecutionForm form) {

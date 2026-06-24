@@ -68,6 +68,34 @@ public class Matrix26ProvisioningJob {
     @Column(name = "demo_data_enabled", nullable = false)
     private boolean demoDataEnabled;
 
+
+    @Column(name = "appearance_preset_code", length = 80)
+    private String appearancePresetCode;
+
+    @Column(name = "public_theme_code", length = 80)
+    private String publicThemeCode;
+
+    @Column(name = "public_layout_code", length = 80)
+    private String publicLayoutCode;
+
+    @Column(name = "admin_theme_code", length = 80)
+    private String adminThemeCode;
+
+    @Column(name = "admin_layout_code", length = 80)
+    private String adminLayoutCode;
+
+    @Column(name = "login_layout_code", length = 80)
+    private String loginLayoutCode;
+
+    @Column(name = "appearance_overrides_json", columnDefinition = "TEXT")
+    private String appearanceOverridesJson;
+
+    @Column(name = "branding_json", columnDefinition = "TEXT")
+    private String brandingJson;
+
+    @Column(name = "branding_demo_assets_enabled", nullable = false)
+    private boolean brandingDemoAssetsEnabled;
+
     @Column(name = "validation_summary", columnDefinition = "TEXT")
     private String validationSummary;
 
@@ -235,6 +263,26 @@ public class Matrix26ProvisioningJob {
     public void setDemoDataEnabled(boolean demoDataEnabled) {
         this.demoDataEnabled = demoDataEnabled;
     }
+
+
+    public String getAppearancePresetCode() { return appearancePresetCode; }
+    public void setAppearancePresetCode(String appearancePresetCode) { this.appearancePresetCode = appearancePresetCode; }
+    public String getPublicThemeCode() { return publicThemeCode; }
+    public void setPublicThemeCode(String publicThemeCode) { this.publicThemeCode = publicThemeCode; }
+    public String getPublicLayoutCode() { return publicLayoutCode; }
+    public void setPublicLayoutCode(String publicLayoutCode) { this.publicLayoutCode = publicLayoutCode; }
+    public String getAdminThemeCode() { return adminThemeCode; }
+    public void setAdminThemeCode(String adminThemeCode) { this.adminThemeCode = adminThemeCode; }
+    public String getAdminLayoutCode() { return adminLayoutCode; }
+    public void setAdminLayoutCode(String adminLayoutCode) { this.adminLayoutCode = adminLayoutCode; }
+    public String getLoginLayoutCode() { return loginLayoutCode; }
+    public void setLoginLayoutCode(String loginLayoutCode) { this.loginLayoutCode = loginLayoutCode; }
+    public String getAppearanceOverridesJson() { return appearanceOverridesJson; }
+    public void setAppearanceOverridesJson(String appearanceOverridesJson) { this.appearanceOverridesJson = appearanceOverridesJson; }
+    public String getBrandingJson() { return brandingJson; }
+    public void setBrandingJson(String brandingJson) { this.brandingJson = brandingJson; }
+    public boolean isBrandingDemoAssetsEnabled() { return brandingDemoAssetsEnabled; }
+    public void setBrandingDemoAssetsEnabled(boolean brandingDemoAssetsEnabled) { this.brandingDemoAssetsEnabled = brandingDemoAssetsEnabled; }
 
     public String getValidationSummary() {
         return validationSummary;

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Logs')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Logs', 'Safe inventory of diagnostic files associated with each runtime.')}" ></header>
+        <main class="matrix26-main">
+            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
+                <div class="matrix26-inline-summary"><span><strong th:text="${#lists.size(logs)}">0</strong> associated files</span><span>Sensitive values are masked when displayed</span></div>
+                <div class="d-flex gap-2"><a class="btn btn-outline-secondary" th:href="@{/control-center/operations}"><i class="bi bi-arrow-left me-1"></i>Overview</a><a class="btn btn-primary" th:href="@{/control-center/operations/logs(refresh=true)}"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a></div>
+            </div>
+
+            <div class="matrix26-alert-safe mb-4"><i class="bi bi-file-earmark-lock-fill"></i><div><strong>Restricted reading</strong><p>Matrix26 only searches for log extensions inside <code>logs/</code> and <code>runtime-clients/</code>. Arbitrary paths and files outside the project are blocked.</p></div></div>
+
+            <section class="matrix26-panel">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Instance</th><th>File</th><th>Size</th><th>Last modified</th><th>Priority</th><th class="text-end">View runtime</th></tr></thead>
+                        <tbody>
+                        <tr th:each="log : ${logs}">
+                            <td><strong th:text="${log.instanceName()}">Instance</strong></td>
+                            <td><code class="matrix26-code-wrap" th:text="${log.relativePath()}">log</code></td>
+                            <td th:text="${log.sizeLabel()}">0 B</td>
+                            <td th:text="${log.modifiedAt() != null ? #temporals.format(log.modifiedAt(), 'dd/MM/yyyy HH:mm:ss') : '—'}">—</td>
+                            <td><span class="badge" th:classappend="${log.currentCandidate() ? ' text-bg-info' : ' text-bg-light border text-dark'}" th:text="${log.currentCandidate() ? 'Primary' : 'Related'}">Priority</span></td>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/operations/runtimes/{key}(key=${log.runtimeKey()})}"><i class="bi bi-eye"></i></a></td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(logs)}"><td colspan="6" class="text-center text-muted py-5">No associated logs were found. Runtimes started in a terminal may not redirect their output to a file.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,2720 @@
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26HttpProbe.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26HttpProbe.java
+@@ -0,0 +1,10 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++public record Matrix26HttpProbe(
++        boolean attempted,
++        boolean online,
++        Integer statusCode,
++        Long responseTimeMs,
++        String message
++) {
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26LogInventoryItem.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26LogInventoryItem.java
+@@ -0,0 +1,14 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import java.time.LocalDateTime;
++
++public record Matrix26LogInventoryItem(
++        String runtimeKey,
++        String instanceName,
++        String relativePath,
++        long sizeBytes,
++        String sizeLabel,
++        LocalDateTime modifiedAt,
++        boolean currentCandidate
++) {
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26LogTailView.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26LogTailView.java
+@@ -0,0 +1,11 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import java.util.List;
++
++public record Matrix26LogTailView(
++        Matrix26LogInventoryItem log,
++        List<String> lines,
++        boolean available,
++        String message
++) {
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsController.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsController.java
+@@ -0,0 +1,90 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Controller;
++import org.springframework.ui.Model;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
++
++@Controller
++@RequestMapping("/control-center/operations")
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26OperationsController {
++
++    private final Matrix26OperationsInventoryService inventoryService;
++
++    public Matrix26OperationsController(Matrix26OperationsInventoryService inventoryService) {
++        this.inventoryService = inventoryService;
++    }
++
++    @GetMapping
++    public String dashboard(
++            @RequestParam(value = "refresh", defaultValue = "false") boolean refresh,
++            Model model
++    ) {
++        Matrix26OperationsSnapshot snapshot = inventoryService.snapshot(refresh);
++        addSnapshotModel(model, snapshot, "matrix26_operations");
++        return "control_center/operations/dashboard";
++    }
++
++    @GetMapping("/runtimes")
++    public String runtimes(
++            @RequestParam(value = "refresh", defaultValue = "false") boolean refresh,
++            Model model
++    ) {
++        Matrix26OperationsSnapshot snapshot = inventoryService.snapshot(refresh);
++        addSnapshotModel(model, snapshot, "matrix26_operations_runtimes");
++        return "control_center/operations/runtimes";
++    }
++
++    @GetMapping("/runtimes/{runtimeKey}")
++    public String runtimeDetail(
++            @PathVariable String runtimeKey,
++            @RequestParam(value = "refresh", defaultValue = "false") boolean refresh,
++            Model model
++    ) {
++        Matrix26RuntimeInventoryItem runtime = inventoryService.runtime(runtimeKey, refresh);
++        model.addAttribute("activePage", "matrix26_operations_runtimes");
++        model.addAttribute("runtime", runtime);
++        model.addAttribute("logTail", inventoryService.logTail(runtimeKey, false));
++        model.addAttribute("readOnlyOperations", true);
++        return "control_center/operations/runtime_detail";
++    }
++
++    @GetMapping("/ports")
++    public String ports(
++            @RequestParam(value = "refresh", defaultValue = "false") boolean refresh,
++            Model model
++    ) {
++        Matrix26OperationsSnapshot snapshot = inventoryService.snapshot(refresh);
++        addSnapshotModel(model, snapshot, "matrix26_operations_ports");
++        return "control_center/operations/ports";
++    }
++
++    @GetMapping("/logs")
++    public String logs(
++            @RequestParam(value = "refresh", defaultValue = "false") boolean refresh,
++            Model model
++    ) {
++        Matrix26OperationsSnapshot snapshot = inventoryService.snapshot(refresh);
++        addSnapshotModel(model, snapshot, "matrix26_operations_logs");
++        return "control_center/operations/logs";
++    }
++
++    private void addSnapshotModel(
++            Model model,
++            Matrix26OperationsSnapshot snapshot,
++            String activePage
++    ) {
++        model.addAttribute("activePage", activePage);
++        model.addAttribute("operations", snapshot);
++        model.addAttribute("runtimes", snapshot.runtimes());
++        model.addAttribute("ports", snapshot.ports());
++        model.addAttribute("logs", snapshot.logs());
++        model.addAttribute("summary", snapshot.summary());
++        model.addAttribute("probeWarnings", snapshot.probeWarnings());
++        model.addAttribute("readOnlyOperations", true);
++    }
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsInventoryService.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsInventoryService.java
+@@ -0,0 +1,800 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClientRepository;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26ControlCenterProperties;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Service;
++
++import java.io.BufferedReader;
++import java.io.IOException;
++import java.net.HttpURLConnection;
++import java.net.URI;
++import java.net.URL;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.time.Duration;
++import java.time.Instant;
++import java.time.LocalDateTime;
++import java.time.ZoneId;
++import java.util.ArrayDeque;
++import java.util.ArrayList;
++import java.util.Comparator;
++import java.util.Deque;
++import java.util.LinkedHashMap;
++import java.util.LinkedHashSet;
++import java.util.List;
++import java.util.Locale;
++import java.util.Map;
++import java.util.Optional;
++import java.util.Properties;
++import java.util.Set;
++import java.util.concurrent.atomic.AtomicReference;
++import java.util.regex.Matcher;
++import java.util.regex.Pattern;
++
++@Service
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26OperationsInventoryService {
++
++    private static final Pattern DATABASE_NAME = Pattern.compile(
++            "(?i)^jdbc:mysql://[^/]+/([^?;]+)"
++    );
++    private static final Set<String> LOG_EXTENSIONS = Set.of(".log", ".out", ".err");
++    private static final int MAX_LOG_FILES = 500;
++
++    private final PlatformBusinessClientRepository clientRepository;
++    private final Matrix26ControlCenterProperties properties;
++    private final Matrix26OperationsProperties operationsProperties;
++    private final Matrix26SystemProbe systemProbe;
++    private final AtomicReference<CachedSnapshot> cache = new AtomicReference<>();
++
++    public Matrix26OperationsInventoryService(
++            PlatformBusinessClientRepository clientRepository,
++            Matrix26ControlCenterProperties properties,
++            Matrix26OperationsProperties operationsProperties,
++            Matrix26SystemProbe systemProbe
++    ) {
++        this.clientRepository = clientRepository;
++        this.properties = properties;
++        this.operationsProperties = operationsProperties;
++        this.systemProbe = systemProbe;
++    }
++
++    public Matrix26OperationsSnapshot snapshot(boolean forceRefresh) {
++        CachedSnapshot cached = cache.get();
++        long cacheSeconds = Math.max(2L, operationsProperties.getCacheSeconds());
++        if (!forceRefresh && cached != null && cached.createdAt().isAfter(Instant.now().minusSeconds(cacheSeconds))) {
++            return cached.snapshot();
++        }
++
++        Matrix26OperationsSnapshot refreshed = inspect();
++        cache.set(new CachedSnapshot(refreshed, Instant.now()));
++        return refreshed;
++    }
++
++    public Matrix26RuntimeInventoryItem runtime(String runtimeKey, boolean forceRefresh) {
++        return snapshot(forceRefresh).runtimes().stream()
++                .filter(item -> item.target().key().equals(runtimeKey))
++                .findFirst()
++                .orElseThrow(() -> new IllegalArgumentException("The requested runtime does not exist."));
++    }
++
++    public Matrix26LogTailView logTail(String runtimeKey, boolean forceRefresh) {
++        Matrix26RuntimeInventoryItem runtime = runtime(runtimeKey, forceRefresh);
++        Matrix26LogInventoryItem log = runtime.primaryLog();
++        if (log == null) {
++            return new Matrix26LogTailView(null, List.of(), false, "No log file is associated with this runtime.");
++        }
++
++        Optional<Path> path = resolveSafeRelativePath(log.relativePath());
++        if (path.isEmpty() || !Files.isRegularFile(path.get())) {
++            return new Matrix26LogTailView(log, List.of(), false, "The log file is no longer available.");
++        }
++
++        int maximumLines = Math.max(20, Math.min(operationsProperties.getLogTailLines(), 500));
++        try {
++            List<String> lines = readLastLines(path.get(), maximumLines).stream()
++                    .map(Matrix26OperationsSanitizer::sanitize)
++                    .toList();
++            return new Matrix26LogTailView(log, lines, true, "Last " + lines.size() + " sanitized lines.");
++        } catch (IOException ex) {
++            return new Matrix26LogTailView(log, List.of(), false, "The log could not be read: " + safeMessage(ex));
++        }
++    }
++
++    private Matrix26OperationsSnapshot inspect() {
++        Path projectRoot = Path.of("").toAbsolutePath().normalize();
++        Path runtimeRoot = safeChild(projectRoot, operationsProperties.getRuntimeDirectory());
++        Path dataRoot = safeChild(projectRoot, operationsProperties.getDataDirectory());
++        Path logRoot = safeChild(projectRoot, operationsProperties.getLogDirectory());
++
++        List<Matrix26RuntimeTarget> targets = new ArrayList<>();
++        targets.add(Matrix26RuntimeTarget.controlCenter(properties));
++        clientRepository.findAllByOrderByBusinessNameAsc().stream()
++                .map(Matrix26RuntimeTarget::fromInstance)
++                .forEach(targets::add);
++
++        List<Integer> expectedPorts = targets.stream()
++                .map(Matrix26RuntimeTarget::expectedPort)
++                .filter(value -> value != null)
++                .distinct()
++                .toList();
++        Matrix26SystemSnapshot system = systemProbe.capture(expectedPorts);
++
++        Map<String, List<Path>> logsByRuntime = discoverLogs(projectRoot, logRoot, runtimeRoot, targets);
++        List<Matrix26RuntimeInventoryItem> runtimes = targets.stream()
++                .map(target -> inspectRuntime(
++                        target,
++                        projectRoot,
++                        runtimeRoot,
++                        dataRoot,
++                        logsByRuntime.getOrDefault(target.key(), List.of()),
++                        system
++                ))
++                .sorted(Comparator
++                        .comparing((Matrix26RuntimeInventoryItem item) -> !item.target().controlCenter())
++                        .thenComparing(item -> item.target().expectedPort(), Comparator.nullsLast(Integer::compareTo)))
++                .toList();
++
++        List<Matrix26LogInventoryItem> logs = runtimes.stream()
++                .flatMap(runtime -> toLogItems(runtime, logsByRuntime.getOrDefault(runtime.target().key(), List.of()), projectRoot).stream())
++                .sorted(Comparator.comparing(Matrix26LogInventoryItem::modifiedAt, Comparator.nullsLast(Comparator.reverseOrder())))
++                .toList();
++
++        List<Matrix26PortBinding> ports = system.listeningPorts().values().stream()
++                .filter(binding -> expectedPorts.contains(binding.port()))
++                .sorted(Comparator.comparingInt(Matrix26PortBinding::port))
++                .toList();
++
++        long online = runtimes.stream().filter(Matrix26RuntimeInventoryItem::online).count();
++        long degraded = runtimes.stream()
++                .filter(item -> item.state() == Matrix26RuntimeState.DEGRADED
++                        || item.state() == Matrix26RuntimeState.PORT_OCCUPIED
++                        || item.state() == Matrix26RuntimeState.CONFIGURATION_MISSING
++                        || item.state() == Matrix26RuntimeState.RUNTIME_MISSING)
++                .count();
++        long offline = runtimes.size() - online - degraded;
++        long protectedRuntimes = runtimes.stream().filter(item -> item.target().protectedInstance()).count();
++        long detectedProcesses = runtimes.stream().filter(item -> item.processId() != null).count();
++        long totalStorage = runtimes.stream()
++                .mapToLong(item -> item.runtimeStorageBytes() + item.assetStorageBytes())
++                .sum();
++        LocalDateTime inspectedAt = LocalDateTime.now();
++
++        Matrix26OperationsSummary summary = new Matrix26OperationsSummary(
++                runtimes.size(),
++                online,
++                Math.max(0, offline),
++                degraded,
++                protectedRuntimes,
++                ports.size(),
++                detectedProcesses,
++                totalStorage,
++                formatBytes(totalStorage),
++                inspectedAt
++        );
++
++        return new Matrix26OperationsSnapshot(
++                List.copyOf(runtimes),
++                List.copyOf(ports),
++                List.copyOf(logs),
++                summary,
++                system.warnings(),
++                inspectedAt
++        );
++    }
++
++    private Matrix26RuntimeInventoryItem inspectRuntime(
++            Matrix26RuntimeTarget target,
++            Path projectRoot,
++            Path runtimeRoot,
++            Path dataRoot,
++            List<Path> logCandidates,
++            Matrix26SystemSnapshot system
++    ) {
++        List<String> warnings = new ArrayList<>();
++        Path runtimeDirectory = resolveRuntimeDirectory(runtimeRoot, target, warnings);
++        boolean runtimeDirectoryPresent = runtimeDirectory != null && Files.isDirectory(runtimeDirectory);
++        Path configuration = runtimeDirectoryPresent ? runtimeDirectory.resolve("application.properties").normalize() : null;
++        boolean configurationPresent = configuration != null && Files.isRegularFile(configuration);
++        RuntimeConfiguration runtimeConfiguration = readConfiguration(configuration, warnings);
++        Path launcher = findLauncher(runtimeDirectory);
++        boolean launcherPresent = launcher != null && Files.isRegularFile(launcher);
++
++        Integer configuredPort = runtimeConfiguration.port();
++        String configuredProfile = runtimeConfiguration.runtimeProfile();
++        String configuredDatabase = runtimeConfiguration.databaseName();
++        boolean configurationConsistent = configurationPresent && configurationMatches(
++                target,
++                configuredPort,
++                configuredProfile,
++                configuredDatabase,
++                warnings
++        );
++
++        Matrix26PortBinding portBinding = target.expectedPort() == null
++                ? null
++                : system.listeningPorts().get(target.expectedPort());
++        boolean portListening = portBinding != null;
++        Matrix26ProcessInfo process = resolveProcess(target, configuration, portBinding, system.processes());
++        boolean expectedProcess = process != null && matchesTarget(process, target, configuration);
++        if (portBinding != null && portBinding.pid() != null && process != null && process.pid() == portBinding.pid()) {
++            expectedProcess = matchesTarget(process, target, configuration) || target.controlCenter();
++        }
++
++        Matrix26HttpProbe http = probeHttp(target.publicUrl());
++        Matrix26LogInventoryItem primaryLog = logCandidates.isEmpty()
++                ? null
++                : toLogItem(target, logCandidates.get(0), projectRoot, true);
++
++        long runtimeStorage = directorySize(runtimeDirectory);
++        Path assetsDirectory = resolveAssetsDirectory(dataRoot, target);
++        long assetStorage = directorySize(assetsDirectory);
++
++        Matrix26RuntimeState state = determineState(
++                target,
++                runtimeDirectoryPresent,
++                configurationPresent,
++                portListening,
++                portBinding,
++                expectedProcess,
++                process,
++                http,
++                warnings
++        );
++        String stateDetail = stateDetail(state, portBinding, http, process);
++
++        if (primaryLog == null) {
++            warnings.add("No log file is associated with the runtime.");
++        }
++        if (!launcherPresent) {
++            warnings.add("No compatible launcher was found in the runtime directory.");
++        }
++
++        LocalDateTime processStartedAt = process == null
++                ? null
++                : Matrix26SystemProbe.toLocalDateTime(process.startedAt());
++        String uptimeLabel = process == null || process.startedAt() == null
++                ? "—"
++                : formatDuration(Duration.between(process.startedAt(), Instant.now()));
++
++        return new Matrix26RuntimeInventoryItem(
++                target,
++                state,
++                stateDetail,
++                runtimeDirectoryPresent,
++                relative(projectRoot, runtimeDirectory),
++                configurationPresent,
++                relative(projectRoot, configuration),
++                launcherPresent,
++                relative(projectRoot, launcher),
++                configurationConsistent,
++                configuredPort,
++                configuredProfile,
++                configuredDatabase,
++                portListening,
++                portBinding == null ? null : portBinding.pid(),
++                portBinding == null ? "" : portBinding.processName(),
++                expectedProcess,
++                process == null ? null : process.pid(),
++                process == null ? "" : process.executable(),
++                process == null ? "" : process.commandLine(),
++                processStartedAt,
++                uptimeLabel,
++                http,
++                primaryLog,
++                runtimeStorage,
++                formatBytes(runtimeStorage),
++                assetStorage,
++                formatBytes(assetStorage),
++                List.copyOf(new LinkedHashSet<>(warnings)),
++                LocalDateTime.now()
++        );
++    }
++
++    private Matrix26RuntimeState determineState(
++            Matrix26RuntimeTarget target,
++            boolean runtimeDirectoryPresent,
++            boolean configurationPresent,
++            boolean portListening,
++            Matrix26PortBinding portBinding,
++            boolean expectedProcess,
++            Matrix26ProcessInfo process,
++            Matrix26HttpProbe http,
++            List<String> warnings
++    ) {
++        if (http.online()) {
++            if (portBinding != null && portBinding.pid() != null && !expectedProcess && !target.controlCenter()) {
++                warnings.add("The portal responded, but the PID could not be correlated with the runtime profile with certainty.");
++            }
++            return Matrix26RuntimeState.ONLINE;
++        }
++        if (portListening && portBinding != null && portBinding.pid() != null && !expectedProcess && !target.controlCenter()) {
++            warnings.add("The port is owned by a process that does not match the expected runtime.");
++            return Matrix26RuntimeState.PORT_OCCUPIED;
++        }
++        if (portListening || process != null) {
++            return Matrix26RuntimeState.DEGRADED;
++        }
++        if (!runtimeDirectoryPresent && !isExternallyManaged(target)) {
++            return Matrix26RuntimeState.RUNTIME_MISSING;
++        }
++        if (runtimeDirectoryPresent && !configurationPresent) {
++            return Matrix26RuntimeState.CONFIGURATION_MISSING;
++        }
++        return Matrix26RuntimeState.OFFLINE;
++    }
++
++    private String stateDetail(
++            Matrix26RuntimeState state,
++            Matrix26PortBinding portBinding,
++            Matrix26HttpProbe http,
++            Matrix26ProcessInfo process
++    ) {
++        return switch (state) {
++            case ONLINE -> http.statusCode() == null
++                    ? "The portal responded successfully."
++                    : "The portal responded with HTTP " + http.statusCode() + ".";
++            case PORT_OCCUPIED -> portBinding != null && portBinding.pid() != null
++                    ? "The port belongs to PID " + portBinding.pid() + " and does not match the expected runtime."
++                    : "The port is occupied by an unidentified process.";
++            case DEGRADED -> process != null
++                    ? "The process exists, but the HTTP probe was not successful."
++                    : "The port is listening, but the portal did not respond successfully.";
++            case RUNTIME_MISSING -> "No managed runtime directory exists for this instance.";
++            case CONFIGURATION_MISSING -> "The runtime directory exists, but application.properties is missing.";
++            case OFFLINE -> "No process, listening port, or HTTP response was detected.";
++            default -> state.getLabel();
++        };
++    }
++
++    private Matrix26ProcessInfo resolveProcess(
++            Matrix26RuntimeTarget target,
++            Path configuration,
++            Matrix26PortBinding binding,
++            Map<Long, Matrix26ProcessInfo> processes
++    ) {
++        if (binding != null && binding.pid() != null) {
++            Matrix26ProcessInfo owner = processes.get(binding.pid());
++            if (owner != null) {
++                return owner;
++            }
++        }
++
++        return processes.values().stream()
++                .filter(Matrix26ProcessInfo::alive)
++                .map(process -> Map.entry(process, processScore(process, target, configuration)))
++                .filter(entry -> entry.getValue() > 0)
++                .max(Map.Entry.comparingByValue())
++                .map(Map.Entry::getKey)
++                .orElse(null);
++    }
++
++    private int processScore(Matrix26ProcessInfo process, Matrix26RuntimeTarget target, Path configuration) {
++        String commandLine = (process.commandLine() + " " + process.executable()).toLowerCase(Locale.ROOT);
++        int score = 0;
++        String profile = lower(target.runtimeProfile());
++        if (!profile.isBlank() && commandLine.contains(profile)) {
++            score += 12;
++        }
++        if (configuration != null) {
++            String fileName = configuration.toString().replace('\\', '/').toLowerCase(Locale.ROOT);
++            String shortPath = "runtime-clients/" + profile + "/application.properties";
++            if (commandLine.replace('\\', '/').contains(fileName) || commandLine.replace('\\', '/').contains(shortPath)) {
++                score += 15;
++            }
++        }
++        if (target.expectedPort() != null
++                && (commandLine.contains("server.port=" + target.expectedPort())
++                || commandLine.contains("--server.port=" + target.expectedPort()))) {
++            score += 8;
++        }
++        if (target.controlCenter() && commandLine.contains("matrix26_control")) {
++            score += 20;
++        }
++        return score;
++    }
++
++    private boolean matchesTarget(Matrix26ProcessInfo process, Matrix26RuntimeTarget target, Path configuration) {
++        return processScore(process, target, configuration) >= 8;
++    }
++
++    private Matrix26HttpProbe probeHttp(String value) {
++        if (value == null || value.isBlank()) {
++            return new Matrix26HttpProbe(false, false, null, null, "No URL is registered.");
++        }
++        URI uri;
++        try {
++            uri = URI.create(value.trim());
++        } catch (IllegalArgumentException ex) {
++            return new Matrix26HttpProbe(false, false, null, null, "The registered URL is invalid.");
++        }
++        if (!isLocalHost(uri.getHost())) {
++            return new Matrix26HttpProbe(false, false, null, null, "The URL is not local and was not probed by Runtime Inventory.");
++        }
++
++        long startedAt = System.nanoTime();
++        Integer status = null;
++        try {
++            URL url = uri.toURL();
++            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
++            connection.setConnectTimeout(Math.max(250, operationsProperties.getConnectTimeoutMs()));
++            connection.setReadTimeout(Math.max(250, operationsProperties.getReadTimeoutMs()));
++            connection.setInstanceFollowRedirects(false);
++            connection.setRequestMethod("GET");
++            connection.setRequestProperty("User-Agent", "Matrix26-Operations-Inventory/3D.1");
++            status = connection.getResponseCode();
++            connection.disconnect();
++            long responseTime = Math.max(0, (System.nanoTime() - startedAt) / 1_000_000L);
++            boolean online = status >= 200 && status < 500;
++            return new Matrix26HttpProbe(
++                    true,
++                    online,
++                    status,
++                    responseTime,
++                    online ? "The local portal responded successfully." : "The local portal returned HTTP " + status + "."
++            );
++        } catch (IOException ex) {
++            long responseTime = Math.max(0, (System.nanoTime() - startedAt) / 1_000_000L);
++            return new Matrix26HttpProbe(true, false, status, responseTime, safeMessage(ex));
++        }
++    }
++
++    private boolean configurationMatches(
++            Matrix26RuntimeTarget target,
++            Integer configuredPort,
++            String configuredProfile,
++            String configuredDatabase,
++            List<String> warnings
++    ) {
++        boolean consistent = true;
++        if (configuredPort != null && target.expectedPort() != null && !configuredPort.equals(target.expectedPort())) {
++            warnings.add("The configured port (" + configuredPort + ") does not match the registered port (" + target.expectedPort() + ").");
++            consistent = false;
++        }
++        if (!isBlank(configuredProfile) && !isBlank(target.runtimeProfile())
++                && !configuredProfile.equalsIgnoreCase(target.runtimeProfile())) {
++            warnings.add("The configured runtime profile does not match the registered profile.");
++            consistent = false;
++        }
++        if (!isBlank(configuredDatabase) && !isBlank(target.databaseName())
++                && !configuredDatabase.equalsIgnoreCase(target.databaseName())) {
++            warnings.add("The configured database does not match the declared database.");
++            consistent = false;
++        }
++        return consistent;
++    }
++
++    private RuntimeConfiguration readConfiguration(Path configuration, List<String> warnings) {
++        if (configuration == null || !Files.isRegularFile(configuration)) {
++            return RuntimeConfiguration.empty();
++        }
++        Properties loaded = new Properties();
++        try (BufferedReader reader = Files.newBufferedReader(configuration, StandardCharsets.UTF_8)) {
++            loaded.load(reader);
++        } catch (IOException ex) {
++            warnings.add("application.properties could not be read: " + safeMessage(ex));
++            return RuntimeConfiguration.empty();
++        }
++
++        Integer port = parseInteger(loaded.getProperty("server.port"));
++        String profile = firstNonBlank(
++                loaded.getProperty("ecoagua.platform.runtime-profile"),
++                loaded.getProperty("matrix26.control-center.runtime-profile"),
++                loaded.getProperty("spring.profiles.active")
++        );
++        String database = databaseName(loaded.getProperty("spring.datasource.url"));
++        return new RuntimeConfiguration(port, profile, database);
++    }
++
++    private Map<String, List<Path>> discoverLogs(
++            Path projectRoot,
++            Path logRoot,
++            Path runtimeRoot,
++            List<Matrix26RuntimeTarget> targets
++    ) {
++        Set<Path> files = new LinkedHashSet<>();
++        collectLogFiles(logRoot, 3, files);
++        collectLogFiles(runtimeRoot, 4, files);
++
++        Map<String, List<Path>> result = new LinkedHashMap<>();
++        for (Matrix26RuntimeTarget target : targets) {
++            List<Path> matches = files.stream()
++                    .map(path -> Map.entry(path, logScore(path, target)))
++                    .filter(entry -> entry.getValue() > 0)
++                    .sorted(Comparator
++                            .<Map.Entry<Path, Integer>>comparingInt(Map.Entry::getValue)
++                            .reversed()
++                            .thenComparing(entry -> lastModified(entry.getKey()), Comparator.nullsLast(Comparator.reverseOrder())))
++                    .map(Map.Entry::getKey)
++                    .toList();
++            result.put(target.key(), matches);
++        }
++        return result;
++    }
++
++    private void collectLogFiles(Path root, int depth, Set<Path> result) {
++        if (root == null || !Files.isDirectory(root) || result.size() >= MAX_LOG_FILES) {
++            return;
++        }
++        try (var stream = Files.walk(root, depth)) {
++            stream.filter(Files::isRegularFile)
++                    .filter(this::isLogFile)
++                    .limit(MAX_LOG_FILES - result.size())
++                    .map(Path::toAbsolutePath)
++                    .map(Path::normalize)
++                    .forEach(result::add);
++        } catch (IOException ignored) {
++            // Runtime inventory remains available even when a log folder cannot be read.
++        }
++    }
++
++    private int logScore(Path path, Matrix26RuntimeTarget target) {
++        String normalized = path.toString().replace('\\', '/').toLowerCase(Locale.ROOT);
++        int score = 0;
++        String profile = lower(target.runtimeProfile());
++        String code = lower(target.code());
++        if (!profile.isBlank() && normalized.contains(profile)) {
++            score += 12;
++        }
++        if (!code.isBlank() && normalized.contains(code)) {
++            score += 12;
++        }
++        if (target.expectedPort() != null && normalized.contains(String.valueOf(target.expectedPort()))) {
++            score += 8;
++        }
++        if (target.controlCenter() && normalized.contains("matrix26") && normalized.contains("control")) {
++            score += 10;
++        }
++        return score;
++    }
++
++    private List<Matrix26LogInventoryItem> toLogItems(
++            Matrix26RuntimeInventoryItem runtime,
++            List<Path> paths,
++            Path projectRoot
++    ) {
++        List<Matrix26LogInventoryItem> result = new ArrayList<>();
++        for (int index = 0; index < paths.size(); index++) {
++            result.add(toLogItem(runtime.target(), paths.get(index), projectRoot, index == 0));
++        }
++        return result;
++    }
++
++    private Matrix26LogInventoryItem toLogItem(
++            Matrix26RuntimeTarget target,
++            Path path,
++            Path projectRoot,
++            boolean currentCandidate
++    ) {
++        long size = fileSize(path);
++        return new Matrix26LogInventoryItem(
++                target.key(),
++                target.businessName(),
++                relative(projectRoot, path),
++                size,
++                formatBytes(size),
++                lastModified(path),
++                currentCandidate
++        );
++    }
++
++    private Path resolveRuntimeDirectory(Path runtimeRoot, Matrix26RuntimeTarget target, List<String> warnings) {
++        String profile = target.runtimeProfile();
++        if (!Matrix26OperationsSanitizer.isSafeRuntimeName(profile)) {
++            warnings.add("The runtime profile contains unsupported characters and was not used to build a path.");
++            return null;
++        }
++        Path resolved = runtimeRoot.resolve(profile).normalize();
++        if (!resolved.startsWith(runtimeRoot)) {
++            warnings.add("The runtime path was blocked by the security policy.");
++            return null;
++        }
++        return resolved;
++    }
++
++    private Path resolveAssetsDirectory(Path dataRoot, Matrix26RuntimeTarget target) {
++        String code = target.code();
++        if (!Matrix26OperationsSanitizer.isSafeRuntimeName(code)) {
++            return null;
++        }
++        Path direct = dataRoot.resolve(code).normalize();
++        if (Files.exists(direct) && direct.startsWith(dataRoot)) {
++            return direct;
++        }
++        String profileSlug = Matrix26OperationsSanitizer.slug(target.runtimeProfile());
++        Path profile = dataRoot.resolve(profileSlug).normalize();
++        return profile.startsWith(dataRoot) ? profile : null;
++    }
++
++    private Path findLauncher(Path runtimeDirectory) {
++        if (runtimeDirectory == null || !Files.isDirectory(runtimeDirectory)) {
++            return null;
++        }
++        for (String name : List.of("run.sh", "run.ps1", "run.cmd", "run.bat")) {
++            Path candidate = runtimeDirectory.resolve(name).normalize();
++            if (Files.isRegularFile(candidate)) {
++                return candidate;
++            }
++        }
++        return null;
++    }
++
++    private List<String> readLastLines(Path path, int maximumLines) throws IOException {
++        Deque<String> lines = new ArrayDeque<>(maximumLines);
++        try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
++            String line;
++            while ((line = reader.readLine()) != null) {
++                if (lines.size() == maximumLines) {
++                    lines.removeFirst();
++                }
++                lines.addLast(Matrix26OperationsSanitizer.limit(line, 1200));
++            }
++        }
++        return List.copyOf(lines);
++    }
++
++    private Optional<Path> resolveSafeRelativePath(String relativePath) {
++        if (relativePath == null || relativePath.isBlank()) {
++            return Optional.empty();
++        }
++        Path projectRoot = Path.of("").toAbsolutePath().normalize();
++        Path resolved = projectRoot.resolve(relativePath).normalize();
++        if (!resolved.startsWith(projectRoot)) {
++            return Optional.empty();
++        }
++        return Optional.of(resolved);
++    }
++
++    private Path safeChild(Path projectRoot, String configuredPath) {
++        String value = configuredPath == null || configuredPath.isBlank() ? "." : configuredPath.trim();
++        Path candidate = Path.of(value);
++        Path resolved = candidate.isAbsolute() ? candidate.normalize() : projectRoot.resolve(candidate).normalize();
++        if (!resolved.startsWith(projectRoot)) {
++            return projectRoot.resolve("__matrix26_blocked_path__");
++        }
++        return resolved;
++    }
++
++    private long directorySize(Path root) {
++        if (root == null || !Files.isDirectory(root)) {
++            return 0L;
++        }
++        try (var stream = Files.walk(root, 6)) {
++            return stream.filter(Files::isRegularFile)
++                    .mapToLong(this::fileSize)
++                    .sum();
++        } catch (IOException ex) {
++            return 0L;
++        }
++    }
++
++    private long fileSize(Path path) {
++        try {
++            return Files.size(path);
++        } catch (IOException ex) {
++            return 0L;
++        }
++    }
++
++    private LocalDateTime lastModified(Path path) {
++        try {
++            return LocalDateTime.ofInstant(Files.getLastModifiedTime(path).toInstant(), ZoneId.systemDefault());
++        } catch (IOException ex) {
++            return null;
++        }
++    }
++
++    private String relative(Path projectRoot, Path path) {
++        if (path == null) {
++            return "";
++        }
++        Path normalized = path.toAbsolutePath().normalize();
++        if (!normalized.startsWith(projectRoot)) {
++            return "";
++        }
++        return projectRoot.relativize(normalized).toString().replace('\\', '/');
++    }
++
++    private boolean isLogFile(Path path) {
++        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
++        return LOG_EXTENSIONS.stream().anyMatch(name::endsWith);
++    }
++
++    private boolean isExternallyManaged(Matrix26RuntimeTarget target) {
++        return "PROTECTED".equalsIgnoreCase(target.managementMode())
++                || "EXTERNAL".equalsIgnoreCase(target.managementMode());
++    }
++
++    private boolean isLocalHost(String host) {
++        if (host == null) {
++            return false;
++        }
++        String normalized = host.toLowerCase(Locale.ROOT);
++        return normalized.equals("localhost")
++                || normalized.equals("127.0.0.1")
++                || normalized.equals("::1")
++                || normalized.equals("0:0:0:0:0:0:0:1");
++    }
++
++    private String databaseName(String jdbcUrl) {
++        if (jdbcUrl == null || jdbcUrl.isBlank()) {
++            return "";
++        }
++        Matcher matcher = DATABASE_NAME.matcher(jdbcUrl.trim());
++        return matcher.find() ? matcher.group(1) : "";
++    }
++
++    private String firstNonBlank(String... values) {
++        for (String value : values) {
++            if (!isBlank(value)) {
++                return value.trim();
++            }
++        }
++        return "";
++    }
++
++    private boolean isBlank(String value) {
++        return value == null || value.isBlank();
++    }
++
++    private Integer parseInteger(String value) {
++        try {
++            return value == null ? null : Integer.valueOf(value.trim());
++        } catch (RuntimeException ex) {
++            return null;
++        }
++    }
++
++    private String lower(String value) {
++        return value == null ? "" : value.toLowerCase(Locale.ROOT);
++    }
++
++    private String formatBytes(long bytes) {
++        if (bytes < 1024) {
++            return bytes + " B";
++        }
++        double value = bytes;
++        String[] units = {"KB", "MB", "GB", "TB"};
++        int unit = -1;
++        do {
++            value /= 1024.0;
++            unit++;
++        } while (value >= 1024.0 && unit < units.length - 1);
++        return String.format(Locale.US, value >= 10 ? "%.1f %s" : "%.2f %s", value, units[unit]);
++    }
++
++    private String formatDuration(Duration duration) {
++        if (duration.isNegative()) {
++            return "—";
++        }
++        long seconds = duration.getSeconds();
++        long days = seconds / 86_400;
++        long hours = (seconds % 86_400) / 3_600;
++        long minutes = (seconds % 3_600) / 60;
++        if (days > 0) {
++            return days + " d " + hours + " h";
++        }
++        if (hours > 0) {
++            return hours + " h " + minutes + " min";
++        }
++        return Math.max(0, minutes) + " min";
++    }
++
++    private String safeMessage(Exception ex) {
++        String message = ex.getMessage();
++        return message == null || message.isBlank()
++                ? ex.getClass().getSimpleName()
++                : Matrix26OperationsSanitizer.limit(message, 300);
++    }
++
++    private record RuntimeConfiguration(Integer port, String runtimeProfile, String databaseName) {
++        private static RuntimeConfiguration empty() {
++            return new RuntimeConfiguration(null, "", "");
++        }
++    }
++
++    private record CachedSnapshot(Matrix26OperationsSnapshot snapshot, Instant createdAt) {
++    }
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsProperties.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsProperties.java
+@@ -0,0 +1,73 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import org.springframework.boot.context.properties.ConfigurationProperties;
++import org.springframework.stereotype.Component;
++
++@Component
++@ConfigurationProperties(prefix = "matrix26.control-center.operations")
++public class Matrix26OperationsProperties {
++
++    private String runtimeDirectory = "runtime-clients";
++    private String dataDirectory = "runtime-data";
++    private String logDirectory = "logs";
++    private long cacheSeconds = 5;
++    private int connectTimeoutMs = 700;
++    private int readTimeoutMs = 700;
++    private int logTailLines = 120;
++
++    public String getRuntimeDirectory() {
++        return runtimeDirectory;
++    }
++
++    public void setRuntimeDirectory(String runtimeDirectory) {
++        this.runtimeDirectory = runtimeDirectory;
++    }
++
++    public String getDataDirectory() {
++        return dataDirectory;
++    }
++
++    public void setDataDirectory(String dataDirectory) {
++        this.dataDirectory = dataDirectory;
++    }
++
++    public String getLogDirectory() {
++        return logDirectory;
++    }
++
++    public void setLogDirectory(String logDirectory) {
++        this.logDirectory = logDirectory;
++    }
++
++    public long getCacheSeconds() {
++        return cacheSeconds;
++    }
++
++    public void setCacheSeconds(long cacheSeconds) {
++        this.cacheSeconds = cacheSeconds;
++    }
++
++    public int getConnectTimeoutMs() {
++        return connectTimeoutMs;
++    }
++
++    public void setConnectTimeoutMs(int connectTimeoutMs) {
++        this.connectTimeoutMs = connectTimeoutMs;
++    }
++
++    public int getReadTimeoutMs() {
++        return readTimeoutMs;
++    }
++
++    public void setReadTimeoutMs(int readTimeoutMs) {
++        this.readTimeoutMs = readTimeoutMs;
++    }
++
++    public int getLogTailLines() {
++        return logTailLines;
++    }
++
++    public void setLogTailLines(int logTailLines) {
++        this.logTailLines = logTailLines;
++    }
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsSanitizer.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsSanitizer.java
+@@ -0,0 +1,54 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import java.text.Normalizer;
++import java.util.Locale;
++import java.util.regex.Pattern;
++
++final class Matrix26OperationsSanitizer {
++
++    private static final Pattern SAFE_RUNTIME_NAME = Pattern.compile("[A-Za-z0-9._-]{1,120}");
++    private static final Pattern SECRET_ASSIGNMENT = Pattern.compile(
++            "(?i)(password|passwd|secret|token|api[_\\-.]?key|private[_\\-.]?key)(\\s*[:=]\\s*)([^\\s,;]+)"
++    );
++    private static final Pattern JDBC_CREDENTIALS = Pattern.compile(
++            "(?i)(jdbc:[^\\s?]+\\?[^\\s]*?(?:password|user)=)([^&\\s]+)"
++    );
++
++    private Matrix26OperationsSanitizer() {
++    }
++
++    static boolean isSafeRuntimeName(String value) {
++        return value != null && SAFE_RUNTIME_NAME.matcher(value.trim()).matches();
++    }
++
++    static String sanitize(String value) {
++        if (value == null || value.isBlank()) {
++            return "";
++        }
++        String sanitized = SECRET_ASSIGNMENT.matcher(value).replaceAll("$1$2***REDACTED***");
++        sanitized = JDBC_CREDENTIALS.matcher(sanitized).replaceAll("$1***REDACTED***");
++        return limit(sanitized.replace('\u0000', ' '), 1200);
++    }
++
++    static String slug(String value) {
++        if (value == null || value.isBlank()) {
++            return "";
++        }
++        String normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
++                .replaceAll("\\p{M}+", "")
++                .toLowerCase(Locale.ROOT)
++                .replaceAll("[^a-z0-9]+", "-")
++                .replaceAll("^-+|-+$", "");
++        return limit(normalized, 120);
++    }
++
++    static String limit(String value, int maxLength) {
++        if (value == null) {
++            return "";
++        }
++        if (value.length() <= maxLength) {
++            return value;
++        }
++        return value.substring(0, Math.max(0, maxLength - 1)) + "…";
++    }
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsSnapshot.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsSnapshot.java
+@@ -0,0 +1,14 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import java.time.LocalDateTime;
++import java.util.List;
++
++public record Matrix26OperationsSnapshot(
++        List<Matrix26RuntimeInventoryItem> runtimes,
++        List<Matrix26PortBinding> ports,
++        List<Matrix26LogInventoryItem> logs,
++        Matrix26OperationsSummary summary,
++        List<String> probeWarnings,
++        LocalDateTime capturedAt
++) {
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsSummary.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsSummary.java
+@@ -0,0 +1,17 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import java.time.LocalDateTime;
++
++public record Matrix26OperationsSummary(
++        long totalRuntimes,
++        long onlineRuntimes,
++        long offlineRuntimes,
++        long degradedRuntimes,
++        long protectedRuntimes,
++        long listeningPorts,
++        long detectedProcesses,
++        long totalStorageBytes,
++        String totalStorageLabel,
++        LocalDateTime inspectedAt
++) {
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26PortBinding.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26PortBinding.java
+@@ -0,0 +1,10 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++public record Matrix26PortBinding(
++        int port,
++        String localAddress,
++        Long pid,
++        String processName,
++        String commandLine
++) {
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26ProcessInfo.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26ProcessInfo.java
+@@ -0,0 +1,14 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import java.time.Instant;
++
++public record Matrix26ProcessInfo(
++        long pid,
++        Long parentPid,
++        String executable,
++        String commandLine,
++        String user,
++        Instant startedAt,
++        boolean alive
++) {
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeInventoryItem.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeInventoryItem.java
+@@ -0,0 +1,45 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import java.time.LocalDateTime;
++import java.util.List;
++
++public record Matrix26RuntimeInventoryItem(
++        Matrix26RuntimeTarget target,
++        Matrix26RuntimeState state,
++        String stateDetail,
++        boolean runtimeDirectoryPresent,
++        String runtimeDirectory,
++        boolean configurationPresent,
++        String configurationPath,
++        boolean launcherPresent,
++        String launcherPath,
++        boolean configurationConsistent,
++        Integer configuredPort,
++        String configuredRuntimeProfile,
++        String configuredDatabaseName,
++        boolean portListening,
++        Long portOwnerPid,
++        String portOwnerProcess,
++        boolean expectedProcess,
++        Long processId,
++        String processExecutable,
++        String processCommandLine,
++        LocalDateTime processStartedAt,
++        String uptimeLabel,
++        Matrix26HttpProbe http,
++        Matrix26LogInventoryItem primaryLog,
++        long runtimeStorageBytes,
++        String runtimeStorageLabel,
++        long assetStorageBytes,
++        String assetStorageLabel,
++        List<String> warnings,
++        LocalDateTime inspectedAt
++) {
++    public boolean online() {
++        return state == Matrix26RuntimeState.ONLINE;
++    }
++
++    public boolean hasWarnings() {
++        return warnings != null && !warnings.isEmpty();
++    }
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeState.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeState.java
+@@ -0,0 +1,36 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++public enum Matrix26RuntimeState {
++    ONLINE("Online", "text-bg-success", "bi-check-circle-fill"),
++    OFFLINE("Offline", "text-bg-secondary", "bi-stop-circle"),
++    PORT_OCCUPIED("Port occupied", "text-bg-danger", "bi-exclamation-octagon-fill"),
++    PROCESS_FOUND("Process detected", "text-bg-info", "bi-cpu-fill"),
++    PROCESS_NOT_FOUND("Process not detected", "text-bg-secondary", "bi-cpu"),
++    CONFIGURATION_MISSING("Configuration missing", "text-bg-warning", "bi-file-earmark-excel-fill"),
++    RUNTIME_MISSING("Runtime missing", "text-bg-warning", "bi-folder-x"),
++    LOG_MISSING("Log unavailable", "text-bg-warning", "bi-file-earmark-x"),
++    DEGRADED("Degraded", "text-bg-warning", "bi-exclamation-triangle-fill"),
++    UNKNOWN("Unknown", "text-bg-dark", "bi-question-circle-fill");
++
++    private final String label;
++    private final String badgeClass;
++    private final String iconClass;
++
++    Matrix26RuntimeState(String label, String badgeClass, String iconClass) {
++        this.label = label;
++        this.badgeClass = badgeClass;
++        this.iconClass = iconClass;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++
++    public String getBadgeClass() {
++        return badgeClass;
++    }
++
++    public String getIconClass() {
++        return iconClass;
++    }
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeTarget.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeTarget.java
+@@ -0,0 +1,62 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClient;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26ControlCenterProperties;
++
++public record Matrix26RuntimeTarget(
++        String key,
++        Long instanceId,
++        String code,
++        String businessName,
++        String runtimeProfile,
++        Integer expectedPort,
++        String publicUrl,
++        String databaseName,
++        String runtimeCommand,
++        String managementMode,
++        boolean protectedInstance,
++        boolean controlCenter
++) {
++    public static Matrix26RuntimeTarget controlCenter(Matrix26ControlCenterProperties properties) {
++        return new Matrix26RuntimeTarget(
++                "control",
++                null,
++                "matrix26-control",
++                properties.getDisplayName(),
++                properties.getRuntimeProfile(),
++                portFromUrl(properties.getPortalUrl(), 8091),
++                properties.getPortalUrl(),
++                properties.getDatabaseName(),
++                "bash scripts/run-matrix26-control.sh",
++                "CONTROL_CENTER",
++                true,
++                true
++        );
++    }
++
++    public static Matrix26RuntimeTarget fromInstance(PlatformBusinessClient instance) {
++        return new Matrix26RuntimeTarget(
++                String.valueOf(instance.getId()),
++                instance.getId(),
++                instance.getCode(),
++                instance.getBusinessName(),
++                instance.getRuntimeProfile(),
++                instance.getRuntimePort(),
++                instance.getPublicUrl(),
++                instance.getDatabaseName(),
++                instance.getRuntimeCommand(),
++                instance.getManagementMode(),
++                instance.isProtectedInstance(),
++                false
++        );
++    }
++
++    private static int portFromUrl(String value, int fallback) {
++        try {
++            java.net.URI uri = java.net.URI.create(value);
++            return uri.getPort() > 0 ? uri.getPort() : fallback;
++        } catch (RuntimeException ex) {
++            return fallback;
++        }
++    }
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26SystemProbe.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26SystemProbe.java
+@@ -0,0 +1,287 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Service;
++
++import java.io.IOException;
++import java.net.InetSocketAddress;
++import java.net.ServerSocket;
++import java.nio.charset.StandardCharsets;
++import java.time.Instant;
++import java.time.LocalDateTime;
++import java.time.ZoneId;
++import java.util.ArrayList;
++import java.util.Comparator;
++import java.util.LinkedHashMap;
++import java.util.List;
++import java.util.Locale;
++import java.util.Map;
++import java.util.concurrent.TimeUnit;
++import java.util.concurrent.atomic.AtomicReference;
++import java.util.regex.Matcher;
++import java.util.regex.Pattern;
++
++@Service
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26SystemProbe {
++
++    private static final Pattern WINDOWS_NETSTAT = Pattern.compile(
++            "^\\s*TCP\\s+\\S+:(\\d+)\\s+\\S+\\s+LISTENING\\s+(\\d+)\\s*$",
++            Pattern.CASE_INSENSITIVE
++    );
++    private static final Pattern UNIX_SS_PORT = Pattern.compile("(?:\\]|:)(\\d+)\\s+");
++    private static final Pattern UNIX_SS_PID = Pattern.compile("pid=(\\d+)");
++
++    public Matrix26SystemSnapshot capture(List<Integer> expectedPorts) {
++        Map<Long, Matrix26ProcessInfo> processes = captureProcesses();
++        List<String> warnings = new ArrayList<>();
++        Map<Integer, Matrix26PortBinding> ports = captureListeningPorts(processes, warnings);
++
++        for (Integer expectedPort : expectedPorts) {
++            if (expectedPort == null || expectedPort < 1 || expectedPort > 65535 || ports.containsKey(expectedPort)) {
++                continue;
++            }
++            if (!isPortAvailable(expectedPort)) {
++                ports.put(expectedPort, new Matrix26PortBinding(
++                        expectedPort,
++                        "unknown",
++                        null,
++                        "Unknown process",
++                        ""
++                ));
++            }
++        }
++
++        Map<Integer, Matrix26PortBinding> orderedPorts = new LinkedHashMap<>();
++        ports.entrySet().stream()
++                .sorted(Map.Entry.comparingByKey())
++                .forEach(entry -> orderedPorts.put(entry.getKey(), entry.getValue()));
++
++        return new Matrix26SystemSnapshot(
++                LocalDateTime.now(),
++                Map.copyOf(processes),
++                Map.copyOf(orderedPorts),
++                List.copyOf(warnings)
++        );
++    }
++
++    private Map<Long, Matrix26ProcessInfo> captureProcesses() {
++        Map<Long, Matrix26ProcessInfo> result = new LinkedHashMap<>();
++        ProcessHandle.allProcesses()
++                .sorted(Comparator.comparingLong(ProcessHandle::pid))
++                .forEach(handle -> {
++                    ProcessHandle.Info info = handle.info();
++                    Long parentPid = handle.parent().map(ProcessHandle::pid).orElse(null);
++                    String executable = info.command().orElse("");
++                    String commandLine = info.commandLine().orElseGet(() -> buildCommandLine(info));
++                    result.put(handle.pid(), new Matrix26ProcessInfo(
++                            handle.pid(),
++                            parentPid,
++                            Matrix26OperationsSanitizer.sanitize(executable),
++                            Matrix26OperationsSanitizer.sanitize(commandLine),
++                            Matrix26OperationsSanitizer.sanitize(info.user().orElse("")),
++                            info.startInstant().orElse(null),
++                            handle.isAlive()
++                    ));
++                });
++        return result;
++    }
++
++    private String buildCommandLine(ProcessHandle.Info info) {
++        String command = info.command().orElse("");
++        String[] arguments = info.arguments().orElse(new String[0]);
++        if (arguments.length == 0) {
++            return command;
++        }
++        return command + " " + String.join(" ", arguments);
++    }
++
++    private Map<Integer, Matrix26PortBinding> captureListeningPorts(
++            Map<Long, Matrix26ProcessInfo> processes,
++            List<String> warnings
++    ) {
++        if (isWindows()) {
++            Map<Integer, Matrix26PortBinding> powershell = captureWindowsPortsWithPowerShell(processes);
++            if (!powershell.isEmpty()) {
++                return powershell;
++            }
++            Map<Integer, Matrix26PortBinding> netstat = captureWindowsPortsWithNetstat(processes);
++            if (!netstat.isEmpty()) {
++                warnings.add("PowerShell port inventory was unavailable; Windows netstat fallback was used.");
++                return netstat;
++            }
++            warnings.add("Windows could not expose PID ownership for listening ports. Port occupancy fallback is active.");
++            return new LinkedHashMap<>();
++        }
++
++        Map<Integer, Matrix26PortBinding> ss = captureUnixPorts(processes);
++        if (ss.isEmpty()) {
++            warnings.add("The operating system did not expose listening port ownership. Port occupancy fallback is active.");
++        }
++        return ss;
++    }
++
++    private Map<Integer, Matrix26PortBinding> captureWindowsPortsWithPowerShell(
++            Map<Long, Matrix26ProcessInfo> processes
++    ) {
++        String script = "[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new(); "
++                + "$ErrorActionPreference='SilentlyContinue'; "
++                + "Get-NetTCPConnection -State Listen | ForEach-Object { "
++                + "Write-Output ($_.LocalAddress + \"`t\" + $_.LocalPort + \"`t\" + $_.OwningProcess) }";
++        List<String> lines = execute(List.of(
++                "powershell.exe",
++                "-NoProfile",
++                "-NonInteractive",
++                "-Command",
++                script
++        ), 4);
++
++        Map<Integer, Matrix26PortBinding> result = new LinkedHashMap<>();
++        for (String line : lines) {
++            String[] parts = line.split("\\t", -1);
++            if (parts.length < 3) {
++                continue;
++            }
++            Integer port = parseInteger(parts[1]);
++            Long pid = parseLong(parts[2]);
++            if (port == null) {
++                continue;
++            }
++            result.putIfAbsent(port, binding(port, parts[0], pid, processes));
++        }
++        return result;
++    }
++
++    private Map<Integer, Matrix26PortBinding> captureWindowsPortsWithNetstat(
++            Map<Long, Matrix26ProcessInfo> processes
++    ) {
++        List<String> lines = execute(List.of("netstat", "-ano", "-p", "tcp"), 4);
++        Map<Integer, Matrix26PortBinding> result = new LinkedHashMap<>();
++        for (String line : lines) {
++            Matcher matcher = WINDOWS_NETSTAT.matcher(line);
++            if (!matcher.matches()) {
++                continue;
++            }
++            Integer port = parseInteger(matcher.group(1));
++            Long pid = parseLong(matcher.group(2));
++            if (port != null) {
++                result.putIfAbsent(port, binding(port, "unknown", pid, processes));
++            }
++        }
++        return result;
++    }
++
++    private Map<Integer, Matrix26PortBinding> captureUnixPorts(Map<Long, Matrix26ProcessInfo> processes) {
++        List<String> lines = execute(List.of("ss", "-ltnpH"), 4);
++        Map<Integer, Matrix26PortBinding> result = new LinkedHashMap<>();
++        for (String line : lines) {
++            Matcher portMatcher = UNIX_SS_PORT.matcher(line);
++            if (!portMatcher.find()) {
++                continue;
++            }
++            Integer port = parseInteger(portMatcher.group(1));
++            Matcher pidMatcher = UNIX_SS_PID.matcher(line);
++            Long pid = pidMatcher.find() ? parseLong(pidMatcher.group(1)) : null;
++            if (port != null) {
++                result.putIfAbsent(port, binding(port, "unknown", pid, processes));
++            }
++        }
++        return result;
++    }
++
++    private Matrix26PortBinding binding(
++            int port,
++            String address,
++            Long pid,
++            Map<Long, Matrix26ProcessInfo> processes
++    ) {
++        Matrix26ProcessInfo process = pid != null ? processes.get(pid) : null;
++        String processName = process == null ? "Unknown process" : executableName(process.executable());
++        String commandLine = process == null ? "" : process.commandLine();
++        return new Matrix26PortBinding(port, address, pid, processName, commandLine);
++    }
++
++    private List<String> execute(List<String> command, int timeoutSeconds) {
++        Process process = null;
++        try {
++            process = new ProcessBuilder(command)
++                    .redirectErrorStream(true)
++                    .start();
++
++            AtomicReference<byte[]> captured = new AtomicReference<>(new byte[0]);
++            Process activeProcess = process;
++            Thread reader = new Thread(() -> {
++                try {
++                    captured.set(activeProcess.getInputStream().readAllBytes());
++                } catch (IOException ignored) {
++                    captured.set(new byte[0]);
++                }
++            }, "matrix26-system-probe-reader");
++            reader.setDaemon(true);
++            reader.start();
++
++            boolean finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
++            if (!finished) {
++                process.destroy();
++                if (!process.waitFor(500, TimeUnit.MILLISECONDS)) {
++                    process.destroyForcibly();
++                }
++            }
++            reader.join(1_000);
++            if (!finished) {
++                return List.of();
++            }
++
++            String output = new String(captured.get(), StandardCharsets.UTF_8);
++            return output.lines().limit(10_000).toList();
++        } catch (IOException ex) {
++            return List.of();
++        } catch (InterruptedException ex) {
++            Thread.currentThread().interrupt();
++            return List.of();
++        }
++    }
++
++    private boolean isPortAvailable(int port) {
++        try (ServerSocket socket = new ServerSocket()) {
++            socket.setReuseAddress(false);
++            socket.bind(new InetSocketAddress("127.0.0.1", port), 1);
++            return true;
++        } catch (IOException ex) {
++            return false;
++        }
++    }
++
++    private boolean isWindows() {
++        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
++    }
++
++    private String executableName(String executable) {
++        if (executable == null || executable.isBlank()) {
++            return "Unknown process";
++        }
++        String normalized = executable.replace('\\', '/');
++        int separator = normalized.lastIndexOf('/');
++        return separator >= 0 ? normalized.substring(separator + 1) : normalized;
++    }
++
++    private Integer parseInteger(String value) {
++        try {
++            return Integer.valueOf(value.trim());
++        } catch (RuntimeException ex) {
++            return null;
++        }
++    }
++
++    private Long parseLong(String value) {
++        try {
++            return Long.valueOf(value.trim());
++        } catch (RuntimeException ex) {
++            return null;
++        }
++    }
++
++    static LocalDateTime toLocalDateTime(Instant value) {
++        return value == null ? null : LocalDateTime.ofInstant(value, ZoneId.systemDefault());
++    }
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26SystemSnapshot.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26SystemSnapshot.java
+@@ -0,0 +1,13 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import java.time.LocalDateTime;
++import java.util.List;
++import java.util.Map;
++
++public record Matrix26SystemSnapshot(
++        LocalDateTime capturedAt,
++        Map<Long, Matrix26ProcessInfo> processes,
++        Map<Integer, Matrix26PortBinding> listeningPorts,
++        List<String> warnings
++) {
++}
+--- a/src/main/resources/templates/control_center/operations/dashboard.html
++++ b/src/main/resources/templates/control_center/operations/dashboard.html
+@@ -0,0 +1,115 @@
++<!DOCTYPE html>
++<html lang="es" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Operations')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Operations Center', 'Live inventory of runtimes, processes, ports, and logs in read-only mode.')}" ></header>
++
++        <main class="matrix26-main">
++            <div class="matrix26-alert-safe mb-4">
++                <i class="bi bi-binoculars-fill"></i>
++                <div>
++                    <strong>Phase 3D.1: safe observation</strong>
++                    <p>This section does not start, stop, or restart processes. It also does not write PID files, modify launchers, or query operational data.</p>
++                </div>
++            </div>
++
++            <div th:each="warning : ${probeWarnings}" class="alert alert-warning d-flex gap-2 align-items-start">
++                <i class="bi bi-exclamation-triangle-fill mt-1"></i>
++                <span th:text="${warning}">Warning</span>
++            </div>
++
++            <section class="matrix26-operations-summary mb-4">
++                <article>
++                    <span class="matrix26-operation-icon is-primary"><i class="bi bi-hdd-stack"></i></span>
++                    <div><strong th:text="${summary.totalRuntimes()}">0</strong><small>Inventoried runtimes</small></div>
++                </article>
++                <article>
++                    <span class="matrix26-operation-icon is-success"><i class="bi bi-check-circle-fill"></i></span>
++                    <div><strong th:text="${summary.onlineRuntimes()}">0</strong><small>Online</small></div>
++                </article>
++                <article>
++                    <span class="matrix26-operation-icon is-warning"><i class="bi bi-exclamation-triangle-fill"></i></span>
++                    <div><strong th:text="${summary.degradedRuntimes()}">0</strong><small>Needs attention</small></div>
++                </article>
++                <article>
++                    <span class="matrix26-operation-icon is-secondary"><i class="bi bi-stop-circle-fill"></i></span>
++                    <div><strong th:text="${summary.offlineRuntimes()}">0</strong><small>Offline</small></div>
++                </article>
++                <article>
++                    <span class="matrix26-operation-icon is-info"><i class="bi bi-cpu-fill"></i></span>
++                    <div><strong th:text="${summary.detectedProcesses()}">0</strong><small>Detected processes</small></div>
++                </article>
++                <article>
++                    <span class="matrix26-operation-icon is-dark"><i class="bi bi-device-ssd-fill"></i></span>
++                    <div><strong th:text="${summary.totalStorageLabel()}">0 B</strong><small>Runtime + assets</small></div>
++                </article>
++            </section>
++
++            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
++                <div class="matrix26-inline-summary">
++                    <span><strong th:text="${summary.listeningPorts()}">0</strong> expected ports listening</span>
++                    <span><strong th:text="${summary.protectedRuntimes()}">0</strong> protected</span>
++                    <span th:if="${summary.inspectedAt() != null}" th:text="|Updated ${#temporals.format(summary.inspectedAt(), 'dd/MM/yyyy HH:mm:ss')}|">Updated</span>
++                </div>
++                <div class="d-flex gap-2 flex-wrap">
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/operations/ports}"><i class="bi bi-ethernet me-1"></i>Ports</a>
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/operations/logs}"><i class="bi bi-journal-text me-1"></i>Logs</a>
++                    <a class="btn btn-primary" th:href="@{/control-center/operations(refresh=true)}"><i class="bi bi-arrow-clockwise me-1"></i>Refresh inventory</a>
++                </div>
++            </div>
++
++            <section class="matrix26-panel">
++                <div class="matrix26-panel-header">
++                    <div><span>Current status</span><h2>Monitored runtimes</h2></div>
++                    <a class="small text-decoration-none" th:href="@{/control-center/operations/runtimes}">View full inventory</a>
++                </div>
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table matrix26-runtime-table">
++                        <thead>
++                        <tr><th>Runtime</th><th>Status</th><th>Port and process</th><th>HTTP</th><th>Storage</th><th class="text-end">Details</th></tr>
++                        </thead>
++                        <tbody>
++                        <tr th:each="runtime : ${runtimes}">
++                            <td>
++                                <div class="d-flex align-items-center gap-2">
++                                    <span class="matrix26-table-avatar"><i class="bi" th:classappend="${runtime.target().controlCenter() ? ' bi-command' : ' bi-building-gear'}"></i></span>
++                                    <div>
++                                        <strong th:text="${runtime.target().businessName()}">Runtime</strong>
++                                        <small><code th:text="${runtime.target().runtimeProfile()}">profile</code></small>
++                                    </div>
++                                </div>
++                            </td>
++                            <td>
++                                <span class="badge" th:classappend="${runtime.state().getBadgeClass()}" th:text="${runtime.state().getLabel()}">Status</span>
++                                <small th:text="${runtime.stateDetail()}">Details</small>
++                            </td>
++                            <td>
++                                <strong th:text="|Port ${runtime.target().expectedPort()}|">Port</strong>
++                                <small th:text="${runtime.processId() != null ? 'PID ' + runtime.processId() : 'PID not detected'}">PID</small>
++                            </td>
++                            <td>
++                                <span th:if="${runtime.http().attempted()}" class="badge" th:classappend="${runtime.http().online() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.http().statusCode() != null ? 'HTTP ' + runtime.http().statusCode() : 'No response'}">HTTP</span>
++                                <span th:unless="${runtime.http().attempted()}" class="badge text-bg-light border text-dark">Not probed</span>
++                                <small th:text="${runtime.http().responseTimeMs() != null ? runtime.http().responseTimeMs() + ' ms' : '—'}">—</small>
++                            </td>
++                            <td>
++                                <strong th:text="${runtime.assetStorageLabel()}">0 B</strong>
++                                <small th:text="${'Runtime ' + runtime.runtimeStorageLabel()}">Runtime</small>
++                            </td>
++                            <td class="text-end">
++                                <a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/operations/runtimes/{key}(key=${runtime.target().key()})}" title="View technical inventory"><i class="bi bi-eye"></i></a>
++                            </td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+--- a/src/main/resources/templates/control_center/operations/logs.html
++++ b/src/main/resources/templates/control_center/operations/logs.html
+@@ -0,0 +1,40 @@
++<!DOCTYPE html>
++<html lang="es" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Logs')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Logs', 'Safe inventory of diagnostic files associated with each runtime.')}" ></header>
++        <main class="matrix26-main">
++            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
++                <div class="matrix26-inline-summary"><span><strong th:text="${#lists.size(logs)}">0</strong> associated files</span><span>Sensitive values are masked when displayed</span></div>
++                <div class="d-flex gap-2"><a class="btn btn-outline-secondary" th:href="@{/control-center/operations}"><i class="bi bi-arrow-left me-1"></i>Overview</a><a class="btn btn-primary" th:href="@{/control-center/operations/logs(refresh=true)}"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a></div>
++            </div>
++
++            <div class="matrix26-alert-safe mb-4"><i class="bi bi-file-earmark-lock-fill"></i><div><strong>Restricted reading</strong><p>Matrix26 only searches for log extensions inside <code>logs/</code> and <code>runtime-clients/</code>. Arbitrary paths and files outside the project are blocked.</p></div></div>
++
++            <section class="matrix26-panel">
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Instance</th><th>File</th><th>Size</th><th>Last modified</th><th>Priority</th><th class="text-end">View runtime</th></tr></thead>
++                        <tbody>
++                        <tr th:each="log : ${logs}">
++                            <td><strong th:text="${log.instanceName()}">Instance</strong></td>
++                            <td><code class="matrix26-code-wrap" th:text="${log.relativePath()}">log</code></td>
++                            <td th:text="${log.sizeLabel()}">0 B</td>
++                            <td th:text="${log.modifiedAt() != null ? #temporals.format(log.modifiedAt(), 'dd/MM/yyyy HH:mm:ss') : '—'}">—</td>
++                            <td><span class="badge" th:classappend="${log.currentCandidate() ? ' text-bg-info' : ' text-bg-light border text-dark'}" th:text="${log.currentCandidate() ? 'Primary' : 'Related'}">Priority</span></td>
++                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/operations/runtimes/{key}(key=${log.runtimeKey()})}"><i class="bi bi-eye"></i></a></td>
++                        </tr>
++                        <tr th:if="${#lists.isEmpty(logs)}"><td colspan="6" class="text-center text-muted py-5">No associated logs were found. Runtimes started in a terminal may not redirect their output to a file.</td></tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+--- a/src/main/resources/templates/control_center/operations/ports.html
++++ b/src/main/resources/templates/control_center/operations/ports.html
+@@ -0,0 +1,52 @@
++<!DOCTYPE html>
++<html lang="es" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Ports')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Ports', 'Live association between expected ports, PIDs, and detected processes.')}" ></header>
++        <main class="matrix26-main">
++            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
++                <div class="matrix26-inline-summary"><span><strong th:text="${summary.listeningPorts()}">0</strong> Matrix26 ports listening</span><span>Read-only capture</span></div>
++                <div class="d-flex gap-2"><a class="btn btn-outline-secondary" th:href="@{/control-center/operations}"><i class="bi bi-arrow-left me-1"></i>Overview</a><a class="btn btn-primary" th:href="@{/control-center/operations/ports(refresh=true)}"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a></div>
++            </div>
++
++            <section class="matrix26-panel mb-4">
++                <div class="matrix26-panel-header"><div><span>Ports esperados</span><h2>Status por runtime</h2></div></div>
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Port</th><th>Instance</th><th>Listening</th><th>PID</th><th>Process</th><th>HTTP</th><th class="text-end">Details</th></tr></thead>
++                        <tbody>
++                        <tr th:each="runtime : ${runtimes}">
++                            <td><strong th:text="${runtime.target().expectedPort()}">8091</strong></td>
++                            <td><strong th:text="${runtime.target().businessName()}">Instance</strong><small><code th:text="${runtime.target().runtimeProfile()}">profile</code></small></td>
++                            <td><span class="badge" th:classappend="${runtime.portListening() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.portListening() ? 'Listening' : 'Sin escucha'}">Status</span></td>
++                            <td th:text="${runtime.portOwnerPid() != null ? runtime.portOwnerPid() : '—'}">—</td>
++                            <td><span th:text="${runtime.portOwnerProcess() != '' ? runtime.portOwnerProcess() : '—'}">—</span><small th:if="${runtime.portListening() && !runtime.expectedProcess()}" class="text-danger">Does not match the expected runtime</small></td>
++                            <td><span class="badge" th:classappend="${runtime.http().online() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.http().statusCode() != null ? 'HTTP ' + runtime.http().statusCode() : 'No response'}">HTTP</span></td>
++                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/operations/runtimes/{key}(key=${runtime.target().key()})}"><i class="bi bi-eye"></i></a></td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++
++            <section class="matrix26-panel">
++                <div class="matrix26-panel-header"><div><span>System detection</span><h2>Detected bindings</h2></div></div>
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Port</th><th>Local address</th><th>PID</th><th>Process</th><th>Sanitized command line</th></tr></thead>
++                        <tbody>
++                        <tr th:each="port : ${ports}"><td><strong th:text="${port.port()}">8091</strong></td><td th:text="${port.localAddress()}">localhost</td><td th:text="${port.pid() != null ? port.pid() : '—'}">—</td><td th:text="${port.processName()}">java.exe</td><td><code class="matrix26-code-wrap" th:text="${port.commandLine() != '' ? port.commandLine() : 'Unavailable'}">Command</code></td></tr>
++                        <tr th:if="${#lists.isEmpty(ports)}"><td colspan="5" class="text-center text-muted py-5">No expected listening ports were detected during this capture.</td></tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+--- a/src/main/resources/templates/control_center/operations/runtime_detail.html
++++ b/src/main/resources/templates/control_center/operations/runtime_detail.html
+@@ -0,0 +1,138 @@
++<!DOCTYPE html>
++<html lang="es" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Details de runtime')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Details de runtime', 'Read-only technical diagnostics without process control.')}" ></header>
++        <main class="matrix26-main">
++            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
++                <div class="d-flex align-items-center gap-3">
++                    <span class="matrix26-detail-avatar"><i class="bi bi-cpu-fill"></i></span>
++                    <div>
++                        <div class="d-flex gap-2 flex-wrap align-items-center">
++                            <h2 class="m-0 fs-4" th:text="${runtime.target().businessName()}">Runtime</h2>
++                            <span class="badge" th:classappend="${runtime.state().getBadgeClass()}" th:text="${runtime.state().getLabel()}">Status</span>
++                            <span class="badge text-bg-primary" th:if="${runtime.target().protectedInstance()}">Protected</span>
++                        </div>
++                        <code th:text="${runtime.target().runtimeProfile()}">profile</code>
++                    </div>
++                </div>
++                <div class="d-flex gap-2 flex-wrap">
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/operations/runtimes}"><i class="bi bi-arrow-left me-1"></i>Back</a>
++                    <a class="btn btn-outline-primary" th:href="@{/control-center/operations/runtimes/{key}(key=${runtime.target().key()},refresh=true)}"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>
++                    <a class="btn btn-primary" th:if="${runtime.target().publicUrl() != null}" th:href="${runtime.target().publicUrl()}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Open portal</a>
++                </div>
++            </div>
++
++            <div class="matrix26-alert-safe mb-4">
++                <i class="bi bi-eye-fill"></i>
++                <div><strong>Read only</strong><p>Matrix26 can inspect this runtime, but it cannot start, stop, restart, modify, or delete the process during Phase 3D.1.</p></div>
++            </div>
++
++            <div th:if="${runtime.hasWarnings()}" class="alert alert-warning">
++                <strong class="d-block mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i>Warnings</strong>
++                <ul class="mb-0 ps-3"><li th:each="warning : ${runtime.warnings()}" th:text="${warning}">Warning</li></ul>
++            </div>
++
++            <div class="row g-4">
++                <div class="col-12 col-xl-7">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Technical identity</span><h2>Registered runtime</h2></div></div>
++                        <dl class="matrix26-settings-list">
++                            <div><dt>Code</dt><dd><code th:text="${runtime.target().code()}">code</code></dd></div>
++                            <div><dt>Runtime profile</dt><dd><code th:text="${runtime.target().runtimeProfile()}">profile</code></dd></div>
++                            <div><dt>Declared database</dt><dd><code th:text="${runtime.target().databaseName()}">database</code></dd></div>
++                            <div><dt>Port esperado</dt><dd th:text="${runtime.target().expectedPort()}">8094</dd></div>
++                            <div><dt>URL</dt><dd><a th:href="${runtime.target().publicUrl()}" target="_blank" rel="noopener" th:text="${runtime.target().publicUrl()}">URL</a></dd></div>
++                            <div><dt>Management mode</dt><dd th:text="${runtime.target().managementMode()}">Mode</dd></div>
++                            <div><dt>Reference command</dt><dd><code th:text="${runtime.target().runtimeCommand() != null ? runtime.target().runtimeCommand() : 'No registrado'}">Command</code></dd></div>
++                        </dl>
++                    </section>
++                </div>
++                <div class="col-12 col-xl-5">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Result</span><h2>Status consolidado</h2></div></div>
++                        <div class="matrix26-runtime-state-card">
++                            <span class="matrix26-runtime-state-icon"><i class="bi" th:classappend="${' ' + runtime.state().getIconClass()}"></i></span>
++                            <div><span class="badge" th:classappend="${runtime.state().getBadgeClass()}" th:text="${runtime.state().getLabel()}">Status</span><p th:text="${runtime.stateDetail()}">Details</p></div>
++                        </div>
++                        <div class="matrix26-operation-lock mt-3"><i class="bi bi-lock-fill"></i><span>Start, stop, and restart will be available in 3D.2 only for authorized laboratory instances.</span></div>
++                    </section>
++                </div>
++            </div>
++
++            <div class="row g-4 mt-0">
++                <div class="col-12 col-xl-6">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Local files</span><h2>Configuration and launcher</h2></div></div>
++                        <dl class="matrix26-settings-list">
++                            <div><dt>Runtime directory</dt><dd><span class="badge" th:classappend="${runtime.runtimeDirectoryPresent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.runtimeDirectoryPresent() ? 'Found' : 'Not found'}">Status</span><code th:text="${runtime.runtimeDirectory() != '' ? runtime.runtimeDirectory() : '—'}">Path</code></dd></div>
++                            <div><dt>application.properties</dt><dd><span class="badge" th:classappend="${runtime.configurationPresent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.configurationPresent() ? 'Found' : 'Missing'}">Status</span><code th:text="${runtime.configurationPath() != '' ? runtime.configurationPath() : '—'}">Path</code></dd></div>
++                            <div><dt>Consistency</dt><dd><span class="badge" th:classappend="${runtime.configurationConsistent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.configurationConsistent() ? 'Consistent' : 'Review'}">Status</span></dd></div>
++                            <div><dt>Port configurado</dt><dd th:text="${runtime.configuredPort() != null ? runtime.configuredPort() : '—'}">—</dd></div>
++                            <div><dt>Configured profile</dt><dd><code th:text="${runtime.configuredRuntimeProfile() != '' ? runtime.configuredRuntimeProfile() : '—'}">—</code></dd></div>
++                            <div><dt>Configured database</dt><dd><code th:text="${runtime.configuredDatabaseName() != '' ? runtime.configuredDatabaseName() : '—'}">—</code></dd></div>
++                            <div><dt>Launcher</dt><dd><span class="badge" th:classappend="${runtime.launcherPresent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.launcherPresent() ? 'Found' : 'Missing'}">Status</span><code th:text="${runtime.launcherPath() != '' ? runtime.launcherPath() : '—'}">Path</code></dd></div>
++                        </dl>
++                    </section>
++                </div>
++                <div class="col-12 col-xl-6">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Operating system</span><h2>Process and port</h2></div></div>
++                        <dl class="matrix26-settings-list">
++                            <div><dt>Port escuchando</dt><dd><span class="badge" th:classappend="${runtime.portListening() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.portListening() ? 'Yes' : 'No'}">Status</span></dd></div>
++                            <div><dt>Owner PID</dt><dd th:text="${runtime.portOwnerPid() != null ? runtime.portOwnerPid() : '—'}">—</dd></div>
++                            <div><dt>Process propietario</dt><dd th:text="${runtime.portOwnerProcess() != '' ? runtime.portOwnerProcess() : '—'}">—</dd></div>
++                            <div><dt>Runtime PID</dt><dd th:text="${runtime.processId() != null ? runtime.processId() : '—'}">—</dd></div>
++                            <div><dt>Started at</dt><dd th:text="${runtime.processStartedAt() != null ? #temporals.format(runtime.processStartedAt(), 'dd/MM/yyyy HH:mm:ss') : '—'}">—</dd></div>
++                            <div><dt>Uptime</dt><dd th:text="${runtime.uptimeLabel()}">—</dd></div>
++                            <div><dt>Executable</dt><dd><code th:text="${runtime.processExecutable() != '' ? runtime.processExecutable() : '—'}">—</code></dd></div>
++                        </dl>
++                        <div class="matrix26-command-preview mt-3"><strong>Sanitized command line</strong><code th:text="${runtime.processCommandLine() != '' ? runtime.processCommandLine() : 'Unavailable'}">Command</code></div>
++                    </section>
++                </div>
++            </div>
++
++            <div class="row g-4 mt-0">
++                <div class="col-12 col-xl-5">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Availability</span><h2>Local HTTP probe</h2></div></div>
++                        <dl class="matrix26-settings-list">
++                            <div><dt>Attempted</dt><dd th:text="${runtime.http().attempted() ? 'Yes' : 'No'}">Yes</dd></div>
++                            <div><dt>Result</dt><dd><span class="badge" th:classappend="${runtime.http().online() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.http().online() ? 'Available' : 'Unavailable'}">Status</span></dd></div>
++                            <div><dt>HTTP</dt><dd th:text="${runtime.http().statusCode() != null ? runtime.http().statusCode() : '—'}">—</dd></div>
++                            <div><dt>Response</dt><dd th:text="${runtime.http().responseTimeMs() != null ? runtime.http().responseTimeMs() + ' ms' : '—'}">—</dd></div>
++                            <div><dt>Message</dt><dd th:text="${runtime.http().message()}">Message</dd></div>
++                        </dl>
++                    </section>
++                </div>
++                <div class="col-12 col-xl-7">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Capacity</span><h2>Detected storage</h2></div></div>
++                        <div class="matrix26-storage-bars">
++                            <article><div><strong>Runtime</strong><span th:text="${runtime.runtimeStorageLabel()}">0 B</span></div><div class="matrix26-storage-track"><span style="width: 42%"></span></div><small th:text="${runtime.runtimeDirectory() != '' ? runtime.runtimeDirectory() : 'No local directory'}">Path</small></article>
++                            <article><div><strong>Instance assets</strong><span th:text="${runtime.assetStorageLabel()}">0 B</span></div><div class="matrix26-storage-track"><span style="width: 68%"></span></div><small>Branding, images, and assets managed outside Git.</small></article>
++                        </div>
++                    </section>
++                </div>
++            </div>
++
++            <section class="matrix26-panel mt-4">
++                <div class="matrix26-panel-header">
++                    <div><span>Diagnostics</span><h2>Latest log lines</h2></div>
++                    <a th:href="@{/control-center/operations/logs}" class="small text-decoration-none">Log inventory</a>
++                </div>
++                <div th:if="${!logTail.available()}" class="text-muted py-4 text-center" th:text="${logTail.message()}">No log</div>
++                <div th:if="${logTail.available()}" class="matrix26-log-viewer">
++                    <div class="matrix26-log-toolbar"><code th:text="${logTail.log().relativePath()}">log</code><span th:text="${logTail.log().sizeLabel()}">0 B</span></div>
++                    <pre><code th:each="line : ${logTail.lines()}" th:text="${line + '\n'}">line</code></pre>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+--- a/src/main/resources/templates/control_center/operations/runtimes.html
++++ b/src/main/resources/templates/control_center/operations/runtimes.html
+@@ -0,0 +1,81 @@
++<!DOCTYPE html>
++<html lang="es" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Runtime inventory')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Runtimes', 'Live process, configuration, storage, and availability detection.')}" ></header>
++        <main class="matrix26-main">
++            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
++                <div class="matrix26-inline-summary">
++                    <span><strong th:text="${summary.totalRuntimes()}">0</strong> inventoried</span>
++                    <span class="text-success"><strong th:text="${summary.onlineRuntimes()}">0</strong> online</span>
++                    <span class="text-warning"><strong th:text="${summary.degradedRuntimes()}">0</strong> needs attention</span>
++                </div>
++                <div class="d-flex gap-2 flex-wrap">
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/operations}"><i class="bi bi-arrow-left me-1"></i>Overview</a>
++                    <a class="btn btn-primary" th:href="@{/control-center/operations/runtimes(refresh=true)}"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>
++                </div>
++            </div>
++
++            <div class="matrix26-alert-safe mb-4">
++                <i class="bi bi-shield-lock-fill"></i>
++                <div><strong>Inventory without process control</strong><p>Start, stop, and restart controls remain locked until Phase 3D.2 and will initially be enabled only for laboratory instances.</p></div>
++            </div>
++
++            <section class="matrix26-panel">
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table matrix26-runtime-table">
++                        <thead>
++                        <tr><th>Instance</th><th>Configuration</th><th>Process</th><th>Port</th><th>HTTP</th><th>Log</th><th>Protection</th><th class="text-end">Actions</th></tr>
++                        </thead>
++                        <tbody>
++                        <tr th:each="runtime : ${runtimes}">
++                            <td>
++                                <strong th:text="${runtime.target().businessName()}">Instance</strong>
++                                <small><code th:text="${runtime.target().code()}">code</code></small>
++                                <small><code th:text="${runtime.target().runtimeProfile()}">profile</code></small>
++                            </td>
++                            <td>
++                                <span class="badge" th:classappend="${runtime.configurationPresent() && runtime.configurationConsistent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.configurationPresent() ? (runtime.configurationConsistent() ? 'Consistent' : 'Review') : 'Missing'}">Configuration</span>
++                                <small th:text="${runtime.configurationPath() != '' ? runtime.configurationPath() : 'No local file'}">Path</small>
++                            </td>
++                            <td>
++                                <strong th:text="${runtime.processId() != null ? 'PID ' + runtime.processId() : 'Not detected'}">PID</strong>
++                                <small th:text="${runtime.uptimeLabel()}">Uptime</small>
++                                <small th:text="${runtime.processExecutable() != '' ? runtime.processExecutable() : '—'}">Java</small>
++                            </td>
++                            <td>
++                                <span class="badge" th:classappend="${runtime.portListening() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.portListening() ? 'Listening' : 'Free / not listening'}">Port</span>
++                                <small th:text="|${runtime.target().expectedPort()} · ${runtime.portOwnerPid() != null ? 'PID ' + runtime.portOwnerPid() : 'no PID'}|">Port</small>
++                            </td>
++                            <td>
++                                <span class="badge" th:classappend="${runtime.http().online() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.http().statusCode() != null ? 'HTTP ' + runtime.http().statusCode() : (runtime.http().attempted() ? 'No response' : 'Not probed')}">HTTP</span>
++                                <small th:text="${runtime.http().responseTimeMs() != null ? runtime.http().responseTimeMs() + ' ms' : '—'}">—</small>
++                            </td>
++                            <td>
++                                <span class="badge" th:classappend="${runtime.primaryLog() != null ? ' text-bg-info' : ' text-bg-light border text-dark'}" th:text="${runtime.primaryLog() != null ? runtime.primaryLog().sizeLabel() : 'No log'}">Log</span>
++                                <small th:if="${runtime.primaryLog() != null}" th:text="${runtime.primaryLog().relativePath()}">Path</small>
++                            </td>
++                            <td>
++                                <span th:if="${runtime.target().protectedInstance()}" class="badge text-bg-primary"><i class="bi bi-shield-lock me-1"></i>Protected</span>
++                                <span th:unless="${runtime.target().protectedInstance()}" class="badge text-bg-secondary">Laboratory</span>
++                            </td>
++                            <td class="text-end">
++                                <div class="btn-group btn-group-sm">
++                                    <a class="btn btn-outline-secondary" th:href="@{/control-center/operations/runtimes/{key}(key=${runtime.target().key()})}" title="View details"><i class="bi bi-eye"></i></a>
++                                    <a class="btn btn-outline-primary" th:if="${runtime.target().publicUrl() != null}" th:href="${runtime.target().publicUrl()}" target="_blank" rel="noopener" title="Open portal"><i class="bi bi-box-arrow-up-right"></i></a>
++                                </div>
++                            </td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+--- a/src/main/resources/templates/control_center/fragments/sidebar.html
++++ b/src/main/resources/templates/control_center/fragments/sidebar.html
+@@ -30,6 +30,30 @@
+            th:classappend="${activePage == 'matrix26_modules'} ? ' active' : ''">
+             <i class="bi bi-grid-3x3-gap"></i>
+             <span>Módulos</span>
++        </a>
++    </nav>
++
++    <div class="matrix26-sidebar-label">Operations</div>
++    <nav class="matrix26-nav">
++        <a th:href="@{/control-center/operations}"
++           th:classappend="${activePage == 'matrix26_operations'} ? ' active' : ''">
++            <i class="bi bi-command"></i>
++            <span>Operations Center</span>
++        </a>
++        <a th:href="@{/control-center/operations/runtimes}"
++           th:classappend="${activePage == 'matrix26_operations_runtimes'} ? ' active' : ''">
++            <i class="bi bi-cpu"></i>
++            <span>Runtimes</span>
++        </a>
++        <a th:href="@{/control-center/operations/ports}"
++           th:classappend="${activePage == 'matrix26_operations_ports'} ? ' active' : ''">
++            <i class="bi bi-ethernet"></i>
++            <span>Ports</span>
++        </a>
++        <a th:href="@{/control-center/operations/logs}"
++           th:classappend="${activePage == 'matrix26_operations_logs'} ? ' active' : ''">
++            <i class="bi bi-journal-text"></i>
++            <span>Logs</span>
+         </a>
+     </nav>
+ 
+--- a/src/main/resources/templates/control_center/instance_detail.html
++++ b/src/main/resources/templates/control_center/instance_detail.html
+@@ -30,6 +30,7 @@
+                     <a class="btn btn-outline-secondary" th:href="@{/control-center/instances}"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+                     <a class="btn btn-outline-primary" th:href="@{/control-center/instances/{id}/edit(id=${instance.id})}"><i class="bi bi-pencil me-1"></i>Editar</a>
+                     <a class="btn btn-outline-primary" th:href="@{/control-center/instances/{id}/appearance(id=${instance.id})}"><i class="bi bi-palette me-1"></i>Apariencia</a>
++                    <a class="btn btn-outline-primary" th:href="@{/control-center/operations/runtimes/{id}(id=${instance.id})}"><i class="bi bi-cpu me-1"></i>Runtime</a>
+                     <a class="btn btn-primary" th:href="${instance.publicUrl}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir portal</a>
+                 </div>
+             </div>
+--- a/src/main/resources/static/css/matrix26-control.css
++++ b/src/main/resources/static/css/matrix26-control.css
+@@ -1521,3 +1521,234 @@
+         flex-direction: column;
+     }
+ }
++
++/* Matrix26 Operations 3D.1: read-only runtime inventory. */
++.matrix26-operations-summary {
++    display: grid;
++    grid-template-columns: repeat(6, minmax(0, 1fr));
++    gap: 1rem;
++}
++
++.matrix26-operations-summary article {
++    display: flex;
++    align-items: center;
++    gap: .85rem;
++    min-width: 0;
++    padding: 1rem;
++    border: 1px solid var(--matrix26-border, #dce3ee);
++    border-radius: 16px;
++    background: var(--matrix26-surface, #ffffff);
++    box-shadow: 0 12px 28px rgba(15, 23, 42, .05);
++}
++
++.matrix26-operations-summary article > div {
++    display: grid;
++    min-width: 0;
++}
++
++.matrix26-operations-summary strong {
++    color: var(--matrix26-heading, #172033);
++    font-size: 1.35rem;
++    line-height: 1.15;
++}
++
++.matrix26-operations-summary small {
++    overflow: hidden;
++    color: var(--matrix26-muted, #667085);
++    font-size: .76rem;
++    text-overflow: ellipsis;
++    white-space: nowrap;
++}
++
++.matrix26-operation-icon {
++    display: inline-grid;
++    width: 42px;
++    height: 42px;
++    flex: 0 0 42px;
++    place-items: center;
++    border-radius: 13px;
++    font-size: 1.05rem;
++}
++
++.matrix26-operation-icon.is-primary { color: #1d4ed8; background: #dbeafe; }
++.matrix26-operation-icon.is-success { color: #047857; background: #d1fae5; }
++.matrix26-operation-icon.is-warning { color: #a16207; background: #fef3c7; }
++.matrix26-operation-icon.is-secondary { color: #475569; background: #e2e8f0; }
++.matrix26-operation-icon.is-info { color: #0e7490; background: #cffafe; }
++.matrix26-operation-icon.is-dark { color: #334155; background: #e2e8f0; }
++
++.matrix26-runtime-table td {
++    vertical-align: middle;
++}
++
++.matrix26-runtime-table td small,
++.matrix26-runtime-table td code {
++    display: block;
++    max-width: 270px;
++    overflow: hidden;
++    text-overflow: ellipsis;
++    white-space: nowrap;
++}
++
++.matrix26-runtime-state-card {
++    display: flex;
++    align-items: flex-start;
++    gap: 1rem;
++    padding: 1rem;
++    border: 1px solid var(--matrix26-border, #dce3ee);
++    border-radius: 16px;
++    background: var(--matrix26-soft, #f7f9fc);
++}
++
++.matrix26-runtime-state-card p {
++    margin: .65rem 0 0;
++    color: var(--matrix26-muted, #667085);
++}
++
++.matrix26-runtime-state-icon {
++    display: inline-grid;
++    width: 48px;
++    height: 48px;
++    flex: 0 0 48px;
++    place-items: center;
++    border-radius: 15px;
++    color: #1d4ed8;
++    background: #dbeafe;
++    font-size: 1.25rem;
++}
++
++.matrix26-operation-lock {
++    display: flex;
++    align-items: flex-start;
++    gap: .65rem;
++    padding: .85rem;
++    border: 1px dashed #cbd5e1;
++    border-radius: 13px;
++    color: #475569;
++    background: #f8fafc;
++    font-size: .86rem;
++}
++
++.matrix26-command-preview {
++    display: grid;
++    gap: .45rem;
++    padding: .85rem;
++    border: 1px solid #dbe3ef;
++    border-radius: 13px;
++    background: #0f172a;
++}
++
++.matrix26-command-preview strong {
++    color: #cbd5e1;
++    font-size: .78rem;
++    text-transform: uppercase;
++    letter-spacing: .04em;
++}
++
++.matrix26-command-preview code {
++    overflow-wrap: anywhere;
++    color: #e2e8f0;
++    white-space: normal;
++}
++
++.matrix26-storage-bars {
++    display: grid;
++    gap: 1.1rem;
++}
++
++.matrix26-storage-bars article {
++    display: grid;
++    gap: .5rem;
++}
++
++.matrix26-storage-bars article > div:first-child {
++    display: flex;
++    justify-content: space-between;
++    gap: 1rem;
++}
++
++.matrix26-storage-bars small {
++    color: var(--matrix26-muted, #667085);
++}
++
++.matrix26-storage-track {
++    overflow: hidden;
++    height: 10px;
++    border-radius: 999px;
++    background: #e2e8f0;
++}
++
++.matrix26-storage-track span {
++    display: block;
++    height: 100%;
++    border-radius: inherit;
++    background: linear-gradient(90deg, #2563eb, #0ea5e9);
++}
++
++.matrix26-log-viewer {
++    overflow: hidden;
++    border: 1px solid #1e293b;
++    border-radius: 14px;
++    background: #020617;
++}
++
++.matrix26-log-toolbar {
++    display: flex;
++    justify-content: space-between;
++    gap: 1rem;
++    padding: .7rem .9rem;
++    border-bottom: 1px solid #1e293b;
++    color: #94a3b8;
++    background: #0f172a;
++    font-size: .78rem;
++}
++
++.matrix26-log-toolbar code {
++    overflow: hidden;
++    color: #cbd5e1;
++    text-overflow: ellipsis;
++    white-space: nowrap;
++}
++
++.matrix26-log-viewer pre {
++    max-height: 460px;
++    margin: 0;
++    padding: 1rem;
++    overflow: auto;
++    color: #dbeafe;
++    background: #020617;
++    font-size: .76rem;
++    line-height: 1.55;
++    white-space: pre-wrap;
++    overflow-wrap: anywhere;
++}
++
++.matrix26-code-wrap {
++    display: inline-block;
++    max-width: 560px;
++    overflow-wrap: anywhere;
++    white-space: normal;
++}
++
++@media (max-width: 1450px) {
++    .matrix26-operations-summary {
++        grid-template-columns: repeat(3, minmax(0, 1fr));
++    }
++}
++
++@media (max-width: 860px) {
++    .matrix26-operations-summary {
++        grid-template-columns: repeat(2, minmax(0, 1fr));
++    }
++}
++
++@media (max-width: 575.98px) {
++    .matrix26-operations-summary {
++        grid-template-columns: 1fr;
++    }
++
++    .matrix26-log-toolbar {
++        align-items: flex-start;
++        flex-direction: column;
++    }
++}
+--- a/scripts/check-matrix26-operations-phase3d1.sh
++++ b/scripts/check-matrix26-operations-phase3d1.sh
+@@ -0,0 +1,78 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++cd "$ROOT_DIR"
++
++OPERATIONS_JAVA="src/main/java/com/ecoamazonas/eco_agua/platform/control/operations"
++OPERATIONS_TEMPLATES="src/main/resources/templates/control_center/operations"
++
++required_files=(
++  "$OPERATIONS_JAVA/Matrix26OperationsController.java"
++  "$OPERATIONS_JAVA/Matrix26OperationsInventoryService.java"
++  "$OPERATIONS_JAVA/Matrix26SystemProbe.java"
++  "$OPERATIONS_TEMPLATES/dashboard.html"
++  "$OPERATIONS_TEMPLATES/runtimes.html"
++  "$OPERATIONS_TEMPLATES/runtime_detail.html"
++  "$OPERATIONS_TEMPLATES/ports.html"
++  "$OPERATIONS_TEMPLATES/logs.html"
++)
++
++for file in "${required_files[@]}"; do
++  if [[ ! -f "$file" ]]; then
++    echo "Missing required file: $file" >&2
++    exit 1
++  fi
++done
++
++if grep -RniE '@PostMapping|@PutMapping|@DeleteMapping|taskkill|Stop-Process|kill -9|Runtime\.getRuntime\(\)\.exec' \
++  "$OPERATIONS_JAVA"; then
++  echo "Unsafe runtime write marker found in Phase 3D.1." >&2
++  exit 1
++fi
++
++for route in \
++  '/control-center/operations' \
++  '/runtimes' \
++  '/ports' \
++  '/logs'; do
++  if ! grep -Rq --fixed-strings "$route" \
++      "$OPERATIONS_JAVA" \
++      "$OPERATIONS_TEMPLATES" \
++      src/main/resources/templates/control_center/fragments/sidebar.html; then
++    echo "Missing route reference: $route" >&2
++    exit 1
++  fi
++done
++
++python - <<'PY'
++from pathlib import Path
++
++root = Path("src/main/resources/templates/control_center/operations")
++for path in sorted(root.glob("*.html")):
++    text = path.read_text(encoding="utf-8")
++    if "<html" not in text or "</html>" not in text:
++        raise SystemExit(f"Invalid HTML document: {path}")
++    if text.count('th:') and text.count('"') % 2:
++        raise SystemExit(f"Unbalanced quotes in: {path}")
++
++css = Path("src/main/resources/static/css/matrix26-control.css").read_text(encoding="utf-8")
++if css.count("{") != css.count("}"):
++    raise SystemExit("CSS braces are unbalanced")
++
++java_root = Path("src/main/java/com/ecoamazonas/eco_agua/platform/control/operations")
++for path in java_root.glob("*.java"):
++    text = path.read_text(encoding="utf-8")
++    if text.count("{") != text.count("}"):
++        raise SystemExit(f"Java braces are unbalanced: {path}")
++
++print("Static HTML, CSS, and Java structure: OK")
++PY
++
++if command -v mvn >/dev/null 2>&1; then
++  mvn -DskipTests compile
++else
++  echo "Maven was not found; compile check skipped by this script." >&2
++fi
++
++echo "Matrix26 Operations Phase 3D.1 static checks passed."
+--- a/docs/project/matrix26-operations-phase3d1-test-guide.md
++++ b/docs/project/matrix26-operations-phase3d1-test-guide.md
+@@ -0,0 +1,200 @@
++# Matrix26 Operations Phase 3D.1 Test Guide
++
++## Scope
++
++Phase 3D.1 adds a read-only operations inventory to Matrix26 Control Center.
++It detects runtime folders, configuration files, launchers, Java processes,
++expected listening ports, local HTTP availability, log files, and storage usage.
++
++This phase does **not** start, stop, restart, delete, or modify runtime processes.
++It also does not modify operational databases or write PID files.
++
++## Prerequisites
++
++- Matrix26 Control Center is available on port `8091`.
++- The project builds successfully with Java 17.
++- At least one laboratory runtime exists under `runtime-clients/`.
++- Runtime processes may be online or offline; both states are valid test cases.
++
++## Build
++
++```bash
++cd "$HOME/Projects/eco-agua-workspace/eco-agua"
++
++bash scripts/check-matrix26-operations-phase3d1.sh
++
++rm -rf target
++mvn clean -DskipTests package
++```
++
++Expected result:
++
++```text
++BUILD SUCCESS
++Matrix26 Operations Phase 3D.1 static checks passed.
++```
++
++## Start Matrix26
++
++```bash
++bash scripts/run-matrix26-control.sh
++```
++
++Open:
++
++```text
++http://localhost:8091/control-center/operations
++```
++
++## Routes
++
++```text
++/control-center/operations
++/control-center/operations/runtimes
++/control-center/operations/runtimes/{runtimeKey}
++/control-center/operations/ports
++/control-center/operations/logs
++```
++
++## Test 1: Control Center inventory
++
++Open:
++
++```text
++http://localhost:8091/control-center/operations/runtimes/control
++```
++
++Expected:
++
++- Runtime profile: `matrix26_control`.
++- Expected port: `8091`.
++- Runtime folder: `runtime-clients/matrix26_control`.
++- `application.properties` detected.
++- Launcher detected.
++- Local HTTP probe returns an online result.
++- A Java PID is displayed when the operating system exposes it.
++- No start, stop, or restart controls are available.
++
++## Test 2: Online laboratory runtime
++
++Start the appearance laboratory in a second terminal:
++
++```bash
++bash runtime-clients/matrix26_appearance_lab/run.sh
++```
++
++Refresh:
++
++```text
++http://localhost:8091/control-center/operations/runtimes?refresh=true
++```
++
++Expected for `matrix26-appearance-lab`:
++
++- Status: `Online`.
++- Port `8094` is listening.
++- HTTP response is detected.
++- Runtime folder and configuration are detected.
++- Database, runtime profile, and port are consistent.
++- PID and uptime are shown when available.
++- Runtime and asset storage are shown separately.
++
++## Test 3: Offline laboratory runtime
++
++Stop only the laboratory process with `Ctrl+C`.
++Do not stop Matrix26.
++
++Refresh the runtime inventory.
++
++Expected:
++
++- Status changes to `Offline`.
++- HTTP probe reports no response.
++- Port `8094` is no longer listening.
++- Runtime folder and configuration remain detected.
++- No destructive action is offered.
++
++## Test 4: Protected instances
++
++Review ports `8081`, `8082`, and `8084`.
++
++Expected:
++
++- Each protected instance displays a `Protected` badge.
++- Matrix26 only observes the process and port.
++- No runtime action is available.
++- Existing operational data is not queried.
++
++## Test 5: Configuration mismatch
++
++Use only a disposable laboratory runtime.
++Temporarily change the copied test runtime configuration so that the registered
++port differs from `server.port`.
++
++Refresh the inventory.
++
++Expected:
++
++- Configuration status changes to `Review`.
++- A warning explains the registered and configured port mismatch.
++- Matrix26 does not rewrite the configuration.
++
++Restore the original file immediately after the test.
++
++## Test 6: Port ownership
++
++If another process occupies a laboratory port while the portal does not respond,
++refresh the Ports page:
++
++```text
++http://localhost:8091/control-center/operations/ports?refresh=true
++```
++
++Expected:
++
++- Port ownership is displayed when Windows exposes the PID.
++- A mismatched owner is reported as `Port occupied`.
++- Matrix26 does not terminate the process.
++
++## Test 7: Logs
++
++Open:
++
++```text
++http://localhost:8091/control-center/operations/logs
++```
++
++Expected:
++
++- Only `.log`, `.out`, and `.err` files inside approved project directories are listed.
++- Arbitrary filesystem paths are not accepted.
++- The runtime detail shows a sanitized tail when a related log exists.
++- Values matching password, secret, token, API key, or private key assignments are masked.
++
++A runtime started directly in a terminal may show `No log` because its standard
++output is not redirected to a file. That is valid in Phase 3D.1.
++
++## Test 8: Cache and refresh
++
++Open the Operations dashboard repeatedly without `refresh=true`.
++Then use the `Refresh inventory` button.
++
++Expected:
++
++- Normal navigation reuses the short inventory cache.
++- Explicit refresh captures a new process and port snapshot.
++- No runtime process is restarted.
++
++## Acceptance checklist
++
++- [ ] Maven build succeeds.
++- [ ] Operations section appears in the Matrix26 sidebar.
++- [ ] Matrix26 Control Center is included in the inventory.
++- [ ] Registered instances are listed.
++- [ ] Process, PID, port, HTTP, configuration, storage, and log states are visible.
++- [ ] Sensitive log and command values are masked.
++- [ ] Protected instances remain read-only.
++- [ ] No POST runtime operation exists.
++- [ ] No PID file is written.
++- [ ] No operational database is modified.
++- [ ] No runtime is started, stopped, restarted, or deleted.
+--- a/reports/matrix26-operations-phase3d1-report.md
++++ b/reports/matrix26-operations-phase3d1-report.md
+@@ -0,0 +1,114 @@
++# Matrix26 Operations Phase 3D.1 Report
++
++## Objective
++
++Provide a trustworthy, read-only runtime inventory before enabling process
++control in Phase 3D.2.
++
++## Delivered
++
++### Operations navigation
++
++- Operations Center dashboard.
++- Runtime inventory.
++- Runtime technical detail.
++- Expected port inventory.
++- Log inventory.
++- Direct runtime link from the instance detail page.
++
++### Runtime inspection
++
++- Dedicated Matrix26 Control Center runtime is included as a synthetic protected target.
++- Registered business instances are loaded from `matrix26_platform_control`.
++- Runtime directories are resolved from approved relative paths.
++- `application.properties` is parsed without exposing credentials.
++- Registered port, runtime profile, and database are compared with local configuration.
++- Compatible launchers are detected: `run.sh`, `run.ps1`, `run.cmd`, and `run.bat`.
++
++### Process and port inspection
++
++- Java `ProcessHandle` provides process metadata without requiring shell input.
++- Windows port ownership uses a fixed PowerShell command.
++- Windows `netstat` is used as a fallback.
++- Unix-like systems use `ss` when available.
++- A non-destructive socket binding check detects occupancy when PID ownership is unavailable.
++- No user-supplied command is executed.
++
++### Availability
++
++- Only local URLs are probed by the operations inventory.
++- Remote URLs are not contacted from this module.
++- HTTP status and response time are displayed.
++- Runtime status consolidates process, port, HTTP, and configuration evidence.
++
++### Logs and storage
++
++- Log discovery is restricted to approved project roots.
++- Supported extensions: `.log`, `.out`, and `.err`.
++- Log tails are sanitized before rendering.
++- Passwords, secrets, tokens, API keys, and private keys are masked.
++- Runtime and instance asset storage are calculated separately.
++
++### Safety
++
++Phase 3D.1 contains no runtime write actions.
++
++It does not:
++
++- start processes;
++- stop processes;
++- restart processes;
++- execute registered runtime commands;
++- write PID files;
++- edit launchers;
++- delete logs;
++- modify runtime configuration;
++- query operational business tables;
++- modify operational databases.
++
++## Status model
++
++- `ONLINE`
++- `OFFLINE`
++- `PORT_OCCUPIED`
++- `PROCESS_FOUND`
++- `PROCESS_NOT_FOUND`
++- `CONFIGURATION_MISSING`
++- `RUNTIME_MISSING`
++- `LOG_MISSING`
++- `DEGRADED`
++- `UNKNOWN`
++
++## Configuration defaults
++
++The following properties have safe defaults and do not require changes to the
++existing Matrix26 runtime configuration:
++
++```properties
++matrix26.control-center.operations-runtime-directory=runtime-clients
++matrix26.control-center.operations-data-directory=runtime-data
++matrix26.control-center.operations-log-directory=logs
++matrix26.control-center.operations-cache-seconds=5
++matrix26.control-center.operations-connect-timeout-ms=700
++matrix26.control-center.operations-read-timeout-ms=700
++matrix26.control-center.operations-log-tail-lines=120
++```
++
++## Validation performed
++
++- Java 17 isolated compilation with framework stubs.
++- Runtime probe smoke test.
++- Log sanitization smoke test.
++- HTML structure checks.
++- CSS brace validation.
++- Static route and safety checks.
++- Package application test over the supplied context.
++
++A full Maven build must be confirmed in the project environment because Maven is
++not installed in the artifact execution container.
++
++## Next phase
++
++Phase 3D.2 will add controlled start, stop, and restart operations only for
++explicitly authorized laboratory instance codes. Protected instances will remain
++blocked.

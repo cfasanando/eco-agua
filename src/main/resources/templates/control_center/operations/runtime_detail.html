@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Details de runtime')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Details de runtime', 'Read-only technical diagnostics without process control.')}" ></header>
+        <main class="matrix26-main">
+            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="matrix26-detail-avatar"><i class="bi bi-cpu-fill"></i></span>
+                    <div>
+                        <div class="d-flex gap-2 flex-wrap align-items-center">
+                            <h2 class="m-0 fs-4" th:text="${runtime.target().businessName()}">Runtime</h2>
+                            <span class="badge" th:classappend="${runtime.state().getBadgeClass()}" th:text="${runtime.state().getLabel()}">Status</span>
+                            <span class="badge text-bg-primary" th:if="${runtime.target().protectedInstance()}">Protected</span>
+                        </div>
+                        <code th:text="${runtime.target().runtimeProfile()}">profile</code>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/operations/runtimes}"><i class="bi bi-arrow-left me-1"></i>Back</a>
+                    <a class="btn btn-outline-primary" th:href="@{/control-center/operations/runtimes/{key}(key=${runtime.target().key()},refresh=true)}"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>
+                    <a class="btn btn-primary" th:if="${runtime.target().publicUrl() != null}" th:href="${runtime.target().publicUrl()}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Open portal</a>
+                </div>
+            </div>
+
+            <div class="matrix26-alert-safe mb-4">
+                <i class="bi bi-eye-fill"></i>
+                <div><strong>Read only</strong><p>Matrix26 can inspect this runtime, but it cannot start, stop, restart, modify, or delete the process during Phase 3D.1.</p></div>
+            </div>
+
+            <div th:if="${runtime.hasWarnings()}" class="alert alert-warning">
+                <strong class="d-block mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i>Warnings</strong>
+                <ul class="mb-0 ps-3"><li th:each="warning : ${runtime.warnings()}" th:text="${warning}">Warning</li></ul>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-12 col-xl-7">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Technical identity</span><h2>Registered runtime</h2></div></div>
+                        <dl class="matrix26-settings-list">
+                            <div><dt>Code</dt><dd><code th:text="${runtime.target().code()}">code</code></dd></div>
+                            <div><dt>Runtime profile</dt><dd><code th:text="${runtime.target().runtimeProfile()}">profile</code></dd></div>
+                            <div><dt>Declared database</dt><dd><code th:text="${runtime.target().databaseName()}">database</code></dd></div>
+                            <div><dt>Port esperado</dt><dd th:text="${runtime.target().expectedPort()}">8094</dd></div>
+                            <div><dt>URL</dt><dd><a th:href="${runtime.target().publicUrl()}" target="_blank" rel="noopener" th:text="${runtime.target().publicUrl()}">URL</a></dd></div>
+                            <div><dt>Management mode</dt><dd th:text="${runtime.target().managementMode()}">Mode</dd></div>
+                            <div><dt>Reference command</dt><dd><code th:text="${runtime.target().runtimeCommand() != null ? runtime.target().runtimeCommand() : 'No registrado'}">Command</code></dd></div>
+                        </dl>
+                    </section>
+                </div>
+                <div class="col-12 col-xl-5">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Result</span><h2>Status consolidado</h2></div></div>
+                        <div class="matrix26-runtime-state-card">
+                            <span class="matrix26-runtime-state-icon"><i class="bi" th:classappend="${' ' + runtime.state().getIconClass()}"></i></span>
+                            <div><span class="badge" th:classappend="${runtime.state().getBadgeClass()}" th:text="${runtime.state().getLabel()}">Status</span><p th:text="${runtime.stateDetail()}">Details</p></div>
+                        </div>
+                        <div class="matrix26-operation-lock mt-3"><i class="bi bi-lock-fill"></i><span>Start, stop, and restart will be available in 3D.2 only for authorized laboratory instances.</span></div>
+                    </section>
+                </div>
+            </div>
+
+            <div class="row g-4 mt-0">
+                <div class="col-12 col-xl-6">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Local files</span><h2>Configuration and launcher</h2></div></div>
+                        <dl class="matrix26-settings-list">
+                            <div><dt>Runtime directory</dt><dd><span class="badge" th:classappend="${runtime.runtimeDirectoryPresent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.runtimeDirectoryPresent() ? 'Found' : 'Not found'}">Status</span><code th:text="${runtime.runtimeDirectory() != '' ? runtime.runtimeDirectory() : '—'}">Path</code></dd></div>
+                            <div><dt>application.properties</dt><dd><span class="badge" th:classappend="${runtime.configurationPresent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.configurationPresent() ? 'Found' : 'Missing'}">Status</span><code th:text="${runtime.configurationPath() != '' ? runtime.configurationPath() : '—'}">Path</code></dd></div>
+                            <div><dt>Consistency</dt><dd><span class="badge" th:classappend="${runtime.configurationConsistent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.configurationConsistent() ? 'Consistent' : 'Review'}">Status</span></dd></div>
+                            <div><dt>Port configurado</dt><dd th:text="${runtime.configuredPort() != null ? runtime.configuredPort() : '—'}">—</dd></div>
+                            <div><dt>Configured profile</dt><dd><code th:text="${runtime.configuredRuntimeProfile() != '' ? runtime.configuredRuntimeProfile() : '—'}">—</code></dd></div>
+                            <div><dt>Configured database</dt><dd><code th:text="${runtime.configuredDatabaseName() != '' ? runtime.configuredDatabaseName() : '—'}">—</code></dd></div>
+                            <div><dt>Launcher</dt><dd><span class="badge" th:classappend="${runtime.launcherPresent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.launcherPresent() ? 'Found' : 'Missing'}">Status</span><code th:text="${runtime.launcherPath() != '' ? runtime.launcherPath() : '—'}">Path</code></dd></div>
+                        </dl>
+                    </section>
+                </div>
+                <div class="col-12 col-xl-6">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Operating system</span><h2>Process and port</h2></div></div>
+                        <dl class="matrix26-settings-list">
+                            <div><dt>Port escuchando</dt><dd><span class="badge" th:classappend="${runtime.portListening() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.portListening() ? 'Yes' : 'No'}">Status</span></dd></div>
+                            <div><dt>Owner PID</dt><dd th:text="${runtime.portOwnerPid() != null ? runtime.portOwnerPid() : '—'}">—</dd></div>
+                            <div><dt>Process propietario</dt><dd th:text="${runtime.portOwnerProcess() != '' ? runtime.portOwnerProcess() : '—'}">—</dd></div>
+                            <div><dt>Runtime PID</dt><dd th:text="${runtime.processId() != null ? runtime.processId() : '—'}">—</dd></div>
+                            <div><dt>Started at</dt><dd th:text="${runtime.processStartedAt() != null ? #temporals.format(runtime.processStartedAt(), 'dd/MM/yyyy HH:mm:ss') : '—'}">—</dd></div>
+                            <div><dt>Uptime</dt><dd th:text="${runtime.uptimeLabel()}">—</dd></div>
+                            <div><dt>Executable</dt><dd><code th:text="${runtime.processExecutable() != '' ? runtime.processExecutable() : '—'}">—</code></dd></div>
+                        </dl>
+                        <div class="matrix26-command-preview mt-3"><strong>Sanitized command line</strong><code th:text="${runtime.processCommandLine() != '' ? runtime.processCommandLine() : 'Unavailable'}">Command</code></div>
+                    </section>
+                </div>
+            </div>
+
+            <div class="row g-4 mt-0">
+                <div class="col-12 col-xl-5">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Availability</span><h2>Local HTTP probe</h2></div></div>
+                        <dl class="matrix26-settings-list">
+                            <div><dt>Attempted</dt><dd th:text="${runtime.http().attempted() ? 'Yes' : 'No'}">Yes</dd></div>
+                            <div><dt>Result</dt><dd><span class="badge" th:classappend="${runtime.http().online() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.http().online() ? 'Available' : 'Unavailable'}">Status</span></dd></div>
+                            <div><dt>HTTP</dt><dd th:text="${runtime.http().statusCode() != null ? runtime.http().statusCode() : '—'}">—</dd></div>
+                            <div><dt>Response</dt><dd th:text="${runtime.http().responseTimeMs() != null ? runtime.http().responseTimeMs() + ' ms' : '—'}">—</dd></div>
+                            <div><dt>Message</dt><dd th:text="${runtime.http().message()}">Message</dd></div>
+                        </dl>
+                    </section>
+                </div>
+                <div class="col-12 col-xl-7">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Capacity</span><h2>Detected storage</h2></div></div>
+                        <div class="matrix26-storage-bars">
+                            <article><div><strong>Runtime</strong><span th:text="${runtime.runtimeStorageLabel()}">0 B</span></div><div class="matrix26-storage-track"><span style="width: 42%"></span></div><small th:text="${runtime.runtimeDirectory() != '' ? runtime.runtimeDirectory() : 'No local directory'}">Path</small></article>
+                            <article><div><strong>Instance assets</strong><span th:text="${runtime.assetStorageLabel()}">0 B</span></div><div class="matrix26-storage-track"><span style="width: 68%"></span></div><small>Branding, images, and assets managed outside Git.</small></article>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <section class="matrix26-panel mt-4">
+                <div class="matrix26-panel-header">
+                    <div><span>Diagnostics</span><h2>Latest log lines</h2></div>
+                    <a th:href="@{/control-center/operations/logs}" class="small text-decoration-none">Log inventory</a>
+                </div>
+                <div th:if="${!logTail.available()}" class="text-muted py-4 text-center" th:text="${logTail.message()}">No log</div>
+                <div th:if="${logTail.available()}" class="matrix26-log-viewer">
+                    <div class="matrix26-log-toolbar"><code th:text="${logTail.log().relativePath()}">log</code><span th:text="${logTail.log().sizeLabel()}">0 B</span></div>
+                    <pre><code th:each="line : ${logTail.lines()}" th:text="${line + '\n'}">line</code></pre>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

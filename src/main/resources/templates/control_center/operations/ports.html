@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Ports')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Ports', 'Live association between expected ports, PIDs, and detected processes.')}" ></header>
+        <main class="matrix26-main">
+            <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
+                <div class="matrix26-inline-summary"><span><strong th:text="${summary.listeningPorts()}">0</strong> Matrix26 ports listening</span><span>Read-only capture</span></div>
+                <div class="d-flex gap-2"><a class="btn btn-outline-secondary" th:href="@{/control-center/operations}"><i class="bi bi-arrow-left me-1"></i>Overview</a><a class="btn btn-primary" th:href="@{/control-center/operations/ports(refresh=true)}"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a></div>
+            </div>
+
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header"><div><span>Ports esperados</span><h2>Status por runtime</h2></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Port</th><th>Instance</th><th>Listening</th><th>PID</th><th>Process</th><th>HTTP</th><th class="text-end">Details</th></tr></thead>
+                        <tbody>
+                        <tr th:each="runtime : ${runtimes}">
+                            <td><strong th:text="${runtime.target().expectedPort()}">8091</strong></td>
+                            <td><strong th:text="${runtime.target().businessName()}">Instance</strong><small><code th:text="${runtime.target().runtimeProfile()}">profile</code></small></td>
+                            <td><span class="badge" th:classappend="${runtime.portListening() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.portListening() ? 'Listening' : 'Sin escucha'}">Status</span></td>
+                            <td th:text="${runtime.portOwnerPid() != null ? runtime.portOwnerPid() : '—'}">—</td>
+                            <td><span th:text="${runtime.portOwnerProcess() != '' ? runtime.portOwnerProcess() : '—'}">—</span><small th:if="${runtime.portListening() && !runtime.expectedProcess()}" class="text-danger">Does not match the expected runtime</small></td>
+                            <td><span class="badge" th:classappend="${runtime.http().online() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.http().statusCode() != null ? 'HTTP ' + runtime.http().statusCode() : 'No response'}">HTTP</span></td>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/operations/runtimes/{key}(key=${runtime.target().key()})}"><i class="bi bi-eye"></i></a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><span>System detection</span><h2>Detected bindings</h2></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Port</th><th>Local address</th><th>PID</th><th>Process</th><th>Sanitized command line</th></tr></thead>
+                        <tbody>
+                        <tr th:each="port : ${ports}"><td><strong th:text="${port.port()}">8091</strong></td><td th:text="${port.localAddress()}">localhost</td><td th:text="${port.pid() != null ? port.pid() : '—'}">—</td><td th:text="${port.processName()}">java.exe</td><td><code class="matrix26-code-wrap" th:text="${port.commandLine() != '' ? port.commandLine() : 'Unavailable'}">Command</code></td></tr>
+                        <tr th:if="${#lists.isEmpty(ports)}"><td colspan="5" class="text-center text-muted py-5">No expected listening ports were detected during this capture.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

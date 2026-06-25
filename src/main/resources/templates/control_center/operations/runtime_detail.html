@@ -5,7 +5,7 @@
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('Runtime details', 'Controlled process operations, live diagnostics, and audit history.')}" ></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Runtime details', 'Controlled process operations, PID recovery, log rotation, and audit history.')}" ></header>
         <main class="matrix26-main">
             <div th:if="${runtimeOperationSuccess}" class="alert alert-success d-flex align-items-start gap-2">
                 <i class="bi bi-check-circle-fill mt-1"></i>
@@ -42,7 +42,7 @@
                     <div>
                         <span class="matrix26-eyebrow">Runtime control</span>
                         <h2 th:text="${runtimeControl.manageable() ? 'Controlled operations enabled' : 'Operations locked'}">Runtime control</h2>
-                        <p th:if="${runtimeControl.manageable()}">Matrix26 can start, stop, and restart this allowlisted laboratory runtime. Graceful stop is always attempted first; force stop is not available in Phase 3D.2.</p>
+                        <p th:if="${runtimeControl.manageable()}">Matrix26 can start, stop, restart, reconcile, and maintain this allowlisted laboratory runtime. Graceful stop is always attempted first; force stop is available only after a verified timeout.</p>
                         <p th:unless="${runtimeControl.manageable()}" th:text="${runtimeControl.reason()}">Locked.</p>
                     </div>
                 </div>
@@ -59,10 +59,64 @@
                     <button th:if="${runtimeControl.canStop()}" class="btn btn-danger" type="button" data-bs-toggle="modal" data-bs-target="#stopRuntimeModal">
                         <i class="bi bi-stop-fill me-1"></i>Stop
                     </button>
+                    <button th:if="${runtimeStability.canForceStop()}" class="btn btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#forceStopRuntimeModal">
+                        <i class="bi bi-exclamation-octagon-fill me-1"></i>Force stop
+                    </button>
+                    <button th:if="${runtimeStability.canAdoptProcess()}" class="btn btn-outline-warning" type="button" data-bs-toggle="modal" data-bs-target="#adoptRuntimeModal">
+                        <i class="bi bi-link-45deg me-1"></i>Adopt process
+                    </button>
+                    <button th:if="${runtimeStability.canCleanStalePid()}" class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#cleanPidModal">
+                        <i class="bi bi-eraser-fill me-1"></i>Clean stale PID
+                    </button>
+                    <button th:if="${runtimeStability.canRotateLogs()}" class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#rotateLogsModal">
+                        <i class="bi bi-file-earmark-zip-fill me-1"></i>Rotate logs
+                    </button>
                     <span th:if="${runtimeControl.operationInProgress()}" class="badge text-bg-info p-2">
                         <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Operation in progress
                     </span>
                     <span th:if="${!runtimeControl.canStart() && !runtimeControl.canStop() && !runtimeControl.operationInProgress()}" class="text-muted small">Refresh the inventory to update available actions.</span>
+                </div>
+            </section>
+
+            <section class="matrix26-panel matrix26-runtime-stability-panel mb-4">
+                <div class="matrix26-panel-header">
+                    <div><span>Stability diagnostics</span><h2>PID, ownership, and log retention</h2></div>
+                    <span class="badge text-bg-success"
+                          th:if="${!runtimeStability.stalePid() && !runtimeStability.orphanProcess() && !runtimeStability.portConflict() && !runtimeStability.interruptedOperation()}">Stable</span>
+                </div>
+                <div class="matrix26-runtime-stability-grid">
+                    <article th:classappend="${runtimeStability.stalePid() ? ' is-warning' : ''}">
+                        <span class="matrix26-operation-icon is-secondary"><i class="bi bi-file-earmark-lock2"></i></span>
+                        <div>
+                            <strong>PID file</strong>
+                            <span th:text="${runtimeStability.pidFile().present() ? (runtimeStability.pidFile().pid() != null ? 'PID ' + runtimeStability.pidFile().pid() : 'Invalid') : 'Not present'}">PID</span>
+                            <small th:text="${runtimeStability.pidFile().message()}">PID status</small>
+                        </div>
+                    </article>
+                    <article th:classappend="${runtimeStability.orphanProcess() ? ' is-warning' : ''}">
+                        <span class="matrix26-operation-icon is-info"><i class="bi bi-diagram-3-fill"></i></span>
+                        <div>
+                            <strong>Process ownership</strong>
+                            <span th:text="${runtimeStability.orphanProcess() ? 'Adoption required' : (runtime.expectedProcess() ? 'Verified' : 'No managed process')}">Ownership</span>
+                            <small>Adoption never targets an unrelated Java process.</small>
+                        </div>
+                    </article>
+                    <article th:classappend="${runtimeStability.portConflict() ? ' is-danger' : ''}">
+                        <span class="matrix26-operation-icon is-warning"><i class="bi bi-ethernet"></i></span>
+                        <div>
+                            <strong>Port integrity</strong>
+                            <span th:text="${runtimeStability.portConflict() ? 'Conflict detected' : (runtime.portListening() ? 'Expected owner' : 'Port free')}">Port</span>
+                            <small th:text="${runtimeStability.diagnosticMessage()}">Diagnostics</small>
+                        </div>
+                    </article>
+                    <article>
+                        <span class="matrix26-operation-icon is-primary"><i class="bi bi-file-earmark-zip-fill"></i></span>
+                        <div>
+                            <strong>Runtime logs</strong>
+                            <span th:text="${runtimeStability.currentLogSizeLabel()}">0 B</span>
+                            <small th:text="|${runtimeStability.rotatedLogCount()} compressed archive(s) retained|">Archives</small>
+                        </div>
+                    </article>
                 </div>
             </section>
 
@@ -161,7 +215,7 @@
             <section class="matrix26-panel mt-4">
                 <div class="matrix26-panel-header">
                     <div><span>Runtime audit</span><h2>Recent operations</h2></div>
-                    <span class="small text-muted">Start, stop, and restart history</span>
+                    <span class="small text-muted">Runtime operations, recovery, PID maintenance, and log rotation</span>
                 </div>
                 <div th:if="${#lists.isEmpty(runtimeOperations)}" class="text-muted py-4 text-center">No controlled runtime operations have been recorded.</div>
                 <div th:unless="${#lists.isEmpty(runtimeOperations)}" class="table-responsive">
@@ -207,7 +261,7 @@
                 </div>
                 <div class="modal-body">
                     <p>Matrix26 will request a graceful shutdown and wait for port <strong th:text="${runtime.target().expectedPort()}">8094</strong> to become free.</p>
-                    <div class="alert alert-warning small">Force stop is not available in this phase. If graceful shutdown times out, the process will remain active for manual review.</div>
+                    <div class="alert alert-warning small">If graceful shutdown times out, Matrix26 records the failure first. A separate force-stop action becomes available only after ownership is verified.</div>
                     <label class="form-label" for="stopConfirmation">Type the exact confirmation</label>
                     <code class="d-block mb-2" th:text="${runtimeControl.stopConfirmation()}">STOP code</code>
                     <input class="form-control" id="stopConfirmation" name="confirmation" type="text" required autocomplete="off" th:placeholder="${runtimeControl.stopConfirmation()}">
@@ -238,6 +292,98 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-warning"><i class="bi bi-arrow-repeat me-1"></i>Restart runtime</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="forceStopRuntimeModal" tabindex="-1" aria-labelledby="forceStopRuntimeModalLabel" aria-hidden="true" th:if="${runtimeStability.canForceStop()}">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form th:action="@{/control-center/operations/runtimes/{key}/force-stop(key=${runtime.target().key()})}" method="post">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="forceStopRuntimeModalLabel">Force stop verified runtime</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger small">Use this only after graceful shutdown timed out. Matrix26 will verify the Java process, runtime profile, configuration path, and port before requesting a forced termination.</div>
+                    <label class="form-label" for="forceStopConfirmation">Type the exact confirmation</label>
+                    <code class="d-block mb-2" th:text="${runtimeStability.forceStopConfirmation()}">FORCE STOP code</code>
+                    <input class="form-control" id="forceStopConfirmation" name="confirmation" type="text" required autocomplete="off" th:placeholder="${runtimeStability.forceStopConfirmation()}">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-exclamation-octagon-fill me-1"></i>Force stop</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="adoptRuntimeModal" tabindex="-1" aria-labelledby="adoptRuntimeModalLabel" aria-hidden="true" th:if="${runtimeStability.canAdoptProcess()}">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form th:action="@{/control-center/operations/runtimes/{key}/adopt(key=${runtime.target().key()})}" method="post">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="adoptRuntimeModalLabel">Adopt verified process</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>The process is already running and matches the registered profile, configuration, and port. Adoption records its PID without restarting or terminating it.</p>
+                    <label class="form-label" for="adoptConfirmation">Type the exact confirmation</label>
+                    <code class="d-block mb-2" th:text="${runtimeStability.adoptConfirmation()}">ADOPT code</code>
+                    <input class="form-control" id="adoptConfirmation" name="confirmation" type="text" required autocomplete="off" th:placeholder="${runtimeStability.adoptConfirmation()}">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-link-45deg me-1"></i>Adopt process</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cleanPidModal" tabindex="-1" aria-labelledby="cleanPidModalLabel" aria-hidden="true" th:if="${runtimeStability.canCleanStalePid()}">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form th:action="@{/control-center/operations/runtimes/{key}/clean-stale-pid(key=${runtime.target().key()})}" method="post">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="cleanPidModalLabel">Clean stale PID metadata</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Only the stale <code>runtime.pid</code> file will be removed. No process, database, configuration, asset, or log will be deleted.</p>
+                    <label class="form-label" for="cleanPidConfirmation">Type the exact confirmation</label>
+                    <code class="d-block mb-2" th:text="${runtimeStability.cleanPidConfirmation()}">CLEAN PID code</code>
+                    <input class="form-control" id="cleanPidConfirmation" name="confirmation" type="text" required autocomplete="off" th:placeholder="${runtimeStability.cleanPidConfirmation()}">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-secondary"><i class="bi bi-eraser-fill me-1"></i>Clean PID</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="rotateLogsModal" tabindex="-1" aria-labelledby="rotateLogsModalLabel" aria-hidden="true" th:if="${runtimeStability.canRotateLogs()}">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form th:action="@{/control-center/operations/runtimes/{key}/rotate-logs(key=${runtime.target().key()})}" method="post">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="rotateLogsModalLabel">Rotate runtime logs</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Current runtime logs will be compressed as numbered GZIP archives. The runtime must remain stopped while the files are rotated.</p>
+                    <label class="form-label" for="rotateLogsConfirmation">Type the exact confirmation</label>
+                    <code class="d-block mb-2" th:text="${runtimeStability.rotateLogsConfirmation()}">ROTATE LOGS code</code>
+                    <input class="form-control" id="rotateLogsConfirmation" name="confirmation" type="text" required autocomplete="off" th:placeholder="${runtimeStability.rotateLogsConfirmation()}">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-file-earmark-zip-fill me-1"></i>Rotate logs</button>
                 </div>
             </form>
         </div>

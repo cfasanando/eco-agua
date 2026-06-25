@@ -59,6 +59,7 @@ public class Matrix26OperationsController {
         model.addAttribute("activePage", "matrix26_operations_runtimes");
         model.addAttribute("runtime", runtime);
         model.addAttribute("runtimeControl", runtimeControlService.view(runtime));
+        model.addAttribute("runtimeStability", runtimeControlService.stability(runtime));
         model.addAttribute("runtimeOperations", runtimeControlService.operationsForInstance(runtime.target().instanceId()));
         model.addAttribute("logTail", inventoryService.logTail(runtimeKey, false));
         model.addAttribute("readOnlyOperations", false);
@@ -106,6 +107,63 @@ public class Matrix26OperationsController {
         );
     }
 
+
+    @PostMapping("/runtimes/{runtimeKey}/force-stop")
+    public String forceStopRuntime(
+            @PathVariable String runtimeKey,
+            @RequestParam("confirmation") String confirmation,
+            Principal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        return executeRuntimeAction(
+                runtimeKey,
+                redirectAttributes,
+                () -> runtimeControlService.forceStop(runtimeKey, actor(principal), confirmation)
+        );
+    }
+
+    @PostMapping("/runtimes/{runtimeKey}/adopt")
+    public String adoptRuntime(
+            @PathVariable String runtimeKey,
+            @RequestParam("confirmation") String confirmation,
+            Principal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        return executeRuntimeAction(
+                runtimeKey,
+                redirectAttributes,
+                () -> runtimeControlService.adopt(runtimeKey, actor(principal), confirmation)
+        );
+    }
+
+    @PostMapping("/runtimes/{runtimeKey}/clean-stale-pid")
+    public String cleanStalePid(
+            @PathVariable String runtimeKey,
+            @RequestParam("confirmation") String confirmation,
+            Principal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        return executeRuntimeAction(
+                runtimeKey,
+                redirectAttributes,
+                () -> runtimeControlService.cleanStalePid(runtimeKey, actor(principal), confirmation)
+        );
+    }
+
+    @PostMapping("/runtimes/{runtimeKey}/rotate-logs")
+    public String rotateLogs(
+            @PathVariable String runtimeKey,
+            @RequestParam("confirmation") String confirmation,
+            Principal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        return executeRuntimeAction(
+                runtimeKey,
+                redirectAttributes,
+                () -> runtimeControlService.rotateLogs(runtimeKey, actor(principal), confirmation)
+        );
+    }
+
     @GetMapping("/ports")
     public String ports(
             @RequestParam(value = "refresh", defaultValue = "false") boolean refresh,
@@ -135,6 +193,7 @@ public class Matrix26OperationsController {
         model.addAttribute("operations", snapshot);
         model.addAttribute("runtimes", snapshot.runtimes());
         model.addAttribute("runtimeControls", runtimeControlService.views(snapshot.runtimes()));
+        model.addAttribute("runtimeStabilities", runtimeControlService.stabilities(snapshot.runtimes()));
         model.addAttribute("ports", snapshot.ports());
         model.addAttribute("logs", snapshot.logs());
         model.addAttribute("summary", snapshot.summary());

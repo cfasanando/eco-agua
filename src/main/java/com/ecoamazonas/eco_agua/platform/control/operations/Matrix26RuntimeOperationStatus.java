@@ -4,6 +4,8 @@ public enum Matrix26RuntimeOperationStatus {
     REQUESTED("Requested", "text-bg-secondary"),
     RUNNING("Running", "text-bg-info"),
     COMPLETED("Completed", "text-bg-success"),
+    RECOVERED("Recovered", "text-bg-success"),
+    INTERRUPTED("Interrupted", "text-bg-warning"),
     BLOCKED("Blocked", "text-bg-warning"),
     STOP_TIMEOUT("Stop timeout", "text-bg-danger"),
     FAILED("Failed", "text-bg-danger");

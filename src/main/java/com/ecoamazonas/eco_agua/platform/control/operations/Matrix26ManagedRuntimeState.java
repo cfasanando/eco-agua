@@ -6,6 +6,9 @@ public enum Matrix26ManagedRuntimeState {
     ONLINE("Online", "text-bg-success"),
     STOPPING("Stopping", "text-bg-warning"),
     RESTARTING("Restarting", "text-bg-info"),
+    ORPHAN_PROCESS("Orphan process", "text-bg-warning"),
+    PID_STALE("Stale PID", "text-bg-warning"),
+    PORT_CONFLICT("Port conflict", "text-bg-danger"),
     DEGRADED("Degraded", "text-bg-warning"),
     FAILED("Failed", "text-bg-danger"),
     UNKNOWN("Unknown", "text-bg-dark");

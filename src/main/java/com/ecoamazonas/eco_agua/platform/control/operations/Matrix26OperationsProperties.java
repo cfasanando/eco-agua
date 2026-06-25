@@ -26,6 +26,9 @@ public class Matrix26OperationsProperties {
     private int stopTimeoutSeconds = 25;
     private int pollIntervalMs = 1000;
     private String operationDirectory = "operations";
+    private long logRotationMaxBytes = 10L * 1024L * 1024L;
+    private int logRotationCopies = 5;
+    private int forceStopTimeoutSeconds = 10;
 
     public String getRuntimeDirectory() {
         return runtimeDirectory;
@@ -132,4 +135,29 @@ public class Matrix26OperationsProperties {
     public void setOperationDirectory(String operationDirectory) {
         this.operationDirectory = operationDirectory;
     }
+
+    public long getLogRotationMaxBytes() {
+        return logRotationMaxBytes;
+    }
+
+    public void setLogRotationMaxBytes(long logRotationMaxBytes) {
+        this.logRotationMaxBytes = logRotationMaxBytes;
+    }
+
+    public int getLogRotationCopies() {
+        return logRotationCopies;
+    }
+
+    public void setLogRotationCopies(int logRotationCopies) {
+        this.logRotationCopies = logRotationCopies;
+    }
+
+    public int getForceStopTimeoutSeconds() {
+        return forceStopTimeoutSeconds;
+    }
+
+    public void setForceStopTimeoutSeconds(int forceStopTimeoutSeconds) {
+        this.forceStopTimeoutSeconds = forceStopTimeoutSeconds;
+    }
+
 }

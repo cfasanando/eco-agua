@@ -5,7 +5,7 @@
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('Runtimes', 'Live process inventory and controlled operations for allowlisted laboratories.')}" ></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Runtimes', 'Live process inventory, PID reconciliation, and controlled operations for allowlisted laboratories.')}" ></header>
         <main class="matrix26-main">
             <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
                 <div class="matrix26-inline-summary">
@@ -21,17 +21,17 @@
 
             <div class="matrix26-alert-safe mb-4">
                 <i class="bi bi-shield-check"></i>
-                <div><strong>Controlled runtime operations</strong><p>Start, stop, and restart are available only for explicitly allowlisted laboratory instances. Protected production instances and Matrix26 itself remain read only.</p></div>
+                <div><strong>Controlled runtime operations</strong><p>Runtime recovery, PID cleanup, process adoption, log rotation, start, stop, and restart remain limited to explicitly allowlisted laboratories. Protected production instances and Matrix26 itself remain read only.</p></div>
             </div>
 
             <section class="matrix26-panel">
                 <div class="table-responsive">
                     <table class="table align-middle mb-0 matrix26-table matrix26-runtime-table">
                         <thead>
-                        <tr><th>Instance</th><th>Configuration</th><th>Process</th><th>Port</th><th>HTTP</th><th>Control</th><th>Protection</th><th class="text-end">Actions</th></tr>
+                        <tr><th>Instance</th><th>Configuration</th><th>Process</th><th>Port</th><th>HTTP</th><th>Control</th><th>Stability</th><th>Protection</th><th class="text-end">Actions</th></tr>
                         </thead>
                         <tbody>
-                        <tr th:each="runtime : ${runtimes}" th:with="control=${runtimeControls[runtime.target().key()]}">
+                        <tr th:each="runtime : ${runtimes}" th:with="control=${runtimeControls[runtime.target().key()]}, stability=${runtimeStabilities[runtime.target().key()]}">
                             <td>
                                 <strong th:text="${runtime.target().businessName()}">Instance</strong>
                                 <small><code th:text="${runtime.target().code()}">code</code></small>
@@ -59,6 +59,14 @@
                                 <span th:unless="${control.manageable()}" class="badge text-bg-light border text-dark"><i class="bi bi-lock me-1"></i>Read only</span>
                                 <small th:if="${!control.manageable()}" th:text="${control.reason()}">Reason</small>
                                 <small th:if="${control.lastOperation() != null}" th:text="|Last: ${control.lastOperation().action.label} · ${control.lastOperation().status.label}|">Last operation</small>
+                            </td>
+                            <td>
+                                <span th:if="${stability.portConflict()}" class="badge text-bg-danger">Port conflict</span>
+                                <span th:if="${stability.orphanProcess()}" class="badge text-bg-warning">Orphan process</span>
+                                <span th:if="${stability.stalePid()}" class="badge text-bg-warning">Stale PID</span>
+                                <span th:if="${stability.interruptedOperation()}" class="badge text-bg-info">Interrupted operation</span>
+                                <span th:if="${!stability.portConflict() && !stability.orphanProcess() && !stability.stalePid() && !stability.interruptedOperation()}" class="badge text-bg-success">Stable</span>
+                                <small th:text="${stability.diagnosticMessage()}">Diagnostics</small>
                             </td>
                             <td>
                                 <span th:if="${runtime.target().protectedInstance()}" class="badge text-bg-primary"><i class="bi bi-shield-lock me-1"></i>Protected data</span>

@@ -1,0 +1,2417 @@
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26ManagedRuntimeState.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26ManagedRuntimeState.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26ManagedRuntimeState.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26ManagedRuntimeState.java	2026-06-25 02:14:49.111064522 +0000
+@@ -0,0 +1,28 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++public enum Matrix26ManagedRuntimeState {
++    STOPPED("Stopped", "text-bg-secondary"),
++    STARTING("Starting", "text-bg-info"),
++    ONLINE("Online", "text-bg-success"),
++    STOPPING("Stopping", "text-bg-warning"),
++    RESTARTING("Restarting", "text-bg-info"),
++    DEGRADED("Degraded", "text-bg-warning"),
++    FAILED("Failed", "text-bg-danger"),
++    UNKNOWN("Unknown", "text-bg-dark");
++
++    private final String label;
++    private final String badgeClass;
++
++    Matrix26ManagedRuntimeState(String label, String badgeClass) {
++        this.label = label;
++        this.badgeClass = badgeClass;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++
++    public String getBadgeClass() {
++        return badgeClass;
++    }
++}
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsController.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsController.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsController.java	2026-06-25 02:12:37.602555553 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsController.java	2026-06-25 02:16:47.283083225 +0000
+@@ -5,8 +5,12 @@
+ import org.springframework.ui.Model;
+ import org.springframework.web.bind.annotation.GetMapping;
+ import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
+ import org.springframework.web.bind.annotation.RequestMapping;
+ import org.springframework.web.bind.annotation.RequestParam;
++import org.springframework.web.servlet.mvc.support.RedirectAttributes;
++
++import java.security.Principal;
+ 
+ @Controller
+ @RequestMapping("/control-center/operations")
+@@ -14,9 +18,14 @@
+ public class Matrix26OperationsController {
+ 
+     private final Matrix26OperationsInventoryService inventoryService;
++    private final Matrix26RuntimeControlService runtimeControlService;
+ 
+-    public Matrix26OperationsController(Matrix26OperationsInventoryService inventoryService) {
++    public Matrix26OperationsController(
++            Matrix26OperationsInventoryService inventoryService,
++            Matrix26RuntimeControlService runtimeControlService
++    ) {
+         this.inventoryService = inventoryService;
++        this.runtimeControlService = runtimeControlService;
+     }
+ 
+     @GetMapping
+@@ -26,6 +35,7 @@
+     ) {
+         Matrix26OperationsSnapshot snapshot = inventoryService.snapshot(refresh);
+         addSnapshotModel(model, snapshot, "matrix26_operations");
++        model.addAttribute("recentRuntimeOperations", runtimeControlService.recentOperations());
+         return "control_center/operations/dashboard";
+     }
+ 
+@@ -48,11 +58,54 @@
+         Matrix26RuntimeInventoryItem runtime = inventoryService.runtime(runtimeKey, refresh);
+         model.addAttribute("activePage", "matrix26_operations_runtimes");
+         model.addAttribute("runtime", runtime);
++        model.addAttribute("runtimeControl", runtimeControlService.view(runtime));
++        model.addAttribute("runtimeOperations", runtimeControlService.operationsForInstance(runtime.target().instanceId()));
+         model.addAttribute("logTail", inventoryService.logTail(runtimeKey, false));
+-        model.addAttribute("readOnlyOperations", true);
++        model.addAttribute("readOnlyOperations", false);
+         return "control_center/operations/runtime_detail";
+     }
+ 
++    @PostMapping("/runtimes/{runtimeKey}/start")
++    public String startRuntime(
++            @PathVariable String runtimeKey,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        return executeRuntimeAction(
++                runtimeKey,
++                redirectAttributes,
++                () -> runtimeControlService.start(runtimeKey, actor(principal))
++        );
++    }
++
++    @PostMapping("/runtimes/{runtimeKey}/stop")
++    public String stopRuntime(
++            @PathVariable String runtimeKey,
++            @RequestParam("confirmation") String confirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        return executeRuntimeAction(
++                runtimeKey,
++                redirectAttributes,
++                () -> runtimeControlService.stop(runtimeKey, actor(principal), confirmation)
++        );
++    }
++
++    @PostMapping("/runtimes/{runtimeKey}/restart")
++    public String restartRuntime(
++            @PathVariable String runtimeKey,
++            @RequestParam("confirmation") String confirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        return executeRuntimeAction(
++                runtimeKey,
++                redirectAttributes,
++                () -> runtimeControlService.restart(runtimeKey, actor(principal), confirmation)
++        );
++    }
++
+     @GetMapping("/ports")
+     public String ports(
+             @RequestParam(value = "refresh", defaultValue = "false") boolean refresh,
+@@ -81,10 +134,36 @@
+         model.addAttribute("activePage", activePage);
+         model.addAttribute("operations", snapshot);
+         model.addAttribute("runtimes", snapshot.runtimes());
++        model.addAttribute("runtimeControls", runtimeControlService.views(snapshot.runtimes()));
+         model.addAttribute("ports", snapshot.ports());
+         model.addAttribute("logs", snapshot.logs());
+         model.addAttribute("summary", snapshot.summary());
+         model.addAttribute("probeWarnings", snapshot.probeWarnings());
+-        model.addAttribute("readOnlyOperations", true);
++        model.addAttribute("readOnlyOperations", false);
++    }
++
++    private String executeRuntimeAction(
++            String runtimeKey,
++            RedirectAttributes redirectAttributes,
++            RuntimeAction action
++    ) {
++        try {
++            Matrix26RuntimeControlResult result = action.execute();
++            redirectAttributes.addFlashAttribute("runtimeOperationSuccess", result.message());
++        } catch (Matrix26RuntimeControlException ex) {
++            redirectAttributes.addFlashAttribute("runtimeOperationError", ex.getMessage());
++        }
++        return "redirect:/control-center/operations/runtimes/" + runtimeKey + "?refresh=true";
++    }
++
++    private String actor(Principal principal) {
++        return principal == null || principal.getName() == null || principal.getName().isBlank()
++                ? "matrix26-system"
++                : principal.getName();
++    }
++
++    @FunctionalInterface
++    private interface RuntimeAction {
++        Matrix26RuntimeControlResult execute();
+     }
+ }
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsInventoryService.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsInventoryService.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsInventoryService.java	2026-06-25 02:12:37.602813487 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsInventoryService.java	2026-06-25 02:16:33.954049183 +0000
+@@ -61,6 +61,10 @@
+         this.systemProbe = systemProbe;
+     }
+ 
++    public void invalidateCache() {
++        cache.set(null);
++    }
++
+     public Matrix26OperationsSnapshot snapshot(boolean forceRefresh) {
+         CachedSnapshot cached = cache.get();
+         long cacheSeconds = Math.max(2L, operationsProperties.getCacheSeconds());
+@@ -122,7 +126,7 @@
+                 .toList();
+         Matrix26SystemSnapshot system = systemProbe.capture(expectedPorts);
+ 
+-        Map<String, List<Path>> logsByRuntime = discoverLogs(projectRoot, logRoot, runtimeRoot, targets);
++        Map<String, List<Path>> logsByRuntime = discoverLogs(projectRoot, logRoot, runtimeRoot, dataRoot, targets);
+         List<Matrix26RuntimeInventoryItem> runtimes = targets.stream()
+                 .map(target -> inspectRuntime(
+                         target,
+@@ -492,11 +496,13 @@
+             Path projectRoot,
+             Path logRoot,
+             Path runtimeRoot,
++            Path dataRoot,
+             List<Matrix26RuntimeTarget> targets
+     ) {
+         Set<Path> files = new LinkedHashSet<>();
+         collectLogFiles(logRoot, 3, files);
+         collectLogFiles(runtimeRoot, 4, files);
++        collectLogFiles(dataRoot, 5, files);
+ 
+         Map<String, List<Path>> result = new LinkedHashMap<>();
+         for (Matrix26RuntimeTarget target : targets) {
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsProperties.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsProperties.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsProperties.java	2026-06-25 02:12:37.603007335 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsProperties.java	2026-06-25 02:14:59.859682680 +0000
+@@ -3,6 +3,9 @@
+ import org.springframework.boot.context.properties.ConfigurationProperties;
+ import org.springframework.stereotype.Component;
+ 
++import java.util.LinkedHashSet;
++import java.util.Set;
++
+ @Component
+ @ConfigurationProperties(prefix = "matrix26.control-center.operations")
+ public class Matrix26OperationsProperties {
+@@ -14,6 +17,15 @@
+     private int connectTimeoutMs = 700;
+     private int readTimeoutMs = 700;
+     private int logTailLines = 120;
++    private boolean runtimeControlEnabled = true;
++    private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of(
++            "matrix26-restaurant-lab",
++            "matrix26-appearance-lab"
++    ));
++    private int startTimeoutSeconds = 45;
++    private int stopTimeoutSeconds = 25;
++    private int pollIntervalMs = 1000;
++    private String operationDirectory = "operations";
+ 
+     public String getRuntimeDirectory() {
+         return runtimeDirectory;
+@@ -70,4 +82,54 @@
+     public void setLogTailLines(int logTailLines) {
+         this.logTailLines = logTailLines;
+     }
++
++    public boolean isRuntimeControlEnabled() {
++        return runtimeControlEnabled;
++    }
++
++    public void setRuntimeControlEnabled(boolean runtimeControlEnabled) {
++        this.runtimeControlEnabled = runtimeControlEnabled;
++    }
++
++    public Set<String> getAllowedInstanceCodes() {
++        return allowedInstanceCodes;
++    }
++
++    public void setAllowedInstanceCodes(Set<String> allowedInstanceCodes) {
++        this.allowedInstanceCodes = allowedInstanceCodes == null
++                ? new LinkedHashSet<>()
++                : new LinkedHashSet<>(allowedInstanceCodes);
++    }
++
++    public int getStartTimeoutSeconds() {
++        return startTimeoutSeconds;
++    }
++
++    public void setStartTimeoutSeconds(int startTimeoutSeconds) {
++        this.startTimeoutSeconds = startTimeoutSeconds;
++    }
++
++    public int getStopTimeoutSeconds() {
++        return stopTimeoutSeconds;
++    }
++
++    public void setStopTimeoutSeconds(int stopTimeoutSeconds) {
++        this.stopTimeoutSeconds = stopTimeoutSeconds;
++    }
++
++    public int getPollIntervalMs() {
++        return pollIntervalMs;
++    }
++
++    public void setPollIntervalMs(int pollIntervalMs) {
++        this.pollIntervalMs = pollIntervalMs;
++    }
++
++    public String getOperationDirectory() {
++        return operationDirectory;
++    }
++
++    public void setOperationDirectory(String operationDirectory) {
++        this.operationDirectory = operationDirectory;
++    }
+ }
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlException.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlException.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlException.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlException.java	2026-06-25 02:14:49.111701896 +0000
+@@ -0,0 +1,12 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++public class Matrix26RuntimeControlException extends RuntimeException {
++
++    public Matrix26RuntimeControlException(String message) {
++        super(message);
++    }
++
++    public Matrix26RuntimeControlException(String message, Throwable cause) {
++        super(message, cause);
++    }
++}
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlInitializer.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlInitializer.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlInitializer.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlInitializer.java	2026-06-25 02:14:49.112366505 +0000
+@@ -0,0 +1,81 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import org.springframework.boot.ApplicationArguments;
++import org.springframework.boot.ApplicationRunner;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.core.Ordered;
++import org.springframework.core.annotation.Order;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.stereotype.Component;
++
++@Component
++@Order(Ordered.HIGHEST_PRECEDENCE + 20)
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26RuntimeControlInitializer implements ApplicationRunner {
++
++    private final JdbcTemplate jdbcTemplate;
++
++    public Matrix26RuntimeControlInitializer(JdbcTemplate jdbcTemplate) {
++        this.jdbcTemplate = jdbcTemplate;
++    }
++
++    @Override
++    public void run(ApplicationArguments args) {
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_runtime_state (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    instance_id BIGINT NOT NULL,
++                    runtime_key VARCHAR(80) NOT NULL,
++                    instance_code VARCHAR(80) NOT NULL,
++                    current_state VARCHAR(30) NOT NULL,
++                    last_known_pid BIGINT NULL,
++                    process_started_at DATETIME(6) NULL,
++                    last_online_at DATETIME(6) NULL,
++                    last_stopped_at DATETIME(6) NULL,
++                    last_operation_id BIGINT NULL,
++                    standard_log_path VARCHAR(500) NULL,
++                    error_log_path VARCHAR(500) NULL,
++                    pid_file_path VARCHAR(500) NULL,
++                    message VARCHAR(500) NULL,
++                    created_at DATETIME(6) NOT NULL,
++                    updated_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    UNIQUE KEY uk_matrix26_runtime_state_instance (instance_id),
++                    UNIQUE KEY idx_matrix26_runtime_state_code (instance_code),
++                    UNIQUE KEY idx_matrix26_runtime_state_runtime_key (runtime_key),
++                    CONSTRAINT fk_matrix26_runtime_state_instance
++                        FOREIGN KEY (instance_id) REFERENCES platform_business_client (id)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_runtime_operation (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    instance_id BIGINT NOT NULL,
++                    runtime_key VARCHAR(80) NOT NULL,
++                    instance_code VARCHAR(80) NOT NULL,
++                    action VARCHAR(30) NOT NULL,
++                    status VARCHAR(30) NOT NULL,
++                    requested_by VARCHAR(120) NOT NULL,
++                    requested_at DATETIME(6) NOT NULL,
++                    started_at DATETIME(6) NULL,
++                    completed_at DATETIME(6) NULL,
++                    previous_pid BIGINT NULL,
++                    resulting_pid BIGINT NULL,
++                    runtime_port INT NULL,
++                    initial_state VARCHAR(40) NULL,
++                    final_state VARCHAR(40) NULL,
++                    duration_ms BIGINT NULL,
++                    message VARCHAR(500) NULL,
++                    error_detail TEXT NULL,
++                    standard_log_path VARCHAR(500) NULL,
++                    error_log_path VARCHAR(500) NULL,
++                    PRIMARY KEY (id),
++                    KEY idx_matrix26_runtime_operation_instance (instance_id, requested_at),
++                    KEY idx_matrix26_runtime_operation_status (status, requested_at),
++                    CONSTRAINT fk_matrix26_runtime_operation_instance
++                        FOREIGN KEY (instance_id) REFERENCES platform_business_client (id)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++    }
++}
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlResult.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlResult.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlResult.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlResult.java	2026-06-25 02:14:49.112045748 +0000
+@@ -0,0 +1,7 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++public record Matrix26RuntimeControlResult(
++        Matrix26RuntimeOperation operation,
++        String message
++) {
++}
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlService.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlService.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlService.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlService.java	2026-06-25 02:16:33.953222538 +0000
+@@ -0,0 +1,902 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClient;
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClientRepository;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceAuditLog;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceAuditLogRepository;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Service;
++
++import java.io.IOException;
++import java.net.ServerSocket;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.StandardOpenOption;
++import java.time.Duration;
++import java.time.Instant;
++import java.time.LocalDateTime;
++import java.time.ZoneId;
++import java.util.ArrayList;
++import java.util.Comparator;
++import java.util.LinkedHashMap;
++import java.util.List;
++import java.util.Locale;
++import java.util.Map;
++import java.util.Optional;
++import java.util.Set;
++import java.util.concurrent.ConcurrentHashMap;
++import java.util.concurrent.TimeUnit;
++import java.util.concurrent.locks.ReentrantLock;
++import java.util.stream.Stream;
++
++@Service
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26RuntimeControlService {
++
++    private static final Logger LOGGER = LoggerFactory.getLogger(Matrix26RuntimeControlService.class);
++    private static final Set<String> JAVA_EXECUTABLE_NAMES = Set.of("java", "java.exe", "javaw", "javaw.exe");
++
++    private final Matrix26OperationsInventoryService inventoryService;
++    private final Matrix26OperationsProperties properties;
++    private final PlatformBusinessClientRepository clientRepository;
++    private final Matrix26RuntimeOperationRepository operationRepository;
++    private final Matrix26RuntimeManagedStateRepository stateRepository;
++    private final Matrix26InstanceAuditLogRepository auditRepository;
++    private final Map<String, ReentrantLock> locks = new ConcurrentHashMap<>();
++
++    public Matrix26RuntimeControlService(
++            Matrix26OperationsInventoryService inventoryService,
++            Matrix26OperationsProperties properties,
++            PlatformBusinessClientRepository clientRepository,
++            Matrix26RuntimeOperationRepository operationRepository,
++            Matrix26RuntimeManagedStateRepository stateRepository,
++            Matrix26InstanceAuditLogRepository auditRepository
++    ) {
++        this.inventoryService = inventoryService;
++        this.properties = properties;
++        this.clientRepository = clientRepository;
++        this.operationRepository = operationRepository;
++        this.stateRepository = stateRepository;
++        this.auditRepository = auditRepository;
++    }
++
++    public Matrix26RuntimeControlView view(Matrix26RuntimeInventoryItem runtime) {
++        Matrix26RuntimeTarget target = runtime.target();
++        Matrix26RuntimeManagedState managedState = target.instanceId() == null
++                ? null
++                : stateRepository.findByInstance_Id(target.instanceId()).orElse(null);
++        Matrix26RuntimeOperation lastOperation = target.instanceId() == null
++                ? null
++                : operationRepository.findTopByInstance_IdOrderByRequestedAtDesc(target.instanceId()).orElse(null);
++
++        boolean inProgress = lastOperation != null
++                && (lastOperation.getStatus() == Matrix26RuntimeOperationStatus.REQUESTED
++                || lastOperation.getStatus() == Matrix26RuntimeOperationStatus.RUNNING);
++        String reason = manageabilityReason(runtime);
++        boolean manageable = reason.isBlank();
++        boolean portOwnedByExpectedRuntime = runtime.portListening()
++                && runtime.expectedProcess()
++                && runtime.processId() != null;
++        boolean stopped = !runtime.portListening() && runtime.processId() == null;
++
++        return new Matrix26RuntimeControlView(
++                properties.isRuntimeControlEnabled(),
++                manageable,
++                inProgress,
++                manageable && !inProgress && stopped,
++                manageable && !inProgress && portOwnedByExpectedRuntime,
++                manageable && !inProgress && portOwnedByExpectedRuntime,
++                reason,
++                "STOP " + target.code(),
++                "RESTART " + target.code(),
++                managedState,
++                lastOperation
++        );
++    }
++
++    public Map<String, Matrix26RuntimeControlView> views(List<Matrix26RuntimeInventoryItem> runtimes) {
++        Map<String, Matrix26RuntimeControlView> result = new LinkedHashMap<>();
++        for (Matrix26RuntimeInventoryItem runtime : runtimes) {
++            result.put(runtime.target().key(), view(runtime));
++        }
++        return result;
++    }
++
++    public List<Matrix26RuntimeOperation> recentOperations() {
++        return operationRepository.findTop100ByOrderByRequestedAtDesc();
++    }
++
++    public List<Matrix26RuntimeOperation> operationsForInstance(Long instanceId) {
++        if (instanceId == null) {
++            return List.of();
++        }
++        return operationRepository.findTop20ByInstance_IdOrderByRequestedAtDesc(instanceId);
++    }
++
++    public Matrix26RuntimeControlResult start(String runtimeKey, String actor) {
++        return executeLocked(runtimeKey, Matrix26RuntimeOperationAction.START, actor, null);
++    }
++
++    public Matrix26RuntimeControlResult stop(String runtimeKey, String actor, String confirmation) {
++        return executeLocked(runtimeKey, Matrix26RuntimeOperationAction.STOP, actor, confirmation);
++    }
++
++    public Matrix26RuntimeControlResult restart(String runtimeKey, String actor, String confirmation) {
++        return executeLocked(runtimeKey, Matrix26RuntimeOperationAction.RESTART, actor, confirmation);
++    }
++
++    private Matrix26RuntimeControlResult executeLocked(
++            String runtimeKey,
++            Matrix26RuntimeOperationAction action,
++            String actor,
++            String confirmation
++    ) {
++        ReentrantLock lock = locks.computeIfAbsent(runtimeKey, ignored -> new ReentrantLock());
++        if (!lock.tryLock()) {
++            throw new Matrix26RuntimeControlException("Another runtime operation is already in progress.");
++        }
++
++        try {
++            inventoryService.invalidateCache();
++            Matrix26RuntimeInventoryItem runtime = inventoryService.runtime(runtimeKey, true);
++            validateManageable(runtime);
++            validateConfirmation(runtime, action, confirmation);
++
++            PlatformBusinessClient instance = clientRepository.findById(runtime.target().instanceId())
++                    .orElseThrow(() -> new Matrix26RuntimeControlException("The registered instance no longer exists."));
++            Matrix26RuntimeOperation operation = newOperation(instance, runtime, action, actor);
++            operationRepository.save(operation);
++
++            try {
++                operation.setStatus(Matrix26RuntimeOperationStatus.RUNNING);
++                operation.setStartedAt(LocalDateTime.now());
++                operationRepository.save(operation);
++
++                Matrix26RuntimeControlResult result = switch (action) {
++                    case START -> startInternal(instance, runtime, operation, false);
++                    case STOP -> stopInternal(instance, runtime, operation, false);
++                    case RESTART -> restartInternal(instance, runtime, operation);
++                };
++                recordAudit(instance, operation, actor, result.message());
++                return result;
++            } catch (Matrix26RuntimeControlException ex) {
++                failOperation(operation, ex.getMessage(), ex);
++                recordAudit(instance, operation, actor, "Runtime operation failed: " + safe(ex.getMessage()));
++                throw ex;
++            } catch (RuntimeException ex) {
++                String message = "The runtime operation failed unexpectedly.";
++                failOperation(operation, message, ex);
++                recordAudit(instance, operation, actor, message);
++                throw new Matrix26RuntimeControlException(message, ex);
++            }
++        } finally {
++            lock.unlock();
++        }
++    }
++
++    private Matrix26RuntimeControlResult startInternal(
++            PlatformBusinessClient instance,
++            Matrix26RuntimeInventoryItem runtime,
++            Matrix26RuntimeOperation operation,
++            boolean restarting
++    ) {
++        inventoryService.invalidateCache();
++        Matrix26RuntimeInventoryItem current = inventoryService.runtime(runtime.target().key(), true);
++        if (current.portListening() || current.processId() != null) {
++            throw new Matrix26RuntimeControlException("The runtime is already running or its port is occupied.");
++        }
++        if (!isPortAvailable(current.target().expectedPort())) {
++            throw new Matrix26RuntimeControlException("The expected port is not available.");
++        }
++
++        RuntimePaths paths = resolvePaths(current);
++        Path applicationJar = findApplicationJar(paths.projectRoot());
++        Path javaExecutable = resolveJavaExecutable();
++        ensureOperationFiles(paths);
++
++        Matrix26RuntimeManagedState managedState = state(instance, current);
++        updateManagedState(
++                managedState,
++                restarting ? Matrix26ManagedRuntimeState.RESTARTING : Matrix26ManagedRuntimeState.STARTING,
++                null,
++                "Starting runtime.",
++                operation,
++                paths
++        );
++        instance.setRuntimeStatus(restarting ? "RESTARTING" : "STARTING");
++        clientRepository.save(instance);
++
++        appendOperationMarker(paths.standardLog(), "Starting runtime through Matrix26.");
++        List<String> command = List.of(
++                javaExecutable.toString(),
++                "-jar",
++                applicationJar.toString(),
++                "--spring.config.additional-location=" + paths.configuration().toUri()
++        );
++
++        Process process;
++        try {
++            ProcessBuilder builder = new ProcessBuilder(command)
++                    .directory(paths.projectRoot().toFile())
++                    .redirectOutput(ProcessBuilder.Redirect.appendTo(paths.standardLog().toFile()))
++                    .redirectError(ProcessBuilder.Redirect.appendTo(paths.errorLog().toFile()));
++            process = builder.start();
++        } catch (IOException ex) {
++            throw new Matrix26RuntimeControlException("The Java process could not be started.", ex);
++        }
++
++        long pid = process.pid();
++        writePidFile(paths.pidFile(), pid, instance.getCode(), current.target().expectedPort());
++        operation.setResultingPid(pid);
++        operation.setStandardLogPath(relative(paths.projectRoot(), paths.standardLog()));
++        operation.setErrorLogPath(relative(paths.projectRoot(), paths.errorLog()));
++        operationRepository.save(operation);
++
++        managedState.setLastKnownPid(pid);
++        managedState.setProcessStartedAt(LocalDateTime.now());
++        managedState.setMessage("Process started. Waiting for the health check.");
++        stateRepository.save(managedState);
++
++        int timeoutSeconds = Math.max(10, properties.getStartTimeoutSeconds());
++        int pollMs = Math.max(250, Math.min(properties.getPollIntervalMs(), 3_000));
++        Instant deadline = Instant.now().plusSeconds(timeoutSeconds);
++        Matrix26RuntimeInventoryItem detected = current;
++
++        while (Instant.now().isBefore(deadline)) {
++            if (!process.isAlive()) {
++                int exitCode = process.exitValue();
++                throw new Matrix26RuntimeControlException(
++                        "The Java process exited before the portal became available. Exit code: " + exitCode + "."
++                );
++            }
++            sleep(pollMs);
++            inventoryService.invalidateCache();
++            detected = inventoryService.runtime(current.target().key(), true);
++            if (detected.http().online() && detected.expectedProcess()) {
++                return completeStart(instance, operation, managedState, paths, detected, pid);
++            }
++        }
++
++        managedState.setCurrentState(Matrix26ManagedRuntimeState.DEGRADED);
++        managedState.setLastKnownPid(pid);
++        managedState.setMessage("The process is running, but the HTTP health check did not become available in time.");
++        managedState.setLastOperationId(operation.getId());
++        stateRepository.save(managedState);
++        instance.setRuntimeStatus("DEGRADED");
++        clientRepository.save(instance);
++        operation.setStatus(Matrix26RuntimeOperationStatus.FAILED);
++        operation.setFinalState("DEGRADED");
++        operation.setCompletedAt(LocalDateTime.now());
++        operation.setDurationMs(durationMs(operation));
++        operation.setMessage("Process started, but the health check timed out.");
++        operationRepository.save(operation);
++        throw new Matrix26RuntimeControlException(
++                "The process is running with PID " + pid + ", but the portal did not answer before the timeout. Review the runtime logs."
++        );
++    }
++
++    private Matrix26RuntimeControlResult completeStart(
++            PlatformBusinessClient instance,
++            Matrix26RuntimeOperation operation,
++            Matrix26RuntimeManagedState managedState,
++            RuntimePaths paths,
++            Matrix26RuntimeInventoryItem detected,
++            long pid
++    ) {
++        LocalDateTime now = LocalDateTime.now();
++        managedState.setCurrentState(Matrix26ManagedRuntimeState.ONLINE);
++        managedState.setLastKnownPid(pid);
++        managedState.setLastOnlineAt(now);
++        managedState.setLastOperationId(operation.getId());
++        managedState.setMessage("Runtime online and verified by HTTP.");
++        managedState.setStandardLogPath(relative(paths.projectRoot(), paths.standardLog()));
++        managedState.setErrorLogPath(relative(paths.projectRoot(), paths.errorLog()));
++        managedState.setPidFilePath(relative(paths.projectRoot(), paths.pidFile()));
++        stateRepository.save(managedState);
++
++        instance.setRuntimeStatus("ONLINE");
++        instance.setLastHealthStatus("ONLINE");
++        instance.setLastHealthCheckedAt(now);
++        instance.setLastHealthMessage("Runtime started by Matrix26 and verified by HTTP.");
++        clientRepository.save(instance);
++
++        operation.setStatus(Matrix26RuntimeOperationStatus.COMPLETED);
++        operation.setFinalState(detected.state().name());
++        operation.setCompletedAt(now);
++        operation.setDurationMs(durationMs(operation));
++        operation.setMessage("Runtime started and verified successfully.");
++        operationRepository.save(operation);
++        appendOperationMarker(paths.standardLog(), "Runtime online and verified by Matrix26.");
++        return new Matrix26RuntimeControlResult(
++                operation,
++                "Runtime started successfully with PID " + pid + "."
++        );
++    }
++
++    private Matrix26RuntimeControlResult stopInternal(
++            PlatformBusinessClient instance,
++            Matrix26RuntimeInventoryItem runtime,
++            Matrix26RuntimeOperation operation,
++            boolean restarting
++    ) {
++        inventoryService.invalidateCache();
++        Matrix26RuntimeInventoryItem current = inventoryService.runtime(runtime.target().key(), true);
++        if (!current.portListening() && current.processId() == null) {
++            RuntimePaths paths = resolvePaths(current);
++            deletePidFile(paths.pidFile());
++            Matrix26RuntimeManagedState managedState = state(instance, current);
++            managedState.setCurrentState(Matrix26ManagedRuntimeState.STOPPED);
++            managedState.setLastKnownPid(null);
++            managedState.setLastStoppedAt(LocalDateTime.now());
++            managedState.setLastOperationId(operation.getId());
++            managedState.setMessage("Runtime was already stopped.");
++            stateRepository.save(managedState);
++            instance.setRuntimeStatus("STOPPED");
++            clientRepository.save(instance);
++            return completeStop(operation, current, "Runtime was already stopped.");
++        }
++
++        Long pid = resolveOwnedPid(current);
++        if (pid == null) {
++            throw new Matrix26RuntimeControlException(
++                    "Matrix26 refused to stop the process because ownership could not be verified."
++            );
++        }
++
++        ProcessHandle handle = ProcessHandle.of(pid)
++                .filter(ProcessHandle::isAlive)
++                .orElseThrow(() -> new Matrix26RuntimeControlException("The detected PID is no longer active."));
++        if (!ownsProcess(handle, current)) {
++            throw new Matrix26RuntimeControlException(
++                    "Matrix26 refused to stop the process because its command line does not match the runtime profile."
++            );
++        }
++
++        RuntimePaths paths = resolvePaths(current);
++        Matrix26RuntimeManagedState managedState = state(instance, current);
++        updateManagedState(
++                managedState,
++                restarting ? Matrix26ManagedRuntimeState.RESTARTING : Matrix26ManagedRuntimeState.STOPPING,
++                pid,
++                restarting ? "Stopping runtime before restart." : "Stopping runtime gracefully.",
++                operation,
++                paths
++        );
++        instance.setRuntimeStatus(restarting ? "RESTARTING" : "STOPPING");
++        clientRepository.save(instance);
++        operation.setPreviousPid(pid);
++        operationRepository.save(operation);
++        appendOperationMarker(paths.standardLog(), restarting
++                ? "Stopping runtime before restart."
++                : "Stopping runtime through Matrix26.");
++
++        boolean destroyRequested = handle.destroy();
++        if (!destroyRequested && handle.isAlive()) {
++            throw new Matrix26RuntimeControlException("The operating system rejected the graceful stop request.");
++        }
++
++        int timeoutSeconds = Math.max(5, properties.getStopTimeoutSeconds());
++        Instant deadline = Instant.now().plusSeconds(timeoutSeconds);
++        int pollMs = Math.max(250, Math.min(properties.getPollIntervalMs(), 3_000));
++        while (handle.isAlive() && Instant.now().isBefore(deadline)) {
++            sleep(pollMs);
++        }
++
++        if (handle.isAlive()) {
++            managedState.setCurrentState(Matrix26ManagedRuntimeState.FAILED);
++            managedState.setMessage("Graceful stop timed out. Force stop was not executed.");
++            managedState.setLastOperationId(operation.getId());
++            stateRepository.save(managedState);
++            instance.setRuntimeStatus("STOP_TIMEOUT");
++            clientRepository.save(instance);
++            operation.setStatus(Matrix26RuntimeOperationStatus.STOP_TIMEOUT);
++            operation.setFinalState("STOP_TIMEOUT");
++            operation.setCompletedAt(LocalDateTime.now());
++            operation.setDurationMs(durationMs(operation));
++            operation.setMessage("Graceful stop timed out. Force stop was not executed.");
++            operationRepository.save(operation);
++            throw new Matrix26RuntimeControlException(
++                    "The runtime did not stop before the timeout. Matrix26 did not force-kill the process."
++            );
++        }
++
++        waitForPortRelease(current.target().expectedPort(), Math.min(timeoutSeconds, 10));
++        deletePidFile(paths.pidFile());
++        managedState.setCurrentState(restarting
++                ? Matrix26ManagedRuntimeState.RESTARTING
++                : Matrix26ManagedRuntimeState.STOPPED);
++        managedState.setLastKnownPid(null);
++        managedState.setLastStoppedAt(LocalDateTime.now());
++        managedState.setLastOperationId(operation.getId());
++        managedState.setMessage(restarting ? "Runtime stopped. Starting replacement process." : "Runtime stopped gracefully.");
++        stateRepository.save(managedState);
++        instance.setRuntimeStatus(restarting ? "RESTARTING" : "STOPPED");
++        clientRepository.save(instance);
++
++        if (restarting) {
++            return new Matrix26RuntimeControlResult(operation, "Runtime stopped before restart.");
++        }
++        return completeStop(operation, current, "Runtime stopped gracefully.");
++    }
++
++    private Matrix26RuntimeControlResult completeStop(
++            Matrix26RuntimeOperation operation,
++            Matrix26RuntimeInventoryItem runtime,
++            String message
++    ) {
++        operation.setStatus(Matrix26RuntimeOperationStatus.COMPLETED);
++        operation.setResultingPid(null);
++        operation.setFinalState("STOPPED");
++        operation.setCompletedAt(LocalDateTime.now());
++        operation.setDurationMs(durationMs(operation));
++        operation.setMessage(message);
++        operationRepository.save(operation);
++        inventoryService.invalidateCache();
++        return new Matrix26RuntimeControlResult(operation, message + " Port " + runtime.target().expectedPort() + " is free.");
++    }
++
++    private Matrix26RuntimeControlResult restartInternal(
++            PlatformBusinessClient instance,
++            Matrix26RuntimeInventoryItem runtime,
++            Matrix26RuntimeOperation operation
++    ) {
++        if (runtime.portListening() || runtime.processId() != null) {
++            stopInternal(instance, runtime, operation, true);
++        }
++        inventoryService.invalidateCache();
++        Matrix26RuntimeInventoryItem stopped = inventoryService.runtime(runtime.target().key(), true);
++        if (stopped.portListening() || stopped.processId() != null) {
++            throw new Matrix26RuntimeControlException("Restart was cancelled because the previous process is still active.");
++        }
++        Matrix26RuntimeControlResult started = startInternal(instance, stopped, operation, true);
++        operation.setMessage("Runtime restarted and verified successfully.");
++        operationRepository.save(operation);
++        return new Matrix26RuntimeControlResult(
++                operation,
++                "Runtime restarted successfully with PID " + operation.getResultingPid() + "."
++        );
++    }
++
++    private Matrix26RuntimeOperation newOperation(
++            PlatformBusinessClient instance,
++            Matrix26RuntimeInventoryItem runtime,
++            Matrix26RuntimeOperationAction action,
++            String actor
++    ) {
++        Matrix26RuntimeOperation operation = new Matrix26RuntimeOperation();
++        operation.setInstance(instance);
++        operation.setRuntimeKey(runtime.target().key());
++        operation.setInstanceCode(runtime.target().code());
++        operation.setAction(action);
++        operation.setStatus(Matrix26RuntimeOperationStatus.REQUESTED);
++        operation.setRequestedBy(actor == null || actor.isBlank() ? "matrix26-system" : actor.trim());
++        operation.setRequestedAt(LocalDateTime.now());
++        operation.setPreviousPid(runtime.processId());
++        operation.setRuntimePort(runtime.target().expectedPort());
++        operation.setInitialState(runtime.state().name());
++        operation.setMessage("Runtime operation requested.");
++        return operation;
++    }
++
++    private void failOperation(
++            Matrix26RuntimeOperation operation,
++            String message,
++            Throwable error
++    ) {
++        if (operation.getStatus() != Matrix26RuntimeOperationStatus.STOP_TIMEOUT) {
++            operation.setStatus(Matrix26RuntimeOperationStatus.FAILED);
++        }
++        operation.setCompletedAt(LocalDateTime.now());
++        operation.setDurationMs(durationMs(operation));
++        operation.setFinalState(operation.getFinalState() == null ? "FAILED" : operation.getFinalState());
++        operation.setMessage(safe(message));
++        operation.setErrorDetail(Matrix26OperationsSanitizer.limit(
++                Matrix26OperationsSanitizer.sanitize(error == null ? message : error.toString()),
++                4_000
++        ));
++        operationRepository.save(operation);
++    }
++
++    private Matrix26RuntimeManagedState state(
++            PlatformBusinessClient instance,
++            Matrix26RuntimeInventoryItem runtime
++    ) {
++        return stateRepository.findByInstance_Id(instance.getId()).orElseGet(() -> {
++            Matrix26RuntimeManagedState state = new Matrix26RuntimeManagedState();
++            state.setInstance(instance);
++            state.setRuntimeKey(runtime.target().key());
++            state.setInstanceCode(instance.getCode());
++            state.setCurrentState(Matrix26ManagedRuntimeState.UNKNOWN);
++            state.setMessage("Runtime control state initialized.");
++            return stateRepository.save(state);
++        });
++    }
++
++    private void updateManagedState(
++            Matrix26RuntimeManagedState state,
++            Matrix26ManagedRuntimeState currentState,
++            Long pid,
++            String message,
++            Matrix26RuntimeOperation operation,
++            RuntimePaths paths
++    ) {
++        state.setCurrentState(currentState);
++        state.setLastKnownPid(pid);
++        state.setLastOperationId(operation.getId());
++        state.setMessage(message);
++        state.setStandardLogPath(relative(paths.projectRoot(), paths.standardLog()));
++        state.setErrorLogPath(relative(paths.projectRoot(), paths.errorLog()));
++        state.setPidFilePath(relative(paths.projectRoot(), paths.pidFile()));
++        stateRepository.save(state);
++    }
++
++    private String manageabilityReason(Matrix26RuntimeInventoryItem runtime) {
++        Matrix26RuntimeTarget target = runtime.target();
++        if (!properties.isRuntimeControlEnabled()) {
++            return "Runtime control is disabled by configuration.";
++        }
++        if (target.controlCenter()) {
++            return "Matrix26 cannot control its own process.";
++        }
++        if (target.instanceId() == null) {
++            return "The runtime is not linked to a registered instance.";
++        }
++        if (!allowedCode(target.code())) {
++            return target.protectedInstance()
++                    ? "The instance is administratively protected and is not in the runtime control allowlist."
++                    : "The instance is not included in the runtime control allowlist.";
++        }
++        if (!runtime.runtimeDirectoryPresent()) {
++            return "The runtime directory does not exist.";
++        }
++        if (!runtime.configurationPresent() || !runtime.configurationConsistent()) {
++            return "The runtime configuration is missing or inconsistent.";
++        }
++        if (!runtime.launcherPresent()) {
++            return "The runtime launcher is missing.";
++        }
++        if (runtime.target().expectedPort() == null) {
++            return "The runtime does not have a registered port.";
++        }
++        if (runtime.portListening() && !runtime.expectedProcess()) {
++            return "The registered port is owned by another process.";
++        }
++        try {
++            findApplicationJar(Path.of("").toAbsolutePath().normalize());
++        } catch (Matrix26RuntimeControlException ex) {
++            return ex.getMessage();
++        }
++        return "";
++    }
++
++    private void validateManageable(Matrix26RuntimeInventoryItem runtime) {
++        String reason = manageabilityReason(runtime);
++        if (!reason.isBlank()) {
++            throw new Matrix26RuntimeControlException(reason);
++        }
++    }
++
++    private void validateConfirmation(
++            Matrix26RuntimeInventoryItem runtime,
++            Matrix26RuntimeOperationAction action,
++            String confirmation
++    ) {
++        if (action == Matrix26RuntimeOperationAction.START) {
++            return;
++        }
++        String expected = action.name() + " " + runtime.target().code();
++        if (confirmation == null || !expected.equals(confirmation.trim())) {
++            throw new Matrix26RuntimeControlException("The confirmation text does not match: " + expected);
++        }
++    }
++
++    private boolean allowedCode(String code) {
++        if (code == null) {
++            return false;
++        }
++        return properties.getAllowedInstanceCodes().stream()
++                .filter(value -> value != null)
++                .map(value -> value.trim().toLowerCase(Locale.ROOT))
++                .anyMatch(code.trim().toLowerCase(Locale.ROOT)::equals);
++    }
++
++    private Long resolveOwnedPid(Matrix26RuntimeInventoryItem runtime) {
++        List<Long> candidates = new ArrayList<>();
++        if (runtime.processId() != null) {
++            candidates.add(runtime.processId());
++        }
++        if (runtime.portOwnerPid() != null && !candidates.contains(runtime.portOwnerPid())) {
++            candidates.add(runtime.portOwnerPid());
++        }
++        if (runtime.target().instanceId() != null) {
++            stateRepository.findByInstance_Id(runtime.target().instanceId())
++                    .map(Matrix26RuntimeManagedState::getLastKnownPid)
++                    .filter(pid -> pid != null && !candidates.contains(pid))
++                    .ifPresent(candidates::add);
++        }
++        RuntimePaths paths = resolvePaths(runtime);
++        readPidFile(paths.pidFile())
++                .filter(pid -> !candidates.contains(pid))
++                .ifPresent(candidates::add);
++
++        for (Long pid : candidates) {
++            Optional<ProcessHandle> handle = ProcessHandle.of(pid).filter(ProcessHandle::isAlive);
++            if (handle.isPresent() && ownsProcess(handle.get(), runtime)) {
++                return pid;
++            }
++        }
++        return null;
++    }
++
++    private boolean ownsProcess(ProcessHandle handle, Matrix26RuntimeInventoryItem runtime) {
++        ProcessHandle.Info info = handle.info();
++        String command = info.command().orElse("");
++        String commandLine = info.commandLine().orElseGet(() -> buildCommandLine(info));
++        String executableName = Path.of(command.isBlank() ? "java" : command).getFileName().toString().toLowerCase(Locale.ROOT);
++        if (!JAVA_EXECUTABLE_NAMES.contains(executableName)) {
++            return false;
++        }
++        String normalized = commandLine.replace('\\', '/').toLowerCase(Locale.ROOT);
++        String profile = runtime.target().runtimeProfile() == null
++                ? ""
++                : runtime.target().runtimeProfile().toLowerCase(Locale.ROOT);
++        return !profile.isBlank()
++                && normalized.contains(profile)
++                && normalized.contains("application.properties");
++    }
++
++    private String buildCommandLine(ProcessHandle.Info info) {
++        String command = info.command().orElse("");
++        String[] arguments = info.arguments().orElse(new String[0]);
++        return arguments.length == 0 ? command : command + " " + String.join(" ", arguments);
++    }
++
++    private RuntimePaths resolvePaths(Matrix26RuntimeInventoryItem runtime) {
++        Path projectRoot = Path.of("").toAbsolutePath().normalize();
++        Path runtimeDirectory = resolveRelative(projectRoot, runtime.runtimeDirectory(), "runtime directory");
++        Path configuration = resolveRelative(projectRoot, runtime.configurationPath(), "runtime configuration");
++        Path dataRoot = projectRoot.resolve(properties.getDataDirectory()).normalize();
++        if (!dataRoot.startsWith(projectRoot)) {
++            throw new Matrix26RuntimeControlException("The configured runtime data directory is outside the project root.");
++        }
++        String code = Matrix26OperationsSanitizer.slug(runtime.target().code());
++        String operationDirectory = Matrix26OperationsSanitizer.slug(properties.getOperationDirectory());
++        if (operationDirectory.isBlank()) {
++            operationDirectory = "operations";
++        }
++        Path operations = dataRoot.resolve(code).resolve(operationDirectory).normalize();
++        if (!operations.startsWith(dataRoot)) {
++            throw new Matrix26RuntimeControlException("The runtime operation path was blocked by the security policy.");
++        }
++        return new RuntimePaths(
++                projectRoot,
++                runtimeDirectory,
++                configuration,
++                operations,
++                operations.resolve("application.log"),
++                operations.resolve("application-error.log"),
++                operations.resolve("runtime.pid")
++        );
++    }
++
++    private Path resolveRelative(Path projectRoot, String relative, String label) {
++        if (relative == null || relative.isBlank()) {
++            throw new Matrix26RuntimeControlException("The " + label + " is not available.");
++        }
++        Path resolved = projectRoot.resolve(relative).normalize();
++        if (!resolved.startsWith(projectRoot)) {
++            throw new Matrix26RuntimeControlException("The " + label + " is outside the project root.");
++        }
++        return resolved;
++    }
++
++    private Path findApplicationJar(Path projectRoot) {
++        Path target = projectRoot.resolve("target").normalize();
++        if (!Files.isDirectory(target)) {
++            throw new Matrix26RuntimeControlException("No packaged application was found. Run Maven package first.");
++        }
++        try (Stream<Path> files = Files.list(target)) {
++            return files
++                    .filter(Files::isRegularFile)
++                    .filter(path -> path.getFileName().toString().endsWith(".jar"))
++                    .filter(path -> !path.getFileName().toString().contains("sources"))
++                    .filter(path -> !path.getFileName().toString().contains("javadoc"))
++                    .filter(path -> !path.getFileName().toString().startsWith("original-"))
++                    .max(Comparator.comparingLong(this::lastModifiedMillis))
++                    .map(Path::toAbsolutePath)
++                    .orElseThrow(() -> new Matrix26RuntimeControlException(
++                            "No packaged application JAR was found. Run Maven package first."
++                    ));
++        } catch (IOException ex) {
++            throw new Matrix26RuntimeControlException("The packaged application directory could not be inspected.", ex);
++        }
++    }
++
++    private Path resolveJavaExecutable() {
++        Path javaHome = Path.of(System.getProperty("java.home", "")).toAbsolutePath().normalize();
++        String executable = isWindows() ? "java.exe" : "java";
++        Path candidate = javaHome.resolve("bin").resolve(executable).normalize();
++        if (!Files.isRegularFile(candidate)) {
++            throw new Matrix26RuntimeControlException("The Java executable could not be resolved from java.home.");
++        }
++        return candidate;
++    }
++
++    private void ensureOperationFiles(RuntimePaths paths) {
++        try {
++            Files.createDirectories(paths.operationsDirectory());
++            if (!Files.exists(paths.standardLog())) {
++                Files.createFile(paths.standardLog());
++            }
++            if (!Files.exists(paths.errorLog())) {
++                Files.createFile(paths.errorLog());
++            }
++        } catch (IOException ex) {
++            throw new Matrix26RuntimeControlException("The runtime operation directory could not be created.", ex);
++        }
++    }
++
++    private void writePidFile(Path pidFile, long pid, String code, Integer port) {
++        String content = "pid=" + pid + System.lineSeparator()
++                + "instance=" + safe(code) + System.lineSeparator()
++                + "port=" + port + System.lineSeparator()
++                + "startedAt=" + LocalDateTime.now() + System.lineSeparator();
++        try {
++            Files.writeString(
++                    pidFile,
++                    content,
++                    StandardCharsets.UTF_8,
++                    StandardOpenOption.CREATE,
++                    StandardOpenOption.TRUNCATE_EXISTING,
++                    StandardOpenOption.WRITE
++            );
++        } catch (IOException ex) {
++            throw new Matrix26RuntimeControlException("The runtime PID file could not be written.", ex);
++        }
++    }
++
++    private Optional<Long> readPidFile(Path pidFile) {
++        if (!Files.isRegularFile(pidFile)) {
++            return Optional.empty();
++        }
++        try {
++            return Files.readAllLines(pidFile, StandardCharsets.UTF_8).stream()
++                    .filter(line -> line.startsWith("pid="))
++                    .map(line -> line.substring(4).trim())
++                    .map(Long::valueOf)
++                    .findFirst();
++        } catch (IOException | NumberFormatException ex) {
++            return Optional.empty();
++        }
++    }
++
++    private void deletePidFile(Path pidFile) {
++        try {
++            Files.deleteIfExists(pidFile);
++        } catch (IOException ex) {
++            LOGGER.warn("Matrix26 could not delete stale PID file {}.", pidFile);
++        }
++    }
++
++    private void appendOperationMarker(Path log, String message) {
++        String line = System.lineSeparator()
++                + "[MATRIX26] " + LocalDateTime.now() + " " + safe(message)
++                + System.lineSeparator();
++        try {
++            Files.writeString(
++                    log,
++                    line,
++                    StandardCharsets.UTF_8,
++                    StandardOpenOption.CREATE,
++                    StandardOpenOption.APPEND
++            );
++        } catch (IOException ex) {
++            LOGGER.warn("Matrix26 could not append the runtime operation marker to {}.", log);
++        }
++    }
++
++    private void waitForPortRelease(Integer port, int timeoutSeconds) {
++        if (port == null) {
++            return;
++        }
++        Instant deadline = Instant.now().plusSeconds(Math.max(1, timeoutSeconds));
++        while (!isPortAvailable(port) && Instant.now().isBefore(deadline)) {
++            sleep(250);
++        }
++        if (!isPortAvailable(port)) {
++            throw new Matrix26RuntimeControlException("The process stopped, but the registered port is still occupied.");
++        }
++    }
++
++    private boolean isPortAvailable(Integer port) {
++        if (port == null || port < 1 || port > 65535) {
++            return false;
++        }
++        try (ServerSocket socket = new ServerSocket(port)) {
++            socket.setReuseAddress(false);
++            return true;
++        } catch (IOException ex) {
++            return false;
++        }
++    }
++
++    private long lastModifiedMillis(Path path) {
++        try {
++            return Files.getLastModifiedTime(path).toMillis();
++        } catch (IOException ex) {
++            return 0L;
++        }
++    }
++
++    private void sleep(long milliseconds) {
++        try {
++            TimeUnit.MILLISECONDS.sleep(milliseconds);
++        } catch (InterruptedException ex) {
++            Thread.currentThread().interrupt();
++            throw new Matrix26RuntimeControlException("The runtime operation was interrupted.", ex);
++        }
++    }
++
++    private long durationMs(Matrix26RuntimeOperation operation) {
++        LocalDateTime started = operation.getStartedAt() == null
++                ? operation.getRequestedAt()
++                : operation.getStartedAt();
++        return Math.max(0, Duration.between(started, LocalDateTime.now()).toMillis());
++    }
++
++    private String relative(Path projectRoot, Path path) {
++        if (path == null) {
++            return "";
++        }
++        try {
++            return projectRoot.relativize(path.toAbsolutePath().normalize()).toString().replace('\\', '/');
++        } catch (RuntimeException ex) {
++            return path.toString().replace('\\', '/');
++        }
++    }
++
++    private boolean isWindows() {
++        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
++    }
++
++    private String safe(String value) {
++        return Matrix26OperationsSanitizer.limit(
++                Matrix26OperationsSanitizer.sanitize(value == null ? "" : value.trim()),
++                500
++        );
++    }
++
++    private void recordAudit(
++            PlatformBusinessClient instance,
++            Matrix26RuntimeOperation operation,
++            String actor,
++            String summary
++    ) {
++        Matrix26InstanceAuditLog audit = new Matrix26InstanceAuditLog();
++        audit.setInstance(instance);
++        audit.setAction("RUNTIME_" + operation.getAction().name());
++        audit.setActorUsername(actor == null || actor.isBlank() ? "matrix26-system" : actor.trim());
++        audit.setSummary(safe(summary));
++        audit.setBeforeSnapshot("state=" + safe(operation.getInitialState())
++                + ";pid=" + operation.getPreviousPid()
++                + ";port=" + operation.getRuntimePort());
++        audit.setAfterSnapshot("status=" + operation.getStatus()
++                + ";state=" + safe(operation.getFinalState())
++                + ";pid=" + operation.getResultingPid());
++        auditRepository.save(audit);
++    }
++
++    private record RuntimePaths(
++            Path projectRoot,
++            Path runtimeDirectory,
++            Path configuration,
++            Path operationsDirectory,
++            Path standardLog,
++            Path errorLog,
++            Path pidFile
++    ) {
++    }
++}
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlView.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlView.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlView.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlView.java	2026-06-25 02:14:49.111838399 +0000
+@@ -0,0 +1,16 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++public record Matrix26RuntimeControlView(
++        boolean controlEnabled,
++        boolean manageable,
++        boolean operationInProgress,
++        boolean canStart,
++        boolean canStop,
++        boolean canRestart,
++        String reason,
++        String stopConfirmation,
++        String restartConfirmation,
++        Matrix26RuntimeManagedState managedState,
++        Matrix26RuntimeOperation lastOperation
++) {
++}
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeManagedState.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeManagedState.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeManagedState.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeManagedState.java	2026-06-25 02:14:49.111341805 +0000
+@@ -0,0 +1,212 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClient;
++import jakarta.persistence.Column;
++import jakarta.persistence.Entity;
++import jakarta.persistence.EnumType;
++import jakarta.persistence.Enumerated;
++import jakarta.persistence.FetchType;
++import jakarta.persistence.GeneratedValue;
++import jakarta.persistence.GenerationType;
++import jakarta.persistence.Id;
++import jakarta.persistence.Index;
++import jakarta.persistence.JoinColumn;
++import jakarta.persistence.OneToOne;
++import jakarta.persistence.PrePersist;
++import jakarta.persistence.PreUpdate;
++import jakarta.persistence.Table;
++
++import java.time.LocalDateTime;
++
++@Entity
++@Table(
++        name = "matrix26_runtime_state",
++        indexes = {
++                @Index(name = "idx_matrix26_runtime_state_code", columnList = "instance_code", unique = true),
++                @Index(name = "idx_matrix26_runtime_state_runtime_key", columnList = "runtime_key", unique = true)
++        }
++)
++public class Matrix26RuntimeManagedState {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    private Long id;
++
++    @OneToOne(fetch = FetchType.LAZY, optional = false)
++    @JoinColumn(name = "instance_id", nullable = false, unique = true)
++    private PlatformBusinessClient instance;
++
++    @Column(name = "runtime_key", nullable = false, unique = true, length = 80)
++    private String runtimeKey;
++
++    @Column(name = "instance_code", nullable = false, unique = true, length = 80)
++    private String instanceCode;
++
++    @Enumerated(EnumType.STRING)
++    @Column(name = "current_state", nullable = false, length = 30)
++    private Matrix26ManagedRuntimeState currentState;
++
++    @Column(name = "last_known_pid")
++    private Long lastKnownPid;
++
++    @Column(name = "process_started_at")
++    private LocalDateTime processStartedAt;
++
++    @Column(name = "last_online_at")
++    private LocalDateTime lastOnlineAt;
++
++    @Column(name = "last_stopped_at")
++    private LocalDateTime lastStoppedAt;
++
++    @Column(name = "last_operation_id")
++    private Long lastOperationId;
++
++    @Column(name = "standard_log_path", length = 500)
++    private String standardLogPath;
++
++    @Column(name = "error_log_path", length = 500)
++    private String errorLogPath;
++
++    @Column(name = "pid_file_path", length = 500)
++    private String pidFilePath;
++
++    @Column(length = 500)
++    private String message;
++
++    @Column(name = "created_at", nullable = false)
++    private LocalDateTime createdAt;
++
++    @Column(name = "updated_at", nullable = false)
++    private LocalDateTime updatedAt;
++
++    @PrePersist
++    void onCreate() {
++        LocalDateTime now = LocalDateTime.now();
++        if (currentState == null) {
++            currentState = Matrix26ManagedRuntimeState.UNKNOWN;
++        }
++        createdAt = now;
++        updatedAt = now;
++    }
++
++    @PreUpdate
++    void onUpdate() {
++        updatedAt = LocalDateTime.now();
++    }
++
++    public Long getId() {
++        return id;
++    }
++
++    public PlatformBusinessClient getInstance() {
++        return instance;
++    }
++
++    public void setInstance(PlatformBusinessClient instance) {
++        this.instance = instance;
++    }
++
++    public String getRuntimeKey() {
++        return runtimeKey;
++    }
++
++    public void setRuntimeKey(String runtimeKey) {
++        this.runtimeKey = runtimeKey;
++    }
++
++    public String getInstanceCode() {
++        return instanceCode;
++    }
++
++    public void setInstanceCode(String instanceCode) {
++        this.instanceCode = instanceCode;
++    }
++
++    public Matrix26ManagedRuntimeState getCurrentState() {
++        return currentState;
++    }
++
++    public void setCurrentState(Matrix26ManagedRuntimeState currentState) {
++        this.currentState = currentState;
++    }
++
++    public Long getLastKnownPid() {
++        return lastKnownPid;
++    }
++
++    public void setLastKnownPid(Long lastKnownPid) {
++        this.lastKnownPid = lastKnownPid;
++    }
++
++    public LocalDateTime getProcessStartedAt() {
++        return processStartedAt;
++    }
++
++    public void setProcessStartedAt(LocalDateTime processStartedAt) {
++        this.processStartedAt = processStartedAt;
++    }
++
++    public LocalDateTime getLastOnlineAt() {
++        return lastOnlineAt;
++    }
++
++    public void setLastOnlineAt(LocalDateTime lastOnlineAt) {
++        this.lastOnlineAt = lastOnlineAt;
++    }
++
++    public LocalDateTime getLastStoppedAt() {
++        return lastStoppedAt;
++    }
++
++    public void setLastStoppedAt(LocalDateTime lastStoppedAt) {
++        this.lastStoppedAt = lastStoppedAt;
++    }
++
++    public Long getLastOperationId() {
++        return lastOperationId;
++    }
++
++    public void setLastOperationId(Long lastOperationId) {
++        this.lastOperationId = lastOperationId;
++    }
++
++    public String getStandardLogPath() {
++        return standardLogPath;
++    }
++
++    public void setStandardLogPath(String standardLogPath) {
++        this.standardLogPath = standardLogPath;
++    }
++
++    public String getErrorLogPath() {
++        return errorLogPath;
++    }
++
++    public void setErrorLogPath(String errorLogPath) {
++        this.errorLogPath = errorLogPath;
++    }
++
++    public String getPidFilePath() {
++        return pidFilePath;
++    }
++
++    public void setPidFilePath(String pidFilePath) {
++        this.pidFilePath = pidFilePath;
++    }
++
++    public String getMessage() {
++        return message;
++    }
++
++    public void setMessage(String message) {
++        this.message = message;
++    }
++
++    public LocalDateTime getCreatedAt() {
++        return createdAt;
++    }
++
++    public LocalDateTime getUpdatedAt() {
++        return updatedAt;
++    }
++}
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeManagedStateRepository.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeManagedStateRepository.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeManagedStateRepository.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeManagedStateRepository.java	2026-06-25 02:14:49.111574056 +0000
+@@ -0,0 +1,12 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import org.springframework.data.jpa.repository.JpaRepository;
++
++import java.util.Optional;
++
++public interface Matrix26RuntimeManagedStateRepository extends JpaRepository<Matrix26RuntimeManagedState, Long> {
++
++    Optional<Matrix26RuntimeManagedState> findByInstance_Id(Long instanceId);
++
++    Optional<Matrix26RuntimeManagedState> findByRuntimeKey(String runtimeKey);
++}
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperation.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperation.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperation.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperation.java	2026-06-25 02:14:49.111224030 +0000
+@@ -0,0 +1,259 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClient;
++import jakarta.persistence.Column;
++import jakarta.persistence.Entity;
++import jakarta.persistence.EnumType;
++import jakarta.persistence.Enumerated;
++import jakarta.persistence.FetchType;
++import jakarta.persistence.GeneratedValue;
++import jakarta.persistence.GenerationType;
++import jakarta.persistence.Id;
++import jakarta.persistence.Index;
++import jakarta.persistence.JoinColumn;
++import jakarta.persistence.ManyToOne;
++import jakarta.persistence.PrePersist;
++import jakarta.persistence.Table;
++
++import java.time.LocalDateTime;
++
++@Entity
++@Table(
++        name = "matrix26_runtime_operation",
++        indexes = {
++                @Index(name = "idx_matrix26_runtime_operation_instance", columnList = "instance_id, requested_at"),
++                @Index(name = "idx_matrix26_runtime_operation_status", columnList = "status, requested_at")
++        }
++)
++public class Matrix26RuntimeOperation {
++
++    @Id
++    @GeneratedValue(strategy = GenerationType.IDENTITY)
++    private Long id;
++
++    @ManyToOne(fetch = FetchType.LAZY, optional = false)
++    @JoinColumn(name = "instance_id", nullable = false)
++    private PlatformBusinessClient instance;
++
++    @Column(name = "runtime_key", nullable = false, length = 80)
++    private String runtimeKey;
++
++    @Column(name = "instance_code", nullable = false, length = 80)
++    private String instanceCode;
++
++    @Enumerated(EnumType.STRING)
++    @Column(nullable = false, length = 30)
++    private Matrix26RuntimeOperationAction action;
++
++    @Enumerated(EnumType.STRING)
++    @Column(nullable = false, length = 30)
++    private Matrix26RuntimeOperationStatus status;
++
++    @Column(name = "requested_by", nullable = false, length = 120)
++    private String requestedBy;
++
++    @Column(name = "requested_at", nullable = false)
++    private LocalDateTime requestedAt;
++
++    @Column(name = "started_at")
++    private LocalDateTime startedAt;
++
++    @Column(name = "completed_at")
++    private LocalDateTime completedAt;
++
++    @Column(name = "previous_pid")
++    private Long previousPid;
++
++    @Column(name = "resulting_pid")
++    private Long resultingPid;
++
++    @Column(name = "runtime_port")
++    private Integer runtimePort;
++
++    @Column(name = "initial_state", length = 40)
++    private String initialState;
++
++    @Column(name = "final_state", length = 40)
++    private String finalState;
++
++    @Column(name = "duration_ms")
++    private Long durationMs;
++
++    @Column(length = 500)
++    private String message;
++
++    @Column(name = "error_detail", columnDefinition = "TEXT")
++    private String errorDetail;
++
++    @Column(name = "standard_log_path", length = 500)
++    private String standardLogPath;
++
++    @Column(name = "error_log_path", length = 500)
++    private String errorLogPath;
++
++    @PrePersist
++    void onCreate() {
++        if (requestedAt == null) {
++            requestedAt = LocalDateTime.now();
++        }
++        if (status == null) {
++            status = Matrix26RuntimeOperationStatus.REQUESTED;
++        }
++    }
++
++    public Long getId() {
++        return id;
++    }
++
++    public PlatformBusinessClient getInstance() {
++        return instance;
++    }
++
++    public void setInstance(PlatformBusinessClient instance) {
++        this.instance = instance;
++    }
++
++    public String getRuntimeKey() {
++        return runtimeKey;
++    }
++
++    public void setRuntimeKey(String runtimeKey) {
++        this.runtimeKey = runtimeKey;
++    }
++
++    public String getInstanceCode() {
++        return instanceCode;
++    }
++
++    public void setInstanceCode(String instanceCode) {
++        this.instanceCode = instanceCode;
++    }
++
++    public Matrix26RuntimeOperationAction getAction() {
++        return action;
++    }
++
++    public void setAction(Matrix26RuntimeOperationAction action) {
++        this.action = action;
++    }
++
++    public Matrix26RuntimeOperationStatus getStatus() {
++        return status;
++    }
++
++    public void setStatus(Matrix26RuntimeOperationStatus status) {
++        this.status = status;
++    }
++
++    public String getRequestedBy() {
++        return requestedBy;
++    }
++
++    public void setRequestedBy(String requestedBy) {
++        this.requestedBy = requestedBy;
++    }
++
++    public LocalDateTime getRequestedAt() {
++        return requestedAt;
++    }
++
++    public void setRequestedAt(LocalDateTime requestedAt) {
++        this.requestedAt = requestedAt;
++    }
++
++    public LocalDateTime getStartedAt() {
++        return startedAt;
++    }
++
++    public void setStartedAt(LocalDateTime startedAt) {
++        this.startedAt = startedAt;
++    }
++
++    public LocalDateTime getCompletedAt() {
++        return completedAt;
++    }
++
++    public void setCompletedAt(LocalDateTime completedAt) {
++        this.completedAt = completedAt;
++    }
++
++    public Long getPreviousPid() {
++        return previousPid;
++    }
++
++    public void setPreviousPid(Long previousPid) {
++        this.previousPid = previousPid;
++    }
++
++    public Long getResultingPid() {
++        return resultingPid;
++    }
++
++    public void setResultingPid(Long resultingPid) {
++        this.resultingPid = resultingPid;
++    }
++
++    public Integer getRuntimePort() {
++        return runtimePort;
++    }
++
++    public void setRuntimePort(Integer runtimePort) {
++        this.runtimePort = runtimePort;
++    }
++
++    public String getInitialState() {
++        return initialState;
++    }
++
++    public void setInitialState(String initialState) {
++        this.initialState = initialState;
++    }
++
++    public String getFinalState() {
++        return finalState;
++    }
++
++    public void setFinalState(String finalState) {
++        this.finalState = finalState;
++    }
++
++    public Long getDurationMs() {
++        return durationMs;
++    }
++
++    public void setDurationMs(Long durationMs) {
++        this.durationMs = durationMs;
++    }
++
++    public String getMessage() {
++        return message;
++    }
++
++    public void setMessage(String message) {
++        this.message = message;
++    }
++
++    public String getErrorDetail() {
++        return errorDetail;
++    }
++
++    public void setErrorDetail(String errorDetail) {
++        this.errorDetail = errorDetail;
++    }
++
++    public String getStandardLogPath() {
++        return standardLogPath;
++    }
++
++    public void setStandardLogPath(String standardLogPath) {
++        this.standardLogPath = standardLogPath;
++    }
++
++    public String getErrorLogPath() {
++        return errorLogPath;
++    }
++
++    public void setErrorLogPath(String errorLogPath) {
++        this.errorLogPath = errorLogPath;
++    }
++}
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperationAction.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperationAction.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperationAction.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperationAction.java	2026-06-25 02:14:49.110494079 +0000
+@@ -0,0 +1,17 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++public enum Matrix26RuntimeOperationAction {
++    START("Start"),
++    STOP("Stop"),
++    RESTART("Restart");
++
++    private final String label;
++
++    Matrix26RuntimeOperationAction(String label) {
++        this.label = label;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++}
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperationRepository.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperationRepository.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperationRepository.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperationRepository.java	2026-06-25 02:14:49.111447412 +0000
+@@ -0,0 +1,15 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++import org.springframework.data.jpa.repository.JpaRepository;
++
++import java.util.List;
++import java.util.Optional;
++
++public interface Matrix26RuntimeOperationRepository extends JpaRepository<Matrix26RuntimeOperation, Long> {
++
++    List<Matrix26RuntimeOperation> findTop100ByOrderByRequestedAtDesc();
++
++    List<Matrix26RuntimeOperation> findTop20ByInstance_IdOrderByRequestedAtDesc(Long instanceId);
++
++    Optional<Matrix26RuntimeOperation> findTopByInstance_IdOrderByRequestedAtDesc(Long instanceId);
++}
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperationStatus.java /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperationStatus.java
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperationStatus.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeOperationStatus.java	2026-06-25 02:14:49.110910092 +0000
+@@ -0,0 +1,26 @@
++package com.ecoamazonas.eco_agua.platform.control.operations;
++
++public enum Matrix26RuntimeOperationStatus {
++    REQUESTED("Requested", "text-bg-secondary"),
++    RUNNING("Running", "text-bg-info"),
++    COMPLETED("Completed", "text-bg-success"),
++    BLOCKED("Blocked", "text-bg-warning"),
++    STOP_TIMEOUT("Stop timeout", "text-bg-danger"),
++    FAILED("Failed", "text-bg-danger");
++
++    private final String label;
++    private final String badgeClass;
++
++    Matrix26RuntimeOperationStatus(String label, String badgeClass) {
++        this.label = label;
++        this.badgeClass = badgeClass;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++
++    public String getBadgeClass() {
++        return badgeClass;
++    }
++}
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/resources/templates/control_center/operations/dashboard.html /mnt/data/matrix26_phase3d2_impl/src/main/resources/templates/control_center/operations/dashboard.html
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/resources/templates/control_center/operations/dashboard.html	2026-06-25 02:12:37.740474174 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/resources/templates/control_center/operations/dashboard.html	2026-06-25 02:17:49.352075684 +0000
+@@ -1,18 +1,18 @@
+ <!DOCTYPE html>
+-<html lang="es" xmlns:th="http://www.thymeleaf.org">
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
+ <head th:replace="~{control_center/fragments/head :: head('Operations')}"></head>
+ <body class="matrix26-body">
+ <div class="matrix26-shell">
+     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+     <div class="matrix26-content">
+-        <header th:replace="~{control_center/fragments/topbar :: topbar('Operations Center', 'Live inventory of runtimes, processes, ports, and logs in read-only mode.')}" ></header>
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Operations Center', 'Runtime inventory, controlled laboratory operations, ports, and persistent logs.')}" ></header>
+ 
+         <main class="matrix26-main">
+             <div class="matrix26-alert-safe mb-4">
+-                <i class="bi bi-binoculars-fill"></i>
++                <i class="bi bi-shield-check"></i>
+                 <div>
+-                    <strong>Phase 3D.1: safe observation</strong>
+-                    <p>This section does not start, stop, or restart processes. It also does not write PID files, modify launchers, or query operational data.</p>
++                    <strong>Phase 3D.2: controlled laboratory operations</strong>
++                    <p>Matrix26 can start, gracefully stop, and restart only explicitly allowlisted laboratory runtimes. Production instances and the Control Center remain read only.</p>
+                 </div>
+             </div>
+ 
+@@ -105,6 +105,30 @@
+                         </tr>
+                         </tbody>
+                     </table>
++                </div>
++            </section>
++
++            <section class="matrix26-panel mt-4">
++                <div class="matrix26-panel-header">
++                    <div><span>Audit trail</span><h2>Recent runtime operations</h2></div>
++                    <span class="small text-muted">Up to 100 operations</span>
++                </div>
++                <div th:if="${#lists.isEmpty(recentRuntimeOperations)}" class="text-muted py-4 text-center">No controlled runtime operations have been recorded.</div>
++                <div th:unless="${#lists.isEmpty(recentRuntimeOperations)}" class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Requested</th><th>Instance</th><th>Action</th><th>Status</th><th>PID</th><th>User</th><th>Result</th></tr></thead>
++                        <tbody>
++                        <tr th:each="operation : ${recentRuntimeOperations}">
++                            <td th:text="${#temporals.format(operation.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">Date</td>
++                            <td><strong th:text="${operation.instanceCode}">Instance</strong><small th:text="|Port ${operation.runtimePort}|">Port</small></td>
++                            <td><span class="badge text-bg-light border text-dark" th:text="${operation.action.label}">Action</span></td>
++                            <td><span class="badge" th:classappend="${operation.status.badgeClass}" th:text="${operation.status.label}">Status</span></td>
++                            <td><code th:text="${operation.resultingPid != null ? operation.resultingPid : (operation.previousPid != null ? operation.previousPid : '—')}">PID</code></td>
++                            <td th:text="${operation.requestedBy}">User</td>
++                            <td class="matrix26-table-message" th:text="${operation.message}">Result</td>
++                        </tr>
++                        </tbody>
++                    </table>
+                 </div>
+             </section>
+         </main>
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/resources/templates/control_center/operations/runtime_detail.html /mnt/data/matrix26_phase3d2_impl/src/main/resources/templates/control_center/operations/runtime_detail.html
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/resources/templates/control_center/operations/runtime_detail.html	2026-06-25 02:12:37.741058284 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/resources/templates/control_center/operations/runtime_detail.html	2026-06-25 02:17:23.972208643 +0000
+@@ -1,12 +1,21 @@
+ <!DOCTYPE html>
+-<html lang="es" xmlns:th="http://www.thymeleaf.org">
+-<head th:replace="~{control_center/fragments/head :: head('Details de runtime')}"></head>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Runtime details')}"></head>
+ <body class="matrix26-body">
+ <div class="matrix26-shell">
+     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+     <div class="matrix26-content">
+-        <header th:replace="~{control_center/fragments/topbar :: topbar('Details de runtime', 'Read-only technical diagnostics without process control.')}" ></header>
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Runtime details', 'Controlled process operations, live diagnostics, and audit history.')}" ></header>
+         <main class="matrix26-main">
++            <div th:if="${runtimeOperationSuccess}" class="alert alert-success d-flex align-items-start gap-2">
++                <i class="bi bi-check-circle-fill mt-1"></i>
++                <span th:text="${runtimeOperationSuccess}">Operation completed.</span>
++            </div>
++            <div th:if="${runtimeOperationError}" class="alert alert-danger d-flex align-items-start gap-2">
++                <i class="bi bi-exclamation-octagon-fill mt-1"></i>
++                <span th:text="${runtimeOperationError}">Operation failed.</span>
++            </div>
++
+             <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
+                 <div class="d-flex align-items-center gap-3">
+                     <span class="matrix26-detail-avatar"><i class="bi bi-cpu-fill"></i></span>
+@@ -14,7 +23,8 @@
+                         <div class="d-flex gap-2 flex-wrap align-items-center">
+                             <h2 class="m-0 fs-4" th:text="${runtime.target().businessName()}">Runtime</h2>
+                             <span class="badge" th:classappend="${runtime.state().getBadgeClass()}" th:text="${runtime.state().getLabel()}">Status</span>
+-                            <span class="badge text-bg-primary" th:if="${runtime.target().protectedInstance()}">Protected</span>
++                            <span class="badge text-bg-primary" th:if="${runtime.target().protectedInstance()}">Protected data</span>
++                            <span class="badge text-bg-success" th:if="${runtimeControl.manageable()}">Runtime control allowed</span>
+                         </div>
+                         <code th:text="${runtime.target().runtimeProfile()}">profile</code>
+                     </div>
+@@ -26,10 +36,35 @@
+                 </div>
+             </div>
+ 
+-            <div class="matrix26-alert-safe mb-4">
+-                <i class="bi bi-eye-fill"></i>
+-                <div><strong>Read only</strong><p>Matrix26 can inspect this runtime, but it cannot start, stop, restart, modify, or delete the process during Phase 3D.1.</p></div>
+-            </div>
++            <section class="matrix26-runtime-control-panel mb-4" th:classappend="${runtimeControl.manageable() ? ' is-enabled' : ' is-locked'}">
++                <div class="matrix26-runtime-control-copy">
++                    <span class="matrix26-runtime-control-icon"><i class="bi" th:classappend="${runtimeControl.manageable() ? ' bi-power' : ' bi-shield-lock-fill'}"></i></span>
++                    <div>
++                        <span class="matrix26-eyebrow">Runtime control</span>
++                        <h2 th:text="${runtimeControl.manageable() ? 'Controlled operations enabled' : 'Operations locked'}">Runtime control</h2>
++                        <p th:if="${runtimeControl.manageable()}">Matrix26 can start, stop, and restart this allowlisted laboratory runtime. Graceful stop is always attempted first; force stop is not available in Phase 3D.2.</p>
++                        <p th:unless="${runtimeControl.manageable()}" th:text="${runtimeControl.reason()}">Locked.</p>
++                    </div>
++                </div>
++
++                <div class="matrix26-runtime-control-actions" th:if="${runtimeControl.manageable()}">
++                    <form th:if="${runtimeControl.canStart()}" th:action="@{/control-center/operations/runtimes/{key}/start(key=${runtime.target().key()})}" method="post">
++                        <button class="btn btn-success" type="submit">
++                            <i class="bi bi-play-fill me-1"></i>Start runtime
++                        </button>
++                    </form>
++                    <button th:if="${runtimeControl.canRestart()}" class="btn btn-warning" type="button" data-bs-toggle="modal" data-bs-target="#restartRuntimeModal">
++                        <i class="bi bi-arrow-repeat me-1"></i>Restart
++                    </button>
++                    <button th:if="${runtimeControl.canStop()}" class="btn btn-danger" type="button" data-bs-toggle="modal" data-bs-target="#stopRuntimeModal">
++                        <i class="bi bi-stop-fill me-1"></i>Stop
++                    </button>
++                    <span th:if="${runtimeControl.operationInProgress()}" class="badge text-bg-info p-2">
++                        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Operation in progress
++                    </span>
++                    <span th:if="${!runtimeControl.canStart() && !runtimeControl.canStop() && !runtimeControl.operationInProgress()}" class="text-muted small">Refresh the inventory to update available actions.</span>
++                </div>
++            </section>
+ 
+             <div th:if="${runtime.hasWarnings()}" class="alert alert-warning">
+                 <strong class="d-block mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i>Warnings</strong>
+@@ -44,21 +79,25 @@
+                             <div><dt>Code</dt><dd><code th:text="${runtime.target().code()}">code</code></dd></div>
+                             <div><dt>Runtime profile</dt><dd><code th:text="${runtime.target().runtimeProfile()}">profile</code></dd></div>
+                             <div><dt>Declared database</dt><dd><code th:text="${runtime.target().databaseName()}">database</code></dd></div>
+-                            <div><dt>Port esperado</dt><dd th:text="${runtime.target().expectedPort()}">8094</dd></div>
++                            <div><dt>Expected port</dt><dd th:text="${runtime.target().expectedPort()}">8094</dd></div>
+                             <div><dt>URL</dt><dd><a th:href="${runtime.target().publicUrl()}" target="_blank" rel="noopener" th:text="${runtime.target().publicUrl()}">URL</a></dd></div>
+                             <div><dt>Management mode</dt><dd th:text="${runtime.target().managementMode()}">Mode</dd></div>
+-                            <div><dt>Reference command</dt><dd><code th:text="${runtime.target().runtimeCommand() != null ? runtime.target().runtimeCommand() : 'No registrado'}">Command</code></dd></div>
++                            <div><dt>Reference command</dt><dd><code th:text="${runtime.target().runtimeCommand() != null ? runtime.target().runtimeCommand() : 'Not registered'}">Command</code></dd></div>
+                         </dl>
+                     </section>
+                 </div>
+                 <div class="col-12 col-xl-5">
+                     <section class="matrix26-panel h-100">
+-                        <div class="matrix26-panel-header"><div><span>Result</span><h2>Status consolidado</h2></div></div>
++                        <div class="matrix26-panel-header"><div><span>Consolidated result</span><h2>Current status</h2></div></div>
+                         <div class="matrix26-runtime-state-card">
+                             <span class="matrix26-runtime-state-icon"><i class="bi" th:classappend="${' ' + runtime.state().getIconClass()}"></i></span>
+                             <div><span class="badge" th:classappend="${runtime.state().getBadgeClass()}" th:text="${runtime.state().getLabel()}">Status</span><p th:text="${runtime.stateDetail()}">Details</p></div>
+                         </div>
+-                        <div class="matrix26-operation-lock mt-3"><i class="bi bi-lock-fill"></i><span>Start, stop, and restart will be available in 3D.2 only for authorized laboratory instances.</span></div>
++                        <dl class="matrix26-settings-list mt-3" th:if="${runtimeControl.managedState() != null}">
++                            <div><dt>Managed state</dt><dd><span class="badge" th:classappend="${runtimeControl.managedState().currentState.badgeClass}" th:text="${runtimeControl.managedState().currentState.label}">State</span></dd></div>
++                            <div><dt>Last managed PID</dt><dd th:text="${runtimeControl.managedState().lastKnownPid != null ? runtimeControl.managedState().lastKnownPid : '—'}">—</dd></div>
++                            <div><dt>Message</dt><dd th:text="${runtimeControl.managedState().message}">Message</dd></div>
++                        </dl>
+                     </section>
+                 </div>
+             </div>
+@@ -71,7 +110,7 @@
+                             <div><dt>Runtime directory</dt><dd><span class="badge" th:classappend="${runtime.runtimeDirectoryPresent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.runtimeDirectoryPresent() ? 'Found' : 'Not found'}">Status</span><code th:text="${runtime.runtimeDirectory() != '' ? runtime.runtimeDirectory() : '—'}">Path</code></dd></div>
+                             <div><dt>application.properties</dt><dd><span class="badge" th:classappend="${runtime.configurationPresent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.configurationPresent() ? 'Found' : 'Missing'}">Status</span><code th:text="${runtime.configurationPath() != '' ? runtime.configurationPath() : '—'}">Path</code></dd></div>
+                             <div><dt>Consistency</dt><dd><span class="badge" th:classappend="${runtime.configurationConsistent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.configurationConsistent() ? 'Consistent' : 'Review'}">Status</span></dd></div>
+-                            <div><dt>Port configurado</dt><dd th:text="${runtime.configuredPort() != null ? runtime.configuredPort() : '—'}">—</dd></div>
++                            <div><dt>Configured port</dt><dd th:text="${runtime.configuredPort() != null ? runtime.configuredPort() : '—'}">—</dd></div>
+                             <div><dt>Configured profile</dt><dd><code th:text="${runtime.configuredRuntimeProfile() != '' ? runtime.configuredRuntimeProfile() : '—'}">—</code></dd></div>
+                             <div><dt>Configured database</dt><dd><code th:text="${runtime.configuredDatabaseName() != '' ? runtime.configuredDatabaseName() : '—'}">—</code></dd></div>
+                             <div><dt>Launcher</dt><dd><span class="badge" th:classappend="${runtime.launcherPresent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.launcherPresent() ? 'Found' : 'Missing'}">Status</span><code th:text="${runtime.launcherPath() != '' ? runtime.launcherPath() : '—'}">Path</code></dd></div>
+@@ -82,9 +121,9 @@
+                     <section class="matrix26-panel h-100">
+                         <div class="matrix26-panel-header"><div><span>Operating system</span><h2>Process and port</h2></div></div>
+                         <dl class="matrix26-settings-list">
+-                            <div><dt>Port escuchando</dt><dd><span class="badge" th:classappend="${runtime.portListening() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.portListening() ? 'Yes' : 'No'}">Status</span></dd></div>
++                            <div><dt>Port listening</dt><dd><span class="badge" th:classappend="${runtime.portListening() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.portListening() ? 'Yes' : 'No'}">Status</span></dd></div>
+                             <div><dt>Owner PID</dt><dd th:text="${runtime.portOwnerPid() != null ? runtime.portOwnerPid() : '—'}">—</dd></div>
+-                            <div><dt>Process propietario</dt><dd th:text="${runtime.portOwnerProcess() != '' ? runtime.portOwnerProcess() : '—'}">—</dd></div>
++                            <div><dt>Owner process</dt><dd th:text="${runtime.portOwnerProcess() != '' ? runtime.portOwnerProcess() : '—'}">—</dd></div>
+                             <div><dt>Runtime PID</dt><dd th:text="${runtime.processId() != null ? runtime.processId() : '—'}">—</dd></div>
+                             <div><dt>Started at</dt><dd th:text="${runtime.processStartedAt() != null ? #temporals.format(runtime.processStartedAt(), 'dd/MM/yyyy HH:mm:ss') : '—'}">—</dd></div>
+                             <div><dt>Uptime</dt><dd th:text="${runtime.uptimeLabel()}">—</dd></div>
+@@ -113,7 +152,7 @@
+                         <div class="matrix26-panel-header"><div><span>Capacity</span><h2>Detected storage</h2></div></div>
+                         <div class="matrix26-storage-bars">
+                             <article><div><strong>Runtime</strong><span th:text="${runtime.runtimeStorageLabel()}">0 B</span></div><div class="matrix26-storage-track"><span style="width: 42%"></span></div><small th:text="${runtime.runtimeDirectory() != '' ? runtime.runtimeDirectory() : 'No local directory'}">Path</small></article>
+-                            <article><div><strong>Instance assets</strong><span th:text="${runtime.assetStorageLabel()}">0 B</span></div><div class="matrix26-storage-track"><span style="width: 68%"></span></div><small>Branding, images, and assets managed outside Git.</small></article>
++                            <article><div><strong>Instance assets</strong><span th:text="${runtime.assetStorageLabel()}">0 B</span></div><div class="matrix26-storage-track"><span style="width: 68%"></span></div><small>Branding, images, logs, and generated runtime files outside Git.</small></article>
+                         </div>
+                     </section>
+                 </div>
+@@ -121,6 +160,30 @@
+ 
+             <section class="matrix26-panel mt-4">
+                 <div class="matrix26-panel-header">
++                    <div><span>Runtime audit</span><h2>Recent operations</h2></div>
++                    <span class="small text-muted">Start, stop, and restart history</span>
++                </div>
++                <div th:if="${#lists.isEmpty(runtimeOperations)}" class="text-muted py-4 text-center">No controlled runtime operations have been recorded.</div>
++                <div th:unless="${#lists.isEmpty(runtimeOperations)}" class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Requested</th><th>Action</th><th>Status</th><th>PID</th><th>Duration</th><th>User</th><th>Result</th></tr></thead>
++                        <tbody>
++                        <tr th:each="operation : ${runtimeOperations}">
++                            <td th:text="${#temporals.format(operation.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">Date</td>
++                            <td><span class="badge text-bg-light border text-dark" th:text="${operation.action.label}">Action</span></td>
++                            <td><span class="badge" th:classappend="${operation.status.badgeClass}" th:text="${operation.status.label}">Status</span></td>
++                            <td><code th:text="${operation.resultingPid != null ? operation.resultingPid : (operation.previousPid != null ? operation.previousPid : '—')}">PID</code></td>
++                            <td th:text="${operation.durationMs != null ? operation.durationMs + ' ms' : '—'}">—</td>
++                            <td th:text="${operation.requestedBy}">User</td>
++                            <td class="matrix26-table-message" th:text="${operation.message}">Result</td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++
++            <section class="matrix26-panel mt-4">
++                <div class="matrix26-panel-header">
+                     <div><span>Diagnostics</span><h2>Latest log lines</h2></div>
+                     <a th:href="@{/control-center/operations/logs}" class="small text-decoration-none">Log inventory</a>
+                 </div>
+@@ -133,6 +196,54 @@
+         </main>
+     </div>
+ </div>
++
++<div class="modal fade" id="stopRuntimeModal" tabindex="-1" aria-labelledby="stopRuntimeModalLabel" aria-hidden="true" th:if="${runtimeControl.manageable()}">
++    <div class="modal-dialog modal-dialog-centered">
++        <div class="modal-content">
++            <form th:action="@{/control-center/operations/runtimes/{key}/stop(key=${runtime.target().key()})}" method="post">
++                <div class="modal-header">
++                    <h2 class="modal-title fs-5" id="stopRuntimeModalLabel">Stop runtime</h2>
++                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
++                </div>
++                <div class="modal-body">
++                    <p>Matrix26 will request a graceful shutdown and wait for port <strong th:text="${runtime.target().expectedPort()}">8094</strong> to become free.</p>
++                    <div class="alert alert-warning small">Force stop is not available in this phase. If graceful shutdown times out, the process will remain active for manual review.</div>
++                    <label class="form-label" for="stopConfirmation">Type the exact confirmation</label>
++                    <code class="d-block mb-2" th:text="${runtimeControl.stopConfirmation()}">STOP code</code>
++                    <input class="form-control" id="stopConfirmation" name="confirmation" type="text" required autocomplete="off" th:placeholder="${runtimeControl.stopConfirmation()}">
++                </div>
++                <div class="modal-footer">
++                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
++                    <button type="submit" class="btn btn-danger"><i class="bi bi-stop-fill me-1"></i>Stop runtime</button>
++                </div>
++            </form>
++        </div>
++    </div>
++</div>
++
++<div class="modal fade" id="restartRuntimeModal" tabindex="-1" aria-labelledby="restartRuntimeModalLabel" aria-hidden="true" th:if="${runtimeControl.manageable()}">
++    <div class="modal-dialog modal-dialog-centered">
++        <div class="modal-content">
++            <form th:action="@{/control-center/operations/runtimes/{key}/restart(key=${runtime.target().key()})}" method="post">
++                <div class="modal-header">
++                    <h2 class="modal-title fs-5" id="restartRuntimeModalLabel">Restart runtime</h2>
++                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
++                </div>
++                <div class="modal-body">
++                    <p>Matrix26 will stop the current process, verify that the port is free, start a replacement process, and wait for the HTTP health check.</p>
++                    <label class="form-label" for="restartConfirmation">Type the exact confirmation</label>
++                    <code class="d-block mb-2" th:text="${runtimeControl.restartConfirmation()}">RESTART code</code>
++                    <input class="form-control" id="restartConfirmation" name="confirmation" type="text" required autocomplete="off" th:placeholder="${runtimeControl.restartConfirmation()}">
++                </div>
++                <div class="modal-footer">
++                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
++                    <button type="submit" class="btn btn-warning"><i class="bi bi-arrow-repeat me-1"></i>Restart runtime</button>
++                </div>
++            </form>
++        </div>
++    </div>
++</div>
++
+ <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+ </body>
+ </html>
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/resources/templates/control_center/operations/runtimes.html /mnt/data/matrix26_phase3d2_impl/src/main/resources/templates/control_center/operations/runtimes.html
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/resources/templates/control_center/operations/runtimes.html	2026-06-25 02:12:37.740897685 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/resources/templates/control_center/operations/runtimes.html	2026-06-25 02:17:38.734556225 +0000
+@@ -1,11 +1,11 @@
+ <!DOCTYPE html>
+-<html lang="es" xmlns:th="http://www.thymeleaf.org">
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
+ <head th:replace="~{control_center/fragments/head :: head('Runtime inventory')}"></head>
+ <body class="matrix26-body">
+ <div class="matrix26-shell">
+     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+     <div class="matrix26-content">
+-        <header th:replace="~{control_center/fragments/topbar :: topbar('Runtimes', 'Live process, configuration, storage, and availability detection.')}" ></header>
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Runtimes', 'Live process inventory and controlled operations for allowlisted laboratories.')}" ></header>
+         <main class="matrix26-main">
+             <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
+                 <div class="matrix26-inline-summary">
+@@ -20,18 +20,18 @@
+             </div>
+ 
+             <div class="matrix26-alert-safe mb-4">
+-                <i class="bi bi-shield-lock-fill"></i>
+-                <div><strong>Inventory without process control</strong><p>Start, stop, and restart controls remain locked until Phase 3D.2 and will initially be enabled only for laboratory instances.</p></div>
++                <i class="bi bi-shield-check"></i>
++                <div><strong>Controlled runtime operations</strong><p>Start, stop, and restart are available only for explicitly allowlisted laboratory instances. Protected production instances and Matrix26 itself remain read only.</p></div>
+             </div>
+ 
+             <section class="matrix26-panel">
+                 <div class="table-responsive">
+                     <table class="table align-middle mb-0 matrix26-table matrix26-runtime-table">
+                         <thead>
+-                        <tr><th>Instance</th><th>Configuration</th><th>Process</th><th>Port</th><th>HTTP</th><th>Log</th><th>Protection</th><th class="text-end">Actions</th></tr>
++                        <tr><th>Instance</th><th>Configuration</th><th>Process</th><th>Port</th><th>HTTP</th><th>Control</th><th>Protection</th><th class="text-end">Actions</th></tr>
+                         </thead>
+                         <tbody>
+-                        <tr th:each="runtime : ${runtimes}">
++                        <tr th:each="runtime : ${runtimes}" th:with="control=${runtimeControls[runtime.target().key()]}">
+                             <td>
+                                 <strong th:text="${runtime.target().businessName()}">Instance</strong>
+                                 <small><code th:text="${runtime.target().code()}">code</code></small>
+@@ -55,15 +55,20 @@
+                                 <small th:text="${runtime.http().responseTimeMs() != null ? runtime.http().responseTimeMs() + ' ms' : '—'}">—</small>
+                             </td>
+                             <td>
+-                                <span class="badge" th:classappend="${runtime.primaryLog() != null ? ' text-bg-info' : ' text-bg-light border text-dark'}" th:text="${runtime.primaryLog() != null ? runtime.primaryLog().sizeLabel() : 'No log'}">Log</span>
+-                                <small th:if="${runtime.primaryLog() != null}" th:text="${runtime.primaryLog().relativePath()}">Path</small>
++                                <span th:if="${control.manageable()}" class="badge text-bg-success"><i class="bi bi-power me-1"></i>Allowed</span>
++                                <span th:unless="${control.manageable()}" class="badge text-bg-light border text-dark"><i class="bi bi-lock me-1"></i>Read only</span>
++                                <small th:if="${!control.manageable()}" th:text="${control.reason()}">Reason</small>
++                                <small th:if="${control.lastOperation() != null}" th:text="|Last: ${control.lastOperation().action.label} · ${control.lastOperation().status.label}|">Last operation</small>
+                             </td>
+                             <td>
+-                                <span th:if="${runtime.target().protectedInstance()}" class="badge text-bg-primary"><i class="bi bi-shield-lock me-1"></i>Protected</span>
++                                <span th:if="${runtime.target().protectedInstance()}" class="badge text-bg-primary"><i class="bi bi-shield-lock me-1"></i>Protected data</span>
+                                 <span th:unless="${runtime.target().protectedInstance()}" class="badge text-bg-secondary">Laboratory</span>
+                             </td>
+                             <td class="text-end">
+                                 <div class="btn-group btn-group-sm">
++                                    <form th:if="${control.canStart()}" th:action="@{/control-center/operations/runtimes/{key}/start(key=${runtime.target().key()})}" method="post" class="d-inline">
++                                        <button class="btn btn-outline-success" type="submit" title="Start runtime"><i class="bi bi-play-fill"></i></button>
++                                    </form>
+                                     <a class="btn btn-outline-secondary" th:href="@{/control-center/operations/runtimes/{key}(key=${runtime.target().key()})}" title="View details"><i class="bi bi-eye"></i></a>
+                                     <a class="btn btn-outline-primary" th:if="${runtime.target().publicUrl() != null}" th:href="${runtime.target().publicUrl()}" target="_blank" rel="noopener" title="Open portal"><i class="bi bi-box-arrow-up-right"></i></a>
+                                 </div>
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/src/main/resources/static/css/matrix26-control.css	2026-06-25 02:12:37.640013015 +0000
++++ /mnt/data/matrix26_phase3d2_impl/src/main/resources/static/css/matrix26-control.css	2026-06-25 02:17:59.768805808 +0000
+@@ -1752,3 +1752,113 @@
+         flex-direction: column;
+     }
+ }
++
++/* Matrix26 Operations Phase 3D.2 */
++.matrix26-runtime-control-panel {
++    display: flex;
++    align-items: center;
++    justify-content: space-between;
++    gap: 1.25rem;
++    padding: 1.15rem 1.25rem;
++    border: 1px solid var(--matrix26-border, #dce3ee);
++    border-radius: 18px;
++    background: var(--matrix26-surface, #ffffff);
++    box-shadow: 0 14px 34px rgba(15, 23, 42, .06);
++}
++
++.matrix26-runtime-control-panel.is-enabled {
++    border-color: #a7f3d0;
++    background: linear-gradient(135deg, #f0fdf4, #ffffff 58%);
++}
++
++.matrix26-runtime-control-panel.is-locked {
++    background: #f8fafc;
++}
++
++.matrix26-runtime-control-copy {
++    display: flex;
++    align-items: flex-start;
++    gap: 1rem;
++    min-width: 0;
++}
++
++.matrix26-runtime-control-copy h2 {
++    margin: .12rem 0 .35rem;
++    color: var(--matrix26-heading, #172033);
++    font-size: 1.05rem;
++}
++
++.matrix26-runtime-control-copy p {
++    max-width: 760px;
++    margin: 0;
++    color: var(--matrix26-muted, #667085);
++    font-size: .88rem;
++}
++
++.matrix26-runtime-control-icon {
++    display: inline-grid;
++    width: 46px;
++    height: 46px;
++    flex: 0 0 46px;
++    place-items: center;
++    border-radius: 15px;
++    color: #047857;
++    background: #d1fae5;
++    font-size: 1.2rem;
++}
++
++.matrix26-runtime-control-panel.is-locked .matrix26-runtime-control-icon {
++    color: #475569;
++    background: #e2e8f0;
++}
++
++.matrix26-runtime-control-actions {
++    display: flex;
++    align-items: center;
++    justify-content: flex-end;
++    gap: .65rem;
++    flex-wrap: wrap;
++}
++
++.matrix26-runtime-control-actions form {
++    margin: 0;
++}
++
++.matrix26-eyebrow {
++    color: #64748b;
++    font-size: .72rem;
++    font-weight: 700;
++    letter-spacing: .08em;
++    text-transform: uppercase;
++}
++
++.matrix26-table-message {
++    min-width: 220px;
++    max-width: 420px;
++    color: var(--matrix26-muted, #667085);
++    white-space: normal !important;
++}
++
++.matrix26-runtime-table .btn-group form {
++    display: inline-flex;
++}
++
++.matrix26-runtime-table .btn-group form .btn {
++    border-radius: 0;
++}
++
++.matrix26-runtime-table .btn-group form:first-child .btn {
++    border-top-left-radius: .375rem;
++    border-bottom-left-radius: .375rem;
++}
++
++@media (max-width: 900px) {
++    .matrix26-runtime-control-panel {
++        align-items: stretch;
++        flex-direction: column;
++    }
++
++    .matrix26-runtime-control-actions {
++        justify-content: flex-start;
++    }
++}
+diff -ruN /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/scripts/check-matrix26-operations-phase3d2.sh /mnt/data/matrix26_phase3d2_impl/scripts/check-matrix26-operations-phase3d2.sh
+--- /mnt/data/matrix26_phase3d2_work/matrix26-operations-phase3d2-context-20260624-211022/scripts/check-matrix26-operations-phase3d2.sh	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_phase3d2_impl/scripts/check-matrix26-operations-phase3d2.sh	2026-06-25 02:19:39.337491750 +0000
+@@ -0,0 +1,61 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++cd "$ROOT_DIR"
++
++CONTROL_DIR="src/main/java/com/ecoamazonas/eco_agua/platform/control/operations"
++TEMPLATE_DIR="src/main/resources/templates/control_center/operations"
++
++required_files=(
++  "$CONTROL_DIR/Matrix26RuntimeControlService.java"
++  "$CONTROL_DIR/Matrix26RuntimeControlInitializer.java"
++  "$CONTROL_DIR/Matrix26RuntimeOperation.java"
++  "$CONTROL_DIR/Matrix26RuntimeManagedState.java"
++  "$CONTROL_DIR/Matrix26RuntimeOperationRepository.java"
++  "$CONTROL_DIR/Matrix26RuntimeManagedStateRepository.java"
++  "$TEMPLATE_DIR/runtime_detail.html"
++  "$TEMPLATE_DIR/runtimes.html"
++)
++
++for file in "${required_files[@]}"; do
++  if [[ ! -f "$file" ]]; then
++    echo "Missing required file: $file" >&2
++    exit 1
++  fi
++done
++
++grep -q 'matrix26-restaurant-lab' "$CONTROL_DIR/Matrix26OperationsProperties.java"
++grep -q 'matrix26-appearance-lab' "$CONTROL_DIR/Matrix26OperationsProperties.java"
++grep -q '@PostMapping("/runtimes/{runtimeKey}/start")' "$CONTROL_DIR/Matrix26OperationsController.java"
++grep -q '@PostMapping("/runtimes/{runtimeKey}/stop")' "$CONTROL_DIR/Matrix26OperationsController.java"
++grep -q '@PostMapping("/runtimes/{runtimeKey}/restart")' "$CONTROL_DIR/Matrix26OperationsController.java"
++grep -q 'CREATE TABLE IF NOT EXISTS matrix26_runtime_state' "$CONTROL_DIR/Matrix26RuntimeControlInitializer.java"
++grep -q 'CREATE TABLE IF NOT EXISTS matrix26_runtime_operation' "$CONTROL_DIR/Matrix26RuntimeControlInitializer.java"
++grep -q 'ProcessBuilder' "$CONTROL_DIR/Matrix26RuntimeControlService.java"
++grep -q 'ProcessHandle' "$CONTROL_DIR/Matrix26RuntimeControlService.java"
++grep -q 'Force stop is not available' "$TEMPLATE_DIR/runtime_detail.html"
++
++if grep -qE 'destroyForcibly|taskkill|Stop-Process|kill -9|Runtime\.getRuntime\(' \
++  "$CONTROL_DIR/Matrix26RuntimeControlService.java"; then
++  echo "Unsafe force-stop or shell execution detected in runtime control service." >&2
++  exit 1
++fi
++
++if grep -qE '8081|8082|8084|matrix26-control' \
++  "$CONTROL_DIR/Matrix26OperationsProperties.java"; then
++  echo "A protected production runtime was added to the control allowlist." >&2
++  exit 1
++fi
++
++if grep -RniE 'password=[^*]|token=[^*]|api[-_.]?key=[^*]' \
++  "$CONTROL_DIR/Matrix26RuntimeControlService.java" \
++  "$TEMPLATE_DIR" >/dev/null 2>&1; then
++  echo "Potential plaintext secret detected in Phase 3D.2 files." >&2
++  exit 1
++fi
++
++echo "Runtime allowlist and protected-instance boundaries: OK"
++echo "Controlled POST endpoints and confirmation flow: OK"
++echo "No force-stop or arbitrary shell execution in runtime control service: OK"
++echo "Matrix26 Operations Phase 3D.2 static checks passed."

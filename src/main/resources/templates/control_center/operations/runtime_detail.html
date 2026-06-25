@@ -1,12 +1,21 @@
 <!DOCTYPE html>
-<html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{control_center/fragments/head :: head('Details de runtime')}"></head>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Runtime details')}"></head>
 <body class="matrix26-body">
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('Details de runtime', 'Read-only technical diagnostics without process control.')}" ></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Runtime details', 'Controlled process operations, live diagnostics, and audit history.')}" ></header>
         <main class="matrix26-main">
+            <div th:if="${runtimeOperationSuccess}" class="alert alert-success d-flex align-items-start gap-2">
+                <i class="bi bi-check-circle-fill mt-1"></i>
+                <span th:text="${runtimeOperationSuccess}">Operation completed.</span>
+            </div>
+            <div th:if="${runtimeOperationError}" class="alert alert-danger d-flex align-items-start gap-2">
+                <i class="bi bi-exclamation-octagon-fill mt-1"></i>
+                <span th:text="${runtimeOperationError}">Operation failed.</span>
+            </div>
+
             <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
                 <div class="d-flex align-items-center gap-3">
                     <span class="matrix26-detail-avatar"><i class="bi bi-cpu-fill"></i></span>
@@ -14,7 +23,8 @@
                         <div class="d-flex gap-2 flex-wrap align-items-center">
                             <h2 class="m-0 fs-4" th:text="${runtime.target().businessName()}">Runtime</h2>
                             <span class="badge" th:classappend="${runtime.state().getBadgeClass()}" th:text="${runtime.state().getLabel()}">Status</span>
-                            <span class="badge text-bg-primary" th:if="${runtime.target().protectedInstance()}">Protected</span>
+                            <span class="badge text-bg-primary" th:if="${runtime.target().protectedInstance()}">Protected data</span>
+                            <span class="badge text-bg-success" th:if="${runtimeControl.manageable()}">Runtime control allowed</span>
                         </div>
                         <code th:text="${runtime.target().runtimeProfile()}">profile</code>
                     </div>
@@ -26,10 +36,35 @@
                 </div>
             </div>
 
-            <div class="matrix26-alert-safe mb-4">
-                <i class="bi bi-eye-fill"></i>
-                <div><strong>Read only</strong><p>Matrix26 can inspect this runtime, but it cannot start, stop, restart, modify, or delete the process during Phase 3D.1.</p></div>
-            </div>
+            <section class="matrix26-runtime-control-panel mb-4" th:classappend="${runtimeControl.manageable() ? ' is-enabled' : ' is-locked'}">
+                <div class="matrix26-runtime-control-copy">
+                    <span class="matrix26-runtime-control-icon"><i class="bi" th:classappend="${runtimeControl.manageable() ? ' bi-power' : ' bi-shield-lock-fill'}"></i></span>
+                    <div>
+                        <span class="matrix26-eyebrow">Runtime control</span>
+                        <h2 th:text="${runtimeControl.manageable() ? 'Controlled operations enabled' : 'Operations locked'}">Runtime control</h2>
+                        <p th:if="${runtimeControl.manageable()}">Matrix26 can start, stop, and restart this allowlisted laboratory runtime. Graceful stop is always attempted first; force stop is not available in Phase 3D.2.</p>
+                        <p th:unless="${runtimeControl.manageable()}" th:text="${runtimeControl.reason()}">Locked.</p>
+                    </div>
+                </div>
+
+                <div class="matrix26-runtime-control-actions" th:if="${runtimeControl.manageable()}">
+                    <form th:if="${runtimeControl.canStart()}" th:action="@{/control-center/operations/runtimes/{key}/start(key=${runtime.target().key()})}" method="post">
+                        <button class="btn btn-success" type="submit">
+                            <i class="bi bi-play-fill me-1"></i>Start runtime
+                        </button>
+                    </form>
+                    <button th:if="${runtimeControl.canRestart()}" class="btn btn-warning" type="button" data-bs-toggle="modal" data-bs-target="#restartRuntimeModal">
+                        <i class="bi bi-arrow-repeat me-1"></i>Restart
+                    </button>
+                    <button th:if="${runtimeControl.canStop()}" class="btn btn-danger" type="button" data-bs-toggle="modal" data-bs-target="#stopRuntimeModal">
+                        <i class="bi bi-stop-fill me-1"></i>Stop
+                    </button>
+                    <span th:if="${runtimeControl.operationInProgress()}" class="badge text-bg-info p-2">
+                        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Operation in progress
+                    </span>
+                    <span th:if="${!runtimeControl.canStart() && !runtimeControl.canStop() && !runtimeControl.operationInProgress()}" class="text-muted small">Refresh the inventory to update available actions.</span>
+                </div>
+            </section>
 
             <div th:if="${runtime.hasWarnings()}" class="alert alert-warning">
                 <strong class="d-block mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i>Warnings</strong>
@@ -44,21 +79,25 @@
                             <div><dt>Code</dt><dd><code th:text="${runtime.target().code()}">code</code></dd></div>
                             <div><dt>Runtime profile</dt><dd><code th:text="${runtime.target().runtimeProfile()}">profile</code></dd></div>
                             <div><dt>Declared database</dt><dd><code th:text="${runtime.target().databaseName()}">database</code></dd></div>
-                            <div><dt>Port esperado</dt><dd th:text="${runtime.target().expectedPort()}">8094</dd></div>
+                            <div><dt>Expected port</dt><dd th:text="${runtime.target().expectedPort()}">8094</dd></div>
                             <div><dt>URL</dt><dd><a th:href="${runtime.target().publicUrl()}" target="_blank" rel="noopener" th:text="${runtime.target().publicUrl()}">URL</a></dd></div>
                             <div><dt>Management mode</dt><dd th:text="${runtime.target().managementMode()}">Mode</dd></div>
-                            <div><dt>Reference command</dt><dd><code th:text="${runtime.target().runtimeCommand() != null ? runtime.target().runtimeCommand() : 'No registrado'}">Command</code></dd></div>
+                            <div><dt>Reference command</dt><dd><code th:text="${runtime.target().runtimeCommand() != null ? runtime.target().runtimeCommand() : 'Not registered'}">Command</code></dd></div>
                         </dl>
                     </section>
                 </div>
                 <div class="col-12 col-xl-5">
                     <section class="matrix26-panel h-100">
-                        <div class="matrix26-panel-header"><div><span>Result</span><h2>Status consolidado</h2></div></div>
+                        <div class="matrix26-panel-header"><div><span>Consolidated result</span><h2>Current status</h2></div></div>
                         <div class="matrix26-runtime-state-card">
                             <span class="matrix26-runtime-state-icon"><i class="bi" th:classappend="${' ' + runtime.state().getIconClass()}"></i></span>
                             <div><span class="badge" th:classappend="${runtime.state().getBadgeClass()}" th:text="${runtime.state().getLabel()}">Status</span><p th:text="${runtime.stateDetail()}">Details</p></div>
                         </div>
-                        <div class="matrix26-operation-lock mt-3"><i class="bi bi-lock-fill"></i><span>Start, stop, and restart will be available in 3D.2 only for authorized laboratory instances.</span></div>
+                        <dl class="matrix26-settings-list mt-3" th:if="${runtimeControl.managedState() != null}">
+                            <div><dt>Managed state</dt><dd><span class="badge" th:classappend="${runtimeControl.managedState().currentState.badgeClass}" th:text="${runtimeControl.managedState().currentState.label}">State</span></dd></div>
+                            <div><dt>Last managed PID</dt><dd th:text="${runtimeControl.managedState().lastKnownPid != null ? runtimeControl.managedState().lastKnownPid : '—'}">—</dd></div>
+                            <div><dt>Message</dt><dd th:text="${runtimeControl.managedState().message}">Message</dd></div>
+                        </dl>
                     </section>
                 </div>
             </div>
@@ -71,7 +110,7 @@
                             <div><dt>Runtime directory</dt><dd><span class="badge" th:classappend="${runtime.runtimeDirectoryPresent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.runtimeDirectoryPresent() ? 'Found' : 'Not found'}">Status</span><code th:text="${runtime.runtimeDirectory() != '' ? runtime.runtimeDirectory() : '—'}">Path</code></dd></div>
                             <div><dt>application.properties</dt><dd><span class="badge" th:classappend="${runtime.configurationPresent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.configurationPresent() ? 'Found' : 'Missing'}">Status</span><code th:text="${runtime.configurationPath() != '' ? runtime.configurationPath() : '—'}">Path</code></dd></div>
                             <div><dt>Consistency</dt><dd><span class="badge" th:classappend="${runtime.configurationConsistent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.configurationConsistent() ? 'Consistent' : 'Review'}">Status</span></dd></div>
-                            <div><dt>Port configurado</dt><dd th:text="${runtime.configuredPort() != null ? runtime.configuredPort() : '—'}">—</dd></div>
+                            <div><dt>Configured port</dt><dd th:text="${runtime.configuredPort() != null ? runtime.configuredPort() : '—'}">—</dd></div>
                             <div><dt>Configured profile</dt><dd><code th:text="${runtime.configuredRuntimeProfile() != '' ? runtime.configuredRuntimeProfile() : '—'}">—</code></dd></div>
                             <div><dt>Configured database</dt><dd><code th:text="${runtime.configuredDatabaseName() != '' ? runtime.configuredDatabaseName() : '—'}">—</code></dd></div>
                             <div><dt>Launcher</dt><dd><span class="badge" th:classappend="${runtime.launcherPresent() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${runtime.launcherPresent() ? 'Found' : 'Missing'}">Status</span><code th:text="${runtime.launcherPath() != '' ? runtime.launcherPath() : '—'}">Path</code></dd></div>
@@ -82,9 +121,9 @@
                     <section class="matrix26-panel h-100">
                         <div class="matrix26-panel-header"><div><span>Operating system</span><h2>Process and port</h2></div></div>
                         <dl class="matrix26-settings-list">
-                            <div><dt>Port escuchando</dt><dd><span class="badge" th:classappend="${runtime.portListening() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.portListening() ? 'Yes' : 'No'}">Status</span></dd></div>
+                            <div><dt>Port listening</dt><dd><span class="badge" th:classappend="${runtime.portListening() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${runtime.portListening() ? 'Yes' : 'No'}">Status</span></dd></div>
                             <div><dt>Owner PID</dt><dd th:text="${runtime.portOwnerPid() != null ? runtime.portOwnerPid() : '—'}">—</dd></div>
-                            <div><dt>Process propietario</dt><dd th:text="${runtime.portOwnerProcess() != '' ? runtime.portOwnerProcess() : '—'}">—</dd></div>
+                            <div><dt>Owner process</dt><dd th:text="${runtime.portOwnerProcess() != '' ? runtime.portOwnerProcess() : '—'}">—</dd></div>
                             <div><dt>Runtime PID</dt><dd th:text="${runtime.processId() != null ? runtime.processId() : '—'}">—</dd></div>
                             <div><dt>Started at</dt><dd th:text="${runtime.processStartedAt() != null ? #temporals.format(runtime.processStartedAt(), 'dd/MM/yyyy HH:mm:ss') : '—'}">—</dd></div>
                             <div><dt>Uptime</dt><dd th:text="${runtime.uptimeLabel()}">—</dd></div>
@@ -113,11 +152,35 @@
                         <div class="matrix26-panel-header"><div><span>Capacity</span><h2>Detected storage</h2></div></div>
                         <div class="matrix26-storage-bars">
                             <article><div><strong>Runtime</strong><span th:text="${runtime.runtimeStorageLabel()}">0 B</span></div><div class="matrix26-storage-track"><span style="width: 42%"></span></div><small th:text="${runtime.runtimeDirectory() != '' ? runtime.runtimeDirectory() : 'No local directory'}">Path</small></article>
-                            <article><div><strong>Instance assets</strong><span th:text="${runtime.assetStorageLabel()}">0 B</span></div><div class="matrix26-storage-track"><span style="width: 68%"></span></div><small>Branding, images, and assets managed outside Git.</small></article>
+                            <article><div><strong>Instance assets</strong><span th:text="${runtime.assetStorageLabel()}">0 B</span></div><div class="matrix26-storage-track"><span style="width: 68%"></span></div><small>Branding, images, logs, and generated runtime files outside Git.</small></article>
                         </div>
                     </section>
                 </div>
             </div>
+
+            <section class="matrix26-panel mt-4">
+                <div class="matrix26-panel-header">
+                    <div><span>Runtime audit</span><h2>Recent operations</h2></div>
+                    <span class="small text-muted">Start, stop, and restart history</span>
+                </div>
+                <div th:if="${#lists.isEmpty(runtimeOperations)}" class="text-muted py-4 text-center">No controlled runtime operations have been recorded.</div>
+                <div th:unless="${#lists.isEmpty(runtimeOperations)}" class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Requested</th><th>Action</th><th>Status</th><th>PID</th><th>Duration</th><th>User</th><th>Result</th></tr></thead>
+                        <tbody>
+                        <tr th:each="operation : ${runtimeOperations}">
+                            <td th:text="${#temporals.format(operation.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">Date</td>
+                            <td><span class="badge text-bg-light border text-dark" th:text="${operation.action.label}">Action</span></td>
+                            <td><span class="badge" th:classappend="${operation.status.badgeClass}" th:text="${operation.status.label}">Status</span></td>
+                            <td><code th:text="${operation.resultingPid != null ? operation.resultingPid : (operation.previousPid != null ? operation.previousPid : '—')}">PID</code></td>
+                            <td th:text="${operation.durationMs != null ? operation.durationMs + ' ms' : '—'}">—</td>
+                            <td th:text="${operation.requestedBy}">User</td>
+                            <td class="matrix26-table-message" th:text="${operation.message}">Result</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
             <section class="matrix26-panel mt-4">
                 <div class="matrix26-panel-header">
@@ -133,6 +196,54 @@
         </main>
     </div>
 </div>
+
+<div class="modal fade" id="stopRuntimeModal" tabindex="-1" aria-labelledby="stopRuntimeModalLabel" aria-hidden="true" th:if="${runtimeControl.manageable()}">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form th:action="@{/control-center/operations/runtimes/{key}/stop(key=${runtime.target().key()})}" method="post">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="stopRuntimeModalLabel">Stop runtime</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Matrix26 will request a graceful shutdown and wait for port <strong th:text="${runtime.target().expectedPort()}">8094</strong> to become free.</p>
+                    <div class="alert alert-warning small">Force stop is not available in this phase. If graceful shutdown times out, the process will remain active for manual review.</div>
+                    <label class="form-label" for="stopConfirmation">Type the exact confirmation</label>
+                    <code class="d-block mb-2" th:text="${runtimeControl.stopConfirmation()}">STOP code</code>
+                    <input class="form-control" id="stopConfirmation" name="confirmation" type="text" required autocomplete="off" th:placeholder="${runtimeControl.stopConfirmation()}">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-stop-fill me-1"></i>Stop runtime</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="restartRuntimeModal" tabindex="-1" aria-labelledby="restartRuntimeModalLabel" aria-hidden="true" th:if="${runtimeControl.manageable()}">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form th:action="@{/control-center/operations/runtimes/{key}/restart(key=${runtime.target().key()})}" method="post">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="restartRuntimeModalLabel">Restart runtime</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Matrix26 will stop the current process, verify that the port is free, start a replacement process, and wait for the HTTP health check.</p>
+                    <label class="form-label" for="restartConfirmation">Type the exact confirmation</label>
+                    <code class="d-block mb-2" th:text="${runtimeControl.restartConfirmation()}">RESTART code</code>
+                    <input class="form-control" id="restartConfirmation" name="confirmation" type="text" required autocomplete="off" th:placeholder="${runtimeControl.restartConfirmation()}">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-arrow-repeat me-1"></i>Restart runtime</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

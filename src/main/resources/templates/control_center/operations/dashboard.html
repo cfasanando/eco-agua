@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{control_center/fragments/head :: head('Operations')}"></head>
 <body class="matrix26-body">
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('Operations Center', 'Live inventory of runtimes, processes, ports, and logs in read-only mode.')}" ></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Operations Center', 'Runtime inventory, controlled laboratory operations, ports, and persistent logs.')}" ></header>
 
         <main class="matrix26-main">
             <div class="matrix26-alert-safe mb-4">
-                <i class="bi bi-binoculars-fill"></i>
+                <i class="bi bi-shield-check"></i>
                 <div>
-                    <strong>Phase 3D.1: safe observation</strong>
-                    <p>This section does not start, stop, or restart processes. It also does not write PID files, modify launchers, or query operational data.</p>
+                    <strong>Phase 3D.2: controlled laboratory operations</strong>
+                    <p>Matrix26 can start, gracefully stop, and restart only explicitly allowlisted laboratory runtimes. Production instances and the Control Center remain read only.</p>
                 </div>
             </div>
 
@@ -102,6 +102,30 @@
                             <td class="text-end">
                                 <a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/operations/runtimes/{key}(key=${runtime.target().key()})}" title="View technical inventory"><i class="bi bi-eye"></i></a>
                             </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="matrix26-panel mt-4">
+                <div class="matrix26-panel-header">
+                    <div><span>Audit trail</span><h2>Recent runtime operations</h2></div>
+                    <span class="small text-muted">Up to 100 operations</span>
+                </div>
+                <div th:if="${#lists.isEmpty(recentRuntimeOperations)}" class="text-muted py-4 text-center">No controlled runtime operations have been recorded.</div>
+                <div th:unless="${#lists.isEmpty(recentRuntimeOperations)}" class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Requested</th><th>Instance</th><th>Action</th><th>Status</th><th>PID</th><th>User</th><th>Result</th></tr></thead>
+                        <tbody>
+                        <tr th:each="operation : ${recentRuntimeOperations}">
+                            <td th:text="${#temporals.format(operation.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">Date</td>
+                            <td><strong th:text="${operation.instanceCode}">Instance</strong><small th:text="|Port ${operation.runtimePort}|">Port</small></td>
+                            <td><span class="badge text-bg-light border text-dark" th:text="${operation.action.label}">Action</span></td>
+                            <td><span class="badge" th:classappend="${operation.status.badgeClass}" th:text="${operation.status.label}">Status</span></td>
+                            <td><code th:text="${operation.resultingPid != null ? operation.resultingPid : (operation.previousPid != null ? operation.previousPid : '—')}">PID</code></td>
+                            <td th:text="${operation.requestedBy}">User</td>
+                            <td class="matrix26-table-message" th:text="${operation.message}">Result</td>
                         </tr>
                         </tbody>
                     </table>

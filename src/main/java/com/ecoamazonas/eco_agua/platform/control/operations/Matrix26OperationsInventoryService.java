@@ -61,6 +61,10 @@ public class Matrix26OperationsInventoryService {
         this.systemProbe = systemProbe;
     }
 
+    public void invalidateCache() {
+        cache.set(null);
+    }
+
     public Matrix26OperationsSnapshot snapshot(boolean forceRefresh) {
         CachedSnapshot cached = cache.get();
         long cacheSeconds = Math.max(2L, operationsProperties.getCacheSeconds());
@@ -122,7 +126,7 @@ public class Matrix26OperationsInventoryService {
                 .toList();
         Matrix26SystemSnapshot system = systemProbe.capture(expectedPorts);
 
-        Map<String, List<Path>> logsByRuntime = discoverLogs(projectRoot, logRoot, runtimeRoot, targets);
+        Map<String, List<Path>> logsByRuntime = discoverLogs(projectRoot, logRoot, runtimeRoot, dataRoot, targets);
         List<Matrix26RuntimeInventoryItem> runtimes = targets.stream()
                 .map(target -> inspectRuntime(
                         target,
@@ -492,11 +496,13 @@ public class Matrix26OperationsInventoryService {
             Path projectRoot,
             Path logRoot,
             Path runtimeRoot,
+            Path dataRoot,
             List<Matrix26RuntimeTarget> targets
     ) {
         Set<Path> files = new LinkedHashSet<>();
         collectLogFiles(logRoot, 3, files);
         collectLogFiles(runtimeRoot, 4, files);
+        collectLogFiles(dataRoot, 5, files);
 
         Map<String, List<Path>> result = new LinkedHashMap<>();
         for (Matrix26RuntimeTarget target : targets) {

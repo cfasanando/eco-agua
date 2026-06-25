@@ -139,6 +139,13 @@ public class Matrix26BackupRepository {
         );
     }
 
+    public void deleteMetadataArtifacts(long jobId) {
+        jdbcTemplate.update(
+                "DELETE FROM matrix26_backup_artifact WHERE job_id = ? AND artifact_type IN ('MANIFEST','CHECKSUMS','REPORT')",
+                jobId
+        );
+    }
+
     public void insertVerification(
             long jobId,
             String code,

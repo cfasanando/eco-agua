@@ -68,6 +68,7 @@ public class Matrix26BackupService {
     private final Matrix26BackupToolLocator toolLocator;
     private final Matrix26InstanceAuditLogRepository auditLogRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final Matrix26FullBackupAssembler fullBackupAssembler;
     private final Set<Long> localLocks = ConcurrentHashMap.newKeySet();
 
     public Matrix26BackupService(
@@ -76,7 +77,8 @@ public class Matrix26BackupService {
             Matrix26BackupProperties properties,
             Matrix26BackupToolLocator toolLocator,
             Matrix26InstanceAuditLogRepository auditLogRepository,
-            JdbcTemplate jdbcTemplate
+            JdbcTemplate jdbcTemplate,
+            Matrix26FullBackupAssembler fullBackupAssembler
     ) {
         this.clientRepository = clientRepository;
         this.backupRepository = backupRepository;
@@ -84,6 +86,7 @@ public class Matrix26BackupService {
         this.toolLocator = toolLocator;
         this.auditLogRepository = auditLogRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.fullBackupAssembler = fullBackupAssembler;
     }
 
     public List<Matrix26BackupCandidate> candidates() {
@@ -139,6 +142,23 @@ public class Matrix26BackupService {
             String actor,
             boolean confirmation
     ) {
+        return createManualBackup(instanceId, actor, confirmation, false);
+    }
+
+    public synchronized Matrix26BackupJob createManualFullBackup(
+            long instanceId,
+            String actor,
+            boolean confirmation
+    ) {
+        return createManualBackup(instanceId, actor, confirmation, true);
+    }
+
+    private Matrix26BackupJob createManualBackup(
+            long instanceId,
+            String actor,
+            boolean confirmation,
+            boolean fullBackup
+    ) {
         if (!properties.isEnabled()) {
             throw new Matrix26BackupException("Database backups are disabled in Matrix26 configuration.");
         }
@@ -189,7 +209,7 @@ public class Matrix26BackupService {
                     instance.getCode(),
                     instance.getBusinessName(),
                     instance.getDatabaseName(),
-                    "MANUAL_DATABASE",
+                    fullBackup ? "MANUAL_FULL" : "MANUAL_DATABASE",
                     Matrix26BackupStatus.PENDING,
                     safeActor(actor),
                     now,
@@ -214,14 +234,23 @@ public class Matrix26BackupService {
             long jobId = backupRepository.insertJob(newJob);
             createdJob = backupRepository.findById(jobId).orElseThrow();
 
-            executeBackup(createdJob, instance, connection, tool, root, backupDirectory);
-            writeAudit(instance, actor, "DATABASE_BACKUP_COMPLETED", "Manual database backup completed: " + publicId);
+            executeBackup(createdJob, instance, connection, tool, root, backupDirectory, fullBackup);
+            if (fullBackup) {
+                Matrix26BackupJob databaseJob = backupRepository.findById(jobId).orElseThrow();
+                Matrix26FullBackupResult fullResult = fullBackupAssembler.assemble(
+                        databaseJob, instance, root, backupDirectory
+                );
+                finalizeFullBackup(databaseJob, instance, connection, tool, root, backupDirectory, fullResult);
+                writeAudit(instance, actor, "FULL_BACKUP_COMPLETED", "Manual full instance backup completed: " + publicId);
+            } else {
+                writeAudit(instance, actor, "DATABASE_BACKUP_COMPLETED", "Manual database backup completed: " + publicId);
+            }
             return backupRepository.findById(jobId).orElseThrow();
         } catch (Matrix26BackupException ex) {
             if (createdJob != null) {
                 backupRepository.fail(createdJob.id(), sanitize(ex.getMessage()));
                 writeFailureReport(backupDirectory, createdJob, ex.getMessage());
-                writeAudit(instance, actor, "DATABASE_BACKUP_FAILED", "Manual database backup failed: " + createdJob.publicId());
+                writeAudit(instance, actor, fullBackup ? "FULL_BACKUP_FAILED" : "DATABASE_BACKUP_FAILED", (fullBackup ? "Manual full instance backup failed: " : "Manual database backup failed: ") + createdJob.publicId());
             }
             throw ex;
         } catch (Exception ex) {
@@ -229,7 +258,7 @@ public class Matrix26BackupService {
             if (createdJob != null) {
                 backupRepository.fail(createdJob.id(), message);
                 writeFailureReport(backupDirectory, createdJob, message);
-                writeAudit(instance, actor, "DATABASE_BACKUP_FAILED", "Manual database backup failed: " + createdJob.publicId());
+                writeAudit(instance, actor, fullBackup ? "FULL_BACKUP_FAILED" : "DATABASE_BACKUP_FAILED", (fullBackup ? "Manual full instance backup failed: " : "Manual database backup failed: ") + createdJob.publicId());
             }
             throw new Matrix26BackupException(message, ex);
         } finally {
@@ -243,7 +272,8 @@ public class Matrix26BackupService {
             Matrix26DatabaseConnectionInfo connection,
             Matrix26BackupToolStatus tool,
             Path root,
-            Path directory
+            Path directory,
+            boolean fullBackup
     ) throws IOException, InterruptedException {
         backupRepository.markStarted(job.id(), Matrix26BackupStatus.VALIDATING, tool.executable(), tool.version());
 
@@ -340,17 +370,173 @@ public class Matrix26BackupService {
         backupRepository.insertArtifact(job.id(), "REPORT", report.getFileName().toString(),
                 relative(root, report), Files.size(report), sha256(report), "VERIFIED");
 
+        if (fullBackup) {
+            backupRepository.updateStatus(job.id(), Matrix26BackupStatus.VERIFYING);
+        } else {
+            backupRepository.complete(
+                    job.id(),
+                    databaseSize,
+                    dumpSize,
+                    compressedSize,
+                    tableCount,
+                    dumpSha,
+                    relative(root, manifest),
+                    relative(root, report),
+                    "All required database backup checks passed."
+            );
+        }
+    }
+
+    private void finalizeFullBackup(
+            Matrix26BackupJob job,
+            PlatformBusinessClient instance,
+            Matrix26DatabaseConnectionInfo connection,
+            Matrix26BackupToolStatus tool,
+            Path root,
+            Path directory,
+            Matrix26FullBackupResult result
+    ) throws IOException {
+        Path compressed = directory.resolve("database.sql.gz");
+        Path manifest = directory.resolve("manifest.json");
+        Path checksums = directory.resolve("checksums.sha256");
+        Path report = directory.resolve("backup-report.txt");
+
+        LinkedHashMap<Path, String> hashes = new LinkedHashMap<>();
+        hashes.put(compressed, sha256(compressed));
+        hashes.putAll(result.hashes());
+
+        writeFullManifest(manifest, job, instance, connection, tool, result, hashes);
+        hashes.put(manifest, sha256(manifest));
+
+        StringBuilder checksumContent = new StringBuilder();
+        for (Map.Entry<Path, String> entry : hashes.entrySet()) {
+            checksumContent.append(entry.getValue())
+                    .append("  ")
+                    .append(entry.getKey().getFileName())
+                    .append(System.lineSeparator());
+        }
+        Files.writeString(checksums, checksumContent, StandardCharsets.UTF_8);
+
+        boolean hashesMatch = true;
+        for (Map.Entry<Path, String> entry : hashes.entrySet()) {
+            if (!entry.getValue().equals(sha256(entry.getKey()))) {
+                hashesMatch = false;
+                break;
+            }
+        }
+        verify(job.id(), "FULL_ARTIFACT_SHA256", "Full package SHA-256 checksums", hashesMatch,
+                hashesMatch
+                        ? hashes.size() + " recovery artifacts passed SHA-256 verification."
+                        : "At least one full-backup artifact changed during verification.");
+        if (!hashesMatch) {
+            throw new Matrix26BackupException("The full-backup artifact checksums did not pass verification.");
+        }
+
+        writeFullReport(report, job, instance, tool, result, hashes);
+
+        backupRepository.deleteMetadataArtifacts(job.id());
+        backupRepository.insertArtifact(job.id(), "MANIFEST", manifest.getFileName().toString(),
+                relative(root, manifest), Files.size(manifest), sha256(manifest), "VERIFIED");
+        backupRepository.insertArtifact(job.id(), "CHECKSUMS", checksums.getFileName().toString(),
+                relative(root, checksums), Files.size(checksums), sha256(checksums), "VERIFIED");
+        backupRepository.insertArtifact(job.id(), "REPORT", report.getFileName().toString(),
+                relative(root, report), Files.size(report), sha256(report), "VERIFIED");
+
+        long totalStored = Files.size(compressed)
+                + result.storedBytes()
+                + Files.size(manifest)
+                + Files.size(checksums)
+                + Files.size(report);
+        String packageSha = sha256(checksums);
         backupRepository.complete(
                 job.id(),
-                databaseSize,
-                dumpSize,
-                compressedSize,
-                tableCount,
-                dumpSha,
+                value(job.databaseSizeBytes()),
+                value(job.dumpSizeBytes()),
+                totalStored,
+                job.tableCount() == null ? 0 : job.tableCount(),
+                packageSha,
                 relative(root, manifest),
                 relative(root, report),
-                "All required database backup checks passed."
+                result.stableInventory()
+                        ? "Database, runtime configuration, modules, appearance, and instance resources passed verification."
+                        : "The full package passed verification with a file-change warning. Restore testing is recommended."
         );
+    }
+
+    private void writeFullManifest(
+            Path manifest,
+            Matrix26BackupJob job,
+            PlatformBusinessClient instance,
+            Matrix26DatabaseConnectionInfo connection,
+            Matrix26BackupToolStatus tool,
+            Matrix26FullBackupResult result,
+            Map<Path, String> hashes
+    ) throws IOException {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("formatVersion", 2);
+        values.put("backupId", job.publicId());
+        values.put("backupType", "MANUAL_FULL");
+        values.put("consistencyMode", "ONLINE_CONSISTENT");
+        values.put("instanceId", instance.getId());
+        values.put("instanceCode", instance.getCode());
+        values.put("instanceName", instance.getBusinessName());
+        values.put("databaseName", connection.databaseName());
+        values.put("databaseHost", connection.host());
+        values.put("databasePort", connection.port());
+        values.put("runtimeProfile", instance.getRuntimeProfile());
+        values.put("runtimePort", instance.getRuntimePort());
+        values.put("createdAt", LocalDateTime.now().toString());
+        values.put("createdAtUtc", java.time.Instant.now().toString());
+        values.put("tool", tool.version());
+        values.put("tableCount", job.tableCount());
+        values.put("databaseSizeBytes", job.databaseSizeBytes());
+        values.put("databaseDumpBytes", job.compressedSizeBytes());
+        values.put("instanceArchiveEntries", result.archiveEntries());
+        values.put("instanceArchiveSourceBytes", result.sourceBytes());
+        values.put("instanceArchiveBytes", result.archiveBytes());
+        values.put("fileInventoryStable", result.stableInventory());
+        values.put("skippedSymlinks", result.skippedSymlinks());
+        values.put("artifactCount", hashes.size());
+        values.put("containsDatabase", true);
+        values.put("containsResources", true);
+        values.put("containsRuntimeConfiguration", true);
+        values.put("containsAppearance", true);
+        values.put("containsModules", true);
+        values.put("credentialsRedacted", true);
+        Files.writeString(manifest, toJson(values), StandardCharsets.UTF_8);
+    }
+
+    private void writeFullReport(
+            Path report,
+            Matrix26BackupJob job,
+            PlatformBusinessClient instance,
+            Matrix26BackupToolStatus tool,
+            Matrix26FullBackupResult result,
+            Map<Path, String> hashes
+    ) throws IOException {
+        String content = "Matrix26 full instance backup report" + System.lineSeparator()
+                + "Backup ID: " + job.publicId() + System.lineSeparator()
+                + "Instance: " + instance.getBusinessName() + " (" + instance.getCode() + ")" + System.lineSeparator()
+                + "Database: " + instance.getDatabaseName() + System.lineSeparator()
+                + "Runtime: " + instance.getRuntimeProfile() + System.lineSeparator()
+                + "Requested by: " + job.requestedBy() + System.lineSeparator()
+                + "Created at: " + LocalDateTime.now() + System.lineSeparator()
+                + "Tool: " + tool.version() + System.lineSeparator()
+                + "Database tables: " + (job.tableCount() == null ? 0 : job.tableCount()) + System.lineSeparator()
+                + "Database dump: " + formatBytes(job.compressedSizeBytes()) + System.lineSeparator()
+                + "Instance archive entries: " + result.archiveEntries() + System.lineSeparator()
+                + "Instance source size: " + formatBytes(result.sourceBytes()) + System.lineSeparator()
+                + "Instance archive size: " + formatBytes(result.archiveBytes()) + System.lineSeparator()
+                + "File inventory stable: " + result.stableInventory() + System.lineSeparator()
+                + "Skipped symbolic links: " + result.skippedSymlinks() + System.lineSeparator()
+                + "Verified recovery artifacts: " + hashes.size() + System.lineSeparator()
+                + "Credentials: REDACTED" + System.lineSeparator()
+                + "Verification: PASSED" + System.lineSeparator();
+        Files.writeString(report, content, StandardCharsets.UTF_8);
+    }
+
+    private long value(Long number) {
+        return number == null ? 0L : number;
     }
 
     private Matrix26BackupCandidate candidate(PlatformBusinessClient instance) {
@@ -359,7 +545,7 @@ public class Matrix26BackupService {
                 .anyMatch(code -> code.equalsIgnoreCase(instance.getCode()));
         String reason = allowed
                 ? ""
-                : "Backups are not enabled for this instance in Phase 3E.1.";
+                : "Backups are not enabled for this instance in Phase 3E.2.";
         if (instance.getDatabaseName() == null || !SAFE_IDENTIFIER.matcher(instance.getDatabaseName()).matches()) {
             allowed = false;
             reason = "The instance does not have a valid isolated database name.";

@@ -1,0 +1,1851 @@
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupController.java	2026-06-25 13:30:33.345908407 +0000
++++ /mnt/data/matrix26_backup3e2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupController.java	2026-06-25 13:34:18.637015212 +0000
+@@ -56,19 +56,20 @@
+     @PostMapping("/backups")
+     public String createBackup(
+             @RequestParam("instanceId") long instanceId,
++            @RequestParam(value = "backupScope", defaultValue = "FULL") String backupScope,
+             @RequestParam(value = "confirmation", defaultValue = "false") boolean confirmation,
+             Principal principal,
+             RedirectAttributes redirectAttributes
+     ) {
+         try {
+-            Matrix26BackupJob job = backupService.createManualDatabaseBackup(
+-                    instanceId,
+-                    actor(principal),
+-                    confirmation
+-            );
++            boolean fullBackup = "FULL".equalsIgnoreCase(backupScope);
++            Matrix26BackupJob job = fullBackup
++                    ? backupService.createManualFullBackup(instanceId, actor(principal), confirmation)
++                    : backupService.createManualDatabaseBackup(instanceId, actor(principal), confirmation);
+             redirectAttributes.addFlashAttribute(
+                     "backupSuccess",
+-                    "Database backup completed and verified: " + job.publicId()
++                    (fullBackup ? "Full instance backup" : "Database backup")
++                            + " completed and verified: " + job.publicId()
+             );
+             return "redirect:/control-center/backups/" + job.id();
+         } catch (Matrix26BackupException ex) {
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupProperties.java	2026-06-25 13:30:33.346728547 +0000
++++ /mnt/data/matrix26_backup3e2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupProperties.java	2026-06-25 13:33:27.489054797 +0000
+@@ -13,9 +13,13 @@
+     private boolean enabled = true;
+     private String rootDirectory = "";
+     private String runtimeDirectory = "runtime-clients";
++    private String runtimeDataDirectory = "runtime-data";
+     private String dumpExecutable = "";
+     private long minimumFreeBytes = 256L * 1024L * 1024L;
+     private long processTimeoutSeconds = 900L;
++    private long maximumSingleFileBytes = 512L * 1024L * 1024L;
++    private long maximumArchiveSourceBytes = 2L * 1024L * 1024L * 1024L;
++    private int diagnosticLogTailLines = 400;
+     private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of("matrix26-appearance-lab"));
+ 
+     public boolean isEnabled() {
+@@ -42,6 +46,15 @@
+         this.runtimeDirectory = runtimeDirectory;
+     }
+ 
++
++    public String getRuntimeDataDirectory() {
++        return runtimeDataDirectory;
++    }
++
++    public void setRuntimeDataDirectory(String runtimeDataDirectory) {
++        this.runtimeDataDirectory = runtimeDataDirectory;
++    }
++
+     public String getDumpExecutable() {
+         return dumpExecutable;
+     }
+@@ -66,6 +79,31 @@
+         this.processTimeoutSeconds = processTimeoutSeconds;
+     }
+ 
++
++    public long getMaximumSingleFileBytes() {
++        return maximumSingleFileBytes;
++    }
++
++    public void setMaximumSingleFileBytes(long maximumSingleFileBytes) {
++        this.maximumSingleFileBytes = maximumSingleFileBytes;
++    }
++
++    public long getMaximumArchiveSourceBytes() {
++        return maximumArchiveSourceBytes;
++    }
++
++    public void setMaximumArchiveSourceBytes(long maximumArchiveSourceBytes) {
++        this.maximumArchiveSourceBytes = maximumArchiveSourceBytes;
++    }
++
++    public int getDiagnosticLogTailLines() {
++        return diagnosticLogTailLines;
++    }
++
++    public void setDiagnosticLogTailLines(int diagnosticLogTailLines) {
++        this.diagnosticLogTailLines = diagnosticLogTailLines;
++    }
++
+     public Set<String> getAllowedInstanceCodes() {
+         return allowedInstanceCodes;
+     }
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupRepository.java	2026-06-25 13:30:33.347003990 +0000
++++ /mnt/data/matrix26_backup3e2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupRepository.java	2026-06-25 13:34:04.645794199 +0000
+@@ -139,6 +139,13 @@
+         );
+     }
+ 
++    public void deleteMetadataArtifacts(long jobId) {
++        jdbcTemplate.update(
++                "DELETE FROM matrix26_backup_artifact WHERE job_id = ? AND artifact_type IN ('MANIFEST','CHECKSUMS','REPORT')",
++                jobId
++        );
++    }
++
+     public void insertVerification(
+             long jobId,
+             String code,
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupService.java	2026-06-25 13:30:33.347281870 +0000
++++ /mnt/data/matrix26_backup3e2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupService.java	2026-06-25 13:41:13.580282975 +0000
+@@ -68,6 +68,7 @@
+     private final Matrix26BackupToolLocator toolLocator;
+     private final Matrix26InstanceAuditLogRepository auditLogRepository;
+     private final JdbcTemplate jdbcTemplate;
++    private final Matrix26FullBackupAssembler fullBackupAssembler;
+     private final Set<Long> localLocks = ConcurrentHashMap.newKeySet();
+ 
+     public Matrix26BackupService(
+@@ -76,7 +77,8 @@
+             Matrix26BackupProperties properties,
+             Matrix26BackupToolLocator toolLocator,
+             Matrix26InstanceAuditLogRepository auditLogRepository,
+-            JdbcTemplate jdbcTemplate
++            JdbcTemplate jdbcTemplate,
++            Matrix26FullBackupAssembler fullBackupAssembler
+     ) {
+         this.clientRepository = clientRepository;
+         this.backupRepository = backupRepository;
+@@ -84,6 +86,7 @@
+         this.toolLocator = toolLocator;
+         this.auditLogRepository = auditLogRepository;
+         this.jdbcTemplate = jdbcTemplate;
++        this.fullBackupAssembler = fullBackupAssembler;
+     }
+ 
+     public List<Matrix26BackupCandidate> candidates() {
+@@ -139,6 +142,23 @@
+             String actor,
+             boolean confirmation
+     ) {
++        return createManualBackup(instanceId, actor, confirmation, false);
++    }
++
++    public synchronized Matrix26BackupJob createManualFullBackup(
++            long instanceId,
++            String actor,
++            boolean confirmation
++    ) {
++        return createManualBackup(instanceId, actor, confirmation, true);
++    }
++
++    private Matrix26BackupJob createManualBackup(
++            long instanceId,
++            String actor,
++            boolean confirmation,
++            boolean fullBackup
++    ) {
+         if (!properties.isEnabled()) {
+             throw new Matrix26BackupException("Database backups are disabled in Matrix26 configuration.");
+         }
+@@ -189,7 +209,7 @@
+                     instance.getCode(),
+                     instance.getBusinessName(),
+                     instance.getDatabaseName(),
+-                    "MANUAL_DATABASE",
++                    fullBackup ? "MANUAL_FULL" : "MANUAL_DATABASE",
+                     Matrix26BackupStatus.PENDING,
+                     safeActor(actor),
+                     now,
+@@ -214,14 +234,23 @@
+             long jobId = backupRepository.insertJob(newJob);
+             createdJob = backupRepository.findById(jobId).orElseThrow();
+ 
+-            executeBackup(createdJob, instance, connection, tool, root, backupDirectory);
+-            writeAudit(instance, actor, "DATABASE_BACKUP_COMPLETED", "Manual database backup completed: " + publicId);
++            executeBackup(createdJob, instance, connection, tool, root, backupDirectory, fullBackup);
++            if (fullBackup) {
++                Matrix26BackupJob databaseJob = backupRepository.findById(jobId).orElseThrow();
++                Matrix26FullBackupResult fullResult = fullBackupAssembler.assemble(
++                        databaseJob, instance, root, backupDirectory
++                );
++                finalizeFullBackup(databaseJob, instance, connection, tool, root, backupDirectory, fullResult);
++                writeAudit(instance, actor, "FULL_BACKUP_COMPLETED", "Manual full instance backup completed: " + publicId);
++            } else {
++                writeAudit(instance, actor, "DATABASE_BACKUP_COMPLETED", "Manual database backup completed: " + publicId);
++            }
+             return backupRepository.findById(jobId).orElseThrow();
+         } catch (Matrix26BackupException ex) {
+             if (createdJob != null) {
+                 backupRepository.fail(createdJob.id(), sanitize(ex.getMessage()));
+                 writeFailureReport(backupDirectory, createdJob, ex.getMessage());
+-                writeAudit(instance, actor, "DATABASE_BACKUP_FAILED", "Manual database backup failed: " + createdJob.publicId());
++                writeAudit(instance, actor, fullBackup ? "FULL_BACKUP_FAILED" : "DATABASE_BACKUP_FAILED", (fullBackup ? "Manual full instance backup failed: " : "Manual database backup failed: ") + createdJob.publicId());
+             }
+             throw ex;
+         } catch (Exception ex) {
+@@ -229,7 +258,7 @@
+             if (createdJob != null) {
+                 backupRepository.fail(createdJob.id(), message);
+                 writeFailureReport(backupDirectory, createdJob, message);
+-                writeAudit(instance, actor, "DATABASE_BACKUP_FAILED", "Manual database backup failed: " + createdJob.publicId());
++                writeAudit(instance, actor, fullBackup ? "FULL_BACKUP_FAILED" : "DATABASE_BACKUP_FAILED", (fullBackup ? "Manual full instance backup failed: " : "Manual database backup failed: ") + createdJob.publicId());
+             }
+             throw new Matrix26BackupException(message, ex);
+         } finally {
+@@ -243,7 +272,8 @@
+             Matrix26DatabaseConnectionInfo connection,
+             Matrix26BackupToolStatus tool,
+             Path root,
+-            Path directory
++            Path directory,
++            boolean fullBackup
+     ) throws IOException, InterruptedException {
+         backupRepository.markStarted(job.id(), Matrix26BackupStatus.VALIDATING, tool.executable(), tool.version());
+ 
+@@ -340,26 +370,182 @@
+         backupRepository.insertArtifact(job.id(), "REPORT", report.getFileName().toString(),
+                 relative(root, report), Files.size(report), sha256(report), "VERIFIED");
+ 
++        if (fullBackup) {
++            backupRepository.updateStatus(job.id(), Matrix26BackupStatus.VERIFYING);
++        } else {
++            backupRepository.complete(
++                    job.id(),
++                    databaseSize,
++                    dumpSize,
++                    compressedSize,
++                    tableCount,
++                    dumpSha,
++                    relative(root, manifest),
++                    relative(root, report),
++                    "All required database backup checks passed."
++            );
++        }
++    }
++
++    private void finalizeFullBackup(
++            Matrix26BackupJob job,
++            PlatformBusinessClient instance,
++            Matrix26DatabaseConnectionInfo connection,
++            Matrix26BackupToolStatus tool,
++            Path root,
++            Path directory,
++            Matrix26FullBackupResult result
++    ) throws IOException {
++        Path compressed = directory.resolve("database.sql.gz");
++        Path manifest = directory.resolve("manifest.json");
++        Path checksums = directory.resolve("checksums.sha256");
++        Path report = directory.resolve("backup-report.txt");
++
++        LinkedHashMap<Path, String> hashes = new LinkedHashMap<>();
++        hashes.put(compressed, sha256(compressed));
++        hashes.putAll(result.hashes());
++
++        writeFullManifest(manifest, job, instance, connection, tool, result, hashes);
++        hashes.put(manifest, sha256(manifest));
++
++        StringBuilder checksumContent = new StringBuilder();
++        for (Map.Entry<Path, String> entry : hashes.entrySet()) {
++            checksumContent.append(entry.getValue())
++                    .append("  ")
++                    .append(entry.getKey().getFileName())
++                    .append(System.lineSeparator());
++        }
++        Files.writeString(checksums, checksumContent, StandardCharsets.UTF_8);
++
++        boolean hashesMatch = true;
++        for (Map.Entry<Path, String> entry : hashes.entrySet()) {
++            if (!entry.getValue().equals(sha256(entry.getKey()))) {
++                hashesMatch = false;
++                break;
++            }
++        }
++        verify(job.id(), "FULL_ARTIFACT_SHA256", "Full package SHA-256 checksums", hashesMatch,
++                hashesMatch
++                        ? hashes.size() + " recovery artifacts passed SHA-256 verification."
++                        : "At least one full-backup artifact changed during verification.");
++        if (!hashesMatch) {
++            throw new Matrix26BackupException("The full-backup artifact checksums did not pass verification.");
++        }
++
++        writeFullReport(report, job, instance, tool, result, hashes);
++
++        backupRepository.deleteMetadataArtifacts(job.id());
++        backupRepository.insertArtifact(job.id(), "MANIFEST", manifest.getFileName().toString(),
++                relative(root, manifest), Files.size(manifest), sha256(manifest), "VERIFIED");
++        backupRepository.insertArtifact(job.id(), "CHECKSUMS", checksums.getFileName().toString(),
++                relative(root, checksums), Files.size(checksums), sha256(checksums), "VERIFIED");
++        backupRepository.insertArtifact(job.id(), "REPORT", report.getFileName().toString(),
++                relative(root, report), Files.size(report), sha256(report), "VERIFIED");
++
++        long totalStored = Files.size(compressed)
++                + result.storedBytes()
++                + Files.size(manifest)
++                + Files.size(checksums)
++                + Files.size(report);
++        String packageSha = sha256(checksums);
+         backupRepository.complete(
+                 job.id(),
+-                databaseSize,
+-                dumpSize,
+-                compressedSize,
+-                tableCount,
+-                dumpSha,
++                value(job.databaseSizeBytes()),
++                value(job.dumpSizeBytes()),
++                totalStored,
++                job.tableCount() == null ? 0 : job.tableCount(),
++                packageSha,
+                 relative(root, manifest),
+                 relative(root, report),
+-                "All required database backup checks passed."
++                result.stableInventory()
++                        ? "Database, runtime configuration, modules, appearance, and instance resources passed verification."
++                        : "The full package passed verification with a file-change warning. Restore testing is recommended."
+         );
+     }
+ 
++    private void writeFullManifest(
++            Path manifest,
++            Matrix26BackupJob job,
++            PlatformBusinessClient instance,
++            Matrix26DatabaseConnectionInfo connection,
++            Matrix26BackupToolStatus tool,
++            Matrix26FullBackupResult result,
++            Map<Path, String> hashes
++    ) throws IOException {
++        Map<String, Object> values = new LinkedHashMap<>();
++        values.put("formatVersion", 2);
++        values.put("backupId", job.publicId());
++        values.put("backupType", "MANUAL_FULL");
++        values.put("consistencyMode", "ONLINE_CONSISTENT");
++        values.put("instanceId", instance.getId());
++        values.put("instanceCode", instance.getCode());
++        values.put("instanceName", instance.getBusinessName());
++        values.put("databaseName", connection.databaseName());
++        values.put("databaseHost", connection.host());
++        values.put("databasePort", connection.port());
++        values.put("runtimeProfile", instance.getRuntimeProfile());
++        values.put("runtimePort", instance.getRuntimePort());
++        values.put("createdAt", LocalDateTime.now().toString());
++        values.put("createdAtUtc", java.time.Instant.now().toString());
++        values.put("tool", tool.version());
++        values.put("tableCount", job.tableCount());
++        values.put("databaseSizeBytes", job.databaseSizeBytes());
++        values.put("databaseDumpBytes", job.compressedSizeBytes());
++        values.put("instanceArchiveEntries", result.archiveEntries());
++        values.put("instanceArchiveSourceBytes", result.sourceBytes());
++        values.put("instanceArchiveBytes", result.archiveBytes());
++        values.put("fileInventoryStable", result.stableInventory());
++        values.put("skippedSymlinks", result.skippedSymlinks());
++        values.put("artifactCount", hashes.size());
++        values.put("containsDatabase", true);
++        values.put("containsResources", true);
++        values.put("containsRuntimeConfiguration", true);
++        values.put("containsAppearance", true);
++        values.put("containsModules", true);
++        values.put("credentialsRedacted", true);
++        Files.writeString(manifest, toJson(values), StandardCharsets.UTF_8);
++    }
++
++    private void writeFullReport(
++            Path report,
++            Matrix26BackupJob job,
++            PlatformBusinessClient instance,
++            Matrix26BackupToolStatus tool,
++            Matrix26FullBackupResult result,
++            Map<Path, String> hashes
++    ) throws IOException {
++        String content = "Matrix26 full instance backup report" + System.lineSeparator()
++                + "Backup ID: " + job.publicId() + System.lineSeparator()
++                + "Instance: " + instance.getBusinessName() + " (" + instance.getCode() + ")" + System.lineSeparator()
++                + "Database: " + instance.getDatabaseName() + System.lineSeparator()
++                + "Runtime: " + instance.getRuntimeProfile() + System.lineSeparator()
++                + "Requested by: " + job.requestedBy() + System.lineSeparator()
++                + "Created at: " + LocalDateTime.now() + System.lineSeparator()
++                + "Tool: " + tool.version() + System.lineSeparator()
++                + "Database tables: " + (job.tableCount() == null ? 0 : job.tableCount()) + System.lineSeparator()
++                + "Database dump: " + formatBytes(job.compressedSizeBytes()) + System.lineSeparator()
++                + "Instance archive entries: " + result.archiveEntries() + System.lineSeparator()
++                + "Instance source size: " + formatBytes(result.sourceBytes()) + System.lineSeparator()
++                + "Instance archive size: " + formatBytes(result.archiveBytes()) + System.lineSeparator()
++                + "File inventory stable: " + result.stableInventory() + System.lineSeparator()
++                + "Skipped symbolic links: " + result.skippedSymlinks() + System.lineSeparator()
++                + "Verified recovery artifacts: " + hashes.size() + System.lineSeparator()
++                + "Credentials: REDACTED" + System.lineSeparator()
++                + "Verification: PASSED" + System.lineSeparator();
++        Files.writeString(report, content, StandardCharsets.UTF_8);
++    }
++
++    private long value(Long number) {
++        return number == null ? 0L : number;
++    }
++
+     private Matrix26BackupCandidate candidate(PlatformBusinessClient instance) {
+         boolean allowed = instance.getCode() != null
+                 && properties.getAllowedInstanceCodes().stream()
+                 .anyMatch(code -> code.equalsIgnoreCase(instance.getCode()));
+         String reason = allowed
+                 ? ""
+-                : "Backups are not enabled for this instance in Phase 3E.1.";
++                : "Backups are not enabled for this instance in Phase 3E.2.";
+         if (instance.getDatabaseName() == null || !SAFE_IDENTIFIER.matcher(instance.getDatabaseName()).matches()) {
+             allowed = false;
+             reason = "The instance does not have a valid isolated database name.";
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26FullBackupAssembler.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26FullBackupAssembler.java	2026-06-25 13:39:51.808280371 +0000
+@@ -0,0 +1,665 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClient;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.stereotype.Component;
++
++import java.io.BufferedInputStream;
++import java.io.BufferedOutputStream;
++import java.io.BufferedReader;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.InputStreamReader;
++import java.io.OutputStream;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.FileVisitResult;
++import java.nio.file.Files;
++import java.nio.file.LinkOption;
++import java.nio.file.Path;
++import java.nio.file.SimpleFileVisitor;
++import java.nio.file.attribute.BasicFileAttributes;
++import java.security.MessageDigest;
++import java.security.NoSuchAlgorithmException;
++import java.time.Instant;
++import java.time.LocalDateTime;
++import java.util.ArrayList;
++import java.util.Comparator;
++import java.util.HexFormat;
++import java.util.LinkedHashMap;
++import java.util.LinkedHashSet;
++import java.util.List;
++import java.util.Locale;
++import java.util.Map;
++import java.util.Properties;
++import java.util.Set;
++import java.util.function.Predicate;
++import java.util.regex.Pattern;
++import java.util.zip.ZipEntry;
++import java.util.zip.ZipFile;
++import java.util.zip.ZipOutputStream;
++
++@Component
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26FullBackupAssembler {
++
++    private static final Pattern SENSITIVE_KEY = Pattern.compile(
++            "(?i).*(password|passwd|secret|token|api[-_.]?key|private[-_.]?key|credential).*"
++    );
++    private static final Set<String> DATA_ROOTS = Set.of(
++            "appearance", "uploads", "documents", "attachments", "media", "public"
++    );
++    private static final Set<String> RUNTIME_EXTENSIONS = Set.of(
++            ".sh", ".cmd", ".bat", ".ps1", ".json", ".yml", ".yaml", ".txt", ".md"
++    );
++
++    private final Matrix26BackupProperties properties;
++    private final Matrix26BackupRepository backupRepository;
++    private final JdbcTemplate jdbcTemplate;
++
++    public Matrix26FullBackupAssembler(
++            Matrix26BackupProperties properties,
++            Matrix26BackupRepository backupRepository,
++            JdbcTemplate jdbcTemplate
++    ) {
++        this.properties = properties;
++        this.backupRepository = backupRepository;
++        this.jdbcTemplate = jdbcTemplate;
++    }
++
++    public Matrix26FullBackupResult assemble(
++            Matrix26BackupJob job,
++            PlatformBusinessClient instance,
++            Path backupRoot,
++            Path backupDirectory
++    ) throws IOException {
++        Path projectRoot = Path.of("").toAbsolutePath().normalize();
++        Path runtimeRoot = projectRoot.resolve(properties.getRuntimeDirectory()).normalize();
++        Path runtimeDirectory = runtimeRoot.resolve(instance.getRuntimeProfile()).normalize();
++        ensureInside(runtimeRoot, runtimeDirectory);
++        if (!Files.isDirectory(runtimeDirectory)) {
++            throw new Matrix26BackupException("The instance runtime directory was not found: " + runtimeDirectory);
++        }
++
++        Path runtimeConfig = runtimeDirectory.resolve("application.properties").normalize();
++        ensureInside(runtimeDirectory, runtimeConfig);
++        if (!Files.isRegularFile(runtimeConfig)) {
++            throw new Matrix26BackupException("Runtime application.properties was not found for the full backup.");
++        }
++
++        Path runtimeDataRoot = projectRoot.resolve(properties.getRuntimeDataDirectory()).normalize();
++        Path instanceData = runtimeDataRoot.resolve(instance.getCode()).normalize();
++        ensureInside(runtimeDataRoot, instanceData);
++
++        FileSnapshot before = snapshot(instanceData, runtimeDirectory);
++
++        Path sanitizedConfig = backupDirectory.resolve("runtime-config.properties");
++        Path instanceJson = backupDirectory.resolve("instance.json");
++        Path modulesJson = backupDirectory.resolve("modules.json");
++        Path appearanceJson = backupDirectory.resolve("appearance.json");
++        Path inventoryJson = backupDirectory.resolve("files-inventory.json");
++        Path diagnosticTail = backupDirectory.resolve("runtime-log-tail.txt");
++        Path filesArchive = backupDirectory.resolve("instance-files.zip");
++
++        sanitizeProperties(runtimeConfig, sanitizedConfig);
++        writeInstanceMetadata(instanceJson, instance);
++        writeModules(modulesJson, instance.getId());
++        writeAppearance(appearanceJson, instance.getId());
++        writeDiagnosticTail(instanceData, diagnosticTail);
++
++        ArchiveResult archive = createArchive(filesArchive, instance, runtimeDirectory, instanceData);
++        FileSnapshot after = snapshot(instanceData, runtimeDirectory);
++        writeInventory(inventoryJson, before, after, archive);
++
++        ZipInspection zipInspection = inspectZip(filesArchive);
++        verify(job.id(), "FULL_ARCHIVE_READABLE", "Readable instance file archive", zipInspection.readable(), zipInspection.message());
++        if (!zipInspection.readable() || zipInspection.entries() <= 0) {
++            throw new Matrix26BackupException("The full backup file archive did not pass verification.");
++        }
++
++        verify(job.id(), "RUNTIME_CONFIG_REDACTED", "Sanitized runtime configuration", configIsRedacted(sanitizedConfig),
++                "Sensitive runtime values are replaced with ***REDACTED***.");
++        if (!configIsRedacted(sanitizedConfig)) {
++            throw new Matrix26BackupException("The sanitized runtime configuration still contains a sensitive value.");
++        }
++
++        boolean stable = before.equals(after);
++        backupRepository.insertVerification(
++                job.id(),
++                "FILESET_STABILITY",
++                "File inventory stability",
++                stable ? Matrix26BackupVerificationStatus.PASSED : Matrix26BackupVerificationStatus.WARNING,
++                stable
++                        ? "The instance file inventory did not change during the backup."
++                        : "Files changed while the online backup was running. The archive is valid, but restore testing is recommended."
++        );
++
++        verify(job.id(), "INSTANCE_OWNERSHIP", "Instance file ownership", archive.invalidPaths() == 0,
++                archive.invalidPaths() == 0
++                        ? "All archived files belong to the selected instance runtime or runtime-data directory."
++                        : archive.invalidPaths() + " unsafe paths were rejected.");
++        if (archive.invalidPaths() > 0) {
++            throw new Matrix26BackupException("Unsafe file paths were detected while building the instance archive.");
++        }
++
++        Map<Path, String> hashes = new LinkedHashMap<>();
++        for (Path artifact : List.of(
++                filesArchive,
++                sanitizedConfig,
++                instanceJson,
++                modulesJson,
++                appearanceJson,
++                inventoryJson,
++                diagnosticTail
++        )) {
++            if (Files.isRegularFile(artifact)) {
++                hashes.put(artifact, sha256(artifact));
++            }
++        }
++
++        for (Map.Entry<Path, String> entry : hashes.entrySet()) {
++            Path artifact = entry.getKey();
++            backupRepository.insertArtifact(
++                    job.id(),
++                    artifactType(artifact),
++                    artifact.getFileName().toString(),
++                    relative(backupRoot, artifact),
++                    Files.size(artifact),
++                    entry.getValue(),
++                    "VERIFIED"
++            );
++        }
++
++        long storedBytes = hashes.keySet().stream().mapToLong(this::sizeQuietly).sum();
++        return new Matrix26FullBackupResult(
++                filesArchive,
++                sanitizedConfig,
++                instanceJson,
++                modulesJson,
++                appearanceJson,
++                inventoryJson,
++                diagnosticTail,
++                hashes,
++                archive.entries(),
++                archive.sourceBytes(),
++                Files.size(filesArchive),
++                storedBytes,
++                stable,
++                archive.skippedSymlinks()
++        );
++    }
++
++    private ArchiveResult createArchive(
++            Path archive,
++            PlatformBusinessClient instance,
++            Path runtimeDirectory,
++            Path instanceData
++    ) throws IOException {
++        Path temporary = archive.resolveSibling(archive.getFileName() + ".part");
++        Files.deleteIfExists(temporary);
++        ArchiveCounter counter = new ArchiveCounter();
++
++        try (ZipOutputStream zip = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(temporary)))) {
++            if (Files.isDirectory(instanceData)) {
++                for (String rootName : DATA_ROOTS) {
++                    Path root = instanceData.resolve(rootName).normalize();
++                    ensureInside(instanceData, root);
++                    if (Files.isDirectory(root)) {
++                        addTree(zip, root, "runtime-data/" + instance.getCode() + "/" + rootName, this::allowInstanceDataFile, counter);
++                    }
++                }
++            }
++            addTree(zip, runtimeDirectory, "runtime-clients/" + instance.getRuntimeProfile(), this::allowRuntimeFile, counter);
++        } catch (Exception ex) {
++            Files.deleteIfExists(temporary);
++            throw ex;
++        }
++
++        if (counter.sourceBytes > properties.getMaximumArchiveSourceBytes()) {
++            Files.deleteIfExists(temporary);
++            throw new Matrix26BackupException(
++                    "The instance files exceed the configured full-backup source limit of "
++                            + Matrix26BackupService.formatBytes(properties.getMaximumArchiveSourceBytes()) + "."
++            );
++        }
++        Files.move(temporary, archive, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
++        return new ArchiveResult(counter.entries, counter.sourceBytes, counter.invalidPaths, counter.skippedSymlinks);
++    }
++
++    private void addTree(
++            ZipOutputStream zip,
++            Path root,
++            String archivePrefix,
++            Predicate<Path> include,
++            ArchiveCounter counter
++    ) throws IOException {
++        Path normalizedRoot = root.toAbsolutePath().normalize();
++        Files.walkFileTree(normalizedRoot, new SimpleFileVisitor<>() {
++            @Override
++            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
++                if (Files.isSymbolicLink(dir)) {
++                    counter.skippedSymlinks++;
++                    return FileVisitResult.SKIP_SUBTREE;
++                }
++                return FileVisitResult.CONTINUE;
++            }
++
++            @Override
++            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
++                if (Files.isSymbolicLink(file)) {
++                    counter.skippedSymlinks++;
++                    return FileVisitResult.CONTINUE;
++                }
++                if (!attrs.isRegularFile() || !include.test(file)) {
++                    return FileVisitResult.CONTINUE;
++                }
++                long size = attrs.size();
++                if (size > properties.getMaximumSingleFileBytes()) {
++                    throw new Matrix26BackupException(
++                            "A file exceeds the configured full-backup size limit: " + file.getFileName()
++                    );
++                }
++                String relative = normalizedRoot.relativize(file.toAbsolutePath().normalize()).toString().replace('\\', '/');
++                String entryName = archivePrefix + (relative.isBlank() ? "" : "/" + relative);
++                if (!safeEntry(entryName)) {
++                    counter.invalidPaths++;
++                    return FileVisitResult.CONTINUE;
++                }
++                ZipEntry entry = new ZipEntry(entryName);
++                entry.setTime(attrs.lastModifiedTime().toMillis());
++                zip.putNextEntry(entry);
++                try (InputStream input = new BufferedInputStream(Files.newInputStream(file))) {
++                    input.transferTo(zip);
++                }
++                zip.closeEntry();
++                counter.entries++;
++                counter.sourceBytes += size;
++                if (counter.sourceBytes > properties.getMaximumArchiveSourceBytes()) {
++                    throw new Matrix26BackupException("The full-backup archive source limit was exceeded.");
++                }
++                return FileVisitResult.CONTINUE;
++            }
++        });
++    }
++
++    private boolean allowInstanceDataFile(Path file) {
++        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
++        return !name.endsWith(".part")
++                && !name.endsWith(".tmp")
++                && !name.endsWith(".lock")
++                && !name.equals("thumbs.db")
++                && !name.equals("desktop.ini");
++    }
++
++    private boolean allowRuntimeFile(Path file) {
++        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
++        if (name.equals("application.properties") || name.endsWith(".jar") || name.endsWith(".log")) {
++            return false;
++        }
++        if (name.startsWith("readme")) {
++            return true;
++        }
++        return RUNTIME_EXTENSIONS.stream().anyMatch(name::endsWith);
++    }
++
++    private void sanitizeProperties(Path source, Path target) throws IOException {
++        List<String> output = new ArrayList<>();
++        for (String line : Files.readAllLines(source, StandardCharsets.ISO_8859_1)) {
++            String trimmed = line.trim();
++            if (trimmed.isBlank() || trimmed.startsWith("#") || trimmed.startsWith("!")) {
++                output.add(line);
++                continue;
++            }
++            int equals = line.indexOf('=');
++            int colon = line.indexOf(':');
++            int separator = equals < 0 ? colon : colon < 0 ? equals : Math.min(equals, colon);
++            if (separator < 0) {
++                output.add(line);
++                continue;
++            }
++            String key = line.substring(0, separator).trim();
++            if (SENSITIVE_KEY.matcher(key).matches()) {
++                output.add(key + "=***REDACTED***");
++            } else {
++                output.add(line);
++            }
++        }
++        Files.write(target, output, StandardCharsets.UTF_8);
++    }
++
++    private boolean configIsRedacted(Path config) throws IOException {
++        for (String line : Files.readAllLines(config, StandardCharsets.UTF_8)) {
++            String trimmed = line.trim();
++            if (trimmed.isBlank() || trimmed.startsWith("#") || trimmed.startsWith("!")) {
++                continue;
++            }
++            int separator = trimmed.indexOf('=');
++            if (separator <= 0) {
++                continue;
++            }
++            String key = trimmed.substring(0, separator).trim();
++            String value = trimmed.substring(separator + 1).trim();
++            if (SENSITIVE_KEY.matcher(key).matches() && !"***REDACTED***".equals(value)) {
++                return false;
++            }
++        }
++        return true;
++    }
++
++    private void writeInstanceMetadata(Path target, PlatformBusinessClient instance) throws IOException {
++        Map<String, Object> values = new LinkedHashMap<>();
++        values.put("formatVersion", 1);
++        values.put("instanceId", instance.getId());
++        values.put("instanceCode", instance.getCode());
++        values.put("businessName", instance.getBusinessName());
++        values.put("legalName", instance.getLegalName());
++        values.put("businessType", instance.getBusinessType());
++        values.put("databaseName", instance.getDatabaseName());
++        values.put("runtimeProfile", instance.getRuntimeProfile());
++        values.put("runtimePort", instance.getRuntimePort());
++        values.put("publicUrl", instance.getPublicUrl());
++        values.put("currency", instance.getCurrency());
++        values.put("city", instance.getCity());
++        values.put("status", instance.getStatus());
++        values.put("databaseStatus", instance.getDatabaseStatus());
++        values.put("runtimeStatus", instance.getRuntimeStatus());
++        values.put("protectedInstance", instance.isProtectedInstance());
++        values.put("createdAt", Instant.now().toString());
++        Files.writeString(target, jsonObject(values), StandardCharsets.UTF_8);
++    }
++
++    private void writeModules(Path target, Long instanceId) throws IOException {
++        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
++                """
++                SELECT m.module_key, m.name, m.area, cm.enabled, cm.selection_source
++                FROM platform_client_module cm
++                JOIN platform_module_catalog m ON m.id = cm.module_id
++                WHERE cm.client_id = ?
++                ORDER BY m.display_order, m.module_key
++                """,
++                instanceId
++        );
++        Files.writeString(target, jsonArray(rows), StandardCharsets.UTF_8);
++    }
++
++    private void writeAppearance(Path target, Long instanceId) throws IOException {
++        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
++                """
++                SELECT public_theme_code, public_layout_code, admin_theme_code,
++                       admin_layout_code, login_layout_code, overrides_json,
++                       status, published_version, published_at, published_by
++                FROM matrix26_instance_appearance
++                WHERE instance_id = ?
++                """,
++                instanceId
++        );
++        Map<String, Object> output = new LinkedHashMap<>();
++        output.put("formatVersion", 1);
++        output.put("instanceId", instanceId);
++        output.put("appearance", rows.isEmpty() ? null : rows.get(0));
++        output.put("capturedAt", Instant.now().toString());
++        Files.writeString(target, jsonObject(output), StandardCharsets.UTF_8);
++    }
++
++    private void writeDiagnosticTail(Path instanceData, Path target) throws IOException {
++        Path operations = instanceData.resolve("operations").normalize();
++        if (!operations.startsWith(instanceData) || !Files.isDirectory(operations)) {
++            Files.writeString(target, "No runtime operation logs were available.\n", StandardCharsets.UTF_8);
++            return;
++        }
++        List<Path> candidates = List.of(
++                operations.resolve("application.log"),
++                operations.resolve("application-error.log")
++        );
++        StringBuilder output = new StringBuilder();
++        for (Path candidate : candidates) {
++            if (!Files.isRegularFile(candidate)) {
++                continue;
++            }
++            output.append("=== ").append(candidate.getFileName()).append(" ===\n");
++            List<String> lines = tail(candidate, properties.getDiagnosticLogTailLines());
++            for (String line : lines) {
++                output.append(sanitizeLog(line)).append('\n');
++            }
++            output.append('\n');
++        }
++        if (output.isEmpty()) {
++            output.append("No runtime operation logs were available.\n");
++        }
++        Files.writeString(target, output, StandardCharsets.UTF_8);
++    }
++
++    private List<String> tail(Path file, int maximumLines) throws IOException {
++        ArrayList<String> ring = new ArrayList<>(Math.max(1, maximumLines));
++        try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
++            String line;
++            while ((line = reader.readLine()) != null) {
++                if (ring.size() == maximumLines) {
++                    ring.remove(0);
++                }
++                ring.add(line);
++            }
++        }
++        return ring;
++    }
++
++    private String sanitizeLog(String line) {
++        if (line == null) {
++            return "";
++        }
++        return line.replaceAll(
++                "(?i)(password|passwd|secret|token|api[-_.]?key|private[-_.]?key)(\\s*[:=]\\s*)([^\\s,;]+)",
++                "$1$2***REDACTED***"
++        );
++    }
++
++    private FileSnapshot snapshot(Path instanceData, Path runtimeDirectory) throws IOException {
++        long files = 0;
++        long bytes = 0;
++        long latest = 0;
++        List<Path> roots = new ArrayList<>();
++        if (Files.isDirectory(instanceData)) {
++            for (String rootName : DATA_ROOTS) {
++                Path root = instanceData.resolve(rootName);
++                if (Files.isDirectory(root)) {
++                    roots.add(root);
++                }
++            }
++        }
++        roots.add(runtimeDirectory);
++        for (Path root : roots) {
++            try (var stream = Files.walk(root)) {
++                for (Path file : stream.filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)).toList()) {
++                    boolean runtimeFileIncluded = allowRuntimeFile(file)
++                            || file.getFileName().toString().equalsIgnoreCase("application.properties");
++                    if ((root.equals(runtimeDirectory) && !runtimeFileIncluded)
++                            || (!root.equals(runtimeDirectory) && !allowInstanceDataFile(file))) {
++                        continue;
++                    }
++                    files++;
++                    bytes += Files.size(file);
++                    latest = Math.max(latest, Files.getLastModifiedTime(file).toMillis());
++                }
++            }
++        }
++        return new FileSnapshot(files, bytes, latest);
++    }
++
++    private void writeInventory(Path target, FileSnapshot before, FileSnapshot after, ArchiveResult archive) throws IOException {
++        Map<String, Object> values = new LinkedHashMap<>();
++        values.put("formatVersion", 1);
++        values.put("capturedAt", Instant.now().toString());
++        values.put("beforeFileCount", before.fileCount());
++        values.put("beforeBytes", before.bytes());
++        values.put("beforeLatestModified", before.latestModified());
++        values.put("afterFileCount", after.fileCount());
++        values.put("afterBytes", after.bytes());
++        values.put("afterLatestModified", after.latestModified());
++        values.put("stable", before.equals(after));
++        values.put("archiveEntries", archive.entries());
++        values.put("archiveSourceBytes", archive.sourceBytes());
++        values.put("skippedSymlinks", archive.skippedSymlinks());
++        Files.writeString(target, jsonObject(values), StandardCharsets.UTF_8);
++    }
++
++    private ZipInspection inspectZip(Path archive) {
++        try (ZipFile zip = new ZipFile(archive.toFile(), StandardCharsets.UTF_8)) {
++            int entries = 0;
++            var enumeration = zip.entries();
++            while (enumeration.hasMoreElements()) {
++                ZipEntry entry = enumeration.nextElement();
++                if (!safeEntry(entry.getName())) {
++                    return new ZipInspection(false, entries, "The archive contains an unsafe path: " + entry.getName());
++                }
++                if (!entry.isDirectory()) {
++                    entries++;
++                    try (InputStream input = zip.getInputStream(entry)) {
++                        input.transferTo(OutputStream.nullOutputStream());
++                    }
++                }
++            }
++            return new ZipInspection(true, entries, "The ZIP archive is readable and contains " + entries + " files.");
++        } catch (IOException ex) {
++            return new ZipInspection(false, 0, "The ZIP archive could not be read: " + ex.getMessage());
++        }
++    }
++
++    private boolean safeEntry(String name) {
++        if (name == null || name.isBlank() || name.startsWith("/") || name.startsWith("\\")) {
++            return false;
++        }
++        String normalized = name.replace('\\', '/');
++        return !normalized.contains("../") && !normalized.equals("..") && !normalized.contains(":");
++    }
++
++    private void verify(long jobId, String code, String label, boolean passed, String detail) {
++        backupRepository.insertVerification(
++                jobId,
++                code,
++                label,
++                passed ? Matrix26BackupVerificationStatus.PASSED : Matrix26BackupVerificationStatus.FAILED,
++                detail
++        );
++    }
++
++    private String artifactType(Path artifact) {
++        return switch (artifact.getFileName().toString()) {
++            case "instance-files.zip" -> "INSTANCE_FILES";
++            case "runtime-config.properties" -> "RUNTIME_CONFIG";
++            case "instance.json" -> "INSTANCE_METADATA";
++            case "modules.json" -> "MODULES";
++            case "appearance.json" -> "APPEARANCE";
++            case "files-inventory.json" -> "FILE_INVENTORY";
++            case "runtime-log-tail.txt" -> "DIAGNOSTIC_LOG";
++            default -> "FULL_BACKUP_FILE";
++        };
++    }
++
++    private String jsonObject(Map<String, ?> values) {
++        StringBuilder output = new StringBuilder("{\n");
++        int index = 0;
++        for (Map.Entry<String, ?> entry : values.entrySet()) {
++            if (index++ > 0) {
++                output.append(",\n");
++            }
++            output.append("  \"").append(json(entry.getKey())).append("\": ")
++                    .append(jsonValue(entry.getValue(), 1));
++        }
++        return output.append("\n}\n").toString();
++    }
++
++    private String jsonArray(List<? extends Map<String, ?>> rows) {
++        StringBuilder output = new StringBuilder("[\n");
++        for (int i = 0; i < rows.size(); i++) {
++            if (i > 0) {
++                output.append(",\n");
++            }
++            output.append(indent(jsonObject(rows.get(i)).trim(), 2));
++        }
++        return output.append("\n]\n").toString();
++    }
++
++    private String jsonValue(Object value, int depth) {
++        if (value == null) {
++            return "null";
++        }
++        if (value instanceof Number || value instanceof Boolean) {
++            return value.toString();
++        }
++        if (value instanceof Map<?, ?> map) {
++            Map<String, Object> converted = new LinkedHashMap<>();
++            map.forEach((key, item) -> converted.put(String.valueOf(key), item));
++            return jsonObject(converted).trim();
++        }
++        return "\"" + json(String.valueOf(value)) + "\"";
++    }
++
++    private String indent(String value, int spaces) {
++        String prefix = " ".repeat(Math.max(0, spaces));
++        return value.lines().map(line -> prefix + line).reduce((a, b) -> a + "\n" + b).orElse("");
++    }
++
++    private String json(String value) {
++        if (value == null) {
++            return "";
++        }
++        return value.replace("\\", "\\\\")
++                .replace("\"", "\\\"")
++                .replace("\n", "\\n")
++                .replace("\r", "\\r")
++                .replace("\t", "\\t");
++    }
++
++    private String sha256(Path file) throws IOException {
++        try {
++            MessageDigest digest = MessageDigest.getInstance("SHA-256");
++            try (InputStream input = new BufferedInputStream(Files.newInputStream(file))) {
++                byte[] buffer = new byte[64 * 1024];
++                int read;
++                while ((read = input.read(buffer)) >= 0) {
++                    if (read > 0) {
++                        digest.update(buffer, 0, read);
++                    }
++                }
++            }
++            return HexFormat.of().formatHex(digest.digest());
++        } catch (NoSuchAlgorithmException ex) {
++            throw new IllegalStateException("SHA-256 is unavailable.", ex);
++        }
++    }
++
++    private long sizeQuietly(Path file) {
++        try {
++            return Files.size(file);
++        } catch (IOException ex) {
++            return 0L;
++        }
++    }
++
++    private String relative(Path root, Path file) {
++        return root.toAbsolutePath().normalize().relativize(file.toAbsolutePath().normalize())
++                .toString().replace('\\', '/');
++    }
++
++    private void ensureInside(Path parent, Path child) {
++        if (!child.toAbsolutePath().normalize().startsWith(parent.toAbsolutePath().normalize())) {
++            throw new Matrix26BackupException("A full-backup path escaped the configured storage boundary.");
++        }
++    }
++
++    private record FileSnapshot(long fileCount, long bytes, long latestModified) {
++    }
++
++    private record ZipInspection(boolean readable, int entries, String message) {
++    }
++
++    private record ArchiveResult(long entries, long sourceBytes, int invalidPaths, int skippedSymlinks) {
++    }
++
++    private static final class ArchiveCounter {
++        private long entries;
++        private long sourceBytes;
++        private int invalidPaths;
++        private int skippedSymlinks;
++    }
++}
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26FullBackupResult.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e2_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26FullBackupResult.java	2026-06-25 13:33:17.880425558 +0000
+@@ -0,0 +1,22 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import java.nio.file.Path;
++import java.util.Map;
++
++public record Matrix26FullBackupResult(
++        Path filesArchive,
++        Path sanitizedRuntimeConfig,
++        Path instanceMetadata,
++        Path modulesMetadata,
++        Path appearanceMetadata,
++        Path filesInventory,
++        Path diagnosticLogTail,
++        Map<Path, String> hashes,
++        long archiveEntries,
++        long sourceBytes,
++        long archiveBytes,
++        long storedBytes,
++        boolean stableInventory,
++        int skippedSymlinks
++) {
++}
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/src/main/resources/templates/control_center/backups/new.html	2026-06-25 13:30:33.562840972 +0000
++++ /mnt/data/matrix26_backup3e2_impl/src/main/resources/templates/control_center/backups/new.html	2026-06-25 13:36:02.267624338 +0000
+@@ -1,20 +1,20 @@
+ <!DOCTYPE html>
+ <html lang="es" xmlns:th="http://www.thymeleaf.org">
+-<head th:replace="~{control_center/fragments/head :: head('New database backup')}"></head>
++<head th:replace="~{control_center/fragments/head :: head('New backup')}"></head>
+ <body class="matrix26-body">
+ <div class="matrix26-shell">
+     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+     <div class="matrix26-content">
+-        <header th:replace="~{control_center/fragments/topbar :: topbar('New database backup', 'Create a verified export of an isolated laboratory database.')}"></header>
++        <header th:replace="~{control_center/fragments/topbar :: topbar('New backup', 'Create a verified database-only or full instance recovery package.')}"></header>
+         <main class="matrix26-main">
+             <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
+             <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
+-                <div><span class="matrix26-eyebrow">Manual backup</span><h1 class="matrix26-page-title">Select an eligible instance</h1></div>
++                <div><span class="matrix26-eyebrow">Manual backup</span><h1 class="matrix26-page-title">Configure the recovery package</h1></div>
+                 <a class="btn btn-outline-secondary" th:href="@{/control-center/backups}"><i class="bi bi-arrow-left me-1"></i>Back</a>
+             </div>
+ 
+             <div class="alert alert-info">
+-                This phase exports only the selected database. Runtime files, uploads, logos, and branding assets will be added in Phase 3E.2.
++                Phase 3E.2 can create a complete recovery package with the database, runtime configuration, appearance, modules, branding resources, uploads, documents, and verified metadata.
+             </div>
+             <div th:unless="${tool.available}" class="alert alert-danger">
+                 <strong>Backup tool unavailable.</strong>
+@@ -23,7 +23,28 @@
+ 
+             <form th:action="@{/control-center/backups}" method="post" class="matrix26-panel matrix26-backup-form">
+                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+-                <div class="matrix26-panel-header"><div><span>Target</span><h2>Database backup request</h2></div></div>
++                <div class="matrix26-panel-header"><div><span>Target</span><h2>Backup request</h2></div></div>
++
++                <div class="matrix26-backup-scope-grid mb-4">
++                    <label class="matrix26-backup-scope is-recommended">
++                        <input type="radio" name="backupScope" value="FULL" checked>
++                        <span class="matrix26-backup-scope-icon"><i class="bi bi-box-seam"></i></span>
++                        <span>
++                            <strong>Full instance backup</strong>
++                            <small>Database, runtime configuration, launchers, modules, appearance, branding resources, uploads, documents, inventory, and diagnostic tail.</small>
++                            <em>Recommended for recovery</em>
++                        </span>
++                    </label>
++                    <label class="matrix26-backup-scope">
++                        <input type="radio" name="backupScope" value="DATABASE">
++                        <span class="matrix26-backup-scope-icon"><i class="bi bi-database"></i></span>
++                        <span>
++                            <strong>Database only</strong>
++                            <small>Creates the Phase 3E.1 logical database export without instance files.</small>
++                            <em>Useful for quick data snapshots</em>
++                        </span>
++                    </label>
++                </div>
+ 
+                 <div class="matrix26-backup-candidates">
+                     <label th:each="candidate : ${candidates}" class="matrix26-backup-candidate" th:classappend="${candidate.allowed} ? ' is-enabled' : ' is-disabled'">
+@@ -34,14 +55,14 @@
+                         <span class="matrix26-backup-candidate-copy">
+                             <strong th:text="${candidate.businessName}">Instance</strong>
+                             <small><code th:text="${candidate.instanceCode}">code</code> · <code th:text="${candidate.databaseName}">database</code></small>
+-                            <small th:if="${candidate.allowed}" class="text-success">Eligible for Phase 3E.1</small>
++                            <small th:if="${candidate.allowed}" class="text-success">Eligible for Phase 3E.2</small>
+                             <small th:unless="${candidate.allowed}" class="text-danger" th:text="${candidate.restrictionReason}">Blocked</small>
+                         </span>
+                     </label>
+                 </div>
+ 
+                 <div class="matrix26-backup-plan mt-4">
+-                    <h3>Verification plan</h3>
++                    <h3>Full backup verification plan</h3>
+                     <ul>
+                         <li><i class="bi bi-check2"></i> Validate Matrix26 registration and runtime database</li>
+                         <li><i class="bi bi-check2"></i> Check table count and free storage</li>
+@@ -49,7 +70,11 @@
+                         <li><i class="bi bi-check2"></i> Compress with GZIP</li>
+                         <li><i class="bi bi-check2"></i> Inspect SQL structure and ownership marker</li>
+                         <li><i class="bi bi-check2"></i> Calculate and recheck SHA-256</li>
+-                        <li><i class="bi bi-check2"></i> Generate manifest and report</li>
++                        <li><i class="bi bi-check2"></i> Package instance-owned resources and approved runtime files</li>
++                        <li><i class="bi bi-check2"></i> Redact secrets from runtime configuration</li>
++                        <li><i class="bi bi-check2"></i> Export modules, appearance, and instance metadata</li>
++                        <li><i class="bi bi-check2"></i> Inspect ZIP paths and read every archive entry</li>
++                        <li><i class="bi bi-check2"></i> Generate complete checksums, manifest, inventory, and report</li>
+                     </ul>
+                 </div>
+ 
+@@ -60,13 +85,13 @@
+ 
+                 <label class="matrix26-confirmation mt-4">
+                     <input type="checkbox" name="confirmation" value="true" required>
+-                    <span>I confirm that Matrix26 may create a manual database backup for the selected laboratory instance.</span>
++                    <span>I confirm that Matrix26 may create the selected verified recovery package for this laboratory instance.</span>
+                 </label>
+ 
+                 <div class="d-flex justify-content-end gap-2 mt-4">
+                     <a class="btn btn-outline-secondary" th:href="@{/control-center/backups}">Cancel</a>
+                     <button class="btn btn-primary" type="submit" th:disabled="${!tool.available}">
+-                        <i class="bi bi-shield-check me-1"></i>Create and verify backup
++                        <i class="bi bi-shield-check me-1"></i>Create and verify package
+                     </button>
+                 </div>
+             </form>
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/src/main/resources/templates/control_center/backups/index.html	2026-06-25 13:30:33.562462664 +0000
++++ /mnt/data/matrix26_backup3e2_impl/src/main/resources/templates/control_center/backups/index.html	2026-06-25 13:36:02.268081416 +0000
+@@ -5,19 +5,19 @@
+ <div class="matrix26-shell">
+     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+     <div class="matrix26-content">
+-        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup Manager', 'Copias manuales y verificadas de bases aisladas.')}"></header>
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup Manager', 'Paquetes manuales y verificados para recuperación de instancias aisladas.')}"></header>
+         <main class="matrix26-main">
+             <div th:if="${backupSuccess}" class="alert alert-success" th:text="${backupSuccess}"></div>
+             <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
+ 
+             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                 <div>
+-                    <span class="matrix26-eyebrow">Matrix26 Backups · Phase 3E.1</span>
+-                    <h1 class="matrix26-page-title">Database backups</h1>
+-                    <p class="matrix26-page-subtitle mb-0">Manual exports with GZIP, SHA-256, manifest, and structural verification.</p>
++                    <span class="matrix26-eyebrow">Matrix26 Backups · Phase 3E.2</span>
++                    <h1 class="matrix26-page-title">Recovery backups</h1>
++                    <p class="matrix26-page-subtitle mb-0">Database-only and full instance packages with GZIP, ZIP, SHA-256, redaction, manifest, and structural verification.</p>
+                 </div>
+                 <a class="btn btn-primary" th:href="@{/control-center/backups/new}">
+-                    <i class="bi bi-database-add me-1"></i>New database backup
++                    <i class="bi bi-database-add me-1"></i>New backup
+                 </a>
+             </div>
+ 
+@@ -25,7 +25,7 @@
+                 <article><span><i class="bi bi-archive"></i></span><div><strong th:text="${summary.total}">0</strong><small>Total jobs</small></div></article>
+                 <article><span><i class="bi bi-check2-circle"></i></span><div><strong th:text="${summary.completed}">0</strong><small>Verified</small></div></article>
+                 <article><span><i class="bi bi-x-octagon"></i></span><div><strong th:text="${summary.failed}">0</strong><small>Failed</small></div></article>
+-                <article><span><i class="bi bi-hdd"></i></span><div><strong th:text="${T(com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupService).formatBytes(summary.totalBytes)}">0 B</strong><small>Stored database dumps</small></div></article>
++                <article><span><i class="bi bi-hdd"></i></span><div><strong th:text="${T(com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupService).formatBytes(summary.totalBytes)}">0 B</strong><small>Stored backup artifacts</small></div></article>
+             </section>
+ 
+             <div class="row g-4 mb-4">
+@@ -34,8 +34,8 @@
+                         <div class="matrix26-panel-header"><div><span>Backup storage</span><h2>Current configuration</h2></div></div>
+                         <dl class="matrix26-settings-list">
+                             <div><dt>Root directory</dt><dd><code class="matrix26-code-wrap" th:text="${backupRoot}">path</code></dd></div>
+-                            <div><dt>Phase scope</dt><dd>Database only</dd></div>
+-                            <div><dt>Compression</dt><dd>GZIP</dd></div>
++                            <div><dt>Phase scope</dt><dd>Database only + full instance</dd></div>
++                            <div><dt>Compression</dt><dd>GZIP database + ZIP instance files</dd></div>
+                             <div><dt>Integrity</dt><dd>SHA-256 + structural checks</dd></div>
+                         </dl>
+                     </section>
+@@ -67,7 +67,7 @@
+                 <div th:if="${#lists.isEmpty(jobs)}" class="matrix26-empty-state">
+                     <i class="bi bi-database"></i>
+                     <strong>No backups have been created</strong>
+-                    <span>Create the first verified laboratory database backup.</span>
++                    <span>Create the first verified laboratory recovery package.</span>
+                 </div>
+                 <div th:unless="${#lists.isEmpty(jobs)}" class="table-responsive">
+                     <table class="table align-middle mb-0 matrix26-table">
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/src/main/resources/templates/control_center/backups/detail.html	2026-06-25 13:30:33.562192761 +0000
++++ /mnt/data/matrix26_backup3e2_impl/src/main/resources/templates/control_center/backups/detail.html	2026-06-25 13:36:02.268553627 +0000
+@@ -26,7 +26,7 @@
+                 <article><span><i class="bi bi-table"></i></span><div><strong th:text="${backup.job.tableCount != null ? backup.job.tableCount : '—'}">0</strong><small>Tables</small></div></article>
+                 <article><span><i class="bi bi-database"></i></span><div><strong th:text="${backup.databaseSizeLabel}">—</strong><small>Database estimate</small></div></article>
+                 <article><span><i class="bi bi-file-earmark-code"></i></span><div><strong th:text="${backup.dumpSizeLabel}">—</strong><small>SQL size</small></div></article>
+-                <article><span><i class="bi bi-file-zip"></i></span><div><strong th:text="${backup.compressedSizeLabel}">—</strong><small>Compressed size</small></div></article>
++                <article><span><i class="bi bi-file-zip"></i></span><div><strong th:text="${backup.compressedSizeLabel}">—</strong><small>Stored package size</small></div></article>
+             </section>
+ 
+             <div class="row g-4 mb-4">
+@@ -40,7 +40,7 @@
+                             <div><dt>Database host</dt><dd><code th:text="|${backup.job.databaseHost}:${backup.job.databasePort}|">host</code></dd></div>
+                             <div><dt>Dump tool</dt><dd th:text="${backup.job.toolVersion != null ? backup.job.toolVersion : '—'}">tool</dd></div>
+                             <div><dt>Directory</dt><dd><code class="matrix26-code-wrap" th:text="${backup.backupDirectoryDisplay}">path</code></dd></div>
+-                            <div><dt>SHA-256</dt><dd><code class="matrix26-hash" th:text="${backup.job.sha256 != null ? backup.job.sha256 : '—'}">hash</code></dd></div>
++                            <div><dt>Package SHA-256</dt><dd><code class="matrix26-hash" th:text="${backup.job.sha256 != null ? backup.job.sha256 : '—'}">hash</code></dd></div>
+                         </dl>
+                     </section>
+                 </div>
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/src/main/resources/templates/control_center/backups/instance.html	2026-06-25 13:30:33.562631567 +0000
++++ /mnt/data/matrix26_backup3e2_impl/src/main/resources/templates/control_center/backups/instance.html	2026-06-25 13:36:02.268322217 +0000
+@@ -16,8 +16,8 @@
+             </div>
+             <div th:if="${candidate == null or !candidate.allowed}" class="alert alert-warning" th:text="${candidate != null ? candidate.restrictionReason : 'This instance is not eligible for database backups.'}">Blocked</div>
+             <section class="matrix26-panel">
+-                <div class="matrix26-panel-header"><div><span>History</span><h2>Database backups</h2></div></div>
+-                <div th:if="${#lists.isEmpty(jobs)}" class="matrix26-empty-state"><i class="bi bi-archive"></i><strong>No backup history</strong><span>No database backups have been registered for this instance.</span></div>
++                <div class="matrix26-panel-header"><div><span>History</span><h2>Recovery backups</h2></div></div>
++                <div th:if="${#lists.isEmpty(jobs)}" class="matrix26-empty-state"><i class="bi bi-archive"></i><strong>No backup history</strong><span>No recovery backups have been registered for this instance.</span></div>
+                 <div th:unless="${#lists.isEmpty(jobs)}" class="table-responsive">
+                     <table class="table align-middle mb-0 matrix26-table">
+                         <thead><tr><th>Backup</th><th>Status</th><th>Tables</th><th>Size</th><th>Requested</th><th></th></tr></thead>
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/src/main/resources/static/css/matrix26-control.css	2026-06-25 13:30:33.414974222 +0000
++++ /mnt/data/matrix26_backup3e2_impl/src/main/resources/static/css/matrix26-control.css	2026-06-25 13:36:02.403729408 +0000
+@@ -2142,3 +2142,80 @@
+         grid-template-columns: 1fr;
+     }
+ }
++
++/* Matrix26 Backups Phase 3E.2 */
++.matrix26-backup-scope-grid {
++    display: grid;
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++    gap: 1rem;
++}
++
++.matrix26-backup-scope {
++    position: relative;
++    display: grid;
++    grid-template-columns: auto 1fr;
++    gap: 1rem;
++    align-items: start;
++    padding: 1.2rem;
++    border: 1px solid var(--matrix26-border, #dce4ee);
++    border-radius: 1rem;
++    background: var(--matrix26-surface, #fff);
++    cursor: pointer;
++    transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
++}
++
++.matrix26-backup-scope:hover,
++.matrix26-backup-scope:has(input:checked) {
++    border-color: var(--matrix26-primary, #2457f5);
++    box-shadow: 0 10px 28px rgba(36, 87, 245, .12);
++    transform: translateY(-1px);
++}
++
++.matrix26-backup-scope input {
++    position: absolute;
++    top: 1rem;
++    right: 1rem;
++}
++
++.matrix26-backup-scope-icon {
++    display: inline-grid;
++    place-items: center;
++    width: 2.75rem;
++    height: 2.75rem;
++    border-radius: .85rem;
++    color: var(--matrix26-primary, #2457f5);
++    background: rgba(36, 87, 245, .1);
++    font-size: 1.25rem;
++}
++
++.matrix26-backup-scope > span:last-child {
++    display: grid;
++    gap: .35rem;
++    padding-right: 1.25rem;
++}
++
++.matrix26-backup-scope strong {
++    font-size: 1rem;
++}
++
++.matrix26-backup-scope small {
++    color: var(--matrix26-muted, #64748b);
++    line-height: 1.45;
++}
++
++.matrix26-backup-scope em {
++    width: fit-content;
++    padding: .2rem .55rem;
++    border-radius: 999px;
++    background: #eef4ff;
++    color: #2448a8;
++    font-size: .72rem;
++    font-style: normal;
++    font-weight: 700;
++}
++
++@media (max-width: 800px) {
++    .matrix26-backup-scope-grid {
++        grid-template-columns: 1fr;
++    }
++}
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/scripts/check-matrix26-backups-phase3e2.sh	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e2_impl/scripts/check-matrix26-backups-phase3e2.sh	2026-06-25 13:43:49.458532433 +0000
+@@ -0,0 +1,87 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "$0")/.." && pwd)"
++PACKAGE="$ROOT/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups"
++TEMPLATES="$ROOT/src/main/resources/templates/control_center/backups"
++CONFIG_SCRIPT="$ROOT/scripts/configure-matrix26-backup-runtime-phase3e2.sh"
++
++required_files=(
++  "$PACKAGE/Matrix26BackupController.java"
++  "$PACKAGE/Matrix26BackupService.java"
++  "$PACKAGE/Matrix26FullBackupAssembler.java"
++  "$PACKAGE/Matrix26FullBackupResult.java"
++  "$PACKAGE/Matrix26BackupRepository.java"
++  "$PACKAGE/Matrix26BackupProperties.java"
++  "$TEMPLATES/index.html"
++  "$TEMPLATES/new.html"
++  "$TEMPLATES/detail.html"
++  "$TEMPLATES/instance.html"
++  "$CONFIG_SCRIPT"
++)
++
++for file in "${required_files[@]}"; do
++  test -f "$file" || { echo "Missing required file: $file" >&2; exit 1; }
++done
++
++grep -q 'createManualFullBackup' "$PACKAGE/Matrix26BackupService.java"
++grep -q 'MANUAL_FULL' "$PACKAGE/Matrix26BackupService.java"
++grep -q 'ZipOutputStream' "$PACKAGE/Matrix26FullBackupAssembler.java"
++grep -q 'ZipFile' "$PACKAGE/Matrix26FullBackupAssembler.java"
++grep -q 'runtime-config.properties' "$PACKAGE/Matrix26FullBackupAssembler.java"
++grep -q 'instance-files.zip' "$PACKAGE/Matrix26FullBackupAssembler.java"
++grep -q 'appearance.json' "$PACKAGE/Matrix26FullBackupAssembler.java"
++grep -q 'modules.json' "$PACKAGE/Matrix26FullBackupAssembler.java"
++grep -q 'files-inventory.json' "$PACKAGE/Matrix26FullBackupAssembler.java"
++grep -q 'runtime-log-tail.txt' "$PACKAGE/Matrix26FullBackupAssembler.java"
++grep -q 'FULL_ARTIFACT_SHA256' "$PACKAGE/Matrix26BackupService.java"
++grep -q 'FILESET_STABILITY' "$PACKAGE/Matrix26FullBackupAssembler.java"
++grep -q 'backupScope' "$PACKAGE/Matrix26BackupController.java"
++grep -q 'value="FULL"' "$TEMPLATES/new.html"
++grep -q 'value="DATABASE"' "$TEMPLATES/new.html"
++
++grep -q 'matrix26.control-center.backups.dump-executable=' "$CONFIG_SCRIPT"
++grep -q 'matrix26.control-center.backups.root-directory=' "$CONFIG_SCRIPT"
++grep -q 'matrix26.control-center.backups.runtime-data-directory=' "$CONFIG_SCRIPT"
++grep -q 'runtime-data/matrix26-control/maintenance' "$CONFIG_SCRIPT"
++
++if grep -RniE -- '--password=|command\.add\("-p[^\"]+' "$PACKAGE"; then
++  echo "Potential command-line password detected." >&2
++  exit 1
++fi
++
++if grep -RniE 'Runtime\.getRuntime\(\)\.exec|cmd\.exe|powershell\.exe.*(mysqldump|mariadb-dump)' "$PACKAGE"; then
++  echo "Arbitrary shell execution boundary violated." >&2
++  exit 1
++fi
++
++if grep -RniE 'runtime-data/.*/operations.*ZipEntry|application-error\.log.*putNextEntry' "$PACKAGE/Matrix26FullBackupAssembler.java"; then
++  echo "Raw operation logs must not be included in the recovery archive." >&2
++  exit 1
++fi
++
++python - "$TEMPLATES" "$ROOT/src/main/resources/static/css/matrix26-control.css" <<'PY'
++from pathlib import Path
++from html.parser import HTMLParser
++import sys
++
++class Parser(HTMLParser):
++    pass
++
++for path in Path(sys.argv[1]).glob('*.html'):
++    parser = Parser()
++    parser.feed(path.read_text(encoding='utf-8'))
++
++css = Path(sys.argv[2]).read_text(encoding='utf-8')
++if css.count('{') != css.count('}'):
++    raise SystemExit('Unbalanced CSS braces')
++
++print('Backup templates and CSS: OK')
++PY
++
++echo "Full and database-only backup flows: OK"
++echo "Runtime configuration redaction and path boundaries: OK"
++echo "ZIP entry validation and symbolic-link exclusion: OK"
++echo "Cross-artifact SHA-256 and inventory verification: OK"
++echo "Persistent Matrix26 backup configuration keys: OK"
++echo "Matrix26 Backups Phase 3E.2 static checks passed."
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/scripts/configure-matrix26-backup-runtime-phase3e2.sh	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e2_impl/scripts/configure-matrix26-backup-runtime-phase3e2.sh	2026-06-25 13:43:49.458282764 +0000
+@@ -0,0 +1,63 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "$0")/.." && pwd)"
++TARGET="$ROOT/runtime-clients/matrix26_control/application.properties"
++DUMP_TOOL="${1:-C:/wamp64/bin/mariadb/mariadb10.10.2/bin/mariadb-dump.exe}"
++BACKUP_ROOT="${2:-C:/Users/PC/Matrix26/backups}"
++CONFIG_BACKUP_DIR="$ROOT/runtime-data/matrix26-control/maintenance"
++mkdir -p "$CONFIG_BACKUP_DIR"
++
++if [[ ! -f "$TARGET" ]]; then
++  echo "Matrix26 runtime configuration was not found: $TARGET" >&2
++  exit 1
++fi
++
++python - "$TARGET" "$DUMP_TOOL" "$BACKUP_ROOT" "$CONFIG_BACKUP_DIR" <<'PY'
++from pathlib import Path
++import sys
++
++path = Path(sys.argv[1])
++dump_tool = sys.argv[2].strip()
++backup_root = sys.argv[3].strip()
++config_backup_dir = Path(sys.argv[4])
++
++if not dump_tool or not backup_root:
++    raise SystemExit("Dump tool and backup root must not be empty.")
++
++keys = (
++    "matrix26.backup.dump-tool=",
++    "matrix26.backup.root=",
++    "matrix26.control-center.backups.dump-executable=",
++    "matrix26.control-center.backups.root-directory=",
++    "matrix26.control-center.backups.runtime-directory=",
++    "matrix26.control-center.backups.runtime-data-directory=",
++    "matrix26.control-center.backups.maximum-single-file-bytes=",
++    "matrix26.control-center.backups.maximum-archive-source-bytes=",
++    "matrix26.control-center.backups.diagnostic-log-tail-lines=",
++)
++
++original = path.read_text(encoding="utf-8")
++lines = [line for line in original.splitlines() if not line.strip().startswith(keys)]
++while lines and not lines[-1].strip():
++    lines.pop()
++
++lines.extend([
++    "",
++    "# Matrix26 Backups Phase 3E.2",
++    f"matrix26.control-center.backups.dump-executable=${{MATRIX26_MYSQLDUMP_PATH:{dump_tool}}}",
++    f"matrix26.control-center.backups.root-directory=${{MATRIX26_BACKUP_ROOT:{backup_root}}}",
++    "matrix26.control-center.backups.runtime-directory=runtime-clients",
++    "matrix26.control-center.backups.runtime-data-directory=runtime-data",
++    "matrix26.control-center.backups.maximum-single-file-bytes=536870912",
++    "matrix26.control-center.backups.maximum-archive-source-bytes=2147483648",
++    "matrix26.control-center.backups.diagnostic-log-tail-lines=400",
++])
++
++config_backup_dir.mkdir(parents=True, exist_ok=True)
++backup = config_backup_dir / "application.properties.phase3e2.bak"
++backup.write_text(original, encoding="utf-8")
++path.write_text("\n".join(lines) + "\n", encoding="utf-8")
++print(f"Matrix26 backup settings updated: {path}")
++print(f"Previous configuration preserved at: {backup}")
++PY
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/docs/project/matrix26-backups-phase3e2-test-guide.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e2_impl/docs/project/matrix26-backups-phase3e2-test-guide.md	2026-06-25 13:43:49.458719221 +0000
+@@ -0,0 +1,221 @@
++# Matrix26 Backups — Phase 3E.2 test guide
++
++## Scope
++
++Phase 3E.2 adds a complete instance recovery package for:
++
++- Instance code: `matrix26-appearance-lab`
++- Runtime profile: `matrix26_appearance_lab`
++- Database: `matrix26_appearance_lab`
++- Runtime port: `8094`
++
++The previous database-only backup remains available.
++
++## Full package contents
++
++A successful full backup creates:
++
++```text
++<backup-root>/matrix26-appearance-lab/YYYY/MM/backup-.../
++├── database.sql.gz
++├── instance-files.zip
++├── runtime-config.properties
++├── instance.json
++├── modules.json
++├── appearance.json
++├── files-inventory.json
++├── runtime-log-tail.txt
++├── manifest.json
++├── checksums.sha256
++└── backup-report.txt
++```
++
++`instance-files.zip` may include only instance-owned recovery files:
++
++```text
++runtime-data/matrix26-appearance-lab/appearance/
++runtime-data/matrix26-appearance-lab/uploads/
++runtime-data/matrix26-appearance-lab/documents/
++runtime-data/matrix26-appearance-lab/attachments/
++runtime-data/matrix26-appearance-lab/media/
++runtime-data/matrix26-appearance-lab/public/
++runtime-clients/matrix26_appearance_lab/<approved launchers and metadata>
++```
++
++It excludes:
++
++- Raw `application.properties`.
++- JAR files.
++- Raw operation logs.
++- PID files.
++- Temporary files.
++- Backups from other instances.
++- Symbolic links.
++- `.git`, `target`, or source code.
++
++A sanitized tail of current runtime logs is stored separately as `runtime-log-tail.txt`.
++
++## Apply and validate
++
++```bash
++cd "$HOME/Projects/eco-agua-workspace/eco-agua"
++
++bash scripts/check-matrix26-backups-phase3e2.sh
++
++rm -rf target
++mvn clean -DskipTests package
++```
++
++Expected results:
++
++```text
++Matrix26 Backups Phase 3E.2 static checks passed.
++BUILD SUCCESS
++```
++
++## Persistent configuration
++
++Apply the configuration helper once. It updates only Matrix26 backup keys and preserves all existing database credentials and runtime settings:
++
++```bash
++bash scripts/configure-matrix26-backup-runtime-phase3e2.sh
++```
++
++The defaults match the detected Wamp installation and current backup root:
++
++```text
++C:/wamp64/bin/mariadb/mariadb10.10.2/bin/mariadb-dump.exe
++C:/Users/PC/Matrix26/backups
++```
++
++To use other paths:
++
++```bash
++bash scripts/configure-matrix26-backup-runtime-phase3e2.sh \
++  'D:/Tools/MariaDB/bin/mariadb-dump.exe' \
++  'D:/Matrix26/backups'
++```
++
++The helper creates:
++
++```text
++runtime-data/matrix26-control/maintenance/application.properties.phase3e2.bak
++```
++
++It never reads or changes the MySQL password value. It replaces the legacy backup keys with the actual Spring `@ConfigurationProperties` keys.
++
++## Start Matrix26
++
++```bash
++bash scripts/run-matrix26-control.sh
++```
++
++Open:
++
++```text
++http://localhost:8091/control-center/backups/new
++```
++
++## Create a full instance backup
++
++1. Select **Full instance backup**.
++2. Select **Matrix26 Appearance Laboratory**.
++3. Mark the confirmation.
++4. Submit once.
++
++Expected result:
++
++- Backup type: `MANUAL_FULL`.
++- Status: `COMPLETED`.
++- The database checks from Phase 3E.1 pass.
++- The full-package checks pass.
++- The artifact table lists all recovery files.
++
++## Required full-package checks
++
++Expected `PASSED` results:
++
++- `FULL_ARCHIVE_READABLE`
++- `RUNTIME_CONFIG_REDACTED`
++- `INSTANCE_OWNERSHIP`
++- `FULL_ARTIFACT_SHA256`
++
++Expected `PASSED` or `WARNING`:
++
++- `FILESET_STABILITY`
++
++A warning is allowed when files change while the online backup runs. The backup remains readable, but restore testing is recommended.
++
++## Verify the archive manually
++
++From Git Bash, locate the newest backup:
++
++```bash
++BACKUP_ROOT="/c/Users/PC/Matrix26/backups/matrix26-appearance-lab"
++LATEST_BACKUP="$(find "$BACKUP_ROOT" -name manifest.json -printf '%T@ %h\n' | sort -nr | head -1 | cut -d' ' -f2-)"
++
++echo "$LATEST_BACKUP"
++unzip -t "$LATEST_BACKUP/instance-files.zip"
++unzip -l "$LATEST_BACKUP/instance-files.zip"
++```
++
++The listing must not contain:
++
++```text
++application.properties
++runtime.pid
++application.log
++application-error.log
++../
++C:/
++```
++
++It should contain the published appearance resources and approved launcher files.
++
++## Verify runtime redaction
++
++```bash
++grep -niE 'password|secret|token|api[-_.]?key|private[-_.]?key' \
++  "$LATEST_BACKUP/runtime-config.properties"
++```
++
++Sensitive keys must show:
++
++```text
++***REDACTED***
++```
++
++## Verify checksums
++
++```bash
++cd "$LATEST_BACKUP"
++sha256sum -c checksums.sha256
++```
++
++All listed files must return `OK`.
++
++## Database-only regression
++
++Create another backup with **Database only**.
++
++Expected result:
++
++- Backup type: `MANUAL_DATABASE`.
++- Status: `COMPLETED`.
++- It creates the original four database-backup artifacts.
++- No `instance-files.zip` is created.
++
++## Protected boundaries
++
++The following remain disabled:
++
++- Eco Agua.
++- Productos de la Selva Belén.
++- Restaurante El Buen Sabor.
++- Matrix26 Control Center database.
++
++A crafted request using another instance ID must be rejected by the service allowlist.
++
++## No manual SQL
++
++Phase 3E.2 reuses the Phase 3E.1 metadata tables and does not require SQL scripts.
+--- /mnt/data/matrix26_backup3e2_work/matrix26-backups-phase3e2-context-20260625-082817/reports/matrix26-backups-phase3e2-report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e2_impl/reports/matrix26-backups-phase3e2-report.md	2026-06-25 13:43:49.458914799 +0000
+@@ -0,0 +1,94 @@
++# Matrix26 Backups — Phase 3E.2 implementation report
++
++## Delivered
++
++- Full instance backup option alongside the database-only option.
++- Database export inherited from Phase 3E.1.
++- ZIP archive of instance-owned runtime data and approved launcher files.
++- Published Appearance Studio resources and history.
++- Upload, document, attachment, media, and public resource roots when present.
++- Sanitized runtime configuration stored outside the ZIP.
++- Instance metadata export.
++- Module assignment export.
++- Appearance assignment export.
++- Before-and-after file inventory.
++- Online consistency warning when files change during the backup.
++- Sanitized diagnostic log tail instead of raw operation logs.
++- ZIP readability and path traversal verification.
++- Symbolic-link exclusion.
++- Per-file and total archive size limits.
++- Cross-artifact SHA-256 verification.
++- Full manifest format version 2.
++- Human-readable full backup report.
++- Full-package audit actions.
++- Safe configuration helper that patches only the correctly named Spring backup properties and preserves runtime secrets.
++- Existing database-only backup flow retained.
++
++## Recovery artifacts
++
++```text
++database.sql.gz
++instance-files.zip
++runtime-config.properties
++instance.json
++modules.json
++appearance.json
++files-inventory.json
++runtime-log-tail.txt
++manifest.json
++checksums.sha256
++backup-report.txt
++```
++
++## Safety boundaries
++
++- Only `matrix26-appearance-lab` remains allowlisted.
++- No user-provided database name or filesystem path is executed.
++- Database passwords remain in the dump process environment only.
++- Raw runtime configuration is never placed in the backup package.
++- Raw operation logs are excluded.
++- Runtime JAR files are excluded.
++- Symbolic links are skipped.
++- ZIP entries are checked for absolute paths and traversal segments.
++- Backup storage remains outside the Git repository.
++- Protected operational instances remain unavailable.
++- No restoration or deletion operation is included in this phase.
++
++## Important correction
++
++The submitted runtime contained legacy keys:
++
++```text
++matrix26.backup.dump-tool
++matrix26.backup.root
++```
++
++The included configuration helper replaces those legacy keys with the actual `@ConfigurationProperties` prefix:
++
++```text
++matrix26.control-center.backups.dump-executable
++matrix26.control-center.backups.root-directory
++```
++
++The helper edits only backup settings, preserves the original runtime file under ignored `runtime-data/matrix26-control/maintenance/`, and does not overwrite database or administrator credentials.
++
++## Validation performed
++
++- Existing Phase 3E.1 backup manifest reviewed: passed.
++- Runtime-data inventory reviewed: published appearance resources detected.
++- Java 17 isolated compilation of the new full-backup assembler: passed.
++- Java 17 isolated compilation of the modified backup service: passed.
++- Synthetic ZIP creation and readback test: passed.
++- Synthetic runtime configuration redaction test: passed.
++- HTML parser validation: passed.
++- CSS brace validation: passed.
++- Static security verifier: passed.
++- Clean-context package apply test: required before delivery.
++
++## Deferred to Phase 3E.3
++
++- Backup encryption.
++- Configurable retention policies.
++- Scheduled backups.
++- Backup expiration and pruning.
++- External/off-machine backup destinations.

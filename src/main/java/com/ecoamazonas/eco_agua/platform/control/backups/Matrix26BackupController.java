@@ -56,19 +56,20 @@ public class Matrix26BackupController {
     @PostMapping("/backups")
     public String createBackup(
             @RequestParam("instanceId") long instanceId,
+            @RequestParam(value = "backupScope", defaultValue = "FULL") String backupScope,
             @RequestParam(value = "confirmation", defaultValue = "false") boolean confirmation,
             Principal principal,
             RedirectAttributes redirectAttributes
     ) {
         try {
-            Matrix26BackupJob job = backupService.createManualDatabaseBackup(
-                    instanceId,
-                    actor(principal),
-                    confirmation
-            );
+            boolean fullBackup = "FULL".equalsIgnoreCase(backupScope);
+            Matrix26BackupJob job = fullBackup
+                    ? backupService.createManualFullBackup(instanceId, actor(principal), confirmation)
+                    : backupService.createManualDatabaseBackup(instanceId, actor(principal), confirmation);
             redirectAttributes.addFlashAttribute(
                     "backupSuccess",
-                    "Database backup completed and verified: " + job.publicId()
+                    (fullBackup ? "Full instance backup" : "Database backup")
+                            + " completed and verified: " + job.publicId()
             );
             return "redirect:/control-center/backups/" + job.id();
         } catch (Matrix26BackupException ex) {

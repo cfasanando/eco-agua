@@ -1,20 +1,20 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{control_center/fragments/head :: head('New database backup')}"></head>
+<head th:replace="~{control_center/fragments/head :: head('New backup')}"></head>
 <body class="matrix26-body">
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('New database backup', 'Create a verified export of an isolated laboratory database.')}"></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('New backup', 'Create a verified database-only or full instance recovery package.')}"></header>
         <main class="matrix26-main">
             <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
             <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
-                <div><span class="matrix26-eyebrow">Manual backup</span><h1 class="matrix26-page-title">Select an eligible instance</h1></div>
+                <div><span class="matrix26-eyebrow">Manual backup</span><h1 class="matrix26-page-title">Configure the recovery package</h1></div>
                 <a class="btn btn-outline-secondary" th:href="@{/control-center/backups}"><i class="bi bi-arrow-left me-1"></i>Back</a>
             </div>
 
             <div class="alert alert-info">
-                This phase exports only the selected database. Runtime files, uploads, logos, and branding assets will be added in Phase 3E.2.
+                Phase 3E.2 can create a complete recovery package with the database, runtime configuration, appearance, modules, branding resources, uploads, documents, and verified metadata.
             </div>
             <div th:unless="${tool.available}" class="alert alert-danger">
                 <strong>Backup tool unavailable.</strong>
@@ -23,7 +23,28 @@
 
             <form th:action="@{/control-center/backups}" method="post" class="matrix26-panel matrix26-backup-form">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                <div class="matrix26-panel-header"><div><span>Target</span><h2>Database backup request</h2></div></div>
+                <div class="matrix26-panel-header"><div><span>Target</span><h2>Backup request</h2></div></div>
+
+                <div class="matrix26-backup-scope-grid mb-4">
+                    <label class="matrix26-backup-scope is-recommended">
+                        <input type="radio" name="backupScope" value="FULL" checked>
+                        <span class="matrix26-backup-scope-icon"><i class="bi bi-box-seam"></i></span>
+                        <span>
+                            <strong>Full instance backup</strong>
+                            <small>Database, runtime configuration, launchers, modules, appearance, branding resources, uploads, documents, inventory, and diagnostic tail.</small>
+                            <em>Recommended for recovery</em>
+                        </span>
+                    </label>
+                    <label class="matrix26-backup-scope">
+                        <input type="radio" name="backupScope" value="DATABASE">
+                        <span class="matrix26-backup-scope-icon"><i class="bi bi-database"></i></span>
+                        <span>
+                            <strong>Database only</strong>
+                            <small>Creates the Phase 3E.1 logical database export without instance files.</small>
+                            <em>Useful for quick data snapshots</em>
+                        </span>
+                    </label>
+                </div>
 
                 <div class="matrix26-backup-candidates">
                     <label th:each="candidate : ${candidates}" class="matrix26-backup-candidate" th:classappend="${candidate.allowed} ? ' is-enabled' : ' is-disabled'">
@@ -34,14 +55,14 @@
                         <span class="matrix26-backup-candidate-copy">
                             <strong th:text="${candidate.businessName}">Instance</strong>
                             <small><code th:text="${candidate.instanceCode}">code</code> · <code th:text="${candidate.databaseName}">database</code></small>
-                            <small th:if="${candidate.allowed}" class="text-success">Eligible for Phase 3E.1</small>
+                            <small th:if="${candidate.allowed}" class="text-success">Eligible for Phase 3E.2</small>
                             <small th:unless="${candidate.allowed}" class="text-danger" th:text="${candidate.restrictionReason}">Blocked</small>
                         </span>
                     </label>
                 </div>
 
                 <div class="matrix26-backup-plan mt-4">
-                    <h3>Verification plan</h3>
+                    <h3>Full backup verification plan</h3>
                     <ul>
                         <li><i class="bi bi-check2"></i> Validate Matrix26 registration and runtime database</li>
                         <li><i class="bi bi-check2"></i> Check table count and free storage</li>
@@ -49,7 +70,11 @@
                         <li><i class="bi bi-check2"></i> Compress with GZIP</li>
                         <li><i class="bi bi-check2"></i> Inspect SQL structure and ownership marker</li>
                         <li><i class="bi bi-check2"></i> Calculate and recheck SHA-256</li>
-                        <li><i class="bi bi-check2"></i> Generate manifest and report</li>
+                        <li><i class="bi bi-check2"></i> Package instance-owned resources and approved runtime files</li>
+                        <li><i class="bi bi-check2"></i> Redact secrets from runtime configuration</li>
+                        <li><i class="bi bi-check2"></i> Export modules, appearance, and instance metadata</li>
+                        <li><i class="bi bi-check2"></i> Inspect ZIP paths and read every archive entry</li>
+                        <li><i class="bi bi-check2"></i> Generate complete checksums, manifest, inventory, and report</li>
                     </ul>
                 </div>
 
@@ -60,13 +85,13 @@
 
                 <label class="matrix26-confirmation mt-4">
                     <input type="checkbox" name="confirmation" value="true" required>
-                    <span>I confirm that Matrix26 may create a manual database backup for the selected laboratory instance.</span>
+                    <span>I confirm that Matrix26 may create the selected verified recovery package for this laboratory instance.</span>
                 </label>
 
                 <div class="d-flex justify-content-end gap-2 mt-4">
                     <a class="btn btn-outline-secondary" th:href="@{/control-center/backups}">Cancel</a>
                     <button class="btn btn-primary" type="submit" th:disabled="${!tool.available}">
-                        <i class="bi bi-shield-check me-1"></i>Create and verify backup
+                        <i class="bi bi-shield-check me-1"></i>Create and verify package
                     </button>
                 </div>
             </form>

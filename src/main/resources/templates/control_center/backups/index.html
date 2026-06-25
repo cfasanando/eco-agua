@@ -5,19 +5,19 @@
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup Manager', 'Copias manuales y verificadas de bases aisladas.')}"></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup Manager', 'Paquetes manuales y verificados para recuperación de instancias aisladas.')}"></header>
         <main class="matrix26-main">
             <div th:if="${backupSuccess}" class="alert alert-success" th:text="${backupSuccess}"></div>
             <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
 
             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
                 <div>
-                    <span class="matrix26-eyebrow">Matrix26 Backups · Phase 3E.1</span>
-                    <h1 class="matrix26-page-title">Database backups</h1>
-                    <p class="matrix26-page-subtitle mb-0">Manual exports with GZIP, SHA-256, manifest, and structural verification.</p>
+                    <span class="matrix26-eyebrow">Matrix26 Backups · Phase 3E.2</span>
+                    <h1 class="matrix26-page-title">Recovery backups</h1>
+                    <p class="matrix26-page-subtitle mb-0">Database-only and full instance packages with GZIP, ZIP, SHA-256, redaction, manifest, and structural verification.</p>
                 </div>
                 <a class="btn btn-primary" th:href="@{/control-center/backups/new}">
-                    <i class="bi bi-database-add me-1"></i>New database backup
+                    <i class="bi bi-database-add me-1"></i>New backup
                 </a>
             </div>
 
@@ -25,7 +25,7 @@
                 <article><span><i class="bi bi-archive"></i></span><div><strong th:text="${summary.total}">0</strong><small>Total jobs</small></div></article>
                 <article><span><i class="bi bi-check2-circle"></i></span><div><strong th:text="${summary.completed}">0</strong><small>Verified</small></div></article>
                 <article><span><i class="bi bi-x-octagon"></i></span><div><strong th:text="${summary.failed}">0</strong><small>Failed</small></div></article>
-                <article><span><i class="bi bi-hdd"></i></span><div><strong th:text="${T(com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupService).formatBytes(summary.totalBytes)}">0 B</strong><small>Stored database dumps</small></div></article>
+                <article><span><i class="bi bi-hdd"></i></span><div><strong th:text="${T(com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupService).formatBytes(summary.totalBytes)}">0 B</strong><small>Stored backup artifacts</small></div></article>
             </section>
 
             <div class="row g-4 mb-4">
@@ -34,8 +34,8 @@
                         <div class="matrix26-panel-header"><div><span>Backup storage</span><h2>Current configuration</h2></div></div>
                         <dl class="matrix26-settings-list">
                             <div><dt>Root directory</dt><dd><code class="matrix26-code-wrap" th:text="${backupRoot}">path</code></dd></div>
-                            <div><dt>Phase scope</dt><dd>Database only</dd></div>
-                            <div><dt>Compression</dt><dd>GZIP</dd></div>
+                            <div><dt>Phase scope</dt><dd>Database only + full instance</dd></div>
+                            <div><dt>Compression</dt><dd>GZIP database + ZIP instance files</dd></div>
                             <div><dt>Integrity</dt><dd>SHA-256 + structural checks</dd></div>
                         </dl>
                     </section>
@@ -67,7 +67,7 @@
                 <div th:if="${#lists.isEmpty(jobs)}" class="matrix26-empty-state">
                     <i class="bi bi-database"></i>
                     <strong>No backups have been created</strong>
-                    <span>Create the first verified laboratory database backup.</span>
+                    <span>Create the first verified laboratory recovery package.</span>
                 </div>
                 <div th:unless="${#lists.isEmpty(jobs)}" class="table-responsive">
                     <table class="table align-middle mb-0 matrix26-table">

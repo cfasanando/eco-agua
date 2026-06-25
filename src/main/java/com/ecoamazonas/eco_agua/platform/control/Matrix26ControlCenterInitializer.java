@@ -421,50 +421,50 @@ public class Matrix26ControlCenterInitializer implements ApplicationRunner {
         seedTheme(
                 "matrix26-classic",
                 "Matrix26 Classic",
-                "Diseño empresarial limpio y neutral basado en la experiencia actual de Matrix26.",
-                "1.0.0",
+                "Clean business design with accessible components, stable navigation and responsive layouts.",
+                "1.1.0",
                 "classic",
                 true,
                 true,
                 "public-classic-grid",
                 "admin-sidebar-classic",
-                "{\"primary\":\"#2563eb\",\"secondary\":\"#172554\",\"background\":\"#f4f7fb\",\"surface\":\"#ffffff\",\"text\":\"#172033\",\"radius\":\"16px\"}",
+                "{\"primary\":\"#2563eb\",\"secondary\":\"#172554\",\"background\":\"#f4f7fb\",\"surface\":\"#ffffff\",\"text\":\"#172033\",\"radius\":\"16px\",\"radiusSmall\":\"10px\",\"radiusMedium\":\"16px\",\"radiusLarge\":\"20px\"}",
                 10
         );
         seedTheme(
                 "matrix26-nature",
                 "Matrix26 Nature",
-                "Identidad amazónica con verdes, turquesas y tonos naturales para marcas sostenibles.",
-                "1.0.0",
+                "Amazon-inspired identity with natural colors, editorial spacing and accessible components.",
+                "1.1.0",
                 "nature",
                 true,
                 true,
                 "public-nature-editorial",
                 "admin-sidebar-classic",
-                "{\"primary\":\"#138a63\",\"secondary\":\"#145a4a\",\"background\":\"#f3f8f3\",\"surface\":\"#ffffff\",\"text\":\"#173c32\",\"radius\":\"20px\"}",
+                "{\"primary\":\"#117a57\",\"secondary\":\"#145a4a\",\"background\":\"#f3f8f3\",\"surface\":\"#ffffff\",\"text\":\"#173c32\",\"radius\":\"18px\",\"radiusSmall\":\"12px\",\"radiusMedium\":\"18px\",\"radiusLarge\":\"24px\"}",
                 20
         );
         seedTheme(
                 "matrix26-warm",
                 "Matrix26 Warm",
-                "Apariencia gastronómica cálida con terracota, crema y mayor protagonismo visual.",
-                "1.0.0",
+                "Warm hospitality identity with visual product emphasis, balanced contrast and responsive components.",
+                "1.1.0",
                 "warm",
                 true,
                 true,
                 "public-restaurant-visual",
                 "admin-sidebar-classic",
-                "{\"primary\":\"#b4532a\",\"secondary\":\"#5f2d1d\",\"background\":\"#fff8f1\",\"surface\":\"#ffffff\",\"text\":\"#3f241b\",\"radius\":\"18px\"}",
+                "{\"primary\":\"#b4532a\",\"secondary\":\"#5f2d1d\",\"background\":\"#fff8f1\",\"surface\":\"#ffffff\",\"text\":\"#3f241b\",\"radius\":\"18px\",\"radiusSmall\":\"11px\",\"radiusMedium\":\"18px\",\"radiusLarge\":\"22px\"}",
                 30
         );
 
         String allThemes = "matrix26-classic,matrix26-nature,matrix26-warm";
-        seedLayout("public-classic-grid", "Public Classic Grid", "PUBLIC", "Catálogo con filtros laterales y grid uniforme de productos.", "1.0.0", "public-grid", allThemes, "{\"columns\":4,\"filterPosition\":\"left\",\"hero\":\"standard\"}", 10);
-        seedLayout("public-nature-editorial", "Public Nature Editorial", "PUBLIC", "Experiencia editorial con historia, imágenes amplias y contenido cultural.", "1.0.0", "public-editorial", allThemes, "{\"hero\":\"wide\",\"storySection\":true,\"productDensity\":\"relaxed\"}", 20);
-        seedLayout("public-restaurant-visual", "Public Restaurant Visual", "PUBLIC", "Carta gastronómica móvil con categorías horizontales, precios y acciones de pedido.", "1.0.0", "public-restaurant", allThemes, "{\"hero\":\"food\",\"categoryNavigation\":\"horizontal\",\"priceEmphasis\":true}", 30);
-        seedLayout("admin-sidebar-classic", "Admin Sidebar Classic", "ADMIN", "Sidebar completo, topbar y área estable para módulos administrativos complejos.", "1.0.0", "admin-sidebar", allThemes, "{\"sidebar\":\"expanded\",\"density\":\"comfortable\",\"topbar\":true}", 40);
-        seedLayout("admin-compact-workspace", "Admin Compact Workspace", "ADMIN", "Sidebar compacto de iconos y mayor área útil para operaciones intensivas.", "1.0.0", "admin-compact", allThemes, "{\"sidebar\":\"compact\",\"density\":\"compact\",\"tooltips\":true}", 50);
-        seedLayout("login-split", "Login Split", "LOGIN", "Acceso dividido con identidad de marca, imagen y panel de autenticación.", "1.0.0", "login-split", allThemes, "{\"variant\":\"split\",\"brandPanel\":true,\"responsive\":true}", 60);
+        seedLayout("public-classic-grid", "Public Classic Grid", "PUBLIC", "Catálogo con filtros laterales y grid uniforme de productos.", "1.1.0", "public-grid", allThemes, "{\"columns\":4,\"filterPosition\":\"left\",\"hero\":\"standard\"}", 10);
+        seedLayout("public-nature-editorial", "Public Nature Editorial", "PUBLIC", "Experiencia editorial con historia, imágenes amplias y contenido cultural.", "1.1.0", "public-editorial", allThemes, "{\"hero\":\"wide\",\"storySection\":true,\"productDensity\":\"relaxed\"}", 20);
+        seedLayout("public-restaurant-visual", "Public Restaurant Visual", "PUBLIC", "Carta gastronómica móvil con categorías horizontales, precios y acciones de pedido.", "1.1.0", "public-restaurant", allThemes, "{\"hero\":\"food\",\"categoryNavigation\":\"horizontal\",\"priceEmphasis\":true}", 30);
+        seedLayout("admin-sidebar-classic", "Admin Sidebar Classic", "ADMIN", "Sidebar completo, topbar y área estable para módulos administrativos complejos.", "1.1.0", "admin-sidebar", allThemes, "{\"sidebar\":\"expanded\",\"density\":\"comfortable\",\"topbar\":true}", 40);
+        seedLayout("admin-compact-workspace", "Admin Compact Workspace", "ADMIN", "Sidebar compacto de iconos y mayor área útil para operaciones intensivas.", "1.1.0", "admin-compact", allThemes, "{\"sidebar\":\"compact\",\"density\":\"compact\",\"tooltips\":true}", 50);
+        seedLayout("login-split", "Login Split", "LOGIN", "Acceso dividido con identidad de marca, imagen y panel de autenticación.", "1.1.0", "login-split", allThemes, "{\"variant\":\"split\",\"brandPanel\":true,\"responsive\":true}", 60);
     }
 
     private void seedTheme(

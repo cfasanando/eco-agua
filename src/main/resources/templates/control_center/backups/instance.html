@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Instance backups')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Instance backups', 'Backup history associated with this Matrix26 instance.')}"></header>
+        <main class="matrix26-main">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                <div><span class="matrix26-eyebrow">Instance</span><h1 class="matrix26-page-title" th:text="${instance.businessName}">Instance</h1><code th:text="${instance.code}">code</code></div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/instances/{id}(id=${instance.id})}"><i class="bi bi-arrow-left me-1"></i>Instance</a>
+                    <a th:if="${candidate != null and candidate.allowed}" class="btn btn-primary" th:href="@{/control-center/backups/new(instanceId=${instance.id})}"><i class="bi bi-database-add me-1"></i>New backup</a>
+                </div>
+            </div>
+            <div th:if="${candidate == null or !candidate.allowed}" class="alert alert-warning" th:text="${candidate != null ? candidate.restrictionReason : 'This instance is not eligible for database backups.'}">Blocked</div>
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><span>History</span><h2>Database backups</h2></div></div>
+                <div th:if="${#lists.isEmpty(jobs)}" class="matrix26-empty-state"><i class="bi bi-archive"></i><strong>No backup history</strong><span>No database backups have been registered for this instance.</span></div>
+                <div th:unless="${#lists.isEmpty(jobs)}" class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Backup</th><th>Status</th><th>Tables</th><th>Size</th><th>Requested</th><th></th></tr></thead>
+                        <tbody>
+                        <tr th:each="job : ${jobs}">
+                            <td><strong th:text="${job.publicId}">BKP</strong><small th:text="${job.backupType}">type</small></td>
+                            <td><span class="badge" th:classappend="${job.status.badgeClass}" th:text="${job.status.label}">status</span></td>
+                            <td th:text="${job.tableCount != null ? job.tableCount : '—'}">—</td>
+                            <td th:text="${T(com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupService).formatBytes(job.compressedSizeBytes)}">—</td>
+                            <td th:text="${#temporals.format(job.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">date</td>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/backups/{id}(id=${job.id})}"><i class="bi bi-eye"></i></a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

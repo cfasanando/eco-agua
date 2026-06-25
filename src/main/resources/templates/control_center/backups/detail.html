@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Backup detail')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup detail', 'Artifacts, checksums, and verification results.')}"></header>
+        <main class="matrix26-main">
+            <div th:if="${backupSuccess}" class="alert alert-success" th:text="${backupSuccess}"></div>
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                <div>
+                    <span class="matrix26-eyebrow" th:text="${backup.job.backupType}">Type</span>
+                    <h1 class="matrix26-page-title" th:text="${backup.job.publicId}">Backup</h1>
+                    <p class="matrix26-page-subtitle"><span th:text="${backup.job.instanceName}">Instance</span> · <code th:text="${backup.job.databaseName}">database</code></p>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <span class="badge fs-6" th:classappend="${backup.job.status.badgeClass}" th:text="${backup.job.status.label}">Status</span>
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups}"><i class="bi bi-arrow-left me-1"></i>Back</a>
+                </div>
+            </div>
+
+            <div th:if="${backup.job.lastError}" class="alert alert-danger"><strong>Backup failed.</strong> <span th:text="${backup.job.lastError}">Error</span></div>
+
+            <section class="matrix26-backup-summary mb-4">
+                <article><span><i class="bi bi-table"></i></span><div><strong th:text="${backup.job.tableCount != null ? backup.job.tableCount : '—'}">0</strong><small>Tables</small></div></article>
+                <article><span><i class="bi bi-database"></i></span><div><strong th:text="${backup.databaseSizeLabel}">—</strong><small>Database estimate</small></div></article>
+                <article><span><i class="bi bi-file-earmark-code"></i></span><div><strong th:text="${backup.dumpSizeLabel}">—</strong><small>SQL size</small></div></article>
+                <article><span><i class="bi bi-file-zip"></i></span><div><strong th:text="${backup.compressedSizeLabel}">—</strong><small>Compressed size</small></div></article>
+            </section>
+
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-xl-7">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Metadata</span><h2>Backup record</h2></div></div>
+                        <dl class="matrix26-settings-list">
+                            <div><dt>Requested by</dt><dd th:text="${backup.job.requestedBy}">User</dd></div>
+                            <div><dt>Requested</dt><dd th:text="${#temporals.format(backup.job.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">Date</dd></div>
+                            <div><dt>Completed</dt><dd th:text="${backup.job.completedAt != null ? #temporals.format(backup.job.completedAt, 'dd/MM/yyyy HH:mm:ss') : '—'}">Date</dd></div>
+                            <div><dt>Database host</dt><dd><code th:text="|${backup.job.databaseHost}:${backup.job.databasePort}|">host</code></dd></div>
+                            <div><dt>Dump tool</dt><dd th:text="${backup.job.toolVersion != null ? backup.job.toolVersion : '—'}">tool</dd></div>
+                            <div><dt>Directory</dt><dd><code class="matrix26-code-wrap" th:text="${backup.backupDirectoryDisplay}">path</code></dd></div>
+                            <div><dt>SHA-256</dt><dd><code class="matrix26-hash" th:text="${backup.job.sha256 != null ? backup.job.sha256 : '—'}">hash</code></dd></div>
+                        </dl>
+                    </section>
+                </div>
+                <div class="col-12 col-xl-5">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Result</span><h2>Verification summary</h2></div></div>
+                        <div class="matrix26-backup-result" th:classappend="${backup.job.completed} ? ' is-valid' : ' is-invalid'">
+                            <i class="bi" th:classappend="${backup.job.completed} ? ' bi-patch-check' : ' bi-exclamation-octagon'"></i>
+                            <strong th:text="${backup.job.completed ? 'Verified backup' : backup.job.status.label}">Result</strong>
+                            <span th:text="${backup.job.verificationSummary != null ? backup.job.verificationSummary : 'The backup did not complete all required checks.'}">Summary</span>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header"><div><span>Checks</span><h2>Verification results</h2></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Check</th><th>Status</th><th>Detail</th><th>Checked</th></tr></thead>
+                        <tbody>
+                        <tr th:each="verification : ${backup.verifications}">
+                            <td><strong th:text="${verification.label}">Check</strong><small><code th:text="${verification.checkCode}">code</code></small></td>
+                            <td><span class="badge" th:classappend="${verification.status.badgeClass}" th:text="${verification.status.label}">Status</span></td>
+                            <td th:text="${verification.detail}">Detail</td>
+                            <td th:text="${#temporals.format(verification.checkedAt, 'dd/MM/yyyy HH:mm:ss')}">Date</td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(backup.verifications)}"><td colspan="4" class="text-center text-muted py-4">No verification results were recorded.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><span>Files</span><h2>Backup artifacts</h2></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Artifact</th><th>Path</th><th>Size</th><th>SHA-256</th><th>Status</th></tr></thead>
+                        <tbody>
+                        <tr th:each="artifact : ${backup.artifacts}">
+                            <td><strong th:text="${artifact.fileName}">File</strong><small th:text="${artifact.artifactType}">Type</small></td>
+                            <td><code class="matrix26-code-wrap" th:text="${artifact.relativePath}">path</code></td>
+                            <td th:text="${T(com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupService).formatBytes(artifact.sizeBytes)}">size</td>
+                            <td><code class="matrix26-hash" th:text="${artifact.sha256}">hash</code></td>
+                            <td><span class="badge text-bg-success" th:text="${artifact.status}">Status</span></td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(backup.artifacts)}"><td colspan="5" class="text-center text-muted py-4">No artifacts were registered.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

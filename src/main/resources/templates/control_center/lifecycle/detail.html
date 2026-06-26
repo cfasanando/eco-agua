@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Lifecycle job')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Lifecycle job', 'Suspension and reactivation evidence for the selected instance.')}"></header>
+        <main class="matrix26-main">
+            <div th:if="${lifecycleSuccess}" class="alert alert-success" th:text="${lifecycleSuccess}"></div>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <div>
+                    <h1 class="h4 mb-1" th:text="${job.publicId()}">LCY</h1>
+                    <p class="text-muted mb-0" th:text="|${job.instanceName()} · ${job.action.label}|">Instance</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <span class="badge fs-6" th:classappend="| ${job.status.badgeClass}|" th:text="${job.status.label}">Status</span>
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle}"><i class="bi bi-arrow-left me-1"></i>Lifecycle Manager</a>
+                </div>
+            </div>
+
+            <section class="row g-3 mb-4">
+                <div class="col-lg-8">
+                    <div class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><h2>Operation evidence</h2><p>Lifecycle state, reason, backup, and runtime context.</p></div></div>
+                        <dl class="row mb-0 matrix26-definition-list">
+                            <dt class="col-sm-4">Instance</dt><dd class="col-sm-8" th:text="|${job.instanceName()} (${job.instanceCode()})|">Instance</dd>
+                            <dt class="col-sm-4">Action</dt><dd class="col-sm-8" th:text="${job.action.label}">Action</dd>
+                            <dt class="col-sm-4">Reason</dt><dd class="col-sm-8" th:text="${job.reason()}">Reason</dd>
+                            <dt class="col-sm-4">Requested by</dt><dd class="col-sm-8" th:text="${job.requestedBy()}">Actor</dd>
+                            <dt class="col-sm-4">Requested at</dt><dd class="col-sm-8" th:text="${#temporals.format(job.requestedAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</dd>
+                            <dt class="col-sm-4">Previous status</dt><dd class="col-sm-8" th:text="${job.previousInstanceStatus()}">Previous</dd>
+                            <dt class="col-sm-4">Resulting status</dt><dd class="col-sm-8" th:text="${job.resultingInstanceStatus() != null ? job.resultingInstanceStatus() : 'Pending'}">Result</dd>
+                            <dt class="col-sm-4">Runtime was running</dt><dd class="col-sm-8" th:text="${job.runtimeWasRunning() ? 'Yes' : 'No'}">No</dd>
+                            <dt class="col-sm-4">Schedules affected</dt><dd class="col-sm-8" th:text="${job.pausedScheduleCount()}">0</dd>
+                            <dt class="col-sm-4">Verified backup</dt><dd class="col-sm-8"><code th:text="${job.verifiedBackupPublicId() != null ? job.verifiedBackupPublicId() : 'Not required'}">Backup</code></dd>
+                            <dt class="col-sm-4">Error</dt><dd class="col-sm-8 text-danger" th:text="${job.lastError() != null ? job.lastError() : '—'}">—</dd>
+                        </dl>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><h2>Current instance</h2><p>Live registry and runtime state.</p></div></div>
+                        <p><span class="badge" th:classappend="${instanceView.instance().status == 'SUSPENDED' ? ' text-bg-dark' : ' text-bg-success'}" th:text="${instanceView.instance().status}">Status</span></p>
+                        <p class="mb-1"><strong>Runtime:</strong> <span th:text="${instanceView.runtimeState()}">State</span></p>
+                        <p class="mb-1"><strong>Port:</strong> <span th:text="${instanceView.instance().runtimePort}">8094</span></p>
+                        <p class="mb-1"><strong>Schedules enabled:</strong> <span th:text="${instanceView.enabledSchedules()}">0</span></p>
+                        <p class="mb-0"><strong>Boundary:</strong> <span th:text="${instanceView.allowlisted() ? 'Laboratory allowlist' : 'Read only'}">Boundary</span></p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header"><div><h2>Event timeline</h2><p>Ordered evidence from precheck through the final lifecycle state.</p></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Time</th><th>Event</th><th>Status</th><th>Actor</th><th>Detail</th></tr></thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(events)}"><td colspan="5" class="text-center text-muted py-4">No events recorded.</td></tr>
+                        <tr th:each="event : ${events}">
+                            <td th:text="${#temporals.format(event.createdAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</td>
+                            <td><code th:text="${event.eventType()}">EVENT</code></td>
+                            <td><span class="badge" th:classappend="${event.status() == 'FAILED' ? ' text-bg-danger' : ' text-bg-success'}" th:text="${event.status()}">Status</span></td>
+                            <td th:text="${event.actor()}">Actor</td>
+                            <td th:text="${event.detail()}">Detail</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><h2>Backup schedule snapshot</h2><p>Only schedules enabled before suspension are eligible for restoration.</p></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Schedule</th><th>Previous next run</th><th>Originally enabled</th><th>Restored</th></tr></thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(scheduleStates)}"><td colspan="4" class="text-center text-muted py-4">No enabled schedules were captured for this job.</td></tr>
+                        <tr th:each="state : ${scheduleStates}">
+                            <td th:text="${state.scheduleName()}">Schedule</td>
+                            <td th:text="${state.previousNextRunAt() != null ? #temporals.format(state.previousNextRunAt(), 'yyyy-MM-dd HH:mm:ss') : 'Not scheduled'}">Time</td>
+                            <td><span class="badge" th:classappend="${state.wasEnabled() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${state.wasEnabled() ? 'Yes' : 'No'}">Yes</span></td>
+                            <td><span class="badge" th:classappend="${state.restored() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${state.restored() ? 'Restored' : 'Paused'}">Paused</span></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

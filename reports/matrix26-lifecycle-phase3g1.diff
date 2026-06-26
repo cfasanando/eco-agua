@@ -1,0 +1,1970 @@
+--- /mnt/data/matrix26_3g1_ctx/matrix26-lifecycle-phase3g1-context-20260626-134138/src/main/resources/templates/control_center/fragments/sidebar.html	2026-06-26 18:44:59.128273890 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/resources/templates/control_center/fragments/sidebar.html	2026-06-26 18:50:28.748638908 +0000
+@@ -95,6 +95,11 @@
+             <i class="bi bi-arrow-counterclockwise"></i>
+             <span>Restore Manager</span>
+         </a>
++        <a th:href="@{/control-center/lifecycle}"
++           th:classappend="${activePage == 'matrix26_lifecycle'} ? ' active' : ''">
++            <i class="bi bi-pause-circle"></i>
++            <span>Lifecycle Manager</span>
++        </a>
+     </nav>
+ 
+     <div class="matrix26-sidebar-label">Diseño y experiencia</div>
+--- /mnt/data/matrix26_3g1_ctx/matrix26-lifecycle-phase3g1-context-20260626-134138/src/main/resources/static/css/matrix26-control.css	2026-06-26 18:44:59.036387938 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/resources/static/css/matrix26-control.css	2026-06-26 18:50:28.881714339 +0000
+@@ -2592,3 +2592,20 @@
+         grid-template-columns: 1fr;
+     }
+ }
++
++/* Matrix26 Lifecycle Manager Phase 3G.1 */
++.matrix26-lifecycle-form {
++    min-width: 280px;
++    max-width: 340px;
++    margin-left: auto;
++}
++.matrix26-lifecycle-form .form-control {
++    font-size: .78rem;
++}
++.matrix26-definition-list dt {
++    color: var(--m26-muted);
++    font-weight: 700;
++}
++.matrix26-definition-list dd {
++    overflow-wrap: anywhere;
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleAction.java	2026-06-26 18:47:54.033311852 +0000
+@@ -0,0 +1,16 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++public enum Matrix26LifecycleAction {
++    SUSPEND("Suspend"),
++    REACTIVATE("Reactivate");
++
++    private final String label;
++
++    Matrix26LifecycleAction(String label) {
++        this.label = label;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleBackupView.java	2026-06-26 18:47:54.093081052 +0000
+@@ -0,0 +1,14 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++import java.time.LocalDateTime;
++
++public record Matrix26LifecycleBackupView(
++        Long jobId,
++        String publicId,
++        LocalDateTime completedAt,
++        LocalDateTime verifiedAt
++) {
++    public boolean available() {
++        return jobId != null;
++    }
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleController.java	2026-06-26 18:49:33.527371655 +0000
+@@ -0,0 +1,103 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Controller;
++import org.springframework.ui.Model;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
++import org.springframework.web.servlet.mvc.support.RedirectAttributes;
++
++import java.security.Principal;
++
++@Controller
++@RequestMapping("/control-center/lifecycle")
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26LifecycleController {
++
++    private final Matrix26LifecycleService lifecycleService;
++    private final Matrix26LifecycleProperties properties;
++
++    public Matrix26LifecycleController(
++            Matrix26LifecycleService lifecycleService,
++            Matrix26LifecycleProperties properties
++    ) {
++        this.lifecycleService = lifecycleService;
++        this.properties = properties;
++    }
++
++    @GetMapping
++    public String index(Model model) {
++        model.addAttribute("activePage", "matrix26_lifecycle");
++        model.addAttribute("summary", lifecycleService.summary());
++        model.addAttribute("instances", lifecycleService.instances());
++        model.addAttribute("jobs", lifecycleService.recentJobs());
++        model.addAttribute("maximumBackupAgeHours", properties.getMaximumVerifiedBackupAgeHours());
++        return "control_center/lifecycle/index";
++    }
++
++    @GetMapping("/jobs/{jobId:\\d+}")
++    public String detail(@PathVariable long jobId, Model model) {
++        Matrix26LifecycleJob job = lifecycleService.job(jobId);
++        model.addAttribute("activePage", "matrix26_lifecycle");
++        model.addAttribute("job", job);
++        model.addAttribute("events", lifecycleService.events(jobId));
++        model.addAttribute("scheduleStates", lifecycleService.scheduleStates(jobId));
++        model.addAttribute("instanceView", lifecycleService.instanceView(job.instanceId()));
++        return "control_center/lifecycle/detail";
++    }
++
++    @PostMapping("/instances/{instanceId:\\d+}/suspend")
++    public String suspend(
++            @PathVariable long instanceId,
++            @RequestParam("reason") String reason,
++            @RequestParam("confirmation") String confirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            Matrix26LifecycleJob job = lifecycleService.suspend(
++                    instanceId, reason, confirmation, actor(principal)
++            );
++            redirectAttributes.addFlashAttribute(
++                    "lifecycleSuccess",
++                    "Instance suspended successfully. Database, resources, and backups were preserved."
++            );
++            return "redirect:/control-center/lifecycle/jobs/" + job.id();
++        } catch (Matrix26LifecycleException ex) {
++            redirectAttributes.addFlashAttribute("lifecycleError", ex.getMessage());
++            return "redirect:/control-center/lifecycle";
++        }
++    }
++
++    @PostMapping("/instances/{instanceId:\\d+}/reactivate")
++    public String reactivate(
++            @PathVariable long instanceId,
++            @RequestParam("reason") String reason,
++            @RequestParam("confirmation") String confirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            Matrix26LifecycleJob job = lifecycleService.reactivate(
++                    instanceId, reason, confirmation, actor(principal)
++            );
++            redirectAttributes.addFlashAttribute(
++                    "lifecycleSuccess",
++                    "Instance reactivated successfully and its previous backup schedules were restored."
++            );
++            return "redirect:/control-center/lifecycle/jobs/" + job.id();
++        } catch (Matrix26LifecycleException ex) {
++            redirectAttributes.addFlashAttribute("lifecycleError", ex.getMessage());
++            return "redirect:/control-center/lifecycle";
++        }
++    }
++
++    private String actor(Principal principal) {
++        return principal == null || principal.getName() == null || principal.getName().isBlank()
++                ? "matrix26-system"
++                : principal.getName();
++    }
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleEvent.java	2026-06-26 18:47:54.075596085 +0000
+@@ -0,0 +1,14 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++import java.time.LocalDateTime;
++
++public record Matrix26LifecycleEvent(
++        Long id,
++        Long lifecycleJobId,
++        String eventType,
++        String status,
++        String actor,
++        String detail,
++        LocalDateTime createdAt
++) {
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleException.java	2026-06-26 18:47:54.050185058 +0000
+@@ -0,0 +1,11 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++public class Matrix26LifecycleException extends RuntimeException {
++    public Matrix26LifecycleException(String message) {
++        super(message);
++    }
++
++    public Matrix26LifecycleException(String message, Throwable cause) {
++        super(message, cause);
++    }
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleInitializer.java	2026-06-26 18:48:29.250940455 +0000
+@@ -0,0 +1,94 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++import org.springframework.boot.ApplicationArguments;
++import org.springframework.boot.ApplicationRunner;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.core.Ordered;
++import org.springframework.core.annotation.Order;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.stereotype.Component;
++
++@Component
++@Order(Ordered.HIGHEST_PRECEDENCE + 60)
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26LifecycleInitializer implements ApplicationRunner {
++
++    private final JdbcTemplate jdbcTemplate;
++
++    public Matrix26LifecycleInitializer(JdbcTemplate jdbcTemplate) {
++        this.jdbcTemplate = jdbcTemplate;
++    }
++
++    @Override
++    public void run(ApplicationArguments args) {
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_lifecycle_job (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    public_id VARCHAR(80) NOT NULL,
++                    instance_id BIGINT NOT NULL,
++                    instance_code VARCHAR(80) NOT NULL,
++                    instance_name VARCHAR(180) NOT NULL,
++                    action VARCHAR(30) NOT NULL,
++                    status VARCHAR(40) NOT NULL,
++                    reason VARCHAR(1000) NOT NULL,
++                    requested_by VARCHAR(120) NOT NULL,
++                    requested_at DATETIME(6) NOT NULL,
++                    started_at DATETIME(6) NULL,
++                    completed_at DATETIME(6) NULL,
++                    previous_instance_status VARCHAR(50) NULL,
++                    resulting_instance_status VARCHAR(50) NULL,
++                    runtime_was_running BIT NOT NULL DEFAULT 0,
++                    paused_schedule_count INT NOT NULL DEFAULT 0,
++                    verified_backup_job_id BIGINT NULL,
++                    verified_backup_public_id VARCHAR(80) NULL,
++                    verified_backup_completed_at DATETIME(6) NULL,
++                    related_lifecycle_job_id BIGINT NULL,
++                    last_error TEXT NULL,
++                    PRIMARY KEY (id),
++                    UNIQUE KEY uk_matrix26_lifecycle_job_public (public_id),
++                    KEY idx_matrix26_lifecycle_job_instance (instance_id, requested_at),
++                    KEY idx_matrix26_lifecycle_job_status (status, requested_at),
++                    KEY idx_matrix26_lifecycle_job_related (related_lifecycle_job_id),
++                    CONSTRAINT fk_matrix26_lifecycle_job_instance
++                        FOREIGN KEY (instance_id) REFERENCES platform_business_client(id)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_lifecycle_schedule_state (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    lifecycle_job_id BIGINT NOT NULL,
++                    schedule_id BIGINT NOT NULL,
++                    schedule_name VARCHAR(160) NOT NULL,
++                    was_enabled BIT NOT NULL DEFAULT 1,
++                    previous_next_run_at DATETIME(6) NULL,
++                    restored BIT NOT NULL DEFAULT 0,
++                    restored_at DATETIME(6) NULL,
++                    created_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    UNIQUE KEY uk_matrix26_lifecycle_schedule_job (lifecycle_job_id, schedule_id),
++                    KEY idx_matrix26_lifecycle_schedule_id (schedule_id),
++                    CONSTRAINT fk_matrix26_lifecycle_schedule_job
++                        FOREIGN KEY (lifecycle_job_id) REFERENCES matrix26_lifecycle_job(id)
++                        ON DELETE CASCADE
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_lifecycle_event (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    lifecycle_job_id BIGINT NOT NULL,
++                    event_type VARCHAR(80) NOT NULL,
++                    status VARCHAR(40) NOT NULL,
++                    actor VARCHAR(120) NOT NULL,
++                    detail TEXT NULL,
++                    created_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    KEY idx_matrix26_lifecycle_event_job (lifecycle_job_id, created_at),
++                    CONSTRAINT fk_matrix26_lifecycle_event_job
++                        FOREIGN KEY (lifecycle_job_id) REFERENCES matrix26_lifecycle_job(id)
++                        ON DELETE CASCADE
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++    }
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleInstanceView.java	2026-06-26 18:47:54.101722419 +0000
+@@ -0,0 +1,22 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClient;
++
++public record Matrix26LifecycleInstanceView(
++        PlatformBusinessClient instance,
++        boolean allowlisted,
++        boolean runtimeOnline,
++        boolean portListening,
++        boolean expectedProcess,
++        String runtimeState,
++        int enabledSchedules,
++        Matrix26LifecycleBackupView latestVerifiedBackup,
++        boolean recentBackup,
++        boolean operationBlocked,
++        String blockingReason,
++        boolean canSuspend,
++        boolean canReactivate,
++        String suspendConfirmation,
++        String reactivateConfirmation
++) {
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleJob.java	2026-06-26 18:47:54.067270716 +0000
+@@ -0,0 +1,28 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++import java.time.LocalDateTime;
++
++public record Matrix26LifecycleJob(
++        Long id,
++        String publicId,
++        Long instanceId,
++        String instanceCode,
++        String instanceName,
++        Matrix26LifecycleAction action,
++        Matrix26LifecycleStatus status,
++        String reason,
++        String requestedBy,
++        LocalDateTime requestedAt,
++        LocalDateTime startedAt,
++        LocalDateTime completedAt,
++        String previousInstanceStatus,
++        String resultingInstanceStatus,
++        boolean runtimeWasRunning,
++        Integer pausedScheduleCount,
++        Long verifiedBackupJobId,
++        String verifiedBackupPublicId,
++        LocalDateTime verifiedBackupCompletedAt,
++        Long relatedLifecycleJobId,
++        String lastError
++) {
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleProperties.java	2026-06-26 18:47:54.058791928 +0000
+@@ -0,0 +1,51 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++import org.springframework.boot.context.properties.ConfigurationProperties;
++import org.springframework.stereotype.Component;
++
++import java.util.LinkedHashSet;
++import java.util.Set;
++
++@Component
++@ConfigurationProperties(prefix = "matrix26.control-center.lifecycle")
++public class Matrix26LifecycleProperties {
++
++    private boolean enabled = true;
++    private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of("matrix26-appearance-lab"));
++    private int maximumVerifiedBackupAgeHours = 72;
++    private int minimumReasonLength = 10;
++
++    public boolean isEnabled() {
++        return enabled;
++    }
++
++    public void setEnabled(boolean enabled) {
++        this.enabled = enabled;
++    }
++
++    public Set<String> getAllowedInstanceCodes() {
++        return allowedInstanceCodes;
++    }
++
++    public void setAllowedInstanceCodes(Set<String> allowedInstanceCodes) {
++        this.allowedInstanceCodes = allowedInstanceCodes == null
++                ? new LinkedHashSet<>()
++                : new LinkedHashSet<>(allowedInstanceCodes);
++    }
++
++    public int getMaximumVerifiedBackupAgeHours() {
++        return maximumVerifiedBackupAgeHours;
++    }
++
++    public void setMaximumVerifiedBackupAgeHours(int maximumVerifiedBackupAgeHours) {
++        this.maximumVerifiedBackupAgeHours = maximumVerifiedBackupAgeHours;
++    }
++
++    public int getMinimumReasonLength() {
++        return minimumReasonLength;
++    }
++
++    public void setMinimumReasonLength(int minimumReasonLength) {
++        this.minimumReasonLength = minimumReasonLength;
++    }
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleRepository.java	2026-06-26 18:52:44.028229370 +0000
+@@ -0,0 +1,346 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.core.RowMapper;
++import org.springframework.jdbc.support.GeneratedKeyHolder;
++import org.springframework.jdbc.support.KeyHolder;
++import org.springframework.stereotype.Repository;
++
++import java.sql.Statement;
++import java.time.LocalDateTime;
++import java.util.List;
++import java.util.Optional;
++
++@Repository
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26LifecycleRepository {
++
++    private final JdbcTemplate jdbcTemplate;
++
++    public Matrix26LifecycleRepository(JdbcTemplate jdbcTemplate) {
++        this.jdbcTemplate = jdbcTemplate;
++    }
++
++    public long insertJob(
++            String publicId,
++            long instanceId,
++            String instanceCode,
++            String instanceName,
++            Matrix26LifecycleAction action,
++            String reason,
++            String actor,
++            String previousStatus,
++            Long relatedJobId
++    ) {
++        KeyHolder keyHolder = new GeneratedKeyHolder();
++        jdbcTemplate.update(connection -> {
++            var statement = connection.prepareStatement("""
++                    INSERT INTO matrix26_lifecycle_job (
++                        public_id, instance_id, instance_code, instance_name, action, status,
++                        reason, requested_by, requested_at, previous_instance_status,
++                        resulting_instance_status, runtime_was_running, paused_schedule_count,
++                        related_lifecycle_job_id
++                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?)
++                    """, Statement.RETURN_GENERATED_KEYS);
++            statement.setString(1, publicId);
++            statement.setLong(2, instanceId);
++            statement.setString(3, instanceCode);
++            statement.setString(4, instanceName);
++            statement.setString(5, action.name());
++            statement.setString(6, Matrix26LifecycleStatus.REQUESTED.name());
++            statement.setString(7, limit(reason, 1000));
++            statement.setString(8, actor);
++            statement.setObject(9, LocalDateTime.now());
++            statement.setString(10, previousStatus);
++            if (relatedJobId == null) {
++                statement.setNull(11, java.sql.Types.BIGINT);
++            } else {
++                statement.setLong(11, relatedJobId);
++            }
++            return statement;
++        }, keyHolder);
++        Number key = keyHolder.getKey();
++        if (key == null) {
++            throw new Matrix26LifecycleException("Matrix26 could not persist the lifecycle job.");
++        }
++        return key.longValue();
++    }
++
++    public Optional<Matrix26LifecycleJob> findJob(long id) {
++        return jdbcTemplate.query("SELECT * FROM matrix26_lifecycle_job WHERE id = ?", jobMapper(), id)
++                .stream().findFirst();
++    }
++
++    public List<Matrix26LifecycleJob> findRecentJobs() {
++        return jdbcTemplate.query(
++                "SELECT * FROM matrix26_lifecycle_job ORDER BY requested_at DESC, id DESC LIMIT 100",
++                jobMapper()
++        );
++    }
++
++    public Optional<Matrix26LifecycleJob> findLatestSuspension(long instanceId) {
++        return jdbcTemplate.query("""
++                SELECT * FROM matrix26_lifecycle_job
++                WHERE instance_id = ? AND action = 'SUSPEND' AND status = 'SUSPENDED'
++                ORDER BY completed_at DESC, id DESC LIMIT 1
++                """, jobMapper(), instanceId).stream().findFirst();
++    }
++
++    public boolean hasActiveJob(long instanceId) {
++        Integer count = jdbcTemplate.queryForObject("""
++                SELECT COUNT(*) FROM matrix26_lifecycle_job
++                WHERE instance_id = ?
++                  AND status IN ('REQUESTED','VALIDATING','SUSPENDING','REACTIVATING')
++                """, Integer.class, instanceId);
++        return count != null && count > 0;
++    }
++
++    public void markStarted(long jobId, Matrix26LifecycleStatus status) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_lifecycle_job
++                SET status = ?, started_at = ?, completed_at = NULL, last_error = NULL
++                WHERE id = ?
++                """, status.name(), LocalDateTime.now(), jobId);
++    }
++
++    public void updateStatus(long jobId, Matrix26LifecycleStatus status) {
++        jdbcTemplate.update("UPDATE matrix26_lifecycle_job SET status = ? WHERE id = ?", status.name(), jobId);
++    }
++
++    public void attachBackup(long jobId, Matrix26LifecycleBackupView backup) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_lifecycle_job
++                SET verified_backup_job_id = ?, verified_backup_public_id = ?, verified_backup_completed_at = ?
++                WHERE id = ?
++                """, backup.jobId(), backup.publicId(), backup.completedAt(), jobId);
++    }
++
++    public void setRuntimeWasRunning(long jobId, boolean running) {
++        jdbcTemplate.update(
++                "UPDATE matrix26_lifecycle_job SET runtime_was_running = ? WHERE id = ?",
++                running, jobId
++        );
++    }
++
++    public void setPausedScheduleCount(long jobId, int count) {
++        jdbcTemplate.update(
++                "UPDATE matrix26_lifecycle_job SET paused_schedule_count = ? WHERE id = ?",
++                count, jobId
++        );
++    }
++
++    public void complete(long jobId, Matrix26LifecycleStatus status, String resultingStatus) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_lifecycle_job
++                SET status = ?, resulting_instance_status = ?, completed_at = ?, last_error = NULL
++                WHERE id = ?
++                """, status.name(), resultingStatus, LocalDateTime.now(), jobId);
++    }
++
++    public void fail(long jobId, Matrix26LifecycleStatus status, String error, String resultingStatus) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_lifecycle_job
++                SET status = ?, resulting_instance_status = ?, completed_at = ?, last_error = ?
++                WHERE id = ?
++                """, status.name(), resultingStatus, LocalDateTime.now(), limit(error, 8000), jobId);
++    }
++
++    public void addEvent(long jobId, String eventType, String status, String actor, String detail) {
++        jdbcTemplate.update("""
++                INSERT INTO matrix26_lifecycle_event (
++                    lifecycle_job_id, event_type, status, actor, detail, created_at
++                ) VALUES (?, ?, ?, ?, ?, ?)
++                """, jobId, eventType, status, actor, limit(detail, 8000), LocalDateTime.now());
++    }
++
++    public List<Matrix26LifecycleEvent> findEvents(long jobId) {
++        return jdbcTemplate.query("""
++                SELECT * FROM matrix26_lifecycle_event
++                WHERE lifecycle_job_id = ? ORDER BY created_at, id
++                """, (rs, rowNum) -> new Matrix26LifecycleEvent(
++                rs.getLong("id"),
++                rs.getLong("lifecycle_job_id"),
++                rs.getString("event_type"),
++                rs.getString("status"),
++                rs.getString("actor"),
++                rs.getString("detail"),
++                rs.getObject("created_at", LocalDateTime.class)
++        ), jobId);
++    }
++
++    public void snapshotEnabledSchedules(long jobId, long instanceId) {
++        jdbcTemplate.update("""
++                INSERT IGNORE INTO matrix26_lifecycle_schedule_state (
++                    lifecycle_job_id, schedule_id, schedule_name, was_enabled,
++                    previous_next_run_at, restored, created_at
++                )
++                SELECT ?, id, name, enabled, next_run_at, 0, ?
++                FROM matrix26_backup_schedule
++                WHERE instance_id = ? AND enabled = 1
++                """, jobId, LocalDateTime.now(), instanceId);
++    }
++
++    public int pauseSnapshottedSchedules(long jobId, String actor) {
++        return jdbcTemplate.update("""
++                UPDATE matrix26_backup_schedule s
++                JOIN matrix26_lifecycle_schedule_state ls ON ls.schedule_id = s.id
++                SET s.enabled = 0, s.next_run_at = NULL, s.updated_by = ?, s.updated_at = ?
++                WHERE ls.lifecycle_job_id = ? AND ls.was_enabled = 1
++                """, actor, LocalDateTime.now(), jobId);
++    }
++
++    public int restoreSnapshottedSchedules(long suspensionJobId, String actor) {
++        int updated = jdbcTemplate.update("""
++                UPDATE matrix26_backup_schedule s
++                JOIN matrix26_lifecycle_schedule_state ls ON ls.schedule_id = s.id
++                SET s.enabled = 1,
++                    s.next_run_at = CASE
++                        WHEN ls.previous_next_run_at IS NOT NULL AND ls.previous_next_run_at > ?
++                            THEN ls.previous_next_run_at
++                        ELSE DATE_ADD(?, INTERVAL 1 MINUTE)
++                    END,
++                    s.updated_by = ?, s.updated_at = ?
++                WHERE ls.lifecycle_job_id = ? AND ls.was_enabled = 1 AND ls.restored = 0
++                """, LocalDateTime.now(), LocalDateTime.now(), actor, LocalDateTime.now(), suspensionJobId);
++        jdbcTemplate.update("""
++                UPDATE matrix26_lifecycle_schedule_state
++                SET restored = 1, restored_at = ?
++                WHERE lifecycle_job_id = ? AND was_enabled = 1 AND restored = 0
++                """, LocalDateTime.now(), suspensionJobId);
++        return updated;
++    }
++
++    public List<Matrix26LifecycleScheduleState> findScheduleStates(long jobId) {
++        return jdbcTemplate.query("""
++                SELECT * FROM matrix26_lifecycle_schedule_state
++                WHERE lifecycle_job_id = ? ORDER BY schedule_name, schedule_id
++                """, (rs, rowNum) -> new Matrix26LifecycleScheduleState(
++                rs.getLong("id"),
++                rs.getLong("lifecycle_job_id"),
++                rs.getLong("schedule_id"),
++                rs.getString("schedule_name"),
++                rs.getBoolean("was_enabled"),
++                rs.getObject("previous_next_run_at", LocalDateTime.class),
++                rs.getBoolean("restored"),
++                rs.getObject("restored_at", LocalDateTime.class)
++        ), jobId);
++    }
++
++    public int countEnabledSchedules(long instanceId) {
++        Integer count = jdbcTemplate.queryForObject(
++                "SELECT COUNT(*) FROM matrix26_backup_schedule WHERE instance_id = ? AND enabled = 1",
++                Integer.class,
++                instanceId
++        );
++        return count == null ? 0 : count;
++    }
++
++    public Matrix26LifecycleBackupView latestVerifiedBackup(long instanceId) {
++        return jdbcTemplate.query("""
++                SELECT j.id, j.public_id, j.completed_at, e.verified_at
++                FROM matrix26_backup_job j
++                JOIN matrix26_backup_encryption e ON e.job_id = j.id
++                WHERE j.instance_id = ?
++                  AND j.status = 'COMPLETED'
++                  AND e.encrypted = 1
++                  AND e.verification_status = 'VERIFIED'
++                ORDER BY COALESCE(e.verified_at, j.completed_at) DESC, j.id DESC
++                LIMIT 1
++                """, (rs, rowNum) -> new Matrix26LifecycleBackupView(
++                rs.getLong("id"),
++                rs.getString("public_id"),
++                rs.getObject("completed_at", LocalDateTime.class),
++                rs.getObject("verified_at", LocalDateTime.class)
++        ), instanceId).stream().findFirst().orElse(new Matrix26LifecycleBackupView(null, null, null, null));
++    }
++
++    public boolean hasActiveBackup(long instanceId) {
++        return positive("""
++                SELECT COUNT(*) FROM matrix26_backup_job
++                WHERE instance_id = ? AND status IN ('PENDING','VALIDATING','RUNNING','COMPRESSING','VERIFYING')
++                """, instanceId);
++    }
++
++    public boolean hasActiveScheduleExecution(long instanceId) {
++        return positive("""
++                SELECT COUNT(*) FROM matrix26_backup_schedule_execution
++                WHERE instance_id = ? AND status IN ('SCHEDULED','QUEUED','RUNNING','RETRY_WAITING')
++                """, instanceId);
++    }
++
++    public boolean hasActiveRuntimeOperation(long instanceId) {
++        return positive("""
++                SELECT COUNT(*) FROM matrix26_runtime_operation
++                WHERE instance_id = ? AND status IN ('REQUESTED','RUNNING','STOP_TIMEOUT')
++                """, instanceId);
++    }
++
++    public boolean hasActiveCloneRestore(long instanceId, String instanceCode) {
++        return positive("""
++                SELECT COUNT(*) FROM matrix26_restore_job
++                WHERE (source_instance_id = ? OR target_instance_code = ?)
++                  AND status NOT IN ('COMPLETED','FAILED','CLEANUP_REQUIRED','PARTIALLY_CLEANED','CLEANED','CANCELLED')
++                """, instanceId, instanceCode);
++    }
++
++    public boolean hasActiveInPlaceRestore(long instanceId) {
++        return positive("""
++                SELECT COUNT(*) FROM matrix26_inplace_restore_job
++                WHERE source_instance_id = ?
++                  AND status NOT IN ('COMPLETED','ROLLED_BACK','FAILED','CANCELLED')
++                """, instanceId);
++    }
++
++    public Matrix26LifecycleSummary summary() {
++        return jdbcTemplate.queryForObject("""
++                SELECT
++                    (SELECT COUNT(*) FROM matrix26_lifecycle_job) total,
++                    (SELECT COUNT(*) FROM platform_business_client WHERE status = 'SUSPENDED') suspended,
++                    (SELECT COUNT(*) FROM matrix26_lifecycle_job
++                        WHERE status IN ('SUSPENSION_FAILED','REACTIVATION_FAILED')) failed,
++                    (SELECT COUNT(*) FROM matrix26_lifecycle_job
++                        WHERE status IN ('REQUESTED','VALIDATING','SUSPENDING','REACTIVATING')) active
++                """, (rs, rowNum) -> new Matrix26LifecycleSummary(
++                rs.getLong("total"), rs.getLong("suspended"), rs.getLong("failed"), rs.getLong("active")
++        ));
++    }
++
++    private boolean positive(String sql, Object... args) {
++        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, args);
++        return count != null && count > 0;
++    }
++
++    private RowMapper<Matrix26LifecycleJob> jobMapper() {
++        return (rs, rowNum) -> new Matrix26LifecycleJob(
++                rs.getLong("id"),
++                rs.getString("public_id"),
++                rs.getLong("instance_id"),
++                rs.getString("instance_code"),
++                rs.getString("instance_name"),
++                Matrix26LifecycleAction.valueOf(rs.getString("action")),
++                Matrix26LifecycleStatus.valueOf(rs.getString("status")),
++                rs.getString("reason"),
++                rs.getString("requested_by"),
++                rs.getObject("requested_at", LocalDateTime.class),
++                rs.getObject("started_at", LocalDateTime.class),
++                rs.getObject("completed_at", LocalDateTime.class),
++                rs.getString("previous_instance_status"),
++                rs.getString("resulting_instance_status"),
++                rs.getBoolean("runtime_was_running"),
++                rs.getObject("paused_schedule_count", Integer.class),
++                rs.getObject("verified_backup_job_id", Long.class),
++                rs.getString("verified_backup_public_id"),
++                rs.getObject("verified_backup_completed_at", LocalDateTime.class),
++                rs.getObject("related_lifecycle_job_id", Long.class),
++                rs.getString("last_error")
++        );
++    }
++
++    private String limit(String value, int maximum) {
++        if (value == null || value.length() <= maximum) {
++            return value;
++        }
++        return value.substring(0, maximum);
++    }
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleScheduleState.java	2026-06-26 18:47:54.084510293 +0000
+@@ -0,0 +1,15 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++import java.time.LocalDateTime;
++
++public record Matrix26LifecycleScheduleState(
++        Long id,
++        Long lifecycleJobId,
++        Long scheduleId,
++        String scheduleName,
++        boolean wasEnabled,
++        LocalDateTime previousNextRunAt,
++        boolean restored,
++        LocalDateTime restoredAt
++) {
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleService.java	2026-06-26 18:52:44.028892212 +0000
+@@ -0,0 +1,534 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClient;
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClientRepository;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceAuditLog;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceAuditLogRepository;
++import com.ecoamazonas.eco_agua.platform.control.operations.Matrix26OperationsInventoryService;
++import com.ecoamazonas.eco_agua.platform.control.operations.Matrix26RuntimeControlException;
++import com.ecoamazonas.eco_agua.platform.control.operations.Matrix26RuntimeControlService;
++import com.ecoamazonas.eco_agua.platform.control.operations.Matrix26RuntimeInventoryItem;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Service;
++
++import java.time.Duration;
++import java.time.LocalDateTime;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++import java.util.Map;
++import java.util.UUID;
++import java.util.concurrent.ConcurrentHashMap;
++import java.util.concurrent.locks.ReentrantLock;
++
++@Service
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26LifecycleService {
++
++    private final PlatformBusinessClientRepository clientRepository;
++    private final Matrix26LifecycleRepository lifecycleRepository;
++    private final Matrix26LifecycleProperties properties;
++    private final Matrix26RuntimeControlService runtimeControlService;
++    private final Matrix26OperationsInventoryService inventoryService;
++    private final Matrix26InstanceAuditLogRepository auditRepository;
++    private final Map<Long, ReentrantLock> locks = new ConcurrentHashMap<>();
++
++    public Matrix26LifecycleService(
++            PlatformBusinessClientRepository clientRepository,
++            Matrix26LifecycleRepository lifecycleRepository,
++            Matrix26LifecycleProperties properties,
++            Matrix26RuntimeControlService runtimeControlService,
++            Matrix26OperationsInventoryService inventoryService,
++            Matrix26InstanceAuditLogRepository auditRepository
++    ) {
++        this.clientRepository = clientRepository;
++        this.lifecycleRepository = lifecycleRepository;
++        this.properties = properties;
++        this.runtimeControlService = runtimeControlService;
++        this.inventoryService = inventoryService;
++        this.auditRepository = auditRepository;
++    }
++
++    public List<Matrix26LifecycleInstanceView> instances() {
++        List<Matrix26LifecycleInstanceView> result = new ArrayList<>();
++        for (PlatformBusinessClient instance : clientRepository.findAllByOrderByBusinessNameAsc()) {
++            result.add(instanceView(instance));
++        }
++        return result;
++    }
++
++    public Matrix26LifecycleInstanceView instanceView(long instanceId) {
++        return instanceView(instance(instanceId));
++    }
++
++    public List<Matrix26LifecycleJob> recentJobs() {
++        return lifecycleRepository.findRecentJobs();
++    }
++
++    public Matrix26LifecycleJob job(long id) {
++        return lifecycleRepository.findJob(id)
++                .orElseThrow(() -> new Matrix26LifecycleException("The requested lifecycle job does not exist."));
++    }
++
++    public List<Matrix26LifecycleEvent> events(long jobId) {
++        return lifecycleRepository.findEvents(jobId);
++    }
++
++    public List<Matrix26LifecycleScheduleState> scheduleStates(long jobId) {
++        return lifecycleRepository.findScheduleStates(jobId);
++    }
++
++    public Matrix26LifecycleSummary summary() {
++        return lifecycleRepository.summary();
++    }
++
++    public Matrix26LifecycleJob suspend(long instanceId, String reason, String confirmation, String actor) {
++        ReentrantLock lock = locks.computeIfAbsent(instanceId, ignored -> new ReentrantLock());
++        if (!lock.tryLock()) {
++            throw new Matrix26LifecycleException("Another lifecycle operation is already running for this instance.");
++        }
++        try {
++            PlatformBusinessClient instance = instance(instanceId);
++            validateFeatureEnabled();
++            validateAllowed(instance);
++            validateConfirmation(confirmation, "SUSPEND " + instance.getCode());
++            String safeReason = validateReason(reason);
++            String safeActor = safeActor(actor);
++            String currentStatus = normalizedStatus(instance);
++            if (!("ACTIVE".equals(currentStatus) || "SUSPENSION_FAILED".equals(currentStatus))) {
++                throw new Matrix26LifecycleException("Only an active laboratory can be suspended.");
++            }
++            validateNoActiveLifecycle(instance);
++            validateOperationalBlockers(instance);
++
++            Matrix26RuntimeInventoryItem runtime = runtime(instance, true);
++            validateRuntimeIdentity(runtime, instance);
++            Matrix26LifecycleBackupView backup = requireRecentVerifiedBackup(instance);
++
++            long jobId = lifecycleRepository.insertJob(
++                    publicId(), instance.getId(), instance.getCode(), instance.getBusinessName(),
++                    Matrix26LifecycleAction.SUSPEND, safeReason, safeActor, currentStatus, null
++            );
++            lifecycleRepository.markStarted(jobId, Matrix26LifecycleStatus.VALIDATING);
++            lifecycleRepository.attachBackup(jobId, backup);
++            lifecycleRepository.addEvent(jobId, "PRECHECK", "COMPLETED", safeActor,
++                    "Lifecycle, backup, restore, runtime, and allowlist checks passed.");
++
++            boolean wasRunning = runtime.portListening() || runtime.processId() != null;
++            lifecycleRepository.setRuntimeWasRunning(jobId, wasRunning);
++            instance.setStatus("SUSPENDING");
++            clientRepository.save(instance);
++
++            try {
++                lifecycleRepository.snapshotEnabledSchedules(jobId, instanceId);
++                int paused = lifecycleRepository.pauseSnapshottedSchedules(jobId, safeActor);
++                lifecycleRepository.setPausedScheduleCount(jobId, paused);
++                lifecycleRepository.addEvent(jobId, "BACKUP_SCHEDULES_PAUSED", "COMPLETED", safeActor,
++                        paused + " enabled backup schedule(s) were paused.");
++                if (lifecycleRepository.hasActiveBackup(instanceId)
++                        || lifecycleRepository.hasActiveScheduleExecution(instanceId)) {
++                    throw new Matrix26LifecycleException(
++                            "A backup operation started while schedules were being paused. Suspension was cancelled."
++                    );
++                }
++
++                lifecycleRepository.updateStatus(jobId, Matrix26LifecycleStatus.SUSPENDING);
++                if (wasRunning) {
++                    runtimeControlService.stop(String.valueOf(instanceId), safeActor, "STOP " + instance.getCode());
++                    lifecycleRepository.addEvent(jobId, "RUNTIME_STOPPED", "COMPLETED", safeActor,
++                            "Runtime Control stopped the laboratory runtime.");
++                } else {
++                    lifecycleRepository.addEvent(jobId, "RUNTIME_ALREADY_STOPPED", "COMPLETED", safeActor,
++                            "The runtime was already offline; no process was terminated.");
++                }
++
++                Matrix26RuntimeInventoryItem stopped = runtime(instance, true);
++                if (stopped.portListening() || stopped.processId() != null) {
++                    throw new Matrix26LifecycleException("The runtime could not be proven stopped after suspension.");
++                }
++
++                instance.setStatus("SUSPENDED");
++                instance.setRuntimeStatus("STOPPED");
++                instance.setLastHealthStatus("SUSPENDED");
++                instance.setLastHealthMessage("Runtime intentionally stopped by Matrix26 Lifecycle Manager.");
++                instance.setLastHealthCheckedAt(LocalDateTime.now());
++                clientRepository.save(instance);
++
++                lifecycleRepository.complete(jobId, Matrix26LifecycleStatus.SUSPENDED, "SUSPENDED");
++                lifecycleRepository.addEvent(jobId, "SUSPENSION_COMPLETED", "COMPLETED", safeActor,
++                        "The instance is suspended. Database, runtime files, resources, and backups were preserved.");
++                audit(instance, "INSTANCE_SUSPENDED", safeActor,
++                        "Instance suspended through Matrix26 Lifecycle Manager.", currentStatus, "SUSPENDED");
++                return job(jobId);
++            } catch (RuntimeException ex) {
++                restoreSchedulesAfterFailedSuspension(jobId, safeActor);
++                instance.setStatus("SUSPENSION_FAILED");
++                clientRepository.save(instance);
++                lifecycleRepository.fail(jobId, Matrix26LifecycleStatus.SUSPENSION_FAILED,
++                        safeMessage(ex), "SUSPENSION_FAILED");
++                lifecycleRepository.addEvent(jobId, "SUSPENSION_FAILED", "FAILED", safeActor, safeMessage(ex));
++                audit(instance, "INSTANCE_SUSPENSION_FAILED", safeActor,
++                        "Instance suspension failed: " + safeMessage(ex), currentStatus, "SUSPENSION_FAILED");
++                throw lifecycleException("The instance could not be suspended.", ex);
++            }
++        } finally {
++            lock.unlock();
++        }
++    }
++
++    public Matrix26LifecycleJob reactivate(long instanceId, String reason, String confirmation, String actor) {
++        ReentrantLock lock = locks.computeIfAbsent(instanceId, ignored -> new ReentrantLock());
++        if (!lock.tryLock()) {
++            throw new Matrix26LifecycleException("Another lifecycle operation is already running for this instance.");
++        }
++        try {
++            PlatformBusinessClient instance = instance(instanceId);
++            validateFeatureEnabled();
++            validateAllowed(instance);
++            validateConfirmation(confirmation, "REACTIVATE " + instance.getCode());
++            String safeReason = validateReason(reason);
++            String safeActor = safeActor(actor);
++            String currentStatus = normalizedStatus(instance);
++            if (!("SUSPENDED".equals(currentStatus) || "REACTIVATION_FAILED".equals(currentStatus))) {
++                throw new Matrix26LifecycleException("Only a suspended laboratory can be reactivated.");
++            }
++            validateNoActiveLifecycle(instance);
++            validateOperationalBlockers(instance);
++
++            Matrix26LifecycleJob suspensionJob = lifecycleRepository.findLatestSuspension(instanceId)
++                    .orElseThrow(() -> new Matrix26LifecycleException(
++                            "The suspension record required to restore backup schedules was not found."
++                    ));
++            Matrix26RuntimeInventoryItem runtime = runtime(instance, true);
++            validateRuntimeIdentity(runtime, instance);
++
++            long jobId = lifecycleRepository.insertJob(
++                    publicId(), instance.getId(), instance.getCode(), instance.getBusinessName(),
++                    Matrix26LifecycleAction.REACTIVATE, safeReason, safeActor, currentStatus, suspensionJob.id()
++            );
++            lifecycleRepository.markStarted(jobId, Matrix26LifecycleStatus.REACTIVATING);
++            lifecycleRepository.addEvent(jobId, "PRECHECK", "COMPLETED", safeActor,
++                    "Lifecycle, restore, runtime, and allowlist checks passed.");
++            instance.setStatus("REACTIVATING");
++            clientRepository.save(instance);
++
++            try {
++                if (!runtime.portListening() && runtime.processId() == null) {
++                    runtimeControlService.start(String.valueOf(instanceId), safeActor);
++                    lifecycleRepository.addEvent(jobId, "RUNTIME_STARTED", "COMPLETED", safeActor,
++                            "Runtime Control started the laboratory runtime.");
++                } else if (runtime.expectedProcess()) {
++                    lifecycleRepository.addEvent(jobId, "RUNTIME_ALREADY_RUNNING", "COMPLETED", safeActor,
++                            "The expected runtime process was already active.");
++                } else {
++                    throw new Matrix26LifecycleException("Port " + instance.getRuntimePort()
++                            + " is occupied by an unexpected process.");
++                }
++
++                Matrix26RuntimeInventoryItem online = runtime(instance, true);
++                if (!online.online()) {
++                    throw new Matrix26LifecycleException("The reactivated runtime did not pass the HTTP health check.");
++                }
++
++                int restored = lifecycleRepository.restoreSnapshottedSchedules(suspensionJob.id(), safeActor);
++                lifecycleRepository.setPausedScheduleCount(jobId, restored);
++                lifecycleRepository.addEvent(jobId, "BACKUP_SCHEDULES_RESTORED", "COMPLETED", safeActor,
++                        restored + " backup schedule(s) were re-enabled.");
++
++                instance.setStatus("ACTIVE");
++                instance.setRuntimeStatus("ONLINE");
++                instance.setLastHealthStatus("ONLINE");
++                instance.setLastHealthMessage("Runtime reactivated and verified by Matrix26 Lifecycle Manager.");
++                instance.setLastHealthCheckedAt(LocalDateTime.now());
++                clientRepository.save(instance);
++
++                lifecycleRepository.complete(jobId, Matrix26LifecycleStatus.ACTIVE, "ACTIVE");
++                lifecycleRepository.addEvent(jobId, "REACTIVATION_COMPLETED", "COMPLETED", safeActor,
++                        "The instance is active and its previous backup schedules were restored.");
++                audit(instance, "INSTANCE_REACTIVATED", safeActor,
++                        "Instance reactivated through Matrix26 Lifecycle Manager.", currentStatus, "ACTIVE");
++                return job(jobId);
++            } catch (RuntimeException ex) {
++                instance.setStatus("REACTIVATION_FAILED");
++                clientRepository.save(instance);
++                lifecycleRepository.fail(jobId, Matrix26LifecycleStatus.REACTIVATION_FAILED,
++                        safeMessage(ex), "REACTIVATION_FAILED");
++                lifecycleRepository.addEvent(jobId, "REACTIVATION_FAILED", "FAILED", safeActor, safeMessage(ex));
++                audit(instance, "INSTANCE_REACTIVATION_FAILED", safeActor,
++                        "Instance reactivation failed: " + safeMessage(ex), currentStatus, "REACTIVATION_FAILED");
++                throw lifecycleException("The instance could not be reactivated.", ex);
++            }
++        } finally {
++            lock.unlock();
++        }
++    }
++
++    private Matrix26LifecycleInstanceView instanceView(PlatformBusinessClient instance) {
++        boolean allowlisted = isAllowlisted(instance);
++        Matrix26RuntimeInventoryItem runtime = null;
++        String runtimeState = "Unavailable";
++        boolean runtimeOnline = false;
++        boolean portListening = false;
++        boolean expectedProcess = false;
++        String runtimeProblem = "";
++        try {
++            runtime = runtime(instance, false);
++            runtimeState = runtime.state().name();
++            runtimeOnline = runtime.online();
++            portListening = runtime.portListening();
++            expectedProcess = runtime.expectedProcess();
++            if (portListening && !expectedProcess) {
++                runtimeProblem = "The registered port is occupied by an unexpected process.";
++            } else if (!runtime.configurationPresent() || !runtime.configurationConsistent()) {
++                runtimeProblem = "Runtime configuration is missing or does not match the instance registry.";
++            }
++        } catch (RuntimeException ex) {
++            runtimeProblem = safeMessage(ex);
++        }
++
++        Matrix26LifecycleBackupView backup;
++        int schedules;
++        try {
++            backup = lifecycleRepository.latestVerifiedBackup(instance.getId());
++            schedules = lifecycleRepository.countEnabledSchedules(instance.getId());
++        } catch (RuntimeException ex) {
++            backup = new Matrix26LifecycleBackupView(null, null, null, null);
++            schedules = 0;
++            if (runtimeProblem.isBlank()) {
++                runtimeProblem = "Lifecycle metadata could not be read.";
++            }
++        }
++        boolean recentBackup = isRecent(backup);
++        String blocker = blockingReason(instance, allowlisted, runtimeProblem, recentBackup);
++        boolean blocked = !blocker.isBlank();
++        String status = normalizedStatus(instance);
++        boolean canSuspend = !blocked && ("ACTIVE".equals(status) || "SUSPENSION_FAILED".equals(status));
++        boolean canReactivate = !blocked && ("SUSPENDED".equals(status) || "REACTIVATION_FAILED".equals(status));
++
++        return new Matrix26LifecycleInstanceView(
++                instance, allowlisted, runtimeOnline, portListening, expectedProcess, runtimeState,
++                schedules, backup, recentBackup, blocked, blocker, canSuspend, canReactivate,
++                "SUSPEND " + instance.getCode(), "REACTIVATE " + instance.getCode()
++        );
++    }
++
++    private String blockingReason(
++            PlatformBusinessClient instance,
++            boolean allowlisted,
++            String runtimeProblem,
++            boolean recentBackup
++    ) {
++        if (!properties.isEnabled()) {
++            return "Lifecycle Manager is disabled.";
++        }
++        if (!allowlisted) {
++            return instance.isProtectedInstance()
++                    ? "Protected instances are read only."
++                    : "The instance is outside the lifecycle laboratory allowlist.";
++        }
++        if (instance.isProtectedInstance()) {
++            return "Protected instances cannot be suspended from this phase.";
++        }
++        if (!runtimeProblem.isBlank()) {
++            return runtimeProblem;
++        }
++        if (lifecycleRepository.hasActiveJob(instance.getId())) {
++            return "Another lifecycle job is active.";
++        }
++        String operational = operationalBlocker(instance);
++        if (!operational.isBlank()) {
++            return operational;
++        }
++        String status = normalizedStatus(instance);
++        if (("ACTIVE".equals(status) || "SUSPENSION_FAILED".equals(status)) && !recentBackup) {
++            return "A recent encrypted and verified backup is required before suspension.";
++        }
++        return "";
++    }
++
++    private String operationalBlocker(PlatformBusinessClient instance) {
++        if (lifecycleRepository.hasActiveBackup(instance.getId())) {
++            return "A backup job is currently active.";
++        }
++        if (lifecycleRepository.hasActiveScheduleExecution(instance.getId())) {
++            return "A scheduled backup execution is currently active.";
++        }
++        if (lifecycleRepository.hasActiveRuntimeOperation(instance.getId())) {
++            return "A runtime operation is currently active.";
++        }
++        if (lifecycleRepository.hasActiveCloneRestore(instance.getId(), instance.getCode())) {
++            return "A clone restore operation is currently active.";
++        }
++        if (lifecycleRepository.hasActiveInPlaceRestore(instance.getId())) {
++            return "An in-place restore is awaiting completion, confirmation, or rollback.";
++        }
++        return "";
++    }
++
++    private void validateOperationalBlockers(PlatformBusinessClient instance) {
++        String blocker = operationalBlocker(instance);
++        if (!blocker.isBlank()) {
++            throw new Matrix26LifecycleException(blocker);
++        }
++    }
++
++    private void validateNoActiveLifecycle(PlatformBusinessClient instance) {
++        if (lifecycleRepository.hasActiveJob(instance.getId())) {
++            throw new Matrix26LifecycleException("Another lifecycle job is already active for this instance.");
++        }
++    }
++
++    private Matrix26LifecycleBackupView requireRecentVerifiedBackup(PlatformBusinessClient instance) {
++        Matrix26LifecycleBackupView backup = lifecycleRepository.latestVerifiedBackup(instance.getId());
++        if (!isRecent(backup)) {
++            int hours = Math.max(1, properties.getMaximumVerifiedBackupAgeHours());
++            throw new Matrix26LifecycleException(
++                    "Create and verify an encrypted full backup from the last " + hours
++                            + " hours before suspending this instance."
++            );
++        }
++        return backup;
++    }
++
++    private boolean isRecent(Matrix26LifecycleBackupView backup) {
++        if (backup == null || !backup.available()) {
++            return false;
++        }
++        LocalDateTime reference = backup.verifiedAt() != null ? backup.verifiedAt() : backup.completedAt();
++        if (reference == null) {
++            return false;
++        }
++        return reference.isAfter(LocalDateTime.now().minusHours(
++                Math.max(1, properties.getMaximumVerifiedBackupAgeHours())
++        ));
++    }
++
++    private void validateRuntimeIdentity(Matrix26RuntimeInventoryItem runtime, PlatformBusinessClient instance) {
++        if (!runtime.configurationPresent() || !runtime.configurationConsistent()) {
++            throw new Matrix26LifecycleException("Runtime configuration does not match the registered instance.");
++        }
++        if (runtime.portListening() && !runtime.expectedProcess()) {
++            throw new Matrix26LifecycleException("Port " + instance.getRuntimePort()
++                    + " is occupied by an unexpected process.");
++        }
++    }
++
++    private Matrix26RuntimeInventoryItem runtime(PlatformBusinessClient instance, boolean refresh) {
++        try {
++            inventoryService.invalidateCache();
++            return inventoryService.runtime(String.valueOf(instance.getId()), refresh);
++        } catch (RuntimeException ex) {
++            throw new Matrix26LifecycleException("The registered runtime could not be inspected.", ex);
++        }
++    }
++
++    private void restoreSchedulesAfterFailedSuspension(long jobId, String actor) {
++        try {
++            lifecycleRepository.restoreSnapshottedSchedules(jobId, actor);
++            lifecycleRepository.addEvent(jobId, "SCHEDULE_COMPENSATION", "COMPLETED", actor,
++                    "Backup schedules were restored after the suspension failed.");
++        } catch (RuntimeException ignored) {
++            lifecycleRepository.addEvent(jobId, "SCHEDULE_COMPENSATION", "FAILED", actor,
++                    "Matrix26 could not automatically restore all paused schedules.");
++        }
++    }
++
++    private PlatformBusinessClient instance(long id) {
++        return clientRepository.findById(id)
++                .orElseThrow(() -> new Matrix26LifecycleException("The requested instance does not exist."));
++    }
++
++    private void validateFeatureEnabled() {
++        if (!properties.isEnabled()) {
++            throw new Matrix26LifecycleException("Lifecycle Manager is disabled by configuration.");
++        }
++    }
++
++    private void validateAllowed(PlatformBusinessClient instance) {
++        if (instance.isProtectedInstance()) {
++            throw new Matrix26LifecycleException("Protected instances are read only in Lifecycle Manager 3G.1.");
++        }
++        if (!isAllowlisted(instance)) {
++            throw new Matrix26LifecycleException("The instance is outside the lifecycle laboratory allowlist.");
++        }
++    }
++
++    private boolean isAllowlisted(PlatformBusinessClient instance) {
++        String code = instance.getCode() == null ? "" : instance.getCode().toLowerCase(Locale.ROOT);
++        return properties.getAllowedInstanceCodes().stream()
++                .filter(value -> value != null)
++                .map(value -> value.toLowerCase(Locale.ROOT))
++                .anyMatch(code::equals);
++    }
++
++    private String validateReason(String reason) {
++        String safe = reason == null ? "" : reason.trim();
++        int minimum = Math.max(5, properties.getMinimumReasonLength());
++        if (safe.length() < minimum) {
++            throw new Matrix26LifecycleException("Provide an operational reason of at least " + minimum + " characters.");
++        }
++        return safe.length() <= 1000 ? safe : safe.substring(0, 1000);
++    }
++
++    private void validateConfirmation(String actual, String expected) {
++        if (!expected.equals(actual == null ? "" : actual.trim())) {
++            throw new Matrix26LifecycleException("The confirmation text does not match: " + expected);
++        }
++    }
++
++    private String normalizedStatus(PlatformBusinessClient instance) {
++        String value = instance.getStatus();
++        return value == null || value.isBlank() ? "ACTIVE" : value.trim().toUpperCase(Locale.ROOT);
++    }
++
++    private String safeActor(String actor) {
++        String value = actor == null || actor.isBlank() ? "matrix26-system" : actor.trim();
++        return value.length() <= 120 ? value : value.substring(0, 120);
++    }
++
++    private String publicId() {
++        return "LCY-" + LocalDateTime.now().toString().replaceAll("[-:.T]", "").substring(0, 14)
++                + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
++    }
++
++    private String safeMessage(Throwable error) {
++        Throwable current = error;
++        while (current.getCause() != null && current.getMessage() != null
++                && current.getMessage().toLowerCase(Locale.ROOT).contains("unexpectedly")) {
++            current = current.getCause();
++        }
++        String message = current.getMessage();
++        if (message == null || message.isBlank()) {
++            message = current.getClass().getSimpleName();
++        }
++        return message.length() <= 1000 ? message : message.substring(0, 1000);
++    }
++
++    private Matrix26LifecycleException lifecycleException(String message, RuntimeException cause) {
++        if (cause instanceof Matrix26LifecycleException lifecycleException) {
++            return lifecycleException;
++        }
++        if (cause instanceof Matrix26RuntimeControlException) {
++            return new Matrix26LifecycleException(message + " " + safeMessage(cause), cause);
++        }
++        return new Matrix26LifecycleException(message, cause);
++    }
++
++    private void audit(
++            PlatformBusinessClient instance,
++            String action,
++            String actor,
++            String summary,
++            String before,
++            String after
++    ) {
++        Matrix26InstanceAuditLog audit = new Matrix26InstanceAuditLog();
++        audit.setInstance(instance);
++        audit.setAction(action);
++        audit.setActorUsername(actor);
++        audit.setSummary(summary);
++        audit.setBeforeSnapshot("status=" + before + ";runtime=" + instance.getRuntimeProfile());
++        audit.setAfterSnapshot("status=" + after + ";runtime=" + instance.getRuntimeProfile());
++        auditRepository.save(audit);
++    }
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleStatus.java	2026-06-26 18:47:54.041942670 +0000
+@@ -0,0 +1,34 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++public enum Matrix26LifecycleStatus {
++    REQUESTED("Requested", "text-bg-secondary"),
++    VALIDATING("Validating", "text-bg-info"),
++    SUSPENDING("Suspending", "text-bg-warning"),
++    SUSPENDED("Suspended", "text-bg-dark"),
++    REACTIVATING("Reactivating", "text-bg-info"),
++    ACTIVE("Active", "text-bg-success"),
++    SUSPENSION_FAILED("Suspension failed", "text-bg-danger"),
++    REACTIVATION_FAILED("Reactivation failed", "text-bg-danger"),
++    CANCELLED("Cancelled", "text-bg-secondary");
++
++    private final String label;
++    private final String badgeClass;
++
++    Matrix26LifecycleStatus(String label, String badgeClass) {
++        this.label = label;
++        this.badgeClass = badgeClass;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++
++    public String getBadgeClass() {
++        return badgeClass;
++    }
++
++    public boolean isFinalState() {
++        return this == SUSPENDED || this == ACTIVE || this == SUSPENSION_FAILED
++                || this == REACTIVATION_FAILED || this == CANCELLED;
++    }
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleSummary.java	2026-06-26 18:47:54.110523025 +0000
+@@ -0,0 +1,9 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle;
++
++public record Matrix26LifecycleSummary(
++        long totalJobs,
++        long suspendedInstances,
++        long failedJobs,
++        long activeJobs
++) {
++}
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/resources/templates/control_center/lifecycle/detail.html	2026-06-26 18:51:51.180484150 +0000
+@@ -0,0 +1,94 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Lifecycle job')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Lifecycle job', 'Suspension and reactivation evidence for the selected instance.')}"></header>
++        <main class="matrix26-main">
++            <div th:if="${lifecycleSuccess}" class="alert alert-success" th:text="${lifecycleSuccess}"></div>
++            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
++                <div>
++                    <h1 class="h4 mb-1" th:text="${job.publicId()}">LCY</h1>
++                    <p class="text-muted mb-0" th:text="|${job.instanceName()} · ${job.action.label}|">Instance</p>
++                </div>
++                <div class="d-flex gap-2">
++                    <span class="badge fs-6" th:classappend="| ${job.status.badgeClass}|" th:text="${job.status.label}">Status</span>
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle}"><i class="bi bi-arrow-left me-1"></i>Lifecycle Manager</a>
++                </div>
++            </div>
++
++            <section class="row g-3 mb-4">
++                <div class="col-lg-8">
++                    <div class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><h2>Operation evidence</h2><p>Lifecycle state, reason, backup, and runtime context.</p></div></div>
++                        <dl class="row mb-0 matrix26-definition-list">
++                            <dt class="col-sm-4">Instance</dt><dd class="col-sm-8" th:text="|${job.instanceName()} (${job.instanceCode()})|">Instance</dd>
++                            <dt class="col-sm-4">Action</dt><dd class="col-sm-8" th:text="${job.action.label}">Action</dd>
++                            <dt class="col-sm-4">Reason</dt><dd class="col-sm-8" th:text="${job.reason()}">Reason</dd>
++                            <dt class="col-sm-4">Requested by</dt><dd class="col-sm-8" th:text="${job.requestedBy()}">Actor</dd>
++                            <dt class="col-sm-4">Requested at</dt><dd class="col-sm-8" th:text="${#temporals.format(job.requestedAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</dd>
++                            <dt class="col-sm-4">Previous status</dt><dd class="col-sm-8" th:text="${job.previousInstanceStatus()}">Previous</dd>
++                            <dt class="col-sm-4">Resulting status</dt><dd class="col-sm-8" th:text="${job.resultingInstanceStatus() != null ? job.resultingInstanceStatus() : 'Pending'}">Result</dd>
++                            <dt class="col-sm-4">Runtime was running</dt><dd class="col-sm-8" th:text="${job.runtimeWasRunning() ? 'Yes' : 'No'}">No</dd>
++                            <dt class="col-sm-4">Schedules affected</dt><dd class="col-sm-8" th:text="${job.pausedScheduleCount()}">0</dd>
++                            <dt class="col-sm-4">Verified backup</dt><dd class="col-sm-8"><code th:text="${job.verifiedBackupPublicId() != null ? job.verifiedBackupPublicId() : 'Not required'}">Backup</code></dd>
++                            <dt class="col-sm-4">Error</dt><dd class="col-sm-8 text-danger" th:text="${job.lastError() != null ? job.lastError() : '—'}">—</dd>
++                        </dl>
++                    </div>
++                </div>
++                <div class="col-lg-4">
++                    <div class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><h2>Current instance</h2><p>Live registry and runtime state.</p></div></div>
++                        <p><span class="badge" th:classappend="${instanceView.instance().status == 'SUSPENDED' ? ' text-bg-dark' : ' text-bg-success'}" th:text="${instanceView.instance().status}">Status</span></p>
++                        <p class="mb-1"><strong>Runtime:</strong> <span th:text="${instanceView.runtimeState()}">State</span></p>
++                        <p class="mb-1"><strong>Port:</strong> <span th:text="${instanceView.instance().runtimePort}">8094</span></p>
++                        <p class="mb-1"><strong>Schedules enabled:</strong> <span th:text="${instanceView.enabledSchedules()}">0</span></p>
++                        <p class="mb-0"><strong>Boundary:</strong> <span th:text="${instanceView.allowlisted() ? 'Laboratory allowlist' : 'Read only'}">Boundary</span></p>
++                    </div>
++                </div>
++            </section>
++
++            <section class="matrix26-panel mb-4">
++                <div class="matrix26-panel-header"><div><h2>Event timeline</h2><p>Ordered evidence from precheck through the final lifecycle state.</p></div></div>
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Time</th><th>Event</th><th>Status</th><th>Actor</th><th>Detail</th></tr></thead>
++                        <tbody>
++                        <tr th:if="${#lists.isEmpty(events)}"><td colspan="5" class="text-center text-muted py-4">No events recorded.</td></tr>
++                        <tr th:each="event : ${events}">
++                            <td th:text="${#temporals.format(event.createdAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</td>
++                            <td><code th:text="${event.eventType()}">EVENT</code></td>
++                            <td><span class="badge" th:classappend="${event.status() == 'FAILED' ? ' text-bg-danger' : ' text-bg-success'}" th:text="${event.status()}">Status</span></td>
++                            <td th:text="${event.actor()}">Actor</td>
++                            <td th:text="${event.detail()}">Detail</td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++
++            <section class="matrix26-panel">
++                <div class="matrix26-panel-header"><div><h2>Backup schedule snapshot</h2><p>Only schedules enabled before suspension are eligible for restoration.</p></div></div>
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Schedule</th><th>Previous next run</th><th>Originally enabled</th><th>Restored</th></tr></thead>
++                        <tbody>
++                        <tr th:if="${#lists.isEmpty(scheduleStates)}"><td colspan="4" class="text-center text-muted py-4">No enabled schedules were captured for this job.</td></tr>
++                        <tr th:each="state : ${scheduleStates}">
++                            <td th:text="${state.scheduleName()}">Schedule</td>
++                            <td th:text="${state.previousNextRunAt() != null ? #temporals.format(state.previousNextRunAt(), 'yyyy-MM-dd HH:mm:ss') : 'Not scheduled'}">Time</td>
++                            <td><span class="badge" th:classappend="${state.wasEnabled() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${state.wasEnabled() ? 'Yes' : 'No'}">Yes</span></td>
++                            <td><span class="badge" th:classappend="${state.restored() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${state.restored() ? 'Restored' : 'Paused'}">Paused</span></td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/src/main/resources/templates/control_center/lifecycle/index.html	2026-06-26 18:51:51.179955582 +0000
+@@ -0,0 +1,151 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Lifecycle Manager')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Lifecycle Manager', 'Controlled suspension and reactivation for explicitly allowlisted laboratory instances.')}"></header>
++        <main class="matrix26-main">
++            <div th:if="${lifecycleSuccess}" class="alert alert-success" th:text="${lifecycleSuccess}"></div>
++            <div th:if="${lifecycleError}" class="alert alert-danger" th:text="${lifecycleError}"></div>
++
++            <div class="matrix26-alert-safe mb-4">
++                <i class="bi bi-shield-check"></i>
++                <div>
++                    <strong>Non-destructive lifecycle controls</strong>
++                    <p>Suspension stops only the allowlisted runtime and pauses its enabled backup schedules. The database, runtime files, instance resources, modules, users, appearance, and encrypted backups remain untouched.</p>
++                </div>
++            </div>
++
++            <section class="row g-3 mb-4">
++                <div class="col-md-3">
++                    <div class="matrix26-stat-card"><span>Lifecycle jobs</span><strong th:text="${summary.totalJobs()}">0</strong></div>
++                </div>
++                <div class="col-md-3">
++                    <div class="matrix26-stat-card"><span>Suspended</span><strong th:text="${summary.suspendedInstances()}">0</strong></div>
++                </div>
++                <div class="col-md-3">
++                    <div class="matrix26-stat-card"><span>Active jobs</span><strong th:text="${summary.activeJobs()}">0</strong></div>
++                </div>
++                <div class="col-md-3">
++                    <div class="matrix26-stat-card"><span>Failed jobs</span><strong th:text="${summary.failedJobs()}">0</strong></div>
++                </div>
++            </section>
++
++            <section class="matrix26-panel mb-4">
++                <div class="matrix26-panel-header">
++                    <div>
++                        <h2>Instance lifecycle</h2>
++                        <p>Suspension requires an encrypted and verified backup no older than <strong th:text="${maximumBackupAgeHours}">72</strong> hours.</p>
++                    </div>
++                    <a class="btn btn-outline-primary" th:href="@{/control-center/lifecycle}"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>
++                </div>
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead>
++                        <tr>
++                            <th>Instance</th>
++                            <th>Lifecycle status</th>
++                            <th>Runtime</th>
++                            <th>Backup schedules</th>
++                            <th>Recovery backup</th>
++                            <th>Boundary</th>
++                            <th class="text-end">Action</th>
++                        </tr>
++                        </thead>
++                        <tbody>
++                        <tr th:each="view : ${instances}">
++                            <td>
++                                <strong th:text="${view.instance().businessName}">Instance</strong>
++                                <small><code th:text="${view.instance().code}">code</code></small>
++                                <small th:text="|Port ${view.instance().runtimePort != null ? view.instance().runtimePort : '—'} · ${view.instance().databaseName != null ? view.instance().databaseName : 'no database'}|">Configuration</small>
++                            </td>
++                            <td>
++                                <span class="badge"
++                                      th:classappend="${view.instance().status == 'SUSPENDED' ? ' text-bg-dark' : (view.instance().status == 'ACTIVE' ? ' text-bg-success' : ' text-bg-warning')}"
++                                      th:text="${view.instance().status}">ACTIVE</span>
++                                <small th:text="${view.instance().runtimeStatus}">Runtime status</small>
++                            </td>
++                            <td>
++                                <span class="badge" th:classappend="${view.runtimeOnline() ? ' text-bg-success' : ' text-bg-secondary'}"
++                                      th:text="${view.runtimeOnline() ? 'Online' : 'Offline'}">Offline</span>
++                                <small th:text="${view.runtimeState()}">State</small>
++                            </td>
++                            <td>
++                                <strong th:text="${view.enabledSchedules()}">0</strong>
++                                <small>enabled schedule(s)</small>
++                            </td>
++                            <td>
++                                <span th:if="${view.latestVerifiedBackup().available()}" class="badge"
++                                      th:classappend="${view.recentBackup() ? ' text-bg-success' : ' text-bg-warning'}"
++                                      th:text="${view.recentBackup() ? 'Recent verified' : 'Too old'}">Backup</span>
++                                <span th:unless="${view.latestVerifiedBackup().available()}" class="badge text-bg-danger">Missing</span>
++                                <small th:if="${view.latestVerifiedBackup().available()}" th:text="${view.latestVerifiedBackup().publicId()}">Backup ID</small>
++                                <small th:if="${view.latestVerifiedBackup().completedAt() != null}" th:text="${#temporals.format(view.latestVerifiedBackup().completedAt(), 'yyyy-MM-dd HH:mm')}">Time</small>
++                            </td>
++                            <td>
++                                <span th:if="${view.allowlisted()}" class="badge text-bg-success">Lifecycle allowlist</span>
++                                <span th:unless="${view.allowlisted()}" class="badge text-bg-light border text-dark">Read only</span>
++                                <small th:if="${view.operationBlocked()}" class="text-danger" th:text="${view.blockingReason()}">Blocked</small>
++                                <small th:unless="${view.operationBlocked()}">No conflicting operation detected.</small>
++                            </td>
++                            <td class="text-end" style="min-width: 310px;">
++                                <form th:if="${view.canSuspend()}"
++                                      th:action="@{/control-center/lifecycle/instances/{id}/suspend(id=${view.instance().id})}"
++                                      method="post" class="matrix26-lifecycle-form">
++                                    <input class="form-control form-control-sm mb-2" name="reason" minlength="10" maxlength="1000" required
++                                           placeholder="Operational reason for suspension">
++                                    <input class="form-control form-control-sm mb-2" name="confirmation" required
++                                           th:placeholder="${view.suspendConfirmation()}">
++                                    <button class="btn btn-sm btn-outline-warning" type="submit">
++                                        <i class="bi bi-pause-circle me-1"></i>Suspend laboratory
++                                    </button>
++                                </form>
++                                <form th:if="${view.canReactivate()}"
++                                      th:action="@{/control-center/lifecycle/instances/{id}/reactivate(id=${view.instance().id})}"
++                                      method="post" class="matrix26-lifecycle-form">
++                                    <input class="form-control form-control-sm mb-2" name="reason" minlength="10" maxlength="1000" required
++                                           placeholder="Operational reason for reactivation">
++                                    <input class="form-control form-control-sm mb-2" name="confirmation" required
++                                           th:placeholder="${view.reactivateConfirmation()}">
++                                    <button class="btn btn-sm btn-outline-success" type="submit">
++                                        <i class="bi bi-play-circle me-1"></i>Reactivate laboratory
++                                    </button>
++                                </form>
++                                <span th:if="${!view.canSuspend() && !view.canReactivate()}" class="text-muted small">No lifecycle action available</span>
++                            </td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++
++            <section class="matrix26-panel">
++                <div class="matrix26-panel-header">
++                    <div><h2>Recent lifecycle jobs</h2><p>Every transition keeps a permanent event trail.</p></div>
++                </div>
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Job</th><th>Instance</th><th>Action</th><th>Status</th><th>Requested</th><th>Reason</th><th></th></tr></thead>
++                        <tbody>
++                        <tr th:if="${#lists.isEmpty(jobs)}"><td colspan="7" class="text-center text-muted py-4">No lifecycle jobs yet.</td></tr>
++                        <tr th:each="job : ${jobs}">
++                            <td><code th:text="${job.publicId()}">LCY</code></td>
++                            <td><strong th:text="${job.instanceName()}">Instance</strong><small th:text="${job.instanceCode()}">code</small></td>
++                            <td th:text="${job.action.label}">Suspend</td>
++                            <td><span class="badge" th:classappend="| ${job.status.badgeClass}|" th:text="${job.status.label}">Status</span></td>
++                            <td th:text="${#temporals.format(job.requestedAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</td>
++                            <td th:text="${job.reason()}">Reason</td>
++                            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/lifecycle/jobs/{id}(id=${job.id()})}" title="View lifecycle job"><i class="bi bi-eye"></i></a></td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/scripts/check-matrix26-lifecycle-phase3g1.sh	2026-06-26 18:53:29.754417892 +0000
+@@ -0,0 +1,94 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++JAVA_DIR="$PROJECT_ROOT/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle"
++TEMPLATE_DIR="$PROJECT_ROOT/src/main/resources/templates/control_center/lifecycle"
++SIDEBAR="$PROJECT_ROOT/src/main/resources/templates/control_center/fragments/sidebar.html"
++CONFIG_SCRIPT="$PROJECT_ROOT/scripts/configure-matrix26-lifecycle-phase3g1.sh"
++
++required_files=(
++  "$JAVA_DIR/Matrix26LifecycleAction.java"
++  "$JAVA_DIR/Matrix26LifecycleStatus.java"
++  "$JAVA_DIR/Matrix26LifecycleProperties.java"
++  "$JAVA_DIR/Matrix26LifecycleInitializer.java"
++  "$JAVA_DIR/Matrix26LifecycleRepository.java"
++  "$JAVA_DIR/Matrix26LifecycleService.java"
++  "$JAVA_DIR/Matrix26LifecycleController.java"
++  "$TEMPLATE_DIR/index.html"
++  "$TEMPLATE_DIR/detail.html"
++  "$CONFIG_SCRIPT"
++)
++for file in "${required_files[@]}"; do
++  [[ -f "$file" ]] || { echo "Missing required file: $file" >&2; exit 1; }
++done
++
++grep -q 'matrix26_lifecycle_job' "$JAVA_DIR/Matrix26LifecycleInitializer.java"
++grep -q 'matrix26_lifecycle_schedule_state' "$JAVA_DIR/Matrix26LifecycleInitializer.java"
++grep -q 'matrix26_lifecycle_event' "$JAVA_DIR/Matrix26LifecycleInitializer.java"
++echo "Persistent lifecycle jobs, schedule snapshots, and events: OK"
++
++grep -q 'matrix26-appearance-lab' "$JAVA_DIR/Matrix26LifecycleProperties.java"
++grep -q 'Protected instances are read only' "$JAVA_DIR/Matrix26LifecycleService.java"
++grep -q 'outside the lifecycle laboratory allowlist' "$JAVA_DIR/Matrix26LifecycleService.java"
++echo "Laboratory allowlist and protected-instance boundary: OK"
++
++grep -q "verification_status = 'VERIFIED'" "$JAVA_DIR/Matrix26LifecycleRepository.java"
++grep -q 'encrypted = 1' "$JAVA_DIR/Matrix26LifecycleRepository.java"
++grep -q 'maximumVerifiedBackupAgeHours' "$JAVA_DIR/Matrix26LifecycleProperties.java"
++echo "Recent encrypted and verified backup gate: OK"
++
++grep -q 'snapshotEnabledSchedules' "$JAVA_DIR/Matrix26LifecycleService.java"
++grep -q 'pauseSnapshottedSchedules' "$JAVA_DIR/Matrix26LifecycleService.java"
++grep -q 'restoreSnapshottedSchedules' "$JAVA_DIR/Matrix26LifecycleService.java"
++grep -q 'SCHEDULE_COMPENSATION' "$JAVA_DIR/Matrix26LifecycleService.java"
++echo "Backup schedule pause, restoration, and failure compensation: OK"
++
++grep -q 'runtimeControlService.stop' "$JAVA_DIR/Matrix26LifecycleService.java"
++grep -q 'runtimeControlService.start' "$JAVA_DIR/Matrix26LifecycleService.java"
++grep -q 'The reactivated runtime did not pass the HTTP health check' "$JAVA_DIR/Matrix26LifecycleService.java"
++echo "Runtime Control stop, start, port ownership, and health verification: OK"
++
++for table in matrix26_backup_job matrix26_backup_schedule_execution matrix26_runtime_operation matrix26_restore_job matrix26_inplace_restore_job; do
++  grep -q "$table" "$JAVA_DIR/Matrix26LifecycleRepository.java" || {
++    echo "Missing active-operation boundary for $table" >&2
++    exit 1
++  }
++done
++echo "Backup, runtime, clone restore, and in-place restore conflict gates: OK"
++
++grep -q 'SUSPEND ' "$JAVA_DIR/Matrix26LifecycleService.java"
++grep -q 'REACTIVATE ' "$JAVA_DIR/Matrix26LifecycleService.java"
++grep -Fq '@PostMapping("/instances/{instanceId:\\d+}/suspend")' "$JAVA_DIR/Matrix26LifecycleController.java"
++grep -Fq '@PostMapping("/instances/{instanceId:\\d+}/reactivate")' "$JAVA_DIR/Matrix26LifecycleController.java"
++echo "Exact confirmations and numeric route boundaries: OK"
++
++if grep -nE 'spring\.datasource\.password|MATRIX26_BACKUP_MASTER_KEY|password=' "$CONFIG_SCRIPT"; then
++  echo "The Phase 3G.1 configuration script must not write credentials." >&2
++  exit 1
++fi
++grep -q 'allowed-instance-codes=matrix26-appearance-lab' "$CONFIG_SCRIPT"
++echo "Configuration preserves credentials and enables only the laboratory lifecycle allowlist: OK"
++
++python3 - "$TEMPLATE_DIR/index.html" "$TEMPLATE_DIR/detail.html" <<'PY'
++from html.parser import HTMLParser
++from pathlib import Path
++import sys
++class Parser(HTMLParser):
++    def __init__(self):
++        super().__init__(); self.forms=0; self.closed=0
++    def handle_starttag(self, tag, attrs):
++        if tag == 'form': self.forms += 1
++    def handle_endtag(self, tag):
++        if tag == 'form': self.closed += 1
++for name in sys.argv[1:]:
++    parser=Parser(); parser.feed(Path(name).read_text(encoding='utf-8'))
++    if parser.forms != parser.closed:
++        raise SystemExit(f'Unbalanced form tags in {name}: {parser.forms}/{parser.closed}')
++print('Lifecycle templates and confirmation forms: OK')
++PY
++
++grep -q '/control-center/lifecycle' "$SIDEBAR"
++echo "Lifecycle Manager navigation: OK"
++
++echo "Matrix26 Lifecycle Manager Phase 3G.1 static checks passed."
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/scripts/configure-matrix26-lifecycle-phase3g1.sh	2026-06-26 18:53:05.595412027 +0000
+@@ -0,0 +1,36 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++CONFIG_FILE="$PROJECT_ROOT/runtime-clients/matrix26_control/application.properties"
++MAINTENANCE_DIR="$PROJECT_ROOT/runtime-data/matrix26-control/maintenance"
++BACKUP_FILE="$MAINTENANCE_DIR/application.properties.phase3g1.bak"
++
++if [[ ! -f "$CONFIG_FILE" ]]; then
++  echo "Matrix26 runtime configuration was not found: $CONFIG_FILE" >&2
++  exit 1
++fi
++
++mkdir -p "$MAINTENANCE_DIR"
++cp -f "$CONFIG_FILE" "$BACKUP_FILE"
++
++TEMP_FILE="$(mktemp)"
++grep -vE '^matrix26\.control-center\.lifecycle\.(enabled|allowed-instance-codes|maximum-verified-backup-age-hours|minimum-reason-length)=' \
++  "$CONFIG_FILE" > "$TEMP_FILE" || true
++
++cat >> "$TEMP_FILE" <<'PROPERTIES'
++
++# Matrix26 Lifecycle Manager Phase 3G.1
++matrix26.control-center.lifecycle.enabled=true
++matrix26.control-center.lifecycle.allowed-instance-codes=matrix26-appearance-lab
++matrix26.control-center.lifecycle.maximum-verified-backup-age-hours=72
++matrix26.control-center.lifecycle.minimum-reason-length=10
++PROPERTIES
++
++mv "$TEMP_FILE" "$CONFIG_FILE"
++
++echo "Lifecycle Manager Phase 3G.1 configuration updated:"
++echo "$CONFIG_FILE"
++echo "Previous configuration preserved at:"
++echo "$BACKUP_FILE"
++echo "No password, token, database credential, or backup master key was changed."
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/docs/project/matrix26-lifecycle-phase3g1-test-guide.md	2026-06-26 18:54:13.134355167 +0000
+@@ -0,0 +1,144 @@
++# Matrix26 Lifecycle Manager — Phase 3G.1 Test Guide
++
++## Scope
++
++Phase 3G.1 adds controlled suspension and reactivation for the allowlisted laboratory instance only:
++
++- Instance code: `matrix26-appearance-lab`
++- Runtime profile: `matrix26_appearance_lab`
++- Database: `matrix26_appearance_lab`
++- Port: `8094`
++
++Protected production/demo instances and Matrix26 Control Center remain read only.
++
++## Preconditions
++
++1. Matrix26 Control Center is stopped before applying the package.
++2. Phase 3E Backup Manager and Phase 3F Restore Manager are already installed.
++3. `matrix26-appearance-lab` has a full encrypted backup with verification state `VERIFIED` from the last 72 hours.
++4. No backup, runtime, clone restore, in-place restore, or lifecycle job is active.
++5. Port `8094` is owned by the expected laboratory runtime or is free.
++
++## Apply
++
++```bash
++cd "$HOME/Projects/eco-agua-workspace/eco-agua"
++
++unzip "$HOME/Downloads/matrix26-lifecycle-phase3g1-final.zip" \
++  -d "$HOME/Downloads"
++
++SRC="$HOME/Downloads/matrix26-lifecycle-phase3g1-final"
++
++cp -rf "$SRC/src/." src/
++cp -rf "$SRC/scripts/." scripts/
++cp -rf "$SRC/docs/." docs/
++cp -rf "$SRC/reports/." reports/
++
++chmod +x scripts/check-matrix26-lifecycle-phase3g1.sh
++chmod +x scripts/configure-matrix26-lifecycle-phase3g1.sh
++```
++
++## Configure
++
++```bash
++bash scripts/configure-matrix26-lifecycle-phase3g1.sh
++```
++
++The script stores the previous runtime configuration under:
++
++```text
++runtime-data/matrix26-control/maintenance/application.properties.phase3g1.bak
++```
++
++It does not write or change passwords, tokens, MySQL credentials, or the backup master key.
++
++## Static verification
++
++```bash
++bash scripts/check-matrix26-lifecycle-phase3g1.sh
++```
++
++Expected final line:
++
++```text
++Matrix26 Lifecycle Manager Phase 3G.1 static checks passed.
++```
++
++## Build and start
++
++```bash
++rm -rf target
++mvn clean -DskipTests package
++bash scripts/run-matrix26-control.sh
++```
++
++Open:
++
++```text
++http://localhost:8091/control-center/lifecycle
++```
++
++## Suspension test
++
++1. Confirm that `8094` is online.
++2. Confirm that Lifecycle Manager shows a recent verified encrypted backup.
++3. Enter an operational reason of at least 10 characters.
++4. Enter exactly:
++
++```text
++SUSPEND matrix26-appearance-lab
++```
++
++5. Submit the suspension.
++
++Expected results:
++
++- Lifecycle job ends as `SUSPENDED`.
++- Instance registry status becomes `SUSPENDED`.
++- Runtime status becomes `STOPPED`.
++- Port `8094` is free.
++- Previously enabled backup schedules are disabled and snapshotted.
++- Database, runtime directory, runtime-data, modules, appearance, users, and backups still exist.
++- Ports `8091`, `8081`, `8082`, and `8084` are not modified.
++
++## Reactivation test
++
++1. From Lifecycle Manager, enter a reason.
++2. Enter exactly:
++
++```text
++REACTIVATE matrix26-appearance-lab
++```
++
++3. Submit the reactivation.
++
++Expected results:
++
++- Runtime Control starts `8094`.
++- HTTP health check succeeds.
++- Instance status returns to `ACTIVE`.
++- Runtime status returns to `ONLINE`.
++- Only schedules captured during suspension are re-enabled.
++- The lifecycle job ends as `ACTIVE`.
++
++## Conflict tests
++
++Suspension/reactivation must be blocked when any of these are active:
++
++- Backup job.
++- Scheduled backup execution.
++- Runtime operation.
++- Clone restore.
++- In-place restore awaiting completion, confirmation, or rollback.
++- Another lifecycle job.
++- Unexpected process on port `8094`.
++
++## Git boundary
++
++Do not commit:
++
++```text
++runtime-data/
++runtime-clients/matrix26_appearance_lab/
++C:/Users/PC/Matrix26/backups/
++```
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/reports/matrix26-lifecycle-phase3g1-report.md	2026-06-26 18:54:13.141661924 +0000
+@@ -0,0 +1,36 @@
++# Matrix26 Lifecycle Manager — Phase 3G.1 Report
++
++## Delivered
++
++- Controlled suspension and reactivation for `matrix26-appearance-lab`.
++- Explicit allowlist and protected-instance rejection.
++- Recent encrypted and verified backup prerequisite.
++- Persistent lifecycle jobs, events, and schedule snapshots.
++- Runtime stop/start through the existing Runtime Control service.
++- Pause and restoration of only the schedules enabled before suspension.
++- Compensation that restores schedules if suspension fails.
++- Backup, schedule execution, runtime, clone restore, and in-place restore conflict gates.
++- Exact operator confirmations and operational reasons.
++- Instance registry state transitions and central audit events.
++- Lifecycle Manager list/detail UI and sidebar navigation.
++
++## Safety boundaries
++
++The implementation does not:
++
++- Delete or modify the instance database.
++- Delete runtime files or runtime-data.
++- Delete backups.
++- Change modules, users, roles, appearance, branding, or documents.
++- Operate on protected instances.
++- Operate outside `matrix26-appearance-lab` in Phase 3G.1.
++- Execute arbitrary commands supplied by the browser.
++
++## Validation completed
++
++- Lifecycle Java sources compiled with Java 17 against controlled API stubs.
++- Static security and route checks passed.
++- Thymeleaf form balance checks passed.
++- Configuration update was tested on a copied runtime configuration.
++- The pre-change configuration copy matched byte-for-byte by SHA-256.
++- Full Maven compilation must be confirmed in the user's project environment because Maven dependencies are not available in the packaging environment.
+--- /dev/null	2026-06-26 18:44:10.719930164 +0000
++++ /mnt/data/matrix26_3g1_work/reports/matrix26-lifecycle-phase3g1-file-list.txt	2026-06-26 18:54:13.149275923 +0000
+@@ -0,0 +1,24 @@
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleAction.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleBackupView.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleController.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleEvent.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleException.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleInitializer.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleInstanceView.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleJob.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleProperties.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleRepository.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleScheduleState.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleService.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleStatus.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/Matrix26LifecycleSummary.java
++src/main/resources/templates/control_center/lifecycle/index.html
++src/main/resources/templates/control_center/lifecycle/detail.html
++src/main/resources/templates/control_center/fragments/sidebar.html
++src/main/resources/static/css/matrix26-control.css
++scripts/check-matrix26-lifecycle-phase3g1.sh
++scripts/configure-matrix26-lifecycle-phase3g1.sh
++docs/project/matrix26-lifecycle-phase3g1-test-guide.md
++reports/matrix26-lifecycle-phase3g1-report.md
++reports/matrix26-lifecycle-phase3g1-file-list.txt
++reports/matrix26-lifecycle-phase3g1.diff

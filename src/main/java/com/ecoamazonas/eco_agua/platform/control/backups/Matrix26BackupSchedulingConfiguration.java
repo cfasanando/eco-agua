@@ -7,9 +7,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @Configuration
 @EnableScheduling
 @ConditionalOnProperty(
-        name = "matrix26.control-center.backups.scheduling-enabled",
-        havingValue = "true",
-        matchIfMissing = true
+        prefix = "matrix26.control-center",
+        name = {"enabled", "backups.scheduling-enabled"},
+        havingValue = "true"
 )
 public class Matrix26BackupSchedulingConfiguration {
 }

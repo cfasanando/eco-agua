@@ -86,7 +86,7 @@ public class Matrix26RestoreController {
         }
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     public String detail(@PathVariable long id, Model model) {
         Matrix26RestoreJob job = restoreService.job(id);
         Matrix26RestoreValidationRun latestValidation = verificationService.latest(id);
@@ -110,7 +110,7 @@ public class Matrix26RestoreController {
         return "control_center/restores/detail";
     }
 
-    @PostMapping("/{id}/verify")
+    @PostMapping("/{id:\\d+}/verify")
     public String verify(
             @PathVariable long id,
             @RequestParam("confirmation") String confirmation,
@@ -127,7 +127,7 @@ public class Matrix26RestoreController {
         return "redirect:/control-center/restores/" + id + "#restore-validation";
     }
 
-    @PostMapping("/{id}/resume")
+    @PostMapping("/{id:\\d+}/resume")
     public String resume(
             @PathVariable long id,
             @RequestParam("confirmation") String confirmation,
@@ -144,7 +144,7 @@ public class Matrix26RestoreController {
     }
 
 
-    @PostMapping("/{id}/cleanup/prepare")
+    @PostMapping("/{id:\\d+}/cleanup/prepare")
     public String prepareCleanup(
             @PathVariable long id,
             @RequestParam("confirmation") String confirmation,
@@ -161,7 +161,7 @@ public class Matrix26RestoreController {
         return "redirect:/control-center/restores/" + id + "#restore-cleanup";
     }
 
-    @PostMapping("/{id}/cleanup/{planId}/approve")
+    @PostMapping("/{id:\\d+}/cleanup/{planId:\\d+}/approve")
     public String approveCleanup(
             @PathVariable long id,
             @PathVariable long planId,
@@ -184,7 +184,7 @@ public class Matrix26RestoreController {
         return "redirect:/control-center/restores/" + id + "#restore-cleanup";
     }
 
-    @PostMapping("/{id}/cleanup/{planId}/execute")
+    @PostMapping("/{id:\\d+}/cleanup/{planId:\\d+}/execute")
     public String executeCleanup(
             @PathVariable long id,
             @PathVariable long planId,
@@ -202,7 +202,7 @@ public class Matrix26RestoreController {
         return "redirect:/control-center/restores/" + id + "#restore-cleanup";
     }
 
-    @GetMapping("/validations/{runId}/report")
+    @GetMapping("/validations/{runId:\\d+}/report")
     public ResponseEntity<byte[]> report(@PathVariable long runId) {
         Matrix26RestoreValidationRun run = verificationService.run(runId);
         byte[] content = verificationService.report(runId).getBytes(StandardCharsets.UTF_8);
@@ -214,7 +214,7 @@ public class Matrix26RestoreController {
                 .body(content);
     }
 
-    @GetMapping("/{id}/steps")
+    @GetMapping("/{id:\\d+}/steps")
     public String steps(@PathVariable long id) {
         return "redirect:/control-center/restores/" + id + "#restore-steps";
     }

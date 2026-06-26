@@ -29,6 +29,11 @@ public class Matrix26RestoreProperties {
     private int verificationHttpTimeoutSeconds = 10;
     private List<String> verificationHttpPaths = new ArrayList<>(List.of("/", "/login", "/restaurant/menu", "/admin/restaurant/dashboard"));
     private boolean cleanupEnabled = true;
+    private boolean inPlaceEnabled = true;
+    private Set<String> inPlaceAllowedInstanceCodes = new LinkedHashSet<>(Set.of("matrix26-appearance-lab"));
+    private String inPlaceStageDirectory = ".restore-stage";
+    private String inPlaceRollbackDirectory = ".restore-rollback";
+    private int inPlaceRollbackRetentionHours = 168;
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -66,4 +71,14 @@ public class Matrix26RestoreProperties {
     public void setVerificationHttpPaths(List<String> values) { verificationHttpPaths = values == null ? new ArrayList<>() : new ArrayList<>(values); }
     public boolean isCleanupEnabled() { return cleanupEnabled; }
     public void setCleanupEnabled(boolean value) { cleanupEnabled = value; }
+    public boolean isInPlaceEnabled() { return inPlaceEnabled; }
+    public void setInPlaceEnabled(boolean value) { inPlaceEnabled = value; }
+    public Set<String> getInPlaceAllowedInstanceCodes() { return inPlaceAllowedInstanceCodes; }
+    public void setInPlaceAllowedInstanceCodes(Set<String> values) { inPlaceAllowedInstanceCodes = values == null ? new LinkedHashSet<>() : new LinkedHashSet<>(values); }
+    public String getInPlaceStageDirectory() { return inPlaceStageDirectory; }
+    public void setInPlaceStageDirectory(String value) { inPlaceStageDirectory = value; }
+    public String getInPlaceRollbackDirectory() { return inPlaceRollbackDirectory; }
+    public void setInPlaceRollbackDirectory(String value) { inPlaceRollbackDirectory = value; }
+    public int getInPlaceRollbackRetentionHours() { return inPlaceRollbackRetentionHours; }
+    public void setInPlaceRollbackRetentionHours(int value) { inPlaceRollbackRetentionHours = value; }
 }

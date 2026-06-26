@@ -1,0 +1,112 @@
+--- /mnt/data/m26_3f4_context/matrix26-restore-phase3f4-context-20260626-103954/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreController.java	2026-06-26 10:34:44.000000000 +0000
++++ /mnt/data/matrix26-restore-phase3f4a-route-hotfix/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreController.java	2026-06-26 16:23:02.729746324 +0000
+@@ -86,7 +86,7 @@
+         }
+     }
+ 
+-    @GetMapping("/{id}")
++    @GetMapping("/{id:\\d+}")
+     public String detail(@PathVariable long id, Model model) {
+         Matrix26RestoreJob job = restoreService.job(id);
+         Matrix26RestoreValidationRun latestValidation = verificationService.latest(id);
+@@ -110,7 +110,7 @@
+         return "control_center/restores/detail";
+     }
+ 
+-    @PostMapping("/{id}/verify")
++    @PostMapping("/{id:\\d+}/verify")
+     public String verify(
+             @PathVariable long id,
+             @RequestParam("confirmation") String confirmation,
+@@ -127,7 +127,7 @@
+         return "redirect:/control-center/restores/" + id + "#restore-validation";
+     }
+ 
+-    @PostMapping("/{id}/resume")
++    @PostMapping("/{id:\\d+}/resume")
+     public String resume(
+             @PathVariable long id,
+             @RequestParam("confirmation") String confirmation,
+@@ -144,7 +144,7 @@
+     }
+ 
+ 
+-    @PostMapping("/{id}/cleanup/prepare")
++    @PostMapping("/{id:\\d+}/cleanup/prepare")
+     public String prepareCleanup(
+             @PathVariable long id,
+             @RequestParam("confirmation") String confirmation,
+@@ -161,7 +161,7 @@
+         return "redirect:/control-center/restores/" + id + "#restore-cleanup";
+     }
+ 
+-    @PostMapping("/{id}/cleanup/{planId}/approve")
++    @PostMapping("/{id:\\d+}/cleanup/{planId:\\d+}/approve")
+     public String approveCleanup(
+             @PathVariable long id,
+             @PathVariable long planId,
+@@ -184,7 +184,7 @@
+         return "redirect:/control-center/restores/" + id + "#restore-cleanup";
+     }
+ 
+-    @PostMapping("/{id}/cleanup/{planId}/execute")
++    @PostMapping("/{id:\\d+}/cleanup/{planId:\\d+}/execute")
+     public String executeCleanup(
+             @PathVariable long id,
+             @PathVariable long planId,
+@@ -202,7 +202,7 @@
+         return "redirect:/control-center/restores/" + id + "#restore-cleanup";
+     }
+ 
+-    @GetMapping("/validations/{runId}/report")
++    @GetMapping("/validations/{runId:\\d+}/report")
+     public ResponseEntity<byte[]> report(@PathVariable long runId) {
+         Matrix26RestoreValidationRun run = verificationService.run(runId);
+         byte[] content = verificationService.report(runId).getBytes(StandardCharsets.UTF_8);
+@@ -214,7 +214,7 @@
+                 .body(content);
+     }
+ 
+-    @GetMapping("/{id}/steps")
++    @GetMapping("/{id:\\d+}/steps")
+     public String steps(@PathVariable long id) {
+         return "redirect:/control-center/restores/" + id + "#restore-steps";
+     }
+--- /mnt/data/m26_3f4_debug/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26InPlaceRestoreController.java	2026-06-26 15:50:40.000000000 +0000
++++ /mnt/data/matrix26-restore-phase3f4a-route-hotfix/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26InPlaceRestoreController.java	2026-06-26 16:23:02.738951509 +0000
+@@ -59,7 +59,7 @@
+         }
+     }
+ 
+-    @GetMapping("/{id}")
++    @GetMapping("/{id:\\d+}")
+     public String detail(@PathVariable long id, Model model) {
+         model.addAttribute("activePage", "matrix26_inplace_restores");
+         model.addAttribute("job", service.job(id));
+@@ -69,7 +69,7 @@
+         return "control_center/restores/in_place_detail";
+     }
+ 
+-    @PostMapping("/{id}/switch")
++    @PostMapping("/{id:\\d+}/switch")
+     public String switchInstance(
+             @PathVariable long id,
+             @RequestParam("confirmation") String confirmation,
+@@ -85,7 +85,7 @@
+         return "redirect:/control-center/restores/in-place/" + id;
+     }
+ 
+-    @PostMapping("/{id}/confirm")
++    @PostMapping("/{id:\\d+}/confirm")
+     public String confirm(
+             @PathVariable long id,
+             @RequestParam("confirmation") String confirmation,
+@@ -101,7 +101,7 @@
+         return "redirect:/control-center/restores/in-place/" + id;
+     }
+ 
+-    @PostMapping("/{id}/rollback")
++    @PostMapping("/{id:\\d+}/rollback")
+     public String rollback(
+             @PathVariable long id,
+             @RequestParam("confirmation") String confirmation,

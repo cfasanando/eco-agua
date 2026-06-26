@@ -8,9 +8,9 @@ import org.springframework.stereotype.Component;
 
 @Component
 @ConditionalOnProperty(
-        name = "matrix26.control-center.backups.scheduling-enabled",
-        havingValue = "true",
-        matchIfMissing = true
+        prefix = "matrix26.control-center",
+        name = {"enabled", "backups.scheduling-enabled"},
+        havingValue = "true"
 )
 public class Matrix26BackupScheduler {
 

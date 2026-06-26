@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('In-place Restore')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('In-place Restore', 'Stage, switch, verify, confirm, or roll back a laboratory instance safely.')}"></header>
+        <main class="matrix26-main">
+            <div th:if="${restoreSuccess}" class="alert alert-success" th:text="${restoreSuccess}"></div>
+            <div th:if="${restoreError}" class="alert alert-danger" th:text="${restoreError}"></div>
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                <div><span class="matrix26-eyebrow">Matrix26 Restore Manager · Phase 3F.4</span><h1 class="matrix26-page-title">Staged in-place recovery</h1><p class="matrix26-page-subtitle mb-0">Prepare everything while the source remains untouched, then switch only after an explicit second confirmation.</p></div>
+                <a class="btn btn-danger" th:href="@{/control-center/restores/in-place/new}"><i class="bi bi-arrow-left-right me-1"></i>New in-place restore</a>
+            </div>
+            <section class="matrix26-backup-summary mb-4">
+                <article><span><i class="bi bi-arrow-left-right"></i></span><div><strong th:text="${summary.total}">0</strong><small>Total jobs</small></div></article>
+                <article><span><i class="bi bi-check2-circle"></i></span><div><strong th:text="${summary.completed}">0</strong><small>Confirmed</small></div></article>
+                <article><span><i class="bi bi-shield-exclamation"></i></span><div><strong th:text="${summary.awaitingConfirmation}">0</strong><small>Awaiting confirmation</small></div></article>
+                <article><span><i class="bi bi-x-octagon"></i></span><div><strong th:text="${summary.failed}">0</strong><small>Failed / recovery</small></div></article>
+            </section>
+            <div class="alert alert-warning matrix26-inplace-warning mb-4"><strong>Laboratory boundary.</strong> Phase 3F.4 is enabled only for <code>matrix26-appearance-lab</code>. The active database is never imported over directly: staging and rollback schemas coexist during the decision window.</div>
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header"><div><span>Recovery sources</span><h2>Eligible encrypted backups</h2></div></div>
+                <div class="table-responsive"><table class="table matrix26-table align-middle"><thead><tr><th>Backup</th><th>Source</th><th>Created</th><th>Encryption</th><th>Status</th><th class="text-end">Action</th></tr></thead><tbody>
+                <tr th:each="candidate : ${candidates}"><td><strong th:text="${candidate.backup.publicId}">BKP</strong><small th:text="${candidate.backup.backupType}">FULL</small></td><td><strong th:text="${candidate.backup.instanceName}">Instance</strong><small><code th:text="${candidate.backup.instanceCode}">code</code></small></td><td th:text="${#temporals.format(candidate.backup.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">date</td><td><span th:if="${candidate.encryption != null}" class="badge text-bg-success" th:text="${candidate.encryption.algorithm}">AES</span></td><td><span class="badge" th:classappend="${candidate.eligible ? 'text-bg-success' : 'text-bg-warning'}" th:text="${candidate.eligible ? 'Ready' : 'Blocked'}">Ready</span><small th:text="${candidate.reason}">reason</small></td><td class="text-end"><a th:if="${candidate.eligible}" class="btn btn-sm btn-outline-danger" th:href="@{/control-center/restores/in-place/new(backupId=${candidate.backup.id})}"><i class="bi bi-arrow-left-right"></i><span class="visually-hidden">Prepare</span></a></td></tr>
+                <tr th:if="${#lists.isEmpty(candidates)}"><td colspan="6" class="text-center text-muted py-4">No eligible encrypted backup is available.</td></tr>
+                </tbody></table></div>
+            </section>
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><span>History</span><h2>In-place restore jobs</h2></div></div>
+                <div class="table-responsive"><table class="table matrix26-table align-middle"><thead><tr><th>Job</th><th>Backup</th><th>Source</th><th>Safety backup</th><th>Status</th><th>Requested</th><th class="text-end">Details</th></tr></thead><tbody>
+                <tr th:each="job : ${jobs}"><td><strong th:text="${job.publicId}">RIP</strong><small th:text="${job.requestedBy}">actor</small></td><td><code th:text="${job.backupPublicId}">BKP</code></td><td><strong th:text="${job.sourceInstanceName}">Source</strong><small><code th:text="${job.sourceInstanceCode}">code</code> · port <span th:text="${job.sourceRuntimePort}">8094</span></small></td><td><code th:text="${job.safetyBackupPublicId != null ? job.safetyBackupPublicId : 'Pending'}">BKP</code></td><td><span class="badge" th:classappend="${job.status.badgeClass}" th:text="${job.status.label}">status</span></td><td th:text="${#temporals.format(job.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">date</td><td class="text-end"><a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/restores/in-place/{id}(id=${job.id})}"><i class="bi bi-eye"></i><span class="visually-hidden">Open</span></a></td></tr>
+                <tr th:if="${#lists.isEmpty(jobs)}"><td colspan="7" class="text-center text-muted py-4">No in-place restore jobs yet.</td></tr>
+                </tbody></table></div>
+            </section>
+        </main>
+    </div>
+</div>
+</body></html>

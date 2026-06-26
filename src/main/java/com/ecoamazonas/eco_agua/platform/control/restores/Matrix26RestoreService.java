@@ -251,7 +251,9 @@ public class Matrix26RestoreService {
     public Matrix26RestoreCleanupPreview cleanupPreview(long restoreJobId) {
         Matrix26RestoreJob job = job(restoreJobId);
         List<Matrix26RestoreCleanupItem> items = new ArrayList<>();
-        boolean cleanupCandidate = job.failed();
+        boolean cleanupCandidate = job.failed()
+                || job.status() == Matrix26RestoreStatus.PARTIALLY_CLEANED
+                || job.status() == Matrix26RestoreStatus.CLEANING;
 
         boolean databaseExists = targetDatabaseService.databaseExists(job.targetDatabaseName());
         items.add(new Matrix26RestoreCleanupItem(

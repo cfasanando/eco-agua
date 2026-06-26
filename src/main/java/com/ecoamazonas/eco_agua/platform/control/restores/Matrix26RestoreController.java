@@ -25,13 +25,16 @@ public class Matrix26RestoreController {
 
     private final Matrix26RestoreService restoreService;
     private final Matrix26RestoreVerificationService verificationService;
+    private final Matrix26RestoreCleanupService cleanupService;
 
     public Matrix26RestoreController(
             Matrix26RestoreService restoreService,
-            Matrix26RestoreVerificationService verificationService
+            Matrix26RestoreVerificationService verificationService,
+            Matrix26RestoreCleanupService cleanupService
     ) {
         this.restoreService = restoreService;
         this.verificationService = verificationService;
+        this.cleanupService = cleanupService;
     }
 
     @GetMapping
@@ -85,9 +88,14 @@ public class Matrix26RestoreController {
 
     @GetMapping("/{id}")
     public String detail(@PathVariable long id, Model model) {
+        Matrix26RestoreJob job = restoreService.job(id);
         Matrix26RestoreValidationRun latestValidation = verificationService.latest(id);
         model.addAttribute("activePage", "matrix26_restores");
-        model.addAttribute("job", restoreService.job(id));
+        model.addAttribute("job", job);
+        model.addAttribute("cleanupEligible", job.status() == Matrix26RestoreStatus.FAILED
+                || job.status() == Matrix26RestoreStatus.CLEANUP_REQUIRED
+                || job.status() == Matrix26RestoreStatus.CLEANING
+                || job.status() == Matrix26RestoreStatus.PARTIALLY_CLEANED);
         model.addAttribute("steps", restoreService.steps(id));
         model.addAttribute("artifacts", restoreService.artifacts(id));
         model.addAttribute("verifications", restoreService.verifications(id));
@@ -95,6 +103,9 @@ public class Matrix26RestoreController {
         model.addAttribute("validationItems", latestValidation == null ? java.util.List.of() : verificationService.items(latestValidation.id()));
         model.addAttribute("resumePlan", restoreService.resumePlan(id));
         model.addAttribute("cleanupPreview", restoreService.cleanupPreview(id));
+        Matrix26RestoreCleanupPlan cleanupPlan = cleanupService.latest(id);
+        model.addAttribute("cleanupPlan", cleanupPlan);
+        model.addAttribute("cleanupItems", cleanupService.items(cleanupPlan));
         model.addAttribute("restoreProperties", restoreService.properties());
         return "control_center/restores/detail";
     }
@@ -130,6 +141,65 @@ public class Matrix26RestoreController {
             redirectAttributes.addFlashAttribute("restoreError", ex.getMessage());
         }
         return "redirect:/control-center/restores/" + id;
+    }
+
+
+    @PostMapping("/{id}/cleanup/prepare")
+    public String prepareCleanup(
+            @PathVariable long id,
+            @RequestParam("confirmation") String confirmation,
+            Principal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            Matrix26RestoreCleanupPlan plan = cleanupService.prepare(id, confirmation, actor(principal));
+            redirectAttributes.addFlashAttribute("restoreSuccess",
+                    "Cleanup preview created: " + plan.publicId() + " — " + plan.status().getLabel());
+        } catch (Matrix26RestoreException ex) {
+            redirectAttributes.addFlashAttribute("restoreError", ex.getMessage());
+        }
+        return "redirect:/control-center/restores/" + id + "#restore-cleanup";
+    }
+
+    @PostMapping("/{id}/cleanup/{planId}/approve")
+    public String approveCleanup(
+            @PathVariable long id,
+            @PathVariable long planId,
+            @RequestParam("stopConfirmation") String stopConfirmation,
+            @RequestParam("filesConfirmation") String filesConfirmation,
+            @RequestParam("databaseConfirmation") String databaseConfirmation,
+            @RequestParam("registrationConfirmation") String registrationConfirmation,
+            Principal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            Matrix26RestoreCleanupPlan plan = cleanupService.approve(
+                    id, planId, stopConfirmation, filesConfirmation, databaseConfirmation,
+                    registrationConfirmation, actor(principal));
+            redirectAttributes.addFlashAttribute("restoreSuccess",
+                    "Cleanup plan approved: " + plan.publicId());
+        } catch (Matrix26RestoreException ex) {
+            redirectAttributes.addFlashAttribute("restoreError", ex.getMessage());
+        }
+        return "redirect:/control-center/restores/" + id + "#restore-cleanup";
+    }
+
+    @PostMapping("/{id}/cleanup/{planId}/execute")
+    public String executeCleanup(
+            @PathVariable long id,
+            @PathVariable long planId,
+            @RequestParam("confirmation") String confirmation,
+            Principal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            Matrix26RestoreCleanupPlan plan = cleanupService.execute(id, planId, confirmation, actor(principal));
+            redirectAttributes.addFlashAttribute("restoreSuccess",
+                    "Cleanup completed: " + plan.publicId());
+        } catch (Matrix26RestoreException ex) {
+            redirectAttributes.addFlashAttribute("restoreError", ex.getMessage());
+        }
+        return "redirect:/control-center/restores/" + id + "#restore-cleanup";
     }
 
     @GetMapping("/validations/{runId}/report")

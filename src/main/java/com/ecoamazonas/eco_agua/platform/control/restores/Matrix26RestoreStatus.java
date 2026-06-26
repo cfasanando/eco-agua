@@ -16,6 +16,9 @@ public enum Matrix26RestoreStatus {
     COMPLETED("Completed", "text-bg-success"),
     FAILED("Failed", "text-bg-danger"),
     CLEANUP_REQUIRED("Cleanup required", "text-bg-warning"),
+    CLEANING("Cleaning", "text-bg-primary"),
+    PARTIALLY_CLEANED("Partially cleaned", "text-bg-warning"),
+    CLEANED("Cleaned", "text-bg-success"),
     CANCELLED("Cancelled", "text-bg-secondary");
 
     private final String label;

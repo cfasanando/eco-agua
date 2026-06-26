@@ -128,25 +128,115 @@
                 </div>
             </section>
 
-            <section th:if="${job.failed}" class="matrix26-panel mb-4">
-                <div class="matrix26-panel-header"><div><span>Dry run only</span><h2>Incomplete restore cleanup preview</h2></div><span class="badge text-bg-secondary">No deletion</span></div>
-                <p class="text-muted" th:text="${cleanupPreview.summary}">Summary</p>
-                <div class="table-responsive">
-                    <table class="table matrix26-table align-middle">
-                        <thead><tr><th>Resource</th><th>Location</th><th>Exists</th><th>Ownership</th><th>Proposed future action</th><th>Detail</th></tr></thead>
-                        <tbody>
-                        <tr th:each="item : ${cleanupPreview.items}">
-                            <td><strong th:text="${item.resourceType}">Resource</strong></td>
-                            <td><code class="matrix26-code-wrap" th:text="${item.location}">path</code></td>
-                            <td><span class="badge" th:classappend="${item.exists ? 'text-bg-warning' : 'text-bg-secondary'}" th:text="${item.exists ? 'Yes' : 'No'}">No</span></td>
-                            <td th:text="${item.ownership}">OWNED</td>
-                            <td><span class="badge" th:classappend="${#strings.startsWith(item.proposedAction, 'BLOCKED') ? 'text-bg-danger' : (#strings.startsWith(item.proposedAction, 'WOULD') ? 'text-bg-warning' : 'text-bg-secondary')}" th:text="${item.proposedAction}">KEEP</span></td>
-                            <td><small th:text="${item.detail}">Detail</small></td>
-                        </tr>
-                        </tbody>
-                    </table>
+            <section id="restore-cleanup" th:if="${cleanupEligible}" class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header">
+                    <div><span>Phase 3F.3</span><h2>Controlled incomplete-restore cleanup</h2></div>
+                    <span th:if="${cleanupPlan == null}" class="badge text-bg-secondary">Preview required</span>
+                    <span th:if="${cleanupPlan != null}" class="badge" th:classappend="${cleanupPlan.status.badgeClass}" th:text="${cleanupPlan.status.label}">Status</span>
                 </div>
-                <div class="alert alert-info mb-0"><strong>Safety boundary:</strong> Phase 3F.2 only inventories residual resources. It does not run <code>DROP DATABASE</code> or delete runtime directories.</div>
+
+                <div class="alert alert-warning">
+                    <strong>Destructive boundary:</strong> only resources proven to belong to this failed restore job can be removed.
+                    The encrypted source backup and the source instance are always preserved.
+                </div>
+
+                <div th:if="${cleanupPlan == null}">
+                    <p class="text-muted" th:text="${cleanupPreview.summary}">Summary</p>
+                    <div class="table-responsive mb-4">
+                        <table class="table matrix26-table align-middle">
+                            <thead><tr><th>Resource</th><th>Location</th><th>Exists</th><th>Ownership</th><th>Proposed action</th><th>Detail</th></tr></thead>
+                            <tbody>
+                            <tr th:each="item : ${cleanupPreview.items}">
+                                <td><strong th:text="${item.resourceType}">Resource</strong></td>
+                                <td><code class="matrix26-code-wrap" th:text="${item.location}">path</code></td>
+                                <td><span class="badge" th:classappend="${item.exists ? 'text-bg-warning' : 'text-bg-secondary'}" th:text="${item.exists ? 'Yes' : 'No'}">No</span></td>
+                                <td th:text="${item.ownership}">OWNED</td>
+                                <td><span class="badge" th:classappend="${#strings.startsWith(item.proposedAction, 'BLOCKED') ? 'text-bg-danger' : (#strings.startsWith(item.proposedAction, 'WOULD') ? 'text-bg-warning' : 'text-bg-secondary')}" th:text="${item.proposedAction}">KEEP</span></td>
+                                <td><small th:text="${item.detail}">Detail</small></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <form th:if="${restoreProperties.cleanupEnabled}"
+                          th:action="@{/control-center/restores/{id}/cleanup/prepare(id=${job.id})}"
+                          method="post" class="matrix26-confirmation-box">
+                        <div>
+                            <strong>Create signed cleanup plan</strong>
+                            <p class="mb-2">Matrix26 captures ownership, resource state, backup availability, and a signed SHA-256 fingerprint. No deletion occurs.</p>
+                            <code th:text="|PREPARE CLEANUP ${job.publicId}|">PREPARE CLEANUP RST</code>
+                        </div>
+                        <div class="matrix26-confirmation-actions">
+                            <input class="form-control" name="confirmation" autocomplete="off" required th:placeholder="|PREPARE CLEANUP ${job.publicId}|">
+                            <button class="btn btn-outline-warning" type="submit"><i class="bi bi-clipboard-check me-1"></i>Prepare cleanup plan</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div th:if="${cleanupPlan != null}">
+                    <div class="matrix26-restore-validation-summary mb-4">
+                        <div><span>Plan</span><strong th:text="${cleanupPlan.publicId}">CLN</strong></div>
+                        <div><span>Status</span><strong th:text="${cleanupPlan.status.label}">Preview ready</strong></div>
+                        <div><span>Requested</span><strong th:text="${#temporals.format(cleanupPlan.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">date</strong></div>
+                        <div class="matrix26-restore-validation-summary-wide"><span>Summary</span><strong th:text="${cleanupPlan.summary}">summary</strong></div>
+                    </div>
+                    <div class="matrix26-cleanup-signature mb-4">
+                        <div><span>Snapshot fingerprint</span><code class="matrix26-code-wrap" th:text="${cleanupPlan.snapshotFingerprint}">sha</code></div>
+                        <div><span>HMAC plan signature</span><code class="matrix26-code-wrap" th:text="${cleanupPlan.planSignature}">sig</code></div>
+                    </div>
+
+                    <div class="table-responsive mb-4">
+                        <table class="table matrix26-table align-middle">
+                            <thead><tr><th>#</th><th>Resource</th><th>Location</th><th>Ownership</th><th>Action</th><th>Status</th><th>Detail</th></tr></thead>
+                            <tbody>
+                            <tr th:each="item : ${cleanupItems}">
+                                <td th:text="${item.sequenceNumber / 10}">1</td>
+                                <td><strong th:text="${item.resourceType}">Resource</strong><small th:text="${item.confirmationGroup}">Group</small></td>
+                                <td><code class="matrix26-code-wrap" th:text="${item.location}">location</code></td>
+                                <td th:text="${item.ownership}">OWNED</td>
+                                <td><span class="badge" th:classappend="${item.plannedAction == 'BLOCKED' ? 'text-bg-danger' : (item.plannedAction == 'KEEP' or item.plannedAction == 'SKIP' ? 'text-bg-secondary' : 'text-bg-warning')}" th:text="${item.plannedAction}">REMOVE</span></td>
+                                <td><span class="badge" th:classappend="${item.status.badgeClass}" th:text="${item.status.label}">Pending</span></td>
+                                <td><small th:text="${item.lastError != null ? item.lastError : item.detail}">Detail</small></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div th:if="${cleanupPlan.blocked}" class="alert alert-danger">
+                        <strong>Cleanup blocked.</strong> Resolve the ownership, backup, verification, or port conflict and generate a fresh signed plan.
+                    </div>
+
+                    <form th:if="${cleanupPlan.previewReady}"
+                          th:action="@{/control-center/restores/{id}/cleanup/{planId}/approve(id=${job.id},planId=${cleanupPlan.id})}"
+                          method="post" class="matrix26-cleanup-approval">
+                        <div class="matrix26-panel-header"><div><span>Independent approvals</span><h3>Approve every destructive group</h3></div></div>
+                        <p class="text-muted">All four confirmations are required, even when a resource is already absent. Approval is refused if the signed snapshot changed.</p>
+                        <div class="row g-3">
+                            <div class="col-12 col-xl-6"><label class="form-label">Runtime confirmation</label><code th:text="|STOP RUNTIME ${job.targetInstanceCode}|">STOP</code><input class="form-control mt-2" name="stopConfirmation" required autocomplete="off" th:placeholder="|STOP RUNTIME ${job.targetInstanceCode}|"></div>
+                            <div class="col-12 col-xl-6"><label class="form-label">Files confirmation</label><code th:text="|REMOVE FILES ${job.targetInstanceCode}|">REMOVE FILES</code><input class="form-control mt-2" name="filesConfirmation" required autocomplete="off" th:placeholder="|REMOVE FILES ${job.targetInstanceCode}|"></div>
+                            <div class="col-12 col-xl-6"><label class="form-label">Database confirmation</label><code th:text="|DROP DATABASE ${job.targetDatabaseName}|">DROP DATABASE</code><input class="form-control mt-2" name="databaseConfirmation" required autocomplete="off" th:placeholder="|DROP DATABASE ${job.targetDatabaseName}|"></div>
+                            <div class="col-12 col-xl-6"><label class="form-label">Registration confirmation</label><code th:text="|REMOVE REGISTRATION ${job.targetInstanceCode}|">REMOVE REGISTRATION</code><input class="form-control mt-2" name="registrationConfirmation" required autocomplete="off" th:placeholder="|REMOVE REGISTRATION ${job.targetInstanceCode}|"></div>
+                        </div>
+                        <button class="btn btn-warning mt-3" type="submit"><i class="bi bi-shield-lock me-1"></i>Approve signed cleanup plan</button>
+                    </form>
+
+                    <form th:if="${cleanupPlan.executable}"
+                          th:action="@{/control-center/restores/{id}/cleanup/{planId}/execute(id=${job.id},planId=${cleanupPlan.id})}"
+                          method="post" class="matrix26-confirmation-box mt-4">
+                        <div>
+                            <strong th:text="${cleanupPlan.firstExecution ? 'Execute approved cleanup' : 'Resume interrupted cleanup'}">Execute cleanup</strong>
+                            <p class="mb-2">Completed cleanup items are skipped. Matrix26 continues from the first unfinished item and verifies that no residue remains.</p>
+                            <code th:text="|EXECUTE CLEANUP ${job.publicId}|">EXECUTE CLEANUP RST</code>
+                        </div>
+                        <div class="matrix26-confirmation-actions">
+                            <input class="form-control" name="confirmation" autocomplete="off" required th:placeholder="|EXECUTE CLEANUP ${job.publicId}|">
+                            <button class="btn btn-danger" type="submit"><i class="bi bi-trash3 me-1"></i>Execute controlled cleanup</button>
+                        </div>
+                    </form>
+
+                    <div th:if="${cleanupPlan.cleaned}" class="alert alert-success mb-0">
+                        <strong>Cleanup completed.</strong> Runtime, restored files, isolated database, and operational registration were removed. The encrypted source backup remains protected.
+                    </div>
+                </div>
             </section>
 
             <section id="restore-steps" class="matrix26-panel mb-4">

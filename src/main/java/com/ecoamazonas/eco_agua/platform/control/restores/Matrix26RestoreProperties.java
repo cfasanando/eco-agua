@@ -28,6 +28,7 @@ public class Matrix26RestoreProperties {
     private boolean resumeEnabled = true;
     private int verificationHttpTimeoutSeconds = 10;
     private List<String> verificationHttpPaths = new ArrayList<>(List.of("/", "/login", "/restaurant/menu", "/admin/restaurant/dashboard"));
+    private boolean cleanupEnabled = true;
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -63,4 +64,6 @@ public class Matrix26RestoreProperties {
     public void setVerificationHttpTimeoutSeconds(int value) { verificationHttpTimeoutSeconds = value; }
     public List<String> getVerificationHttpPaths() { return verificationHttpPaths; }
     public void setVerificationHttpPaths(List<String> values) { verificationHttpPaths = values == null ? new ArrayList<>() : new ArrayList<>(values); }
+    public boolean isCleanupEnabled() { return cleanupEnabled; }
+    public void setCleanupEnabled(boolean value) { cleanupEnabled = value; }
 }

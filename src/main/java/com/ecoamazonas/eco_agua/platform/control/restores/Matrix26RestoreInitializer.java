@@ -158,5 +158,96 @@ public class Matrix26RestoreInitializer {
                         ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS matrix26_restore_cleanup_plan (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    public_id VARCHAR(80) NOT NULL,
+                    restore_job_id BIGINT NOT NULL,
+                    status VARCHAR(40) NOT NULL,
+                    snapshot_fingerprint VARCHAR(64) NOT NULL,
+                    plan_signature VARCHAR(64) NOT NULL,
+                    requested_by VARCHAR(120) NOT NULL,
+                    requested_at DATETIME(6) NOT NULL,
+                    approved_by VARCHAR(120) NULL,
+                    approved_at DATETIME(6) NULL,
+                    started_at DATETIME(6) NULL,
+                    completed_at DATETIME(6) NULL,
+                    summary TEXT NULL,
+                    last_error TEXT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_matrix26_restore_cleanup_public_id (public_id),
+                    KEY idx_matrix26_restore_cleanup_job (restore_job_id, requested_at),
+                    KEY idx_matrix26_restore_cleanup_status (status, requested_at),
+                    CONSTRAINT fk_matrix26_restore_cleanup_job
+                        FOREIGN KEY (restore_job_id) REFERENCES matrix26_restore_job(id)
+                        ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS matrix26_restore_cleanup_item (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    cleanup_plan_id BIGINT NOT NULL,
+                    sequence_number INT NOT NULL,
+                    resource_type VARCHAR(80) NOT NULL,
+                    location VARCHAR(900) NOT NULL,
+                    existed_at_preview BIT NOT NULL DEFAULT 0,
+                    ownership VARCHAR(60) NOT NULL,
+                    planned_action VARCHAR(40) NOT NULL,
+                    confirmation_group VARCHAR(40) NOT NULL,
+                    status VARCHAR(30) NOT NULL,
+                    detail TEXT NULL,
+                    started_at DATETIME(6) NULL,
+                    completed_at DATETIME(6) NULL,
+                    last_error TEXT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_matrix26_restore_cleanup_item (cleanup_plan_id, resource_type),
+                    KEY idx_matrix26_restore_cleanup_item_order (cleanup_plan_id, sequence_number),
+                    KEY idx_matrix26_restore_cleanup_item_status (cleanup_plan_id, status),
+                    CONSTRAINT fk_matrix26_restore_cleanup_item_plan
+                        FOREIGN KEY (cleanup_plan_id) REFERENCES matrix26_restore_cleanup_plan(id)
+                        ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS matrix26_restore_cleanup_event (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    cleanup_plan_id BIGINT NOT NULL,
+                    cleanup_item_id BIGINT NULL,
+                    event_type VARCHAR(80) NOT NULL,
+                    status VARCHAR(40) NOT NULL,
+                    actor_username VARCHAR(120) NOT NULL,
+                    detail TEXT NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_matrix26_restore_cleanup_event_plan (cleanup_plan_id, created_at),
+                    CONSTRAINT fk_matrix26_restore_cleanup_event_plan
+                        FOREIGN KEY (cleanup_plan_id) REFERENCES matrix26_restore_cleanup_plan(id)
+                        ON DELETE CASCADE,
+                    CONSTRAINT fk_matrix26_restore_cleanup_event_item
+                        FOREIGN KEY (cleanup_item_id) REFERENCES matrix26_restore_cleanup_item(id)
+                        ON DELETE SET NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        jdbcTemplate.update("""
+                UPDATE matrix26_restore_cleanup_item
+                SET status = 'FAILED', last_error = COALESCE(last_error, 'Interrupted while Matrix26 was offline'),
+                    completed_at = COALESCE(completed_at, NOW(6))
+                WHERE status = 'RUNNING'
+                """);
+        jdbcTemplate.update("""
+                UPDATE matrix26_restore_cleanup_plan
+                SET status = 'PARTIALLY_CLEANED',
+                    last_error = COALESCE(last_error, 'Cleanup was interrupted while Matrix26 was offline'),
+                    completed_at = COALESCE(completed_at, NOW(6))
+                WHERE status = 'RUNNING'
+                """);
+        jdbcTemplate.update("""
+                UPDATE matrix26_restore_job
+                SET status = 'PARTIALLY_CLEANED',
+                    last_error = COALESCE(last_error, 'Cleanup was interrupted while Matrix26 was offline'),
+                    completed_at = COALESCE(completed_at, NOW(6))
+                WHERE status = 'CLEANING'
+                """);
     }
 }

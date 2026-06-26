@@ -60,6 +60,22 @@ public class Matrix26RestoreRepository {
         jdbcTemplate.update("UPDATE matrix26_restore_job SET status = ? WHERE id = ?", status.name(), id);
     }
 
+    public void markCleanupStarted(long id) {
+        jdbcTemplate.update("""
+                UPDATE matrix26_restore_job
+                SET status = 'CLEANING', completed_at = NULL, last_error = NULL
+                WHERE id = ?
+                """, id);
+    }
+
+    public void completeCleanup(long id) {
+        jdbcTemplate.update("""
+                UPDATE matrix26_restore_job
+                SET status = 'CLEANED', completed_at = ?, last_error = NULL
+                WHERE id = ?
+                """, LocalDateTime.now(), id);
+    }
+
     public void markStarted(long id, String temporaryDirectory) {
         jdbcTemplate.update("""
                 UPDATE matrix26_restore_job
@@ -177,8 +193,8 @@ public class Matrix26RestoreRepository {
         return jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) AS total,
                        SUM(status = 'COMPLETED') AS completed,
-                       SUM(status IN ('FAILED','CLEANUP_REQUIRED')) AS failed,
-                       SUM(status NOT IN ('COMPLETED','FAILED','CLEANUP_REQUIRED','CANCELLED')) AS running
+                       SUM(status IN ('FAILED','CLEANUP_REQUIRED','PARTIALLY_CLEANED')) AS failed,
+                       SUM(status NOT IN ('COMPLETED','FAILED','CLEANUP_REQUIRED','PARTIALLY_CLEANED','CLEANED','CANCELLED')) AS running
                 FROM matrix26_restore_job
                 """, (rs, rowNum) -> new Matrix26RestoreSummary(
                         rs.getLong("total"), rs.getLong("completed"), rs.getLong("failed"), rs.getLong("running")
@@ -188,7 +204,7 @@ public class Matrix26RestoreRepository {
     public boolean hasActiveRestore() {
         Integer count = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM matrix26_restore_job
-                WHERE status NOT IN ('COMPLETED','FAILED','CLEANUP_REQUIRED','CANCELLED')
+                WHERE status NOT IN ('COMPLETED','FAILED','CLEANUP_REQUIRED','PARTIALLY_CLEANED','CLEANED','CANCELLED')
                 """, Integer.class);
         return count != null && count > 0;
     }

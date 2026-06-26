@@ -142,7 +142,7 @@ public class Matrix26BackupService {
             String actor,
             boolean confirmation
     ) {
-        return createManualBackup(instanceId, actor, confirmation, false);
+        return createBackup(instanceId, actor, confirmation, false, "MANUAL_DATABASE", "Manual");
     }
 
     public synchronized Matrix26BackupJob createManualFullBackup(
@@ -150,14 +150,23 @@ public class Matrix26BackupService {
             String actor,
             boolean confirmation
     ) {
-        return createManualBackup(instanceId, actor, confirmation, true);
+        return createBackup(instanceId, actor, confirmation, true, "MANUAL_FULL", "Manual");
     }
 
-    private Matrix26BackupJob createManualBackup(
+    public synchronized Matrix26BackupJob createScheduledFullBackup(
+            long instanceId,
+            String actor
+    ) {
+        return createBackup(instanceId, actor, true, true, "SCHEDULED_FULL", "Scheduled");
+    }
+
+    private Matrix26BackupJob createBackup(
             long instanceId,
             String actor,
             boolean confirmation,
-            boolean fullBackup
+            boolean fullBackup,
+            String backupType,
+            String sourceLabel
     ) {
         if (!properties.isEnabled()) {
             throw new Matrix26BackupException("Database backups are disabled in Matrix26 configuration.");
@@ -209,7 +218,7 @@ public class Matrix26BackupService {
                     instance.getCode(),
                     instance.getBusinessName(),
                     instance.getDatabaseName(),
-                    fullBackup ? "MANUAL_FULL" : "MANUAL_DATABASE",
+                    backupType,
                     Matrix26BackupStatus.PENDING,
                     safeActor(actor),
                     now,
@@ -241,16 +250,16 @@ public class Matrix26BackupService {
                         databaseJob, instance, root, backupDirectory
                 );
                 finalizeFullBackup(databaseJob, instance, connection, tool, root, backupDirectory, fullResult);
-                writeAudit(instance, actor, "FULL_BACKUP_COMPLETED", "Manual full instance backup completed: " + publicId);
+                writeAudit(instance, actor, "FULL_BACKUP_COMPLETED", sourceLabel + " full instance backup completed: " + publicId);
             } else {
-                writeAudit(instance, actor, "DATABASE_BACKUP_COMPLETED", "Manual database backup completed: " + publicId);
+                writeAudit(instance, actor, "DATABASE_BACKUP_COMPLETED", sourceLabel + " database backup completed: " + publicId);
             }
             return backupRepository.findById(jobId).orElseThrow();
         } catch (Matrix26BackupException ex) {
             if (createdJob != null) {
                 backupRepository.fail(createdJob.id(), sanitize(ex.getMessage()));
                 writeFailureReport(backupDirectory, createdJob, ex.getMessage());
-                writeAudit(instance, actor, fullBackup ? "FULL_BACKUP_FAILED" : "DATABASE_BACKUP_FAILED", (fullBackup ? "Manual full instance backup failed: " : "Manual database backup failed: ") + createdJob.publicId());
+                writeAudit(instance, actor, fullBackup ? "FULL_BACKUP_FAILED" : "DATABASE_BACKUP_FAILED", (fullBackup ? sourceLabel + " full instance backup failed: " : sourceLabel + " database backup failed: ") + createdJob.publicId());
             }
             throw ex;
         } catch (Exception ex) {
@@ -258,7 +267,7 @@ public class Matrix26BackupService {
             if (createdJob != null) {
                 backupRepository.fail(createdJob.id(), message);
                 writeFailureReport(backupDirectory, createdJob, message);
-                writeAudit(instance, actor, fullBackup ? "FULL_BACKUP_FAILED" : "DATABASE_BACKUP_FAILED", (fullBackup ? "Manual full instance backup failed: " : "Manual database backup failed: ") + createdJob.publicId());
+                writeAudit(instance, actor, fullBackup ? "FULL_BACKUP_FAILED" : "DATABASE_BACKUP_FAILED", (fullBackup ? sourceLabel + " full instance backup failed: " : sourceLabel + " database backup failed: ") + createdJob.publicId());
             }
             throw new Matrix26BackupException(message, ex);
         } finally {

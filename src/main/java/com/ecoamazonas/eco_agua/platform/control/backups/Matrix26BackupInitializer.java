@@ -153,5 +153,92 @@ public class Matrix26BackupInitializer implements ApplicationRunner {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
 
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS matrix26_backup_schedule (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    instance_id BIGINT NOT NULL,
+                    instance_code VARCHAR(80) NOT NULL,
+                    instance_name VARCHAR(180) NOT NULL,
+                    name VARCHAR(160) NOT NULL,
+                    frequency VARCHAR(30) NOT NULL,
+                    day_of_week INT NULL,
+                    day_of_month INT NULL,
+                    hour_of_day INT NOT NULL,
+                    minute_of_hour INT NOT NULL,
+                    timezone VARCHAR(80) NOT NULL,
+                    encryption_required BIT NOT NULL DEFAULT 1,
+                    retention_class VARCHAR(30) NOT NULL,
+                    max_attempts INT NOT NULL DEFAULT 3,
+                    retry_delay_minutes INT NOT NULL DEFAULT 15,
+                    missed_policy VARCHAR(40) NOT NULL,
+                    enabled BIT NOT NULL DEFAULT 1,
+                    next_run_at DATETIME(6) NULL,
+                    last_run_at DATETIME(6) NULL,
+                    last_status VARCHAR(40) NULL,
+                    created_by VARCHAR(120) NOT NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    updated_by VARCHAR(120) NOT NULL,
+                    updated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_matrix26_backup_schedule_instance (instance_id),
+                    KEY idx_matrix26_backup_schedule_due (enabled, next_run_at),
+                    KEY idx_matrix26_backup_schedule_code (instance_code)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS matrix26_backup_schedule_execution (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    schedule_id BIGINT NOT NULL,
+                    instance_id BIGINT NOT NULL,
+                    instance_code VARCHAR(80) NOT NULL,
+                    instance_name VARCHAR(180) NOT NULL,
+                    schedule_name VARCHAR(160) NOT NULL,
+                    planned_at DATETIME(6) NOT NULL,
+                    status VARCHAR(40) NOT NULL,
+                    attempt_count INT NOT NULL DEFAULT 0,
+                    max_attempts INT NOT NULL DEFAULT 3,
+                    queued_at DATETIME(6) NULL,
+                    started_at DATETIME(6) NULL,
+                    completed_at DATETIME(6) NULL,
+                    next_retry_at DATETIME(6) NULL,
+                    backup_job_id BIGINT NULL,
+                    backup_public_id VARCHAR(80) NULL,
+                    trigger_type VARCHAR(50) NOT NULL,
+                    error_message TEXT NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    updated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_matrix26_backup_schedule_window (schedule_id, planned_at),
+                    KEY idx_matrix26_backup_execution_status (status, next_retry_at),
+                    KEY idx_matrix26_backup_execution_instance (instance_id, planned_at),
+                    KEY idx_matrix26_backup_execution_backup (backup_job_id),
+                    CONSTRAINT fk_matrix26_backup_execution_schedule
+                        FOREIGN KEY (schedule_id) REFERENCES matrix26_backup_schedule(id)
+                        ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS matrix26_backup_alert (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    instance_id BIGINT NOT NULL,
+                    instance_code VARCHAR(80) NOT NULL,
+                    schedule_id BIGINT NULL,
+                    execution_id BIGINT NULL,
+                    alert_code VARCHAR(80) NOT NULL,
+                    severity VARCHAR(30) NOT NULL,
+                    status VARCHAR(30) NOT NULL,
+                    title VARCHAR(180) NOT NULL,
+                    message TEXT NOT NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    resolved_at DATETIME(6) NULL,
+                    resolved_by VARCHAR(120) NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_matrix26_backup_alert_status (status, severity, created_at),
+                    KEY idx_matrix26_backup_alert_instance (instance_id, created_at),
+                    KEY idx_matrix26_backup_alert_schedule (schedule_id),
+                    KEY idx_matrix26_backup_alert_execution (execution_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+
     }
 }

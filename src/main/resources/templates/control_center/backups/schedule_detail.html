@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Backup schedule')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup schedule', 'Execution history and operational controls.')}"></header>
+        <main class="matrix26-main">
+            <div th:if="${backupSuccess}" class="alert alert-success" th:text="${backupSuccess}"></div>
+            <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
+
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                <div>
+                    <span class="matrix26-eyebrow" th:text="${schedule.instanceCode}">instance</span>
+                    <h1 class="matrix26-page-title" th:text="${schedule.name}">Schedule</h1>
+                    <p class="matrix26-page-subtitle mb-0" th:text="${schedule.scheduleLabel() + ' · ' + schedule.timezone}">Frequency</p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/schedules}"><i class="bi bi-arrow-left me-1"></i>Back</a>
+                    <a class="btn btn-outline-primary" th:href="@{/control-center/backups/schedules/{id}/edit(id=${schedule.id})}"><i class="bi bi-pencil me-1"></i>Edit</a>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-xl-7">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Configuration</span><h2>Schedule details</h2></div></div>
+                        <dl class="matrix26-settings-list">
+                            <div><dt>Instance</dt><dd th:text="${schedule.instanceName}">Instance</dd></div>
+                            <div><dt>Next run</dt><dd th:text="${schedule.nextRunAt != null ? #temporals.format(schedule.nextRunAt, 'dd/MM/yyyy HH:mm') : 'Disabled'}">Date</dd></div>
+                            <div><dt>Encryption</dt><dd th:text="${schedule.encryptionRequired ? 'Required' : 'Optional'}">Required</dd></div>
+                            <div><dt>Retention</dt><dd th:text="${schedule.retentionClass.label}">Daily</dd></div>
+                            <div><dt>Retries</dt><dd th:text="${schedule.maxAttempts + ' attempts · ' + schedule.retryDelayMinutes + ' minute delay'}">Retries</dd></div>
+                            <div><dt>Missed run</dt><dd th:text="${schedule.missedPolicy.label}">Policy</dd></div>
+                            <div><dt>State</dt><dd><span class="badge" th:classappend="${schedule.enabled} ? ' text-bg-success' : ' text-bg-secondary'" th:text="${schedule.enabled ? 'Enabled' : 'Disabled'}">State</span></dd></div>
+                        </dl>
+                    </section>
+                </div>
+                <div class="col-12 col-xl-5">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Operations</span><h2>Controlled actions</h2></div></div>
+                        <form method="post" th:action="@{/control-center/backups/schedules/{id}/toggle(id=${schedule.id})}" class="mb-3">
+                            <input type="hidden" name="enabled" th:value="${!schedule.enabled}">
+                            <button class="btn w-100" th:classappend="${schedule.enabled} ? ' btn-outline-warning' : ' btn-outline-success'" type="submit">
+                                <i class="bi me-1" th:classappend="${schedule.enabled} ? ' bi-pause-circle' : ' bi-play-circle'"></i>
+                                <span th:text="${schedule.enabled ? 'Disable schedule' : 'Enable schedule'}">Toggle</span>
+                            </button>
+                        </form>
+                        <form method="post" th:action="@{/control-center/backups/schedules/{id}/run(id=${schedule.id})}">
+                            <label class="form-label">Type to run now</label>
+                            <code class="d-block mb-2" th:text="${'RUN BACKUP ' + schedule.instanceCode}">RUN BACKUP code</code>
+                            <input class="form-control mb-3" name="confirmation" autocomplete="off" required>
+                            <button class="btn btn-primary w-100" type="submit"><i class="bi bi-play-fill me-1"></i>Run encrypted backup now</button>
+                        </form>
+                        <div class="small text-muted mt-3">
+                            Manual schedule runs use the same lock, encryption, retry, and audit boundaries as automatic executions.
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><span>History</span><h2>Schedule executions</h2></div></div>
+                <div th:if="${#lists.isEmpty(executions)}" class="matrix26-empty-state">
+                    <i class="bi bi-clock-history"></i><strong>No executions yet</strong><span>The next run will be recorded here.</span>
+                </div>
+                <div th:unless="${#lists.isEmpty(executions)}" class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Planned</th><th>Status</th><th>Attempt</th><th>Trigger</th><th>Backup</th><th>Message</th></tr></thead>
+                        <tbody>
+                        <tr th:each="execution : ${executions}">
+                            <td th:text="${#temporals.format(execution.plannedAt, 'dd/MM/yyyy HH:mm')}">Date</td>
+                            <td><span class="badge" th:classappend="${execution.status.badgeClass}" th:text="${execution.status.label}">Status</span></td>
+                            <td th:text="${execution.attemptCount + ' / ' + execution.maxAttempts}">0 / 3</td>
+                            <td><code th:text="${execution.triggerType}">SCHEDULED</code></td>
+                            <td>
+                                <a th:if="${execution.backupJobId != null}" th:href="@{/control-center/backups/{id}(id=${execution.backupJobId})}" th:text="${execution.backupPublicId}">Backup</a>
+                                <span th:unless="${execution.backupJobId != null}">—</span>
+                            </td>
+                            <td class="small" th:text="${execution.errorMessage != null ? execution.errorMessage : '—'}">Message</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

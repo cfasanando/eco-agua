@@ -1,0 +1,2861 @@
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupAlert.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupAlert.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupAlert.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupAlert.java	2026-06-26 05:01:33.508066122 +0000
+@@ -0,0 +1,20 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import java.time.LocalDateTime;
++
++public record Matrix26BackupAlert(
++        Long id,
++        Long instanceId,
++        String instanceCode,
++        Long scheduleId,
++        Long executionId,
++        String alertCode,
++        Matrix26BackupAlertSeverity severity,
++        Matrix26BackupAlertStatus status,
++        String title,
++        String message,
++        LocalDateTime createdAt,
++        LocalDateTime resolvedAt,
++        String resolvedBy
++) {
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupAlertSeverity.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupAlertSeverity.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupAlertSeverity.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupAlertSeverity.java	2026-06-26 05:01:33.507841605 +0000
+@@ -0,0 +1,23 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++public enum Matrix26BackupAlertSeverity {
++    INFO("Info", "text-bg-info"),
++    WARNING("Warning", "text-bg-warning"),
++    CRITICAL("Critical", "text-bg-danger");
++
++    private final String label;
++    private final String badgeClass;
++
++    Matrix26BackupAlertSeverity(String label, String badgeClass) {
++        this.label = label;
++        this.badgeClass = badgeClass;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++
++    public String getBadgeClass() {
++        return badgeClass;
++    }
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupAlertStatus.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupAlertStatus.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupAlertStatus.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupAlertStatus.java	2026-06-26 05:01:33.507904489 +0000
+@@ -0,0 +1,6 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++public enum Matrix26BackupAlertStatus {
++    OPEN,
++    RESOLVED
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupCalendarEvent.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupCalendarEvent.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupCalendarEvent.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupCalendarEvent.java	2026-06-26 05:01:33.508177720 +0000
+@@ -0,0 +1,16 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import java.time.LocalDateTime;
++
++public record Matrix26BackupCalendarEvent(
++        LocalDateTime scheduledAt,
++        String instanceCode,
++        String instanceName,
++        String scheduleName,
++        String eventType,
++        String status,
++        String badgeClass,
++        Long executionId,
++        Long backupJobId
++) {
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupInitializer.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupInitializer.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupInitializer.java	2026-06-26 04:59:55.643067872 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupInitializer.java	2026-06-26 05:03:18.955780063 +0000
+@@ -153,5 +153,92 @@
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                 """);
+ 
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_backup_schedule (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    instance_id BIGINT NOT NULL,
++                    instance_code VARCHAR(80) NOT NULL,
++                    instance_name VARCHAR(180) NOT NULL,
++                    name VARCHAR(160) NOT NULL,
++                    frequency VARCHAR(30) NOT NULL,
++                    day_of_week INT NULL,
++                    day_of_month INT NULL,
++                    hour_of_day INT NOT NULL,
++                    minute_of_hour INT NOT NULL,
++                    timezone VARCHAR(80) NOT NULL,
++                    encryption_required BIT NOT NULL DEFAULT 1,
++                    retention_class VARCHAR(30) NOT NULL,
++                    max_attempts INT NOT NULL DEFAULT 3,
++                    retry_delay_minutes INT NOT NULL DEFAULT 15,
++                    missed_policy VARCHAR(40) NOT NULL,
++                    enabled BIT NOT NULL DEFAULT 1,
++                    next_run_at DATETIME(6) NULL,
++                    last_run_at DATETIME(6) NULL,
++                    last_status VARCHAR(40) NULL,
++                    created_by VARCHAR(120) NOT NULL,
++                    created_at DATETIME(6) NOT NULL,
++                    updated_by VARCHAR(120) NOT NULL,
++                    updated_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    KEY idx_matrix26_backup_schedule_instance (instance_id),
++                    KEY idx_matrix26_backup_schedule_due (enabled, next_run_at),
++                    KEY idx_matrix26_backup_schedule_code (instance_code)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_backup_schedule_execution (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    schedule_id BIGINT NOT NULL,
++                    instance_id BIGINT NOT NULL,
++                    instance_code VARCHAR(80) NOT NULL,
++                    instance_name VARCHAR(180) NOT NULL,
++                    schedule_name VARCHAR(160) NOT NULL,
++                    planned_at DATETIME(6) NOT NULL,
++                    status VARCHAR(40) NOT NULL,
++                    attempt_count INT NOT NULL DEFAULT 0,
++                    max_attempts INT NOT NULL DEFAULT 3,
++                    queued_at DATETIME(6) NULL,
++                    started_at DATETIME(6) NULL,
++                    completed_at DATETIME(6) NULL,
++                    next_retry_at DATETIME(6) NULL,
++                    backup_job_id BIGINT NULL,
++                    backup_public_id VARCHAR(80) NULL,
++                    trigger_type VARCHAR(50) NOT NULL,
++                    error_message TEXT NULL,
++                    created_at DATETIME(6) NOT NULL,
++                    updated_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    UNIQUE KEY uk_matrix26_backup_schedule_window (schedule_id, planned_at),
++                    KEY idx_matrix26_backup_execution_status (status, next_retry_at),
++                    KEY idx_matrix26_backup_execution_instance (instance_id, planned_at),
++                    KEY idx_matrix26_backup_execution_backup (backup_job_id),
++                    CONSTRAINT fk_matrix26_backup_execution_schedule
++                        FOREIGN KEY (schedule_id) REFERENCES matrix26_backup_schedule(id)
++                        ON DELETE CASCADE
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_backup_alert (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    instance_id BIGINT NOT NULL,
++                    instance_code VARCHAR(80) NOT NULL,
++                    schedule_id BIGINT NULL,
++                    execution_id BIGINT NULL,
++                    alert_code VARCHAR(80) NOT NULL,
++                    severity VARCHAR(30) NOT NULL,
++                    status VARCHAR(30) NOT NULL,
++                    title VARCHAR(180) NOT NULL,
++                    message TEXT NOT NULL,
++                    created_at DATETIME(6) NOT NULL,
++                    resolved_at DATETIME(6) NULL,
++                    resolved_by VARCHAR(120) NULL,
++                    PRIMARY KEY (id),
++                    KEY idx_matrix26_backup_alert_status (status, severity, created_at),
++                    KEY idx_matrix26_backup_alert_instance (instance_id, created_at),
++                    KEY idx_matrix26_backup_alert_schedule (schedule_id),
++                    KEY idx_matrix26_backup_alert_execution (execution_id)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++
+     }
+ }
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupMissedPolicy.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupMissedPolicy.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupMissedPolicy.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupMissedPolicy.java	2026-06-26 05:01:33.507610562 +0000
+@@ -0,0 +1,28 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++public enum Matrix26BackupMissedPolicy {
++    RUN_ON_STARTUP("Run latest missed backup"),
++    SKIP("Skip missed backup"),
++    MARK_AS_MISSED("Record as missed");
++
++    private final String label;
++
++    Matrix26BackupMissedPolicy(String label) {
++        this.label = label;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++
++    public static Matrix26BackupMissedPolicy from(String value) {
++        if (value == null || value.isBlank()) {
++            return RUN_ON_STARTUP;
++        }
++        try {
++            return valueOf(value.trim().toUpperCase(java.util.Locale.ROOT));
++        } catch (IllegalArgumentException ex) {
++            return RUN_ON_STARTUP;
++        }
++    }
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupProperties.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupProperties.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupProperties.java	2026-06-26 04:59:55.643509776 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupProperties.java	2026-06-26 05:03:07.925803549 +0000
+@@ -23,6 +23,11 @@
+     private boolean encryptionEnabled = true;
+     private String masterKeyEnvironment = "MATRIX26_BACKUP_MASTER_KEY";
+     private boolean retentionEnabled = true;
++    private boolean schedulingEnabled = true;
++    private long schedulerPollMilliseconds = 60000L;
++    private long schedulerInitialDelayMilliseconds = 15000L;
++    private int schedulerGraceMinutes = 2;
++    private String scheduleTimezone = "America/Lima";
+     private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of("matrix26-appearance-lab"));
+ 
+     public boolean isEnabled() {
+@@ -132,6 +137,48 @@
+         this.retentionEnabled = retentionEnabled;
+     }
+ 
++
++
++    public boolean isSchedulingEnabled() {
++        return schedulingEnabled;
++    }
++
++    public void setSchedulingEnabled(boolean schedulingEnabled) {
++        this.schedulingEnabled = schedulingEnabled;
++    }
++
++    public long getSchedulerPollMilliseconds() {
++        return schedulerPollMilliseconds;
++    }
++
++    public void setSchedulerPollMilliseconds(long schedulerPollMilliseconds) {
++        this.schedulerPollMilliseconds = schedulerPollMilliseconds;
++    }
++
++    public long getSchedulerInitialDelayMilliseconds() {
++        return schedulerInitialDelayMilliseconds;
++    }
++
++    public void setSchedulerInitialDelayMilliseconds(long schedulerInitialDelayMilliseconds) {
++        this.schedulerInitialDelayMilliseconds = schedulerInitialDelayMilliseconds;
++    }
++
++    public int getSchedulerGraceMinutes() {
++        return schedulerGraceMinutes;
++    }
++
++    public void setSchedulerGraceMinutes(int schedulerGraceMinutes) {
++        this.schedulerGraceMinutes = schedulerGraceMinutes;
++    }
++
++    public String getScheduleTimezone() {
++        return scheduleTimezone;
++    }
++
++    public void setScheduleTimezone(String scheduleTimezone) {
++        this.scheduleTimezone = scheduleTimezone;
++    }
++
+     public Set<String> getAllowedInstanceCodes() {
+         return allowedInstanceCodes;
+     }
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSchedule.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSchedule.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSchedule.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSchedule.java	2026-06-26 05:01:33.507960884 +0000
+@@ -0,0 +1,49 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import java.time.LocalDateTime;
++
++public record Matrix26BackupSchedule(
++        Long id,
++        Long instanceId,
++        String instanceCode,
++        String instanceName,
++        String name,
++        Matrix26BackupScheduleFrequency frequency,
++        Integer dayOfWeek,
++        Integer dayOfMonth,
++        Integer hourOfDay,
++        Integer minuteOfHour,
++        String timezone,
++        boolean encryptionRequired,
++        Matrix26BackupRetentionClass retentionClass,
++        Integer maxAttempts,
++        Integer retryDelayMinutes,
++        Matrix26BackupMissedPolicy missedPolicy,
++        boolean enabled,
++        LocalDateTime nextRunAt,
++        LocalDateTime lastRunAt,
++        String lastStatus,
++        String createdBy,
++        LocalDateTime createdAt,
++        String updatedBy,
++        LocalDateTime updatedAt
++) {
++    public String scheduleLabel() {
++        String time = String.format("%02d:%02d", hourOfDay, minuteOfHour);
++        return switch (frequency) {
++            case DAILY -> "Every day at " + time;
++            case WEEKLY -> "Every " + weekdayName(dayOfWeek) + " at " + time;
++            case MONTHLY -> "Day " + dayOfMonth + " of each month at " + time;
++        };
++    }
++
++    private String weekdayName(Integer value) {
++        if (value == null || value < 1 || value > 7) {
++            return "day";
++        }
++        return java.time.DayOfWeek.of(value).getDisplayName(
++                java.time.format.TextStyle.FULL,
++                java.util.Locale.ENGLISH
++        );
++    }
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleController.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleController.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleController.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleController.java	2026-06-26 05:03:39.162578129 +0000
+@@ -0,0 +1,224 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Controller;
++import org.springframework.ui.Model;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
++import org.springframework.web.servlet.mvc.support.RedirectAttributes;
++
++import java.security.Principal;
++
++@Controller
++@RequestMapping("/control-center/backups")
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26BackupScheduleController {
++
++    private final Matrix26BackupScheduleService scheduleService;
++    private final Matrix26BackupService backupService;
++    private final Matrix26BackupSecurityService backupSecurityService;
++    private final Matrix26BackupProperties properties;
++
++    public Matrix26BackupScheduleController(
++            Matrix26BackupScheduleService scheduleService,
++            Matrix26BackupService backupService,
++            Matrix26BackupSecurityService backupSecurityService,
++            Matrix26BackupProperties properties
++    ) {
++        this.scheduleService = scheduleService;
++        this.backupService = backupService;
++        this.backupSecurityService = backupSecurityService;
++        this.properties = properties;
++    }
++
++    @GetMapping("/schedules")
++    public String schedules(Model model) {
++        model.addAttribute("activePage", "matrix26_backup_schedules");
++        model.addAttribute("schedules", scheduleService.schedules());
++        model.addAttribute("summary", scheduleService.summary());
++        model.addAttribute("keyStatus", backupSecurityService.keyStatus());
++        model.addAttribute("tool", backupService.toolStatus());
++        model.addAttribute("timezone", properties.getScheduleTimezone());
++        return "control_center/backups/schedules";
++    }
++
++    @GetMapping("/schedules/new")
++    public String newSchedule(
++            @RequestParam(value = "instanceId", required = false) Long instanceId,
++            Model model
++    ) {
++        populateForm(model, null, instanceId);
++        return "control_center/backups/schedule_form";
++    }
++
++    @GetMapping("/schedules/{scheduleId}")
++    public String scheduleDetail(@PathVariable long scheduleId, Model model) {
++        Matrix26BackupSchedule schedule = scheduleService.schedule(scheduleId);
++        model.addAttribute("activePage", "matrix26_backup_schedules");
++        model.addAttribute("schedule", schedule);
++        model.addAttribute("executions", scheduleService.executionsForSchedule(scheduleId));
++        model.addAttribute("keyStatus", backupSecurityService.keyStatus());
++        model.addAttribute("tool", backupService.toolStatus());
++        return "control_center/backups/schedule_detail";
++    }
++
++    @GetMapping("/schedules/{scheduleId}/edit")
++    public String editSchedule(@PathVariable long scheduleId, Model model) {
++        Matrix26BackupSchedule schedule = scheduleService.schedule(scheduleId);
++        populateForm(model, schedule, schedule.instanceId());
++        return "control_center/backups/schedule_form";
++    }
++
++    @PostMapping("/schedules")
++    public String saveSchedule(
++            @RequestParam(value = "scheduleId", required = false) Long scheduleId,
++            @RequestParam("instanceId") long instanceId,
++            @RequestParam("name") String name,
++            @RequestParam("frequency") String frequency,
++            @RequestParam(value = "dayOfWeek", required = false) Integer dayOfWeek,
++            @RequestParam(value = "dayOfMonth", required = false) Integer dayOfMonth,
++            @RequestParam("hourOfDay") int hourOfDay,
++            @RequestParam("minuteOfHour") int minuteOfHour,
++            @RequestParam(value = "timezone", defaultValue = "America/Lima") String timezone,
++            @RequestParam(value = "encryptionRequired", defaultValue = "false") boolean encryptionRequired,
++            @RequestParam(value = "retentionClass", defaultValue = "DAILY") String retentionClass,
++            @RequestParam(value = "maxAttempts", defaultValue = "3") int maxAttempts,
++            @RequestParam(value = "retryDelayMinutes", defaultValue = "15") int retryDelayMinutes,
++            @RequestParam(value = "missedPolicy", defaultValue = "RUN_ON_STARTUP") String missedPolicy,
++            @RequestParam(value = "enabled", defaultValue = "false") boolean enabled,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            Matrix26BackupSchedule saved = scheduleService.saveSchedule(
++                    scheduleId,
++                    instanceId,
++                    name,
++                    frequency,
++                    dayOfWeek,
++                    dayOfMonth,
++                    hourOfDay,
++                    minuteOfHour,
++                    timezone,
++                    encryptionRequired,
++                    retentionClass,
++                    maxAttempts,
++                    retryDelayMinutes,
++                    missedPolicy,
++                    enabled,
++                    actor(principal)
++            );
++            redirectAttributes.addFlashAttribute("backupSuccess", "Backup schedule saved.");
++            return "redirect:/control-center/backups/schedules/" + saved.id();
++        } catch (Matrix26BackupException ex) {
++            redirectAttributes.addFlashAttribute("backupError", ex.getMessage());
++            String suffix = scheduleId == null ? "/new?instanceId=" + instanceId : "/" + scheduleId + "/edit";
++            return "redirect:/control-center/backups/schedules" + suffix;
++        }
++    }
++
++    @PostMapping("/schedules/{scheduleId}/toggle")
++    public String toggleSchedule(
++            @PathVariable long scheduleId,
++            @RequestParam("enabled") boolean enabled,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            scheduleService.setEnabled(scheduleId, enabled, actor(principal));
++            redirectAttributes.addFlashAttribute(
++                    "backupSuccess",
++                    enabled ? "Backup schedule enabled." : "Backup schedule disabled."
++            );
++        } catch (Matrix26BackupException ex) {
++            redirectAttributes.addFlashAttribute("backupError", ex.getMessage());
++        }
++        return "redirect:/control-center/backups/schedules/" + scheduleId;
++    }
++
++    @PostMapping("/schedules/{scheduleId}/run")
++    public String runScheduleNow(
++            @PathVariable long scheduleId,
++            @RequestParam("confirmation") String confirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        Matrix26BackupSchedule schedule = scheduleService.schedule(scheduleId);
++        String expected = "RUN BACKUP " + schedule.instanceCode();
++        if (!expected.equals(confirmation)) {
++            redirectAttributes.addFlashAttribute("backupError", "Type exactly: " + expected);
++            return "redirect:/control-center/backups/schedules/" + scheduleId;
++        }
++        try {
++            Matrix26BackupScheduleExecution execution = scheduleService.runNow(scheduleId, actor(principal));
++            redirectAttributes.addFlashAttribute(
++                    execution.status() == Matrix26BackupScheduleExecutionStatus.COMPLETED ? "backupSuccess" : "backupError",
++                    "Execution finished with status " + execution.status().getLabel() + "."
++            );
++        } catch (Matrix26BackupException ex) {
++            redirectAttributes.addFlashAttribute("backupError", ex.getMessage());
++        }
++        return "redirect:/control-center/backups/schedules/" + scheduleId;
++    }
++
++    @GetMapping("/calendar")
++    public String calendar(
++            @RequestParam(value = "days", defaultValue = "31") int days,
++            Model model
++    ) {
++        model.addAttribute("activePage", "matrix26_backup_calendar");
++        model.addAttribute("days", Math.max(7, Math.min(days, 90)));
++        model.addAttribute("events", scheduleService.calendar(days));
++        model.addAttribute("timezone", properties.getScheduleTimezone());
++        return "control_center/backups/calendar";
++    }
++
++    @GetMapping("/executions")
++    public String executions(Model model) {
++        model.addAttribute("activePage", "matrix26_backup_executions");
++        model.addAttribute("executions", scheduleService.recentExecutions());
++        return "control_center/backups/executions";
++    }
++
++    @GetMapping("/alerts")
++    public String alerts(
++            @RequestParam(value = "all", defaultValue = "false") boolean all,
++            Model model
++    ) {
++        model.addAttribute("activePage", "matrix26_backup_alerts");
++        model.addAttribute("all", all);
++        model.addAttribute("alerts", scheduleService.alerts(!all));
++        return "control_center/backups/alerts";
++    }
++
++    @PostMapping("/alerts/{alertId}/resolve")
++    public String resolveAlert(
++            @PathVariable long alertId,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        scheduleService.resolveAlert(alertId, actor(principal));
++        redirectAttributes.addFlashAttribute("backupSuccess", "Backup alert resolved.");
++        return "redirect:/control-center/backups/alerts";
++    }
++
++    private void populateForm(Model model, Matrix26BackupSchedule schedule, Long instanceId) {
++        model.addAttribute("activePage", "matrix26_backup_schedules");
++        model.addAttribute("schedule", schedule);
++        model.addAttribute("selectedInstanceId", instanceId);
++        model.addAttribute("candidates", backupService.candidates());
++        model.addAttribute("frequencies", Matrix26BackupScheduleFrequency.values());
++        model.addAttribute("retentionClasses", Matrix26BackupRetentionClass.values());
++        model.addAttribute("missedPolicies", Matrix26BackupMissedPolicy.values());
++        model.addAttribute("defaultTimezone", properties.getScheduleTimezone());
++    }
++
++    private String actor(Principal principal) {
++        return principal == null || principal.getName() == null || principal.getName().isBlank()
++                ? "matrix26-admin"
++                : principal.getName();
++    }
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleExecution.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleExecution.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleExecution.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleExecution.java	2026-06-26 05:01:33.508014615 +0000
+@@ -0,0 +1,27 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import java.time.LocalDateTime;
++
++public record Matrix26BackupScheduleExecution(
++        Long id,
++        Long scheduleId,
++        Long instanceId,
++        String instanceCode,
++        String instanceName,
++        String scheduleName,
++        LocalDateTime plannedAt,
++        Matrix26BackupScheduleExecutionStatus status,
++        Integer attemptCount,
++        Integer maxAttempts,
++        LocalDateTime queuedAt,
++        LocalDateTime startedAt,
++        LocalDateTime completedAt,
++        LocalDateTime nextRetryAt,
++        Long backupJobId,
++        String backupPublicId,
++        String triggerType,
++        String errorMessage,
++        LocalDateTime createdAt,
++        LocalDateTime updatedAt
++) {
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleExecutionStatus.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleExecutionStatus.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleExecutionStatus.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleExecutionStatus.java	2026-06-26 05:01:33.507755014 +0000
+@@ -0,0 +1,33 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++public enum Matrix26BackupScheduleExecutionStatus {
++    SCHEDULED("Scheduled", "text-bg-secondary"),
++    QUEUED("Queued", "text-bg-info"),
++    RUNNING("Running", "text-bg-primary"),
++    COMPLETED("Completed", "text-bg-success"),
++    FAILED("Failed", "text-bg-danger"),
++    RETRY_WAITING("Retry waiting", "text-bg-warning"),
++    MISSED("Missed", "text-bg-dark"),
++    SKIPPED("Skipped", "text-bg-secondary"),
++    CANCELLED("Cancelled", "text-bg-secondary");
++
++    private final String label;
++    private final String badgeClass;
++
++    Matrix26BackupScheduleExecutionStatus(String label, String badgeClass) {
++        this.label = label;
++        this.badgeClass = badgeClass;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++
++    public String getBadgeClass() {
++        return badgeClass;
++    }
++
++    public boolean isFinalState() {
++        return this == COMPLETED || this == FAILED || this == MISSED || this == SKIPPED || this == CANCELLED;
++    }
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleFrequency.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleFrequency.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleFrequency.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleFrequency.java	2026-06-26 05:01:33.507253560 +0000
+@@ -0,0 +1,28 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++public enum Matrix26BackupScheduleFrequency {
++    DAILY("Daily"),
++    WEEKLY("Weekly"),
++    MONTHLY("Monthly");
++
++    private final String label;
++
++    Matrix26BackupScheduleFrequency(String label) {
++        this.label = label;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++
++    public static Matrix26BackupScheduleFrequency from(String value) {
++        if (value == null || value.isBlank()) {
++            return DAILY;
++        }
++        try {
++            return valueOf(value.trim().toUpperCase(java.util.Locale.ROOT));
++        } catch (IllegalArgumentException ex) {
++            return DAILY;
++        }
++    }
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleRepository.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleRepository.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleRepository.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleRepository.java	2026-06-26 05:10:01.872318900 +0000
+@@ -0,0 +1,605 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.dao.DuplicateKeyException;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.support.GeneratedKeyHolder;
++import org.springframework.jdbc.support.KeyHolder;
++import org.springframework.stereotype.Repository;
++
++import java.sql.Statement;
++import java.time.LocalDateTime;
++import java.util.List;
++import java.util.Optional;
++
++@Repository
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26BackupScheduleRepository {
++
++    private final JdbcTemplate jdbcTemplate;
++
++    public Matrix26BackupScheduleRepository(JdbcTemplate jdbcTemplate) {
++        this.jdbcTemplate = jdbcTemplate;
++    }
++
++    public long insertSchedule(Matrix26BackupSchedule schedule) {
++        KeyHolder keyHolder = new GeneratedKeyHolder();
++        jdbcTemplate.update(connection -> {
++            var statement = connection.prepareStatement(
++                    """
++                    INSERT INTO matrix26_backup_schedule (
++                        instance_id, instance_code, instance_name, name, frequency,
++                        day_of_week, day_of_month, hour_of_day, minute_of_hour, timezone,
++                        encryption_required, retention_class, max_attempts, retry_delay_minutes,
++                        missed_policy, enabled, next_run_at, last_run_at, last_status,
++                        created_by, created_at, updated_by, updated_at
++                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
++                    """,
++                    Statement.RETURN_GENERATED_KEYS
++            );
++            statement.setLong(1, schedule.instanceId());
++            statement.setString(2, schedule.instanceCode());
++            statement.setString(3, schedule.instanceName());
++            statement.setString(4, schedule.name());
++            statement.setString(5, schedule.frequency().name());
++            statement.setObject(6, schedule.dayOfWeek());
++            statement.setObject(7, schedule.dayOfMonth());
++            statement.setInt(8, schedule.hourOfDay());
++            statement.setInt(9, schedule.minuteOfHour());
++            statement.setString(10, schedule.timezone());
++            statement.setBoolean(11, schedule.encryptionRequired());
++            statement.setString(12, schedule.retentionClass().name());
++            statement.setInt(13, schedule.maxAttempts());
++            statement.setInt(14, schedule.retryDelayMinutes());
++            statement.setString(15, schedule.missedPolicy().name());
++            statement.setBoolean(16, schedule.enabled());
++            statement.setObject(17, schedule.nextRunAt());
++            statement.setObject(18, schedule.lastRunAt());
++            statement.setString(19, schedule.lastStatus());
++            statement.setString(20, schedule.createdBy());
++            statement.setObject(21, schedule.createdAt());
++            statement.setString(22, schedule.updatedBy());
++            statement.setObject(23, schedule.updatedAt());
++            return statement;
++        }, keyHolder);
++        Number id = keyHolder.getKey();
++        if (id == null) {
++            throw new IllegalStateException("The backup schedule could not be created.");
++        }
++        return id.longValue();
++    }
++
++    public void updateSchedule(Matrix26BackupSchedule schedule) {
++        jdbcTemplate.update(
++                """
++                UPDATE matrix26_backup_schedule
++                SET name = ?, frequency = ?, day_of_week = ?, day_of_month = ?,
++                    hour_of_day = ?, minute_of_hour = ?, timezone = ?,
++                    encryption_required = ?, retention_class = ?, max_attempts = ?,
++                    retry_delay_minutes = ?, missed_policy = ?, enabled = ?,
++                    next_run_at = ?, updated_by = ?, updated_at = ?
++                WHERE id = ?
++                """,
++                schedule.name(),
++                schedule.frequency().name(),
++                schedule.dayOfWeek(),
++                schedule.dayOfMonth(),
++                schedule.hourOfDay(),
++                schedule.minuteOfHour(),
++                schedule.timezone(),
++                schedule.encryptionRequired(),
++                schedule.retentionClass().name(),
++                schedule.maxAttempts(),
++                schedule.retryDelayMinutes(),
++                schedule.missedPolicy().name(),
++                schedule.enabled(),
++                schedule.nextRunAt(),
++                schedule.updatedBy(),
++                schedule.updatedAt(),
++                schedule.id()
++        );
++    }
++
++    public Optional<Matrix26BackupSchedule> findSchedule(long id) {
++        return jdbcTemplate.query(
++                "SELECT * FROM matrix26_backup_schedule WHERE id = ?",
++                scheduleMapper(),
++                id
++        ).stream().findFirst();
++    }
++
++    public List<Matrix26BackupSchedule> findSchedules() {
++        return jdbcTemplate.query(
++                "SELECT * FROM matrix26_backup_schedule ORDER BY instance_name, name",
++                scheduleMapper()
++        );
++    }
++
++    public List<Matrix26BackupSchedule> findEnabledSchedules() {
++        return jdbcTemplate.query(
++                "SELECT * FROM matrix26_backup_schedule WHERE enabled = 1 ORDER BY next_run_at, id",
++                scheduleMapper()
++        );
++    }
++
++    public List<Matrix26BackupSchedule> findSchedulesByInstance(long instanceId) {
++        return jdbcTemplate.query(
++                "SELECT * FROM matrix26_backup_schedule WHERE instance_id = ? ORDER BY name",
++                scheduleMapper(),
++                instanceId
++        );
++    }
++
++    public void updateScheduleAfterEvaluation(
++            long scheduleId,
++            LocalDateTime nextRunAt,
++            LocalDateTime lastRunAt,
++            String lastStatus
++    ) {
++        jdbcTemplate.update(
++                """
++                UPDATE matrix26_backup_schedule
++                SET next_run_at = ?, last_run_at = ?, last_status = ?, updated_at = ?
++                WHERE id = ?
++                """,
++                nextRunAt,
++                lastRunAt,
++                lastStatus,
++                LocalDateTime.now(),
++                scheduleId
++        );
++    }
++
++    public void setScheduleEnabled(long scheduleId, boolean enabled, LocalDateTime nextRunAt, String actor) {
++        jdbcTemplate.update(
++                """
++                UPDATE matrix26_backup_schedule
++                SET enabled = ?, next_run_at = ?, updated_by = ?, updated_at = ?
++                WHERE id = ?
++                """,
++                enabled,
++                nextRunAt,
++                actor,
++                LocalDateTime.now(),
++                scheduleId
++        );
++    }
++
++    public Optional<Long> insertExecution(Matrix26BackupScheduleExecution execution) {
++        try {
++            KeyHolder keyHolder = new GeneratedKeyHolder();
++            jdbcTemplate.update(connection -> {
++                var statement = connection.prepareStatement(
++                        """
++                        INSERT INTO matrix26_backup_schedule_execution (
++                            schedule_id, instance_id, instance_code, instance_name, schedule_name,
++                            planned_at, status, attempt_count, max_attempts, queued_at, started_at,
++                            completed_at, next_retry_at, backup_job_id, backup_public_id,
++                            trigger_type, error_message, created_at, updated_at
++                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
++                        """,
++                        Statement.RETURN_GENERATED_KEYS
++                );
++                statement.setLong(1, execution.scheduleId());
++                statement.setLong(2, execution.instanceId());
++                statement.setString(3, execution.instanceCode());
++                statement.setString(4, execution.instanceName());
++                statement.setString(5, execution.scheduleName());
++                statement.setObject(6, execution.plannedAt());
++                statement.setString(7, execution.status().name());
++                statement.setInt(8, execution.attemptCount());
++                statement.setInt(9, execution.maxAttempts());
++                statement.setObject(10, execution.queuedAt());
++                statement.setObject(11, execution.startedAt());
++                statement.setObject(12, execution.completedAt());
++                statement.setObject(13, execution.nextRetryAt());
++                statement.setObject(14, execution.backupJobId());
++                statement.setString(15, execution.backupPublicId());
++                statement.setString(16, execution.triggerType());
++                statement.setString(17, limit(execution.errorMessage(), 4000));
++                statement.setObject(18, execution.createdAt());
++                statement.setObject(19, execution.updatedAt());
++                return statement;
++            }, keyHolder);
++            Number id = keyHolder.getKey();
++            return id == null ? Optional.empty() : Optional.of(id.longValue());
++        } catch (DuplicateKeyException ex) {
++            return Optional.empty();
++        }
++    }
++
++    public Optional<Matrix26BackupScheduleExecution> findExecution(long id) {
++        return jdbcTemplate.query(
++                """
++                SELECT e.*, s.name AS current_schedule_name
++                FROM matrix26_backup_schedule_execution e
++                LEFT JOIN matrix26_backup_schedule s ON s.id = e.schedule_id
++                WHERE e.id = ?
++                """,
++                executionMapper(),
++                id
++        ).stream().findFirst();
++    }
++
++    public List<Matrix26BackupScheduleExecution> findRecentExecutions(int limit) {
++        int safeLimit = Math.max(1, Math.min(limit, 500));
++        return jdbcTemplate.query(
++                """
++                SELECT e.*, s.name AS current_schedule_name
++                FROM matrix26_backup_schedule_execution e
++                LEFT JOIN matrix26_backup_schedule s ON s.id = e.schedule_id
++                ORDER BY e.planned_at DESC, e.id DESC
++                LIMIT
++                """ + " " + safeLimit,
++                executionMapper()
++        );
++    }
++
++    public List<Matrix26BackupScheduleExecution> findExecutionsBySchedule(long scheduleId) {
++        return jdbcTemplate.query(
++                """
++                SELECT e.*, s.name AS current_schedule_name
++                FROM matrix26_backup_schedule_execution e
++                LEFT JOIN matrix26_backup_schedule s ON s.id = e.schedule_id
++                WHERE e.schedule_id = ?
++                ORDER BY e.planned_at DESC, e.id DESC
++                LIMIT 200
++                """,
++                executionMapper(),
++                scheduleId
++        );
++    }
++
++    public List<Matrix26BackupScheduleExecution> findRetryable(LocalDateTime now) {
++        return jdbcTemplate.query(
++                """
++                SELECT e.*, s.name AS current_schedule_name
++                FROM matrix26_backup_schedule_execution e
++                LEFT JOIN matrix26_backup_schedule s ON s.id = e.schedule_id
++                WHERE e.status = 'RETRY_WAITING'
++                  AND e.next_retry_at <= ?
++                ORDER BY e.next_retry_at, e.id
++                """,
++                executionMapper(),
++                now
++        );
++    }
++
++    public List<Matrix26BackupScheduleExecution> findCalendarExecutions(LocalDateTime from, LocalDateTime to) {
++        return jdbcTemplate.query(
++                """
++                SELECT e.*, s.name AS current_schedule_name
++                FROM matrix26_backup_schedule_execution e
++                LEFT JOIN matrix26_backup_schedule s ON s.id = e.schedule_id
++                WHERE e.planned_at >= ? AND e.planned_at < ?
++                ORDER BY e.planned_at, e.id
++                """,
++                executionMapper(),
++                from,
++                to
++        );
++    }
++
++    public boolean hasActiveExecution(long instanceId, Long excludedExecutionId) {
++        Integer count;
++        if (excludedExecutionId == null) {
++            count = jdbcTemplate.queryForObject(
++                    """
++                    SELECT COUNT(*) FROM matrix26_backup_schedule_execution
++                    WHERE instance_id = ?
++                      AND status IN ('QUEUED','RUNNING','RETRY_WAITING')
++                    """,
++                    Integer.class,
++                    instanceId
++            );
++        } else {
++            count = jdbcTemplate.queryForObject(
++                    """
++                    SELECT COUNT(*) FROM matrix26_backup_schedule_execution
++                    WHERE instance_id = ?
++                      AND id <> ?
++                      AND status IN ('QUEUED','RUNNING','RETRY_WAITING')
++                    """,
++                    Integer.class,
++                    instanceId,
++                    excludedExecutionId
++            );
++        }
++        return count != null && count > 0;
++    }
++
++    public void markExecutionQueued(long id) {
++        jdbcTemplate.update(
++                """
++                UPDATE matrix26_backup_schedule_execution
++                SET status = 'QUEUED', queued_at = ?, updated_at = ?
++                WHERE id = ?
++                """,
++                LocalDateTime.now(),
++                LocalDateTime.now(),
++                id
++        );
++    }
++
++    public int markExecutionRunning(long id) {
++        return jdbcTemplate.update(
++                """
++                UPDATE matrix26_backup_schedule_execution
++                SET status = 'RUNNING', attempt_count = attempt_count + 1,
++                    started_at = ?, next_retry_at = NULL, error_message = NULL, updated_at = ?
++                WHERE id = ?
++                  AND status IN ('SCHEDULED','QUEUED','RETRY_WAITING')
++                """,
++                LocalDateTime.now(),
++                LocalDateTime.now(),
++                id
++        );
++    }
++
++    public void completeExecution(long id, long backupJobId, String backupPublicId) {
++        jdbcTemplate.update(
++                """
++                UPDATE matrix26_backup_schedule_execution
++                SET status = 'COMPLETED', completed_at = ?, backup_job_id = ?,
++                    backup_public_id = ?, error_message = NULL, next_retry_at = NULL, updated_at = ?
++                WHERE id = ?
++                """,
++                LocalDateTime.now(),
++                backupJobId,
++                backupPublicId,
++                LocalDateTime.now(),
++                id
++        );
++    }
++
++    public void updateExecutionFailure(
++            long id,
++            Matrix26BackupScheduleExecutionStatus status,
++            LocalDateTime nextRetryAt,
++            String error
++    ) {
++        jdbcTemplate.update(
++                """
++                UPDATE matrix26_backup_schedule_execution
++                SET status = ?, completed_at = ?, next_retry_at = ?, error_message = ?, updated_at = ?
++                WHERE id = ?
++                """,
++                status.name(),
++                status == Matrix26BackupScheduleExecutionStatus.RETRY_WAITING ? null : LocalDateTime.now(),
++                nextRetryAt,
++                limit(error, 4000),
++                LocalDateTime.now(),
++                id
++        );
++    }
++
++    public void markExecutionFinal(long id, Matrix26BackupScheduleExecutionStatus status, String message) {
++        jdbcTemplate.update(
++                """
++                UPDATE matrix26_backup_schedule_execution
++                SET status = ?, completed_at = ?, error_message = ?, updated_at = ?
++                WHERE id = ?
++                """,
++                status.name(),
++                LocalDateTime.now(),
++                limit(message, 4000),
++                LocalDateTime.now(),
++                id
++        );
++    }
++
++    public long insertAlert(Matrix26BackupAlert alert) {
++        KeyHolder keyHolder = new GeneratedKeyHolder();
++        jdbcTemplate.update(connection -> {
++            var statement = connection.prepareStatement(
++                    """
++                    INSERT INTO matrix26_backup_alert (
++                        instance_id, instance_code, schedule_id, execution_id, alert_code,
++                        severity, status, title, message, created_at, resolved_at, resolved_by
++                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
++                    """,
++                    Statement.RETURN_GENERATED_KEYS
++            );
++            statement.setLong(1, alert.instanceId());
++            statement.setString(2, alert.instanceCode());
++            statement.setObject(3, alert.scheduleId());
++            statement.setObject(4, alert.executionId());
++            statement.setString(5, alert.alertCode());
++            statement.setString(6, alert.severity().name());
++            statement.setString(7, alert.status().name());
++            statement.setString(8, alert.title());
++            statement.setString(9, limit(alert.message(), 4000));
++            statement.setObject(10, alert.createdAt());
++            statement.setObject(11, alert.resolvedAt());
++            statement.setString(12, alert.resolvedBy());
++            return statement;
++        }, keyHolder);
++        Number id = keyHolder.getKey();
++        return id == null ? 0L : id.longValue();
++    }
++
++    public boolean hasOpenAlert(long instanceId, Long scheduleId, String alertCode) {
++        Integer count = jdbcTemplate.queryForObject(
++                """
++                SELECT COUNT(*) FROM matrix26_backup_alert
++                WHERE instance_id = ?
++                  AND ((schedule_id IS NULL AND ? IS NULL) OR schedule_id = ?)
++                  AND alert_code = ?
++                  AND status = 'OPEN'
++                """,
++                Integer.class,
++                instanceId,
++                scheduleId,
++                scheduleId,
++                alertCode
++        );
++        return count != null && count > 0;
++    }
++
++    public void resolveAlerts(long instanceId, Long scheduleId, List<String> codes, String actor) {
++        if (codes == null || codes.isEmpty()) {
++            return;
++        }
++        String placeholders = String.join(",", java.util.Collections.nCopies(codes.size(), "?"));
++        java.util.ArrayList<Object> parameters = new java.util.ArrayList<>();
++        parameters.add(LocalDateTime.now());
++        parameters.add(actor);
++        parameters.add(instanceId);
++        parameters.add(scheduleId);
++        parameters.add(scheduleId);
++        parameters.addAll(codes);
++        jdbcTemplate.update(
++                """
++                UPDATE matrix26_backup_alert
++                SET status = 'RESOLVED', resolved_at = ?, resolved_by = ?
++                WHERE instance_id = ?
++                  AND ((schedule_id IS NULL AND ? IS NULL) OR schedule_id = ?)
++                  AND alert_code IN (
++                """ + placeholders + ") AND status = 'OPEN'",
++                parameters.toArray()
++        );
++    }
++
++    public void resolveAlert(long alertId, String actor) {
++        jdbcTemplate.update(
++                """
++                UPDATE matrix26_backup_alert
++                SET status = 'RESOLVED', resolved_at = ?, resolved_by = ?
++                WHERE id = ? AND status = 'OPEN'
++                """,
++                LocalDateTime.now(),
++                actor,
++                alertId
++        );
++    }
++
++    public List<Matrix26BackupAlert> findAlerts(boolean openOnly) {
++        String sql = """
++                SELECT * FROM matrix26_backup_alert
++                """ + (openOnly ? " WHERE status = 'OPEN' " : " ") + """
++                ORDER BY created_at DESC, id DESC
++                LIMIT 300
++                """;
++        return jdbcTemplate.query(sql, alertMapper());
++    }
++
++    public Matrix26BackupScheduleSummary summary() {
++        Long activeSchedules = jdbcTemplate.queryForObject(
++                "SELECT COUNT(*) FROM matrix26_backup_schedule WHERE enabled = 1",
++                Long.class
++        );
++        Long openAlerts = jdbcTemplate.queryForObject(
++                "SELECT COUNT(*) FROM matrix26_backup_alert WHERE status = 'OPEN'",
++                Long.class
++        );
++        Long completed = jdbcTemplate.queryForObject(
++                "SELECT COUNT(*) FROM matrix26_backup_schedule_execution WHERE status = 'COMPLETED'",
++                Long.class
++        );
++        Long failed = jdbcTemplate.queryForObject(
++                "SELECT COUNT(*) FROM matrix26_backup_schedule_execution WHERE status = 'FAILED'",
++                Long.class
++        );
++        Long missed = jdbcTemplate.queryForObject(
++                "SELECT COUNT(*) FROM matrix26_backup_schedule_execution WHERE status = 'MISSED'",
++                Long.class
++        );
++        return new Matrix26BackupScheduleSummary(
++                value(activeSchedules),
++                value(openAlerts),
++                value(completed),
++                value(failed),
++                value(missed)
++        );
++    }
++
++    private org.springframework.jdbc.core.RowMapper<Matrix26BackupSchedule> scheduleMapper() {
++        return (rs, rowNum) -> new Matrix26BackupSchedule(
++                rs.getLong("id"),
++                rs.getLong("instance_id"),
++                rs.getString("instance_code"),
++                rs.getString("instance_name"),
++                rs.getString("name"),
++                Matrix26BackupScheduleFrequency.from(rs.getString("frequency")),
++                rs.getObject("day_of_week", Integer.class),
++                rs.getObject("day_of_month", Integer.class),
++                rs.getObject("hour_of_day", Integer.class),
++                rs.getObject("minute_of_hour", Integer.class),
++                rs.getString("timezone"),
++                rs.getBoolean("encryption_required"),
++                Matrix26BackupRetentionClass.from(rs.getString("retention_class")),
++                rs.getObject("max_attempts", Integer.class),
++                rs.getObject("retry_delay_minutes", Integer.class),
++                Matrix26BackupMissedPolicy.from(rs.getString("missed_policy")),
++                rs.getBoolean("enabled"),
++                rs.getObject("next_run_at", LocalDateTime.class),
++                rs.getObject("last_run_at", LocalDateTime.class),
++                rs.getString("last_status"),
++                rs.getString("created_by"),
++                rs.getObject("created_at", LocalDateTime.class),
++                rs.getString("updated_by"),
++                rs.getObject("updated_at", LocalDateTime.class)
++        );
++    }
++
++    private org.springframework.jdbc.core.RowMapper<Matrix26BackupScheduleExecution> executionMapper() {
++        return (rs, rowNum) -> new Matrix26BackupScheduleExecution(
++                rs.getLong("id"),
++                rs.getLong("schedule_id"),
++                rs.getLong("instance_id"),
++                rs.getString("instance_code"),
++                rs.getString("instance_name"),
++                firstNonBlank(rs.getString("schedule_name"), rs.getString("current_schedule_name")),
++                rs.getObject("planned_at", LocalDateTime.class),
++                Matrix26BackupScheduleExecutionStatus.valueOf(rs.getString("status")),
++                rs.getObject("attempt_count", Integer.class),
++                rs.getObject("max_attempts", Integer.class),
++                rs.getObject("queued_at", LocalDateTime.class),
++                rs.getObject("started_at", LocalDateTime.class),
++                rs.getObject("completed_at", LocalDateTime.class),
++                rs.getObject("next_retry_at", LocalDateTime.class),
++                rs.getObject("backup_job_id", Long.class),
++                rs.getString("backup_public_id"),
++                rs.getString("trigger_type"),
++                rs.getString("error_message"),
++                rs.getObject("created_at", LocalDateTime.class),
++                rs.getObject("updated_at", LocalDateTime.class)
++        );
++    }
++
++    private org.springframework.jdbc.core.RowMapper<Matrix26BackupAlert> alertMapper() {
++        return (rs, rowNum) -> new Matrix26BackupAlert(
++                rs.getLong("id"),
++                rs.getLong("instance_id"),
++                rs.getString("instance_code"),
++                rs.getObject("schedule_id", Long.class),
++                rs.getObject("execution_id", Long.class),
++                rs.getString("alert_code"),
++                Matrix26BackupAlertSeverity.valueOf(rs.getString("severity")),
++                Matrix26BackupAlertStatus.valueOf(rs.getString("status")),
++                rs.getString("title"),
++                rs.getString("message"),
++                rs.getObject("created_at", LocalDateTime.class),
++                rs.getObject("resolved_at", LocalDateTime.class),
++                rs.getString("resolved_by")
++        );
++    }
++
++    private long value(Long value) {
++        return value == null ? 0L : value;
++    }
++
++    private String firstNonBlank(String first, String second) {
++        if (first != null && !first.isBlank()) {
++            return first;
++        }
++        return second == null ? "" : second;
++    }
++
++    private String limit(String value, int maximum) {
++        if (value == null || value.length() <= maximum) {
++            return value;
++        }
++        return value.substring(0, maximum);
++    }
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleService.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleService.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleService.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleService.java	2026-06-26 05:08:28.988407413 +0000
+@@ -0,0 +1,783 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClient;
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClientRepository;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceAuditLog;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceAuditLogRepository;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
++
++import java.io.IOException;
++import java.nio.file.FileStore;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.time.DayOfWeek;
++import java.time.Duration;
++import java.time.LocalDate;
++import java.time.LocalDateTime;
++import java.time.YearMonth;
++import java.time.ZoneId;
++import java.time.zone.ZoneRulesException;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++import java.util.Optional;
++import java.util.Set;
++import java.util.concurrent.atomic.AtomicBoolean;
++
++@Service
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26BackupScheduleService {
++
++    private static final Set<String> RECOVERABLE_ALERT_CODES = Set.of(
++            "MASTER_KEY_UNAVAILABLE",
++            "DUMP_TOOL_UNAVAILABLE",
++            "BACKUP_STORAGE_UNAVAILABLE",
++            "LOW_DISK_SPACE",
++            "SCHEDULED_BACKUP_FAILED"
++    );
++
++    private final Matrix26BackupScheduleRepository scheduleRepository;
++    private final Matrix26BackupRepository backupRepository;
++    private final Matrix26BackupService backupService;
++    private final Matrix26BackupSecurityService backupSecurityService;
++    private final Matrix26BackupProperties properties;
++    private final PlatformBusinessClientRepository clientRepository;
++    private final Matrix26InstanceAuditLogRepository auditLogRepository;
++    private final AtomicBoolean schedulerLock = new AtomicBoolean(false);
++
++    public Matrix26BackupScheduleService(
++            Matrix26BackupScheduleRepository scheduleRepository,
++            Matrix26BackupRepository backupRepository,
++            Matrix26BackupService backupService,
++            Matrix26BackupSecurityService backupSecurityService,
++            Matrix26BackupProperties properties,
++            PlatformBusinessClientRepository clientRepository,
++            Matrix26InstanceAuditLogRepository auditLogRepository
++    ) {
++        this.scheduleRepository = scheduleRepository;
++        this.backupRepository = backupRepository;
++        this.backupService = backupService;
++        this.backupSecurityService = backupSecurityService;
++        this.properties = properties;
++        this.clientRepository = clientRepository;
++        this.auditLogRepository = auditLogRepository;
++    }
++
++    public List<Matrix26BackupSchedule> schedules() {
++        return scheduleRepository.findSchedules();
++    }
++
++    public Matrix26BackupSchedule schedule(long id) {
++        return scheduleRepository.findSchedule(id)
++                .orElseThrow(() -> new Matrix26BackupException("The requested backup schedule does not exist."));
++    }
++
++    public List<Matrix26BackupScheduleExecution> recentExecutions() {
++        return scheduleRepository.findRecentExecutions(300);
++    }
++
++    public List<Matrix26BackupScheduleExecution> executionsForSchedule(long scheduleId) {
++        return scheduleRepository.findExecutionsBySchedule(scheduleId);
++    }
++
++    public List<Matrix26BackupAlert> alerts(boolean openOnly) {
++        return scheduleRepository.findAlerts(openOnly);
++    }
++
++    public Matrix26BackupScheduleSummary summary() {
++        return scheduleRepository.summary();
++    }
++
++    public List<Matrix26BackupCalendarEvent> calendar(int days) {
++        int safeDays = Math.max(7, Math.min(days, 90));
++        LocalDateTime from = LocalDate.now().atStartOfDay();
++        LocalDateTime to = from.plusDays(safeDays);
++        List<Matrix26BackupCalendarEvent> events = new ArrayList<>();
++
++        for (Matrix26BackupScheduleExecution execution : scheduleRepository.findCalendarExecutions(from, to)) {
++            events.add(new Matrix26BackupCalendarEvent(
++                    execution.plannedAt(),
++                    execution.instanceCode(),
++                    execution.instanceName(),
++                    execution.scheduleName(),
++                    "EXECUTION",
++                    execution.status().getLabel(),
++                    execution.status().getBadgeClass(),
++                    execution.id(),
++                    execution.backupJobId()
++            ));
++        }
++
++        for (Matrix26BackupSchedule schedule : scheduleRepository.findEnabledSchedules()) {
++            LocalDateTime cursor = schedule.nextRunAt();
++            int guard = 0;
++            while (cursor != null && cursor.isBefore(to) && guard++ < 100) {
++                if (!cursor.isBefore(from)) {
++                    events.add(new Matrix26BackupCalendarEvent(
++                            cursor,
++                            schedule.instanceCode(),
++                            schedule.instanceName(),
++                            schedule.name(),
++                            "PLANNED",
++                            "Planned",
++                            "text-bg-info",
++                            null,
++                            null
++                    ));
++                }
++                cursor = nextAfter(schedule, cursor);
++            }
++        }
++
++        return events.stream()
++                .sorted(java.util.Comparator.comparing(Matrix26BackupCalendarEvent::scheduledAt))
++                .toList();
++    }
++
++    public Matrix26BackupSchedule saveSchedule(
++            Long scheduleId,
++            long instanceId,
++            String name,
++            String frequencyValue,
++            Integer dayOfWeek,
++            Integer dayOfMonth,
++            int hourOfDay,
++            int minuteOfHour,
++            String timezone,
++            boolean encryptionRequired,
++            String retentionClassValue,
++            int maxAttempts,
++            int retryDelayMinutes,
++            String missedPolicyValue,
++            boolean enabled,
++            String actor
++    ) {
++        PlatformBusinessClient instance = allowedInstance(instanceId);
++        Matrix26BackupScheduleFrequency frequency = Matrix26BackupScheduleFrequency.from(frequencyValue);
++        Matrix26BackupRetentionClass retentionClass = Matrix26BackupRetentionClass.from(retentionClassValue);
++        Matrix26BackupMissedPolicy missedPolicy = Matrix26BackupMissedPolicy.from(missedPolicyValue);
++        String safeTimezone = validateTimezone(timezone);
++        int safeHour = bounded(hourOfDay, 0, 23);
++        int safeMinute = bounded(minuteOfHour, 0, 59);
++        int safeDayOfWeek = bounded(dayOfWeek == null ? DayOfWeek.SUNDAY.getValue() : dayOfWeek, 1, 7);
++        int safeDayOfMonth = bounded(dayOfMonth == null ? 1 : dayOfMonth, 1, 28);
++        int safeAttempts = bounded(maxAttempts, 1, 5);
++        int safeRetryDelay = bounded(retryDelayMinutes, 1, 1440);
++        String safeName = safeText(name, "Backup schedule", 160);
++        String safeActor = safeActor(actor);
++
++        LocalDateTime now = LocalDateTime.now(ZoneId.of(safeTimezone));
++        Matrix26BackupSchedule provisional = new Matrix26BackupSchedule(
++                scheduleId,
++                instance.getId(),
++                instance.getCode(),
++                instance.getBusinessName(),
++                safeName,
++                frequency,
++                frequency == Matrix26BackupScheduleFrequency.WEEKLY ? safeDayOfWeek : null,
++                frequency == Matrix26BackupScheduleFrequency.MONTHLY ? safeDayOfMonth : null,
++                safeHour,
++                safeMinute,
++                safeTimezone,
++                true,
++                retentionClass,
++                safeAttempts,
++                safeRetryDelay,
++                missedPolicy,
++                enabled,
++                null,
++                null,
++                null,
++                safeActor,
++                now,
++                safeActor,
++                now
++        );
++        LocalDateTime nextRun = enabled ? nextAfter(provisional, now.minusMinutes(1)) : null;
++        Matrix26BackupSchedule schedule = new Matrix26BackupSchedule(
++                scheduleId,
++                provisional.instanceId(),
++                provisional.instanceCode(),
++                provisional.instanceName(),
++                provisional.name(),
++                provisional.frequency(),
++                provisional.dayOfWeek(),
++                provisional.dayOfMonth(),
++                provisional.hourOfDay(),
++                provisional.minuteOfHour(),
++                provisional.timezone(),
++                provisional.encryptionRequired(),
++                provisional.retentionClass(),
++                provisional.maxAttempts(),
++                provisional.retryDelayMinutes(),
++                provisional.missedPolicy(),
++                provisional.enabled(),
++                nextRun,
++                scheduleId == null ? null : schedule(scheduleId).lastRunAt(),
++                scheduleId == null ? null : schedule(scheduleId).lastStatus(),
++                scheduleId == null ? safeActor : schedule(scheduleId).createdBy(),
++                scheduleId == null ? now : schedule(scheduleId).createdAt(),
++                safeActor,
++                now
++        );
++
++        long id;
++        if (scheduleId == null) {
++            id = scheduleRepository.insertSchedule(schedule);
++            writeAudit(instance, safeActor, "BACKUP_SCHEDULE_CREATED",
++                    "Backup schedule created: " + safeName + ".");
++        } else {
++            Matrix26BackupSchedule existing = schedule(scheduleId);
++            if (!existing.instanceId().equals(instanceId)) {
++                throw new Matrix26BackupException("A backup schedule cannot be moved to another instance.");
++            }
++            scheduleRepository.updateSchedule(schedule);
++            id = scheduleId;
++            writeAudit(instance, safeActor, "BACKUP_SCHEDULE_UPDATED",
++                    "Backup schedule updated: " + safeName + ".");
++        }
++        return schedule(id);
++    }
++
++    public Matrix26BackupSchedule setEnabled(long scheduleId, boolean enabled, String actor) {
++        Matrix26BackupSchedule schedule = schedule(scheduleId);
++        PlatformBusinessClient instance = allowedInstance(schedule.instanceId());
++        LocalDateTime nextRun = enabled
++                ? nextAfter(schedule, LocalDateTime.now(ZoneId.of(schedule.timezone())).minusMinutes(1))
++                : null;
++        scheduleRepository.setScheduleEnabled(scheduleId, enabled, nextRun, safeActor(actor));
++        writeAudit(instance, actor, enabled ? "BACKUP_SCHEDULE_ENABLED" : "BACKUP_SCHEDULE_DISABLED",
++                (enabled ? "Enabled" : "Disabled") + " backup schedule: " + schedule.name() + ".");
++        return schedule(scheduleId);
++    }
++
++    public Matrix26BackupScheduleExecution runNow(long scheduleId, String actor) {
++        Matrix26BackupSchedule schedule = schedule(scheduleId);
++        allowedInstance(schedule.instanceId());
++        LocalDateTime now = LocalDateTime.now(ZoneId.of(schedule.timezone())).withSecond(0).withNano(0);
++        Matrix26BackupScheduleExecution execution = newExecution(
++                schedule,
++                now,
++                Matrix26BackupScheduleExecutionStatus.QUEUED,
++                "MANUAL_SCHEDULE",
++                null
++        );
++        long executionId = scheduleRepository.insertExecution(execution)
++                .orElseThrow(() -> new Matrix26BackupException("An execution already exists for this schedule window."));
++        processExecution(executionId, safeActor(actor));
++        return scheduleRepository.findExecution(executionId).orElseThrow();
++    }
++
++    public void processSchedulerTick() {
++        if (!properties.isSchedulingEnabled() || !schedulerLock.compareAndSet(false, true)) {
++            return;
++        }
++        try {
++            processRetries();
++            for (Matrix26BackupSchedule schedule : scheduleRepository.findEnabledSchedules()) {
++                evaluateSchedule(schedule);
++            }
++            evaluateHealthAlerts();
++        } finally {
++            schedulerLock.set(false);
++        }
++    }
++
++    public void recoverOnStartup() {
++        processSchedulerTick();
++    }
++
++    public void resolveAlert(long alertId, String actor) {
++        scheduleRepository.resolveAlert(alertId, safeActor(actor));
++    }
++
++    private void processRetries() {
++        LocalDateTime now = LocalDateTime.now();
++        for (Matrix26BackupScheduleExecution execution : scheduleRepository.findRetryable(now)) {
++            processExecution(execution.id(), "matrix26-scheduler");
++        }
++    }
++
++    private void evaluateSchedule(Matrix26BackupSchedule schedule) {
++        ZoneId zone = ZoneId.of(schedule.timezone());
++        LocalDateTime now = LocalDateTime.now(zone);
++        LocalDateTime cursor = schedule.nextRunAt();
++        if (cursor == null || cursor.isAfter(now)) {
++            return;
++        }
++
++        List<LocalDateTime> dueSlots = new ArrayList<>();
++        int guard = 0;
++        while (cursor != null && !cursor.isAfter(now) && guard++ < 400) {
++            dueSlots.add(cursor);
++            cursor = nextAfter(schedule, cursor);
++        }
++        if (dueSlots.isEmpty()) {
++            return;
++        }
++
++        LocalDateTime latest = dueSlots.get(dueSlots.size() - 1);
++        for (int index = 0; index < dueSlots.size() - 1; index++) {
++            recordFinalExecution(
++                    schedule,
++                    dueSlots.get(index),
++                    Matrix26BackupScheduleExecutionStatus.MISSED,
++                    "MISSED_SUPERSEDED",
++                    "A newer missed execution replaced this window."
++            );
++        }
++
++        long latenessMinutes = Math.max(0, Duration.between(latest, now).toMinutes());
++        if (latenessMinutes <= properties.getSchedulerGraceMinutes()) {
++            queueAndProcess(schedule, latest, "SCHEDULED");
++        } else {
++            switch (schedule.missedPolicy()) {
++                case RUN_ON_STARTUP -> queueAndProcess(schedule, latest, "MISSED_RUN_ON_STARTUP");
++                case SKIP -> recordFinalExecution(
++                        schedule,
++                        latest,
++                        Matrix26BackupScheduleExecutionStatus.SKIPPED,
++                        "MISSED_SKIPPED",
++                        "The missed execution policy skipped this backup window."
++                );
++                case MARK_AS_MISSED -> recordFinalExecution(
++                        schedule,
++                        latest,
++                        Matrix26BackupScheduleExecutionStatus.MISSED,
++                        "MISSED_RECORDED",
++                        "Matrix26 was not available during this backup window."
++                );
++            }
++        }
++        scheduleRepository.updateScheduleAfterEvaluation(
++                schedule.id(),
++                cursor,
++                latest,
++                latestExecutionStatus(schedule.id())
++        );
++    }
++
++    private void queueAndProcess(Matrix26BackupSchedule schedule, LocalDateTime plannedAt, String triggerType) {
++        Matrix26BackupScheduleExecution execution = newExecution(
++                schedule,
++                plannedAt,
++                Matrix26BackupScheduleExecutionStatus.QUEUED,
++                triggerType,
++                null
++        );
++        Optional<Long> executionId = scheduleRepository.insertExecution(execution);
++        executionId.ifPresent(id -> processExecution(id, "matrix26-scheduler"));
++    }
++
++    private void recordFinalExecution(
++            Matrix26BackupSchedule schedule,
++            LocalDateTime plannedAt,
++            Matrix26BackupScheduleExecutionStatus status,
++            String triggerType,
++            String message
++    ) {
++        Matrix26BackupScheduleExecution execution = newExecution(schedule, plannedAt, status, triggerType, message);
++        Optional<Long> executionId = scheduleRepository.insertExecution(execution);
++        if (executionId.isPresent() && status == Matrix26BackupScheduleExecutionStatus.MISSED) {
++            createAlert(
++                    schedule,
++                    executionId.get(),
++                    "BACKUP_EXECUTION_MISSED",
++                    Matrix26BackupAlertSeverity.WARNING,
++                    "Scheduled backup missed",
++                    schedule.name() + " did not run at " + plannedAt + "."
++            );
++        }
++    }
++
++    private void processExecution(long executionId, String actor) {
++        Matrix26BackupScheduleExecution execution = scheduleRepository.findExecution(executionId)
++                .orElseThrow(() -> new Matrix26BackupException("The scheduled execution does not exist."));
++        Matrix26BackupSchedule schedule = schedule(execution.scheduleId());
++        PlatformBusinessClient instance = allowedInstance(schedule.instanceId());
++
++        if (scheduleRepository.hasActiveExecution(instance.getId(), executionId)
++                || backupRepository.hasActiveJob(instance.getId())) {
++            scheduleRepository.markExecutionFinal(
++                    executionId,
++                    Matrix26BackupScheduleExecutionStatus.SKIPPED,
++                    "Another backup operation is already active for this instance."
++            );
++            createAlert(
++                    schedule,
++                    executionId,
++                    "BACKUP_OPERATION_CONFLICT",
++                    Matrix26BackupAlertSeverity.WARNING,
++                    "Scheduled backup skipped",
++                    "Another backup, verification, or retention operation was active."
++            );
++            return;
++        }
++
++        if (schedule.encryptionRequired() && !backupSecurityService.keyStatus().available()) {
++            failExecution(
++                    schedule,
++                    execution,
++                    "MASTER_KEY_UNAVAILABLE",
++                    Matrix26BackupAlertSeverity.CRITICAL,
++                    "Backup master key unavailable",
++                    backupSecurityService.keyStatus().message()
++            );
++            return;
++        }
++        Matrix26BackupToolStatus tool = backupService.toolStatus();
++        if (!tool.available()) {
++            failExecution(
++                    schedule,
++                    execution,
++                    "DUMP_TOOL_UNAVAILABLE",
++                    Matrix26BackupAlertSeverity.CRITICAL,
++                    "Database dump tool unavailable",
++                    tool.message()
++            );
++            return;
++        }
++        try {
++            validateStorage();
++        } catch (Matrix26BackupException ex) {
++            boolean lowSpace = ex.getMessage() != null && ex.getMessage().startsWith("LOW_DISK_SPACE:");
++            failExecution(
++                    schedule,
++                    execution,
++                    lowSpace ? "LOW_DISK_SPACE" : "BACKUP_STORAGE_UNAVAILABLE",
++                    Matrix26BackupAlertSeverity.CRITICAL,
++                    lowSpace ? "Low backup storage" : "Backup storage unavailable",
++                    lowSpace ? ex.getMessage().substring("LOW_DISK_SPACE:".length()).trim() : ex.getMessage()
++            );
++            return;
++        }
++
++        if (scheduleRepository.markExecutionRunning(executionId) == 0) {
++            return;
++        }
++
++        Matrix26BackupScheduleExecution running = scheduleRepository.findExecution(executionId).orElseThrow();
++        try {
++            Matrix26BackupJob job = backupService.createScheduledFullBackup(
++                    schedule.instanceId(),
++                    safeActor(actor)
++            );
++            if (schedule.encryptionRequired()) {
++                job = backupSecurityService.encryptBackup(
++                        job.id(),
++                        schedule.retentionClass(),
++                        safeActor(actor)
++                );
++            }
++            scheduleRepository.completeExecution(executionId, job.id(), job.publicId());
++            scheduleRepository.updateScheduleAfterEvaluation(
++                    schedule.id(),
++                    schedule.nextRunAt(),
++                    running.plannedAt(),
++                    Matrix26BackupScheduleExecutionStatus.COMPLETED.name()
++            );
++            scheduleRepository.resolveAlerts(
++                    schedule.instanceId(),
++                    schedule.id(),
++                    new ArrayList<>(RECOVERABLE_ALERT_CODES),
++                    safeActor(actor)
++            );
++            writeAudit(instance, actor, "SCHEDULED_BACKUP_COMPLETED",
++                    "Scheduled backup completed: " + job.publicId() + ".");
++        } catch (Exception ex) {
++            failExecution(
++                    schedule,
++                    running,
++                    "SCHEDULED_BACKUP_FAILED",
++                    Matrix26BackupAlertSeverity.CRITICAL,
++                    "Scheduled backup failed",
++                    safeMessage(ex)
++            );
++        }
++    }
++
++    private void failExecution(
++            Matrix26BackupSchedule schedule,
++            Matrix26BackupScheduleExecution execution,
++            String alertCode,
++            Matrix26BackupAlertSeverity severity,
++            String title,
++            String message
++    ) {
++        Matrix26BackupScheduleExecution current = scheduleRepository.findExecution(execution.id()).orElse(execution);
++        int attempts = current.attemptCount() == null ? 0 : current.attemptCount();
++        int maximum = current.maxAttempts() == null ? schedule.maxAttempts() : current.maxAttempts();
++        if (attempts < maximum) {
++            LocalDateTime retryAt = LocalDateTime.now().plusMinutes(schedule.retryDelayMinutes());
++            scheduleRepository.updateExecutionFailure(
++                    execution.id(),
++                    Matrix26BackupScheduleExecutionStatus.RETRY_WAITING,
++                    retryAt,
++                    message
++            );
++        } else {
++            scheduleRepository.updateExecutionFailure(
++                    execution.id(),
++                    Matrix26BackupScheduleExecutionStatus.FAILED,
++                    null,
++                    message
++            );
++        }
++        createAlert(schedule, execution.id(), alertCode, severity, title, message);
++        PlatformBusinessClient instance = clientRepository.findById(schedule.instanceId()).orElse(null);
++        if (instance != null) {
++            writeAudit(instance, "matrix26-scheduler", "SCHEDULED_BACKUP_FAILED",
++                    schedule.name() + ": " + message);
++        }
++    }
++
++    private void evaluateHealthAlerts() {
++        for (Matrix26BackupSchedule schedule : scheduleRepository.findEnabledSchedules()) {
++            if (schedule.encryptionRequired() && !backupSecurityService.keyStatus().available()) {
++                createAlert(
++                        schedule,
++                        null,
++                        "MASTER_KEY_UNAVAILABLE",
++                        Matrix26BackupAlertSeverity.CRITICAL,
++                        "Backup master key unavailable",
++                        backupSecurityService.keyStatus().message()
++                );
++            }
++            if (!backupService.toolStatus().available()) {
++                createAlert(
++                        schedule,
++                        null,
++                        "DUMP_TOOL_UNAVAILABLE",
++                        Matrix26BackupAlertSeverity.CRITICAL,
++                        "Database dump tool unavailable",
++                        backupService.toolStatus().message()
++                );
++            }
++            try {
++                validateStorage();
++                scheduleRepository.resolveAlerts(
++                        schedule.instanceId(),
++                        schedule.id(),
++                        List.of("LOW_DISK_SPACE", "BACKUP_STORAGE_UNAVAILABLE"),
++                        "matrix26-scheduler"
++                );
++            } catch (Matrix26BackupException ex) {
++                boolean lowSpace = ex.getMessage() != null && ex.getMessage().startsWith("LOW_DISK_SPACE:");
++                createAlert(
++                        schedule,
++                        null,
++                        lowSpace ? "LOW_DISK_SPACE" : "BACKUP_STORAGE_UNAVAILABLE",
++                        Matrix26BackupAlertSeverity.CRITICAL,
++                        lowSpace ? "Low backup storage" : "Backup storage unavailable",
++                        lowSpace ? ex.getMessage().substring("LOW_DISK_SPACE:".length()).trim() : ex.getMessage()
++                );
++            }
++            Optional<Matrix26BackupJob> latest = backupRepository.findByInstanceId(schedule.instanceId()).stream()
++                    .filter(Matrix26BackupJob::isCompleted)
++                    .findFirst();
++            if (latest.isEmpty()
++                    || latest.get().completedAt() == null
++                    || latest.get().completedAt().isBefore(LocalDateTime.now().minusHours(24))) {
++                createAlert(
++                        schedule,
++                        null,
++                        "NO_RECENT_SUCCESSFUL_BACKUP",
++                        Matrix26BackupAlertSeverity.WARNING,
++                        "No recent successful backup",
++                        "No completed backup was detected during the last 24 hours."
++                );
++            } else {
++                scheduleRepository.resolveAlerts(
++                        schedule.instanceId(),
++                        schedule.id(),
++                        List.of("NO_RECENT_SUCCESSFUL_BACKUP"),
++                        "matrix26-scheduler"
++                );
++            }
++        }
++    }
++
++    private void createAlert(
++            Matrix26BackupSchedule schedule,
++            Long executionId,
++            String code,
++            Matrix26BackupAlertSeverity severity,
++            String title,
++            String message
++    ) {
++        if (scheduleRepository.hasOpenAlert(schedule.instanceId(), schedule.id(), code)) {
++            return;
++        }
++        scheduleRepository.insertAlert(new Matrix26BackupAlert(
++                null,
++                schedule.instanceId(),
++                schedule.instanceCode(),
++                schedule.id(),
++                executionId,
++                code,
++                severity,
++                Matrix26BackupAlertStatus.OPEN,
++                title,
++                safeText(message, "Backup operation requires attention.", 4000),
++                LocalDateTime.now(),
++                null,
++                null
++        ));
++    }
++
++    private Matrix26BackupScheduleExecution newExecution(
++            Matrix26BackupSchedule schedule,
++            LocalDateTime plannedAt,
++            Matrix26BackupScheduleExecutionStatus status,
++            String triggerType,
++            String error
++    ) {
++        LocalDateTime now = LocalDateTime.now();
++        return new Matrix26BackupScheduleExecution(
++                null,
++                schedule.id(),
++                schedule.instanceId(),
++                schedule.instanceCode(),
++                schedule.instanceName(),
++                schedule.name(),
++                plannedAt,
++                status,
++                0,
++                schedule.maxAttempts(),
++                status == Matrix26BackupScheduleExecutionStatus.QUEUED ? now : null,
++                null,
++                status.isFinalState() ? now : null,
++                null,
++                null,
++                null,
++                triggerType,
++                error,
++                now,
++                now
++        );
++    }
++
++    private PlatformBusinessClient allowedInstance(long instanceId) {
++        PlatformBusinessClient instance = clientRepository.findById(instanceId)
++                .orElseThrow(() -> new Matrix26BackupException("The selected instance does not exist."));
++        Matrix26BackupCandidate candidate = backupService.candidates().stream()
++                .filter(value -> value.instanceId().equals(instanceId))
++                .findFirst()
++                .orElseThrow(() -> new Matrix26BackupException("The selected instance is not available for backups."));
++        if (!candidate.allowed()) {
++            throw new Matrix26BackupException(candidate.restrictionReason());
++        }
++        return instance;
++    }
++
++    private LocalDateTime nextAfter(Matrix26BackupSchedule schedule, LocalDateTime reference) {
++        int hour = schedule.hourOfDay();
++        int minute = schedule.minuteOfHour();
++        return switch (schedule.frequency()) {
++            case DAILY -> {
++                LocalDateTime candidate = reference.toLocalDate().atTime(hour, minute);
++                if (!candidate.isAfter(reference)) {
++                    candidate = candidate.plusDays(1);
++                }
++                yield candidate;
++            }
++            case WEEKLY -> {
++                int target = schedule.dayOfWeek() == null ? DayOfWeek.SUNDAY.getValue() : schedule.dayOfWeek();
++                LocalDate date = reference.toLocalDate();
++                int delta = target - date.getDayOfWeek().getValue();
++                if (delta < 0) {
++                    delta += 7;
++                }
++                LocalDateTime candidate = date.plusDays(delta).atTime(hour, minute);
++                if (!candidate.isAfter(reference)) {
++                    candidate = candidate.plusWeeks(1);
++                }
++                yield candidate;
++            }
++            case MONTHLY -> {
++                int day = schedule.dayOfMonth() == null ? 1 : schedule.dayOfMonth();
++                YearMonth month = YearMonth.from(reference);
++                LocalDateTime candidate = month.atDay(Math.min(day, month.lengthOfMonth())).atTime(hour, minute);
++                if (!candidate.isAfter(reference)) {
++                    YearMonth nextMonth = month.plusMonths(1);
++                    candidate = nextMonth.atDay(Math.min(day, nextMonth.lengthOfMonth())).atTime(hour, minute);
++                }
++                yield candidate;
++            }
++        };
++    }
++
++    private String latestExecutionStatus(long scheduleId) {
++        return scheduleRepository.findExecutionsBySchedule(scheduleId).stream()
++                .findFirst()
++                .map(value -> value.status().name())
++                .orElse(null);
++    }
++
++    private void validateStorage() {
++        try {
++            Path root = backupService.backupRoot();
++            Files.createDirectories(root);
++            FileStore store = Files.getFileStore(root);
++            if (store.getUsableSpace() < properties.getMinimumFreeBytes()) {
++                throw new Matrix26BackupException(
++                        "LOW_DISK_SPACE: Backup storage has less than "
++                                + Matrix26BackupService.formatBytes(properties.getMinimumFreeBytes())
++                                + " available."
++                );
++            }
++        } catch (IOException ex) {
++            throw new Matrix26BackupException("Backup storage could not be accessed: " + safeMessage(ex), ex);
++        }
++    }
++
++    private String validateTimezone(String timezone) {
++        String value = timezone == null || timezone.isBlank()
++                ? properties.getScheduleTimezone()
++                : timezone.trim();
++        try {
++            ZoneId.of(value);
++            return value;
++        } catch (ZoneRulesException ex) {
++            throw new Matrix26BackupException("The selected timezone is invalid.");
++        }
++    }
++
++    private int bounded(int value, int minimum, int maximum) {
++        return Math.max(minimum, Math.min(value, maximum));
++    }
++
++    private String safeActor(String actor) {
++        if (actor == null || actor.isBlank()) {
++            return "matrix26-system";
++        }
++        return actor.length() <= 120 ? actor : actor.substring(0, 120);
++    }
++
++    private String safeText(String value, String fallback, int maximum) {
++        String result = value == null || value.isBlank() ? fallback : value.trim();
++        return result.length() <= maximum ? result : result.substring(0, maximum);
++    }
++
++    private String safeMessage(Exception ex) {
++        if (ex == null || ex.getMessage() == null || ex.getMessage().isBlank()) {
++            return ex == null ? "Unknown backup error." : ex.getClass().getSimpleName();
++        }
++        String value = ex.getMessage()
++                .replaceAll("(?i)(password|secret|token|api[-_.]?key|private[-_.]?key)=\\S+", "$1=***REDACTED***");
++        return value.length() <= 1000 ? value : value.substring(0, 1000);
++    }
++
++    @Transactional
++    protected void writeAudit(PlatformBusinessClient instance, String actor, String action, String summary) {
++        Matrix26InstanceAuditLog log = new Matrix26InstanceAuditLog();
++        log.setInstance(instance);
++        log.setActorUsername(safeActor(actor));
++        log.setAction(action);
++        log.setSummary(summary.length() <= 500 ? summary : summary.substring(0, 500));
++        log.setAfterSnapshot("{\"instanceCode\":\"" + instance.getCode() + "\"}");
++        auditLogRepository.save(log);
++    }
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleSummary.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleSummary.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleSummary.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduleSummary.java	2026-06-26 05:01:33.508116698 +0000
+@@ -0,0 +1,10 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++public record Matrix26BackupScheduleSummary(
++        long activeSchedules,
++        long openAlerts,
++        long completedExecutions,
++        long failedExecutions,
++        long missedExecutions
++) {
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduler.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduler.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduler.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupScheduler.java	2026-06-26 05:02:59.478929800 +0000
+@@ -0,0 +1,35 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.context.event.EventListener;
++import org.springframework.boot.context.event.ApplicationReadyEvent;
++import org.springframework.scheduling.annotation.Scheduled;
++import org.springframework.stereotype.Component;
++
++@Component
++@ConditionalOnProperty(
++        name = "matrix26.control-center.backups.scheduling-enabled",
++        havingValue = "true",
++        matchIfMissing = true
++)
++public class Matrix26BackupScheduler {
++
++    private final Matrix26BackupScheduleService scheduleService;
++
++    public Matrix26BackupScheduler(Matrix26BackupScheduleService scheduleService) {
++        this.scheduleService = scheduleService;
++    }
++
++    @EventListener(ApplicationReadyEvent.class)
++    public void recoverMissedExecutions() {
++        scheduleService.recoverOnStartup();
++    }
++
++    @Scheduled(
++            fixedDelayString = "${matrix26.control-center.backups.scheduler-poll-milliseconds:60000}",
++            initialDelayString = "${matrix26.control-center.backups.scheduler-initial-delay-milliseconds:15000}"
++    )
++    public void evaluateSchedules() {
++        scheduleService.processSchedulerTick();
++    }
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSchedulingConfiguration.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSchedulingConfiguration.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSchedulingConfiguration.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSchedulingConfiguration.java	2026-06-26 05:02:59.477692274 +0000
+@@ -0,0 +1,15 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.context.annotation.Configuration;
++import org.springframework.scheduling.annotation.EnableScheduling;
++
++@Configuration
++@EnableScheduling
++@ConditionalOnProperty(
++        name = "matrix26.control-center.backups.scheduling-enabled",
++        havingValue = "true",
++        matchIfMissing = true
++)
++public class Matrix26BackupSchedulingConfiguration {
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityService.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityService.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityService.java	2026-06-26 04:59:55.644276739 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityService.java	2026-06-26 05:08:09.316602571 +0000
+@@ -111,8 +111,9 @@
+         if (!job.isCompleted()) {
+             throw new Matrix26BackupException("Only completed backups can be encrypted.");
+         }
+-        if (!"MANUAL_FULL".equalsIgnoreCase(job.backupType())) {
+-            throw new Matrix26BackupException("Phase 3E.3 encrypts full instance backups only.");
++        if (!"MANUAL_FULL".equalsIgnoreCase(job.backupType())
++                && !"SCHEDULED_FULL".equalsIgnoreCase(job.backupType())) {
++            throw new Matrix26BackupException("Only full instance backups can be encrypted.");
+         }
+         if (securityRepository.findEncryption(jobId).map(Matrix26BackupEncryption::encrypted).orElse(false)) {
+             throw new Matrix26BackupException("This backup is already encrypted.");
+@@ -595,7 +596,7 @@
+         values.put("formatVersion", FORMAT_VERSION);
+         values.put("backupId", job.publicId());
+         values.put("instanceCode", instance.getCode());
+-        values.put("backupType", "MANUAL_FULL_ENCRYPTED");
++        values.put("backupType", job.backupType() + "_ENCRYPTED");
+         values.put("createdAt", LocalDateTime.now().toString());
+         values.put("algorithm", ALGORITHM);
+         values.put("keyId", key.keyId());
+@@ -620,6 +621,7 @@
+         String content = "Matrix26 encrypted backup report" + System.lineSeparator()
+                 + "Backup ID: " + job.publicId() + System.lineSeparator()
+                 + "Instance: " + instance.getBusinessName() + " (" + instance.getCode() + ")" + System.lineSeparator()
++                + "Backup type: " + job.backupType() + "_ENCRYPTED" + System.lineSeparator()
+                 + "Encrypted at: " + LocalDateTime.now() + System.lineSeparator()
+                 + "Algorithm: " + ALGORITHM + System.lineSeparator()
+                 + "Key identifier: " + key.keyId() + System.lineSeparator()
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupService.java /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupService.java
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupService.java	2026-06-26 04:59:55.644727887 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupService.java	2026-06-26 05:02:11.767065204 +0000
+@@ -142,7 +142,7 @@
+             String actor,
+             boolean confirmation
+     ) {
+-        return createManualBackup(instanceId, actor, confirmation, false);
++        return createBackup(instanceId, actor, confirmation, false, "MANUAL_DATABASE", "Manual");
+     }
+ 
+     public synchronized Matrix26BackupJob createManualFullBackup(
+@@ -150,14 +150,23 @@
+             String actor,
+             boolean confirmation
+     ) {
+-        return createManualBackup(instanceId, actor, confirmation, true);
++        return createBackup(instanceId, actor, confirmation, true, "MANUAL_FULL", "Manual");
+     }
+ 
+-    private Matrix26BackupJob createManualBackup(
++    public synchronized Matrix26BackupJob createScheduledFullBackup(
++            long instanceId,
++            String actor
++    ) {
++        return createBackup(instanceId, actor, true, true, "SCHEDULED_FULL", "Scheduled");
++    }
++
++    private Matrix26BackupJob createBackup(
+             long instanceId,
+             String actor,
+             boolean confirmation,
+-            boolean fullBackup
++            boolean fullBackup,
++            String backupType,
++            String sourceLabel
+     ) {
+         if (!properties.isEnabled()) {
+             throw new Matrix26BackupException("Database backups are disabled in Matrix26 configuration.");
+@@ -209,7 +218,7 @@
+                     instance.getCode(),
+                     instance.getBusinessName(),
+                     instance.getDatabaseName(),
+-                    fullBackup ? "MANUAL_FULL" : "MANUAL_DATABASE",
++                    backupType,
+                     Matrix26BackupStatus.PENDING,
+                     safeActor(actor),
+                     now,
+@@ -241,16 +250,16 @@
+                         databaseJob, instance, root, backupDirectory
+                 );
+                 finalizeFullBackup(databaseJob, instance, connection, tool, root, backupDirectory, fullResult);
+-                writeAudit(instance, actor, "FULL_BACKUP_COMPLETED", "Manual full instance backup completed: " + publicId);
++                writeAudit(instance, actor, "FULL_BACKUP_COMPLETED", sourceLabel + " full instance backup completed: " + publicId);
+             } else {
+-                writeAudit(instance, actor, "DATABASE_BACKUP_COMPLETED", "Manual database backup completed: " + publicId);
++                writeAudit(instance, actor, "DATABASE_BACKUP_COMPLETED", sourceLabel + " database backup completed: " + publicId);
+             }
+             return backupRepository.findById(jobId).orElseThrow();
+         } catch (Matrix26BackupException ex) {
+             if (createdJob != null) {
+                 backupRepository.fail(createdJob.id(), sanitize(ex.getMessage()));
+                 writeFailureReport(backupDirectory, createdJob, ex.getMessage());
+-                writeAudit(instance, actor, fullBackup ? "FULL_BACKUP_FAILED" : "DATABASE_BACKUP_FAILED", (fullBackup ? "Manual full instance backup failed: " : "Manual database backup failed: ") + createdJob.publicId());
++                writeAudit(instance, actor, fullBackup ? "FULL_BACKUP_FAILED" : "DATABASE_BACKUP_FAILED", (fullBackup ? sourceLabel + " full instance backup failed: " : sourceLabel + " database backup failed: ") + createdJob.publicId());
+             }
+             throw ex;
+         } catch (Exception ex) {
+@@ -258,7 +267,7 @@
+             if (createdJob != null) {
+                 backupRepository.fail(createdJob.id(), message);
+                 writeFailureReport(backupDirectory, createdJob, message);
+-                writeAudit(instance, actor, fullBackup ? "FULL_BACKUP_FAILED" : "DATABASE_BACKUP_FAILED", (fullBackup ? "Manual full instance backup failed: " : "Manual database backup failed: ") + createdJob.publicId());
++                writeAudit(instance, actor, fullBackup ? "FULL_BACKUP_FAILED" : "DATABASE_BACKUP_FAILED", (fullBackup ? sourceLabel + " full instance backup failed: " : sourceLabel + " database backup failed: ") + createdJob.publicId());
+             }
+             throw new Matrix26BackupException(message, ex);
+         } finally {
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/static/css/matrix26-control.css	2026-06-26 04:59:55.692339607 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/resources/static/css/matrix26-control.css	2026-06-26 05:04:47.179216030 +0000
+@@ -2329,3 +2329,67 @@
+         width: 100%;
+     }
+ }
++
++/* Matrix26 Backups Phase 3E.4 */
++.matrix26-backup-timeline {
++    display: grid;
++    gap: 0.85rem;
++}
++
++.matrix26-backup-timeline-item {
++    display: grid;
++    grid-template-columns: 92px minmax(0, 1fr) auto;
++    gap: 1rem;
++    align-items: center;
++    padding: 1rem;
++    border: 1px solid var(--matrix26-border, #dfe5ec);
++    border-radius: 14px;
++    background: var(--matrix26-surface, #fff);
++}
++
++.matrix26-backup-timeline-item time {
++    display: grid;
++    gap: 0.1rem;
++}
++
++.matrix26-backup-timeline-item time span,
++.matrix26-backup-timeline-item small {
++    color: var(--matrix26-muted, #657284);
++}
++
++.matrix26-backup-alert-list {
++    display: grid;
++    gap: 0.85rem;
++}
++
++.matrix26-backup-alert-item {
++    display: flex;
++    gap: 1rem;
++    align-items: flex-start;
++    padding: 1rem;
++    border: 1px solid var(--matrix26-border, #dfe5ec);
++    border-radius: 14px;
++    background: var(--matrix26-surface, #fff);
++}
++
++.matrix26-backup-alert-icon {
++    width: 40px;
++    height: 40px;
++    display: inline-flex;
++    align-items: center;
++    justify-content: center;
++    border-radius: 12px;
++    background: rgba(36, 87, 245, 0.1);
++    color: var(--matrix26-primary, #2457f5);
++    flex: 0 0 auto;
++}
++
++@media (max-width: 720px) {
++    .matrix26-backup-timeline-item {
++        grid-template-columns: 1fr;
++    }
++
++    .matrix26-backup-alert-item {
++        flex-wrap: wrap;
++    }
++}
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/alerts.html /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/alerts.html
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/alerts.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/alerts.html	2026-06-26 05:04:29.468328159 +0000
+@@ -0,0 +1,45 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Backup alerts')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup alerts', 'Operational conditions that require administrator attention.')}"></header>
++        <main class="matrix26-main">
++            <div th:if="${backupSuccess}" class="alert alert-success" th:text="${backupSuccess}"></div>
++            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
++                <div><span class="matrix26-eyebrow">Monitoring</span><h1 class="matrix26-page-title" th:text="${all ? 'All backup alerts' : 'Open backup alerts'}">Alerts</h1></div>
++                <div class="d-flex gap-2">
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/schedules}"><i class="bi bi-arrow-left me-1"></i>Schedules</a>
++                    <a class="btn btn-outline-primary" th:href="${all} ? @{/control-center/backups/alerts} : @{/control-center/backups/alerts(all=true)}" th:text="${all ? 'Open only' : 'Show all'}">Filter</a>
++                </div>
++            </div>
++            <section class="matrix26-panel">
++                <div th:if="${#lists.isEmpty(alerts)}" class="matrix26-empty-state">
++                    <i class="bi bi-shield-check"></i><strong>No backup alerts</strong><span>Scheduled backup prerequisites and recent recovery points are healthy.</span>
++                </div>
++                <div th:unless="${#lists.isEmpty(alerts)}" class="matrix26-backup-alert-list">
++                    <article th:each="alert : ${alerts}" class="matrix26-backup-alert-item">
++                        <span class="matrix26-backup-alert-icon"><i class="bi bi-bell-fill"></i></span>
++                        <div class="flex-grow-1">
++                            <div class="d-flex gap-2 align-items-center flex-wrap mb-1">
++                                <strong th:text="${alert.title}">Alert</strong>
++                                <span class="badge" th:classappend="${alert.severity.badgeClass}" th:text="${alert.severity.label}">Severity</span>
++                                <span class="badge" th:classappend="${alert.status.name() == 'OPEN' ? ' text-bg-danger' : ' text-bg-success'}" th:text="${alert.status}">OPEN</span>
++                            </div>
++                            <p class="mb-1" th:text="${alert.message}">Message</p>
++                            <small><code th:text="${alert.alertCode}">CODE</code> · <span th:text="${alert.instanceCode}">instance</span> · <span th:text="${#temporals.format(alert.createdAt, 'dd/MM/yyyy HH:mm:ss')}">date</span></small>
++                        </div>
++                        <form th:if="${alert.status.name() == 'OPEN'}" method="post" th:action="@{/control-center/backups/alerts/{id}/resolve(id=${alert.id})}">
++                            <button class="btn btn-sm btn-outline-success" type="submit" title="Resolve alert"><i class="bi bi-check2"></i></button>
++                        </form>
++                    </article>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/calendar.html /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/calendar.html
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/calendar.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/calendar.html	2026-06-26 05:04:29.467991803 +0000
+@@ -0,0 +1,48 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Backup calendar')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup calendar', 'Planned and completed automatic recovery points.')}"></header>
++        <main class="matrix26-main">
++            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
++                <div>
++                    <span class="matrix26-eyebrow">Scheduler calendar</span>
++                    <h1 class="matrix26-page-title">Next <span th:text="${days}">31</span> days</h1>
++                    <p class="matrix26-page-subtitle mb-0">Timezone: <strong th:text="${timezone}">America/Lima</strong></p>
++                </div>
++                <div class="d-flex gap-2">
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/schedules}"><i class="bi bi-arrow-left me-1"></i>Schedules</a>
++                    <a class="btn btn-outline-primary" th:href="@{/control-center/backups/calendar(days=90)}">90 days</a>
++                </div>
++            </div>
++
++            <section class="matrix26-panel">
++                <div th:if="${#lists.isEmpty(events)}" class="matrix26-empty-state">
++                    <i class="bi bi-calendar3"></i><strong>No calendar events</strong><span>Create and enable a backup schedule.</span>
++                </div>
++                <div th:unless="${#lists.isEmpty(events)}" class="matrix26-backup-timeline">
++                    <article th:each="event : ${events}" class="matrix26-backup-timeline-item">
++                        <time>
++                            <strong th:text="${#temporals.format(event.scheduledAt, 'dd MMM')}">25 Jun</strong>
++                            <span th:text="${#temporals.format(event.scheduledAt, 'HH:mm')}">02:00</span>
++                        </time>
++                        <div>
++                            <div class="d-flex align-items-center gap-2 flex-wrap">
++                                <strong th:text="${event.scheduleName}">Schedule</strong>
++                                <span class="badge" th:classappend="${event.badgeClass}" th:text="${event.status}">Planned</span>
++                            </div>
++                            <small th:text="${event.instanceName + ' · ' + event.instanceCode + ' · ' + event.eventType}">Instance</small>
++                        </div>
++                        <a th:if="${event.backupJobId != null}" class="btn btn-sm btn-outline-primary" th:href="@{/control-center/backups/{id}(id=${event.backupJobId})}" title="View backup"><i class="bi bi-eye"></i></a>
++                    </article>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/executions.html /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/executions.html
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/executions.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/executions.html	2026-06-26 05:04:29.468144893 +0000
+@@ -0,0 +1,43 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Backup executions')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup executions', 'Scheduled runs, retries, missed windows, and results.')}"></header>
++        <main class="matrix26-main">
++            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
++                <div><span class="matrix26-eyebrow">Execution history</span><h1 class="matrix26-page-title">Automatic backup runs</h1></div>
++                <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/schedules}"><i class="bi bi-arrow-left me-1"></i>Schedules</a>
++            </div>
++            <section class="matrix26-panel">
++                <div th:if="${#lists.isEmpty(executions)}" class="matrix26-empty-state">
++                    <i class="bi bi-list-check"></i><strong>No scheduled executions</strong><span>Automatic and manual schedule runs will appear here.</span>
++                </div>
++                <div th:unless="${#lists.isEmpty(executions)}" class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Planned</th><th>Schedule</th><th>Instance</th><th>Status</th><th>Attempts</th><th>Retry</th><th>Backup</th></tr></thead>
++                        <tbody>
++                        <tr th:each="execution : ${executions}">
++                            <td th:text="${#temporals.format(execution.plannedAt, 'dd/MM/yyyy HH:mm')}">Date</td>
++                            <td><strong th:text="${execution.scheduleName}">Schedule</strong><small><code th:text="${execution.triggerType}">Trigger</code></small></td>
++                            <td><strong th:text="${execution.instanceName}">Instance</strong><small th:text="${execution.instanceCode}">Code</small></td>
++                            <td><span class="badge" th:classappend="${execution.status.badgeClass}" th:text="${execution.status.label}">Status</span></td>
++                            <td th:text="${execution.attemptCount + ' / ' + execution.maxAttempts}">0 / 3</td>
++                            <td th:text="${execution.nextRetryAt != null ? #temporals.format(execution.nextRetryAt, 'dd/MM HH:mm') : '—'}">—</td>
++                            <td>
++                                <a th:if="${execution.backupJobId != null}" th:href="@{/control-center/backups/{id}(id=${execution.backupJobId})}" th:text="${execution.backupPublicId}">Backup</a>
++                                <span th:unless="${execution.backupJobId != null}">—</span>
++                            </td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/index.html /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/index.html
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/index.html	2026-06-26 04:59:55.812434786 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/index.html	2026-06-26 05:04:39.310785129 +0000
+@@ -12,12 +12,13 @@
+ 
+             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                 <div>
+-                    <span class="matrix26-eyebrow">Matrix26 Backups · Phase 3E.3</span>
++                    <span class="matrix26-eyebrow">Matrix26 Backups · Phase 3E.4</span>
+                     <h1 class="matrix26-page-title">Recovery backups</h1>
+-                    <p class="matrix26-page-subtitle mb-0">Encrypted recovery packages, independent reverification, retention policies, and manual cleanup preview.</p>
++                    <p class="matrix26-page-subtitle mb-0">Encrypted recovery packages, automatic schedules, retries, missed-run recovery, retention, and operational alerts.</p>
+                 </div>
+                 <div class="d-flex gap-2 flex-wrap">
+-                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/policies}"><i class="bi bi-calendar-check me-1"></i>Policies</a>
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/schedules}"><i class="bi bi-calendar2-week me-1"></i>Schedules</a>
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/alerts}"><i class="bi bi-bell me-1"></i>Alerts</a>
+                     <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/retention}"><i class="bi bi-trash3 me-1"></i>Retention</a>
+                     <a class="btn btn-primary" th:href="@{/control-center/backups/new}"><i class="bi bi-database-add me-1"></i>New backup</a>
+                 </div>
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/schedule_detail.html /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/schedule_detail.html
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/schedule_detail.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/schedule_detail.html	2026-06-26 05:04:29.467828067 +0000
+@@ -0,0 +1,92 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Backup schedule')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup schedule', 'Execution history and operational controls.')}"></header>
++        <main class="matrix26-main">
++            <div th:if="${backupSuccess}" class="alert alert-success" th:text="${backupSuccess}"></div>
++            <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
++
++            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
++                <div>
++                    <span class="matrix26-eyebrow" th:text="${schedule.instanceCode}">instance</span>
++                    <h1 class="matrix26-page-title" th:text="${schedule.name}">Schedule</h1>
++                    <p class="matrix26-page-subtitle mb-0" th:text="${schedule.scheduleLabel() + ' · ' + schedule.timezone}">Frequency</p>
++                </div>
++                <div class="d-flex gap-2 flex-wrap">
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/schedules}"><i class="bi bi-arrow-left me-1"></i>Back</a>
++                    <a class="btn btn-outline-primary" th:href="@{/control-center/backups/schedules/{id}/edit(id=${schedule.id})}"><i class="bi bi-pencil me-1"></i>Edit</a>
++                </div>
++            </div>
++
++            <div class="row g-4 mb-4">
++                <div class="col-12 col-xl-7">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Configuration</span><h2>Schedule details</h2></div></div>
++                        <dl class="matrix26-settings-list">
++                            <div><dt>Instance</dt><dd th:text="${schedule.instanceName}">Instance</dd></div>
++                            <div><dt>Next run</dt><dd th:text="${schedule.nextRunAt != null ? #temporals.format(schedule.nextRunAt, 'dd/MM/yyyy HH:mm') : 'Disabled'}">Date</dd></div>
++                            <div><dt>Encryption</dt><dd th:text="${schedule.encryptionRequired ? 'Required' : 'Optional'}">Required</dd></div>
++                            <div><dt>Retention</dt><dd th:text="${schedule.retentionClass.label}">Daily</dd></div>
++                            <div><dt>Retries</dt><dd th:text="${schedule.maxAttempts + ' attempts · ' + schedule.retryDelayMinutes + ' minute delay'}">Retries</dd></div>
++                            <div><dt>Missed run</dt><dd th:text="${schedule.missedPolicy.label}">Policy</dd></div>
++                            <div><dt>State</dt><dd><span class="badge" th:classappend="${schedule.enabled} ? ' text-bg-success' : ' text-bg-secondary'" th:text="${schedule.enabled ? 'Enabled' : 'Disabled'}">State</span></dd></div>
++                        </dl>
++                    </section>
++                </div>
++                <div class="col-12 col-xl-5">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Operations</span><h2>Controlled actions</h2></div></div>
++                        <form method="post" th:action="@{/control-center/backups/schedules/{id}/toggle(id=${schedule.id})}" class="mb-3">
++                            <input type="hidden" name="enabled" th:value="${!schedule.enabled}">
++                            <button class="btn w-100" th:classappend="${schedule.enabled} ? ' btn-outline-warning' : ' btn-outline-success'" type="submit">
++                                <i class="bi me-1" th:classappend="${schedule.enabled} ? ' bi-pause-circle' : ' bi-play-circle'"></i>
++                                <span th:text="${schedule.enabled ? 'Disable schedule' : 'Enable schedule'}">Toggle</span>
++                            </button>
++                        </form>
++                        <form method="post" th:action="@{/control-center/backups/schedules/{id}/run(id=${schedule.id})}">
++                            <label class="form-label">Type to run now</label>
++                            <code class="d-block mb-2" th:text="${'RUN BACKUP ' + schedule.instanceCode}">RUN BACKUP code</code>
++                            <input class="form-control mb-3" name="confirmation" autocomplete="off" required>
++                            <button class="btn btn-primary w-100" type="submit"><i class="bi bi-play-fill me-1"></i>Run encrypted backup now</button>
++                        </form>
++                        <div class="small text-muted mt-3">
++                            Manual schedule runs use the same lock, encryption, retry, and audit boundaries as automatic executions.
++                        </div>
++                    </section>
++                </div>
++            </div>
++
++            <section class="matrix26-panel">
++                <div class="matrix26-panel-header"><div><span>History</span><h2>Schedule executions</h2></div></div>
++                <div th:if="${#lists.isEmpty(executions)}" class="matrix26-empty-state">
++                    <i class="bi bi-clock-history"></i><strong>No executions yet</strong><span>The next run will be recorded here.</span>
++                </div>
++                <div th:unless="${#lists.isEmpty(executions)}" class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Planned</th><th>Status</th><th>Attempt</th><th>Trigger</th><th>Backup</th><th>Message</th></tr></thead>
++                        <tbody>
++                        <tr th:each="execution : ${executions}">
++                            <td th:text="${#temporals.format(execution.plannedAt, 'dd/MM/yyyy HH:mm')}">Date</td>
++                            <td><span class="badge" th:classappend="${execution.status.badgeClass}" th:text="${execution.status.label}">Status</span></td>
++                            <td th:text="${execution.attemptCount + ' / ' + execution.maxAttempts}">0 / 3</td>
++                            <td><code th:text="${execution.triggerType}">SCHEDULED</code></td>
++                            <td>
++                                <a th:if="${execution.backupJobId != null}" th:href="@{/control-center/backups/{id}(id=${execution.backupJobId})}" th:text="${execution.backupPublicId}">Backup</a>
++                                <span th:unless="${execution.backupJobId != null}">—</span>
++                            </td>
++                            <td class="small" th:text="${execution.errorMessage != null ? execution.errorMessage : '—'}">Message</td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/schedule_form.html /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/schedule_form.html
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/schedule_form.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/schedule_form.html	2026-06-26 05:06:28.053331409 +0000
+@@ -0,0 +1,165 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Backup schedule')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup schedule', 'Configure encrypted automatic recovery points.')}"></header>
++        <main class="matrix26-main">
++            <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
++            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
++                <div>
++                    <span class="matrix26-eyebrow">Scheduler</span>
++                    <h1 class="matrix26-page-title" th:text="${schedule == null ? 'New backup schedule' : 'Edit backup schedule'}">Schedule</h1>
++                    <p class="matrix26-page-subtitle mb-0">All timestamps are evaluated in the selected IANA timezone.</p>
++                </div>
++                <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/schedules}"><i class="bi bi-arrow-left me-1"></i>Back</a>
++            </div>
++
++            <form method="post" th:action="@{/control-center/backups/schedules}" class="matrix26-panel">
++                <input type="hidden" name="scheduleId" th:value="${schedule != null ? schedule.id : ''}">
++
++                <div class="matrix26-panel-header"><div><span>Target</span><h2>Instance and schedule identity</h2></div></div>
++                <div class="row g-3 mb-4">
++                    <div class="col-12 col-lg-7">
++                        <label class="form-label">Instance</label>
++                        <select class="form-select" name="instanceId" th:disabled="${schedule != null}" required>
++                            <option value="">Select an instance</option>
++                            <option th:each="candidate : ${candidates}"
++                                    th:if="${candidate.allowed}"
++                                    th:value="${candidate.instanceId}"
++                                    th:selected="${schedule != null ? schedule.instanceId == candidate.instanceId : selectedInstanceId == candidate.instanceId}"
++                                    th:text="${candidate.businessName + ' · ' + candidate.instanceCode}">
++                                Instance
++                            </option>
++                        </select>
++                        <input th:if="${schedule != null}" type="hidden" name="instanceId" th:value="${schedule.instanceId}">
++                    </div>
++                    <div class="col-12 col-lg-5">
++                        <label class="form-label">Schedule name</label>
++                        <input class="form-control" name="name" maxlength="160" required
++                               th:value="${schedule != null ? schedule.name : 'Daily encrypted backup'}">
++                    </div>
++                </div>
++
++                <div class="matrix26-panel-header"><div><span>Calendar</span><h2>Frequency and time</h2></div></div>
++                <div class="row g-3 mb-4">
++                    <div class="col-12 col-md-4">
++                        <label class="form-label">Frequency</label>
++                        <select class="form-select" name="frequency" id="frequency">
++                            <option th:each="frequency : ${frequencies}"
++                                    th:value="${frequency.name()}"
++                                    th:selected="${schedule != null ? schedule.frequency == frequency : frequency.name() == 'DAILY'}"
++                                    th:text="${frequency.label}">Daily</option>
++                        </select>
++                    </div>
++                    <div class="col-6 col-md-2" id="weeklyField">
++                        <label class="form-label">Weekday</label>
++                        <select class="form-select" name="dayOfWeek">
++                            <option value="1" th:selected="${schedule != null && schedule.dayOfWeek == 1}">Monday</option>
++                            <option value="2" th:selected="${schedule != null && schedule.dayOfWeek == 2}">Tuesday</option>
++                            <option value="3" th:selected="${schedule != null && schedule.dayOfWeek == 3}">Wednesday</option>
++                            <option value="4" th:selected="${schedule != null && schedule.dayOfWeek == 4}">Thursday</option>
++                            <option value="5" th:selected="${schedule != null && schedule.dayOfWeek == 5}">Friday</option>
++                            <option value="6" th:selected="${schedule != null && schedule.dayOfWeek == 6}">Saturday</option>
++                            <option value="7" th:selected="${schedule == null || schedule.dayOfWeek == 7}">Sunday</option>
++                        </select>
++                    </div>
++                    <div class="col-6 col-md-2" id="monthlyField">
++                        <label class="form-label">Month day</label>
++                        <input class="form-control" type="number" name="dayOfMonth" min="1" max="28"
++                               th:value="${schedule != null && schedule.dayOfMonth != null ? schedule.dayOfMonth : 1}">
++                    </div>
++                    <div class="col-6 col-md-2">
++                        <label class="form-label">Hour</label>
++                        <input class="form-control" type="number" name="hourOfDay" min="0" max="23" required
++                               th:value="${schedule != null ? schedule.hourOfDay : 2}">
++                    </div>
++                    <div class="col-6 col-md-2">
++                        <label class="form-label">Minute</label>
++                        <input class="form-control" type="number" name="minuteOfHour" min="0" max="59" required
++                               th:value="${schedule != null ? schedule.minuteOfHour : 0}">
++                    </div>
++                    <div class="col-12 col-lg-6">
++                        <label class="form-label">Timezone</label>
++                        <input class="form-control" name="timezone" required
++                               th:value="${schedule != null ? schedule.timezone : defaultTimezone}">
++                    </div>
++                </div>
++
++                <div class="matrix26-panel-header"><div><span>Recovery</span><h2>Encryption, retention, and retries</h2></div></div>
++                <div class="row g-3 mb-4">
++                    <div class="col-12 col-md-4">
++                        <label class="form-label">Retention class</label>
++                        <select class="form-select" name="retentionClass">
++                            <option th:each="retention : ${retentionClasses}"
++                                    th:value="${retention.name()}"
++                                    th:selected="${schedule != null ? schedule.retentionClass == retention : retention.name() == 'DAILY'}"
++                                    th:text="${retention.label}">Daily</option>
++                        </select>
++                    </div>
++                    <div class="col-6 col-md-2">
++                        <label class="form-label">Maximum attempts</label>
++                        <input class="form-control" type="number" name="maxAttempts" min="1" max="5"
++                               th:value="${schedule != null ? schedule.maxAttempts : 3}">
++                    </div>
++                    <div class="col-6 col-md-3">
++                        <label class="form-label">Retry delay (minutes)</label>
++                        <input class="form-control" type="number" name="retryDelayMinutes" min="1" max="1440"
++                               th:value="${schedule != null ? schedule.retryDelayMinutes : 15}">
++                    </div>
++                    <div class="col-12 col-md-3">
++                        <label class="form-label">Missed execution</label>
++                        <select class="form-select" name="missedPolicy">
++                            <option th:each="policy : ${missedPolicies}"
++                                    th:value="${policy.name()}"
++                                    th:selected="${schedule != null ? schedule.missedPolicy == policy : policy.name() == 'RUN_ON_STARTUP'}"
++                                    th:text="${policy.label}">Run on startup</option>
++                        </select>
++                    </div>
++                </div>
++
++                <div class="d-flex gap-4 flex-wrap mb-4">
++                    <div class="form-check form-switch">
++                        <input type="hidden" name="encryptionRequired" value="true">
++                        <input class="form-check-input" type="checkbox" role="switch" id="encryptionRequired"
++                               checked disabled>
++                        <label class="form-check-label" for="encryptionRequired">AES-256-GCM encryption is mandatory</label>
++                    </div>
++                    <div class="form-check form-switch">
++                        <input class="form-check-input" type="checkbox" role="switch" id="enabled"
++                               name="enabled" value="true"
++                               th:checked="${schedule == null || schedule.enabled}">
++                        <label class="form-check-label" for="enabled">Enable schedule immediately</label>
++                    </div>
++                </div>
++
++                <div class="alert alert-info small">
++                    Matrix26 executes only the latest missed window after startup. Older missed windows are recorded without generating a backlog of duplicate backups.
++                </div>
++
++                <div class="d-flex justify-content-end gap-2">
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/schedules}">Cancel</a>
++                    <button class="btn btn-primary" type="submit"><i class="bi bi-check2 me-1"></i>Save schedule</button>
++                </div>
++            </form>
++        </main>
++    </div>
++</div>
++<script>
++(function () {
++    const frequency = document.getElementById('frequency');
++    const weekly = document.getElementById('weeklyField');
++    const monthly = document.getElementById('monthlyField');
++    function updateFields() {
++        weekly.style.display = frequency.value === 'WEEKLY' ? '' : 'none';
++        monthly.style.display = frequency.value === 'MONTHLY' ? '' : 'none';
++    }
++    frequency.addEventListener('change', updateFields);
++    updateFields();
++})();
++</script>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+diff -ruN /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/schedules.html /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/schedules.html
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/backups/schedules.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/backups/schedules.html	2026-06-26 05:04:29.467347655 +0000
+@@ -0,0 +1,94 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Backup schedules')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup schedules', 'Automatic encrypted recovery points with retries and missed-run protection.')}"></header>
++        <main class="matrix26-main">
++            <div th:if="${backupSuccess}" class="alert alert-success" th:text="${backupSuccess}"></div>
++            <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
++
++            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
++                <div>
++                    <span class="matrix26-eyebrow">Matrix26 Backups · Phase 3E.4</span>
++                    <h1 class="matrix26-page-title">Scheduled backups</h1>
++                    <p class="matrix26-page-subtitle mb-0">Schedule evaluation uses <strong th:text="${timezone}">America/Lima</strong> and never queues duplicate windows.</p>
++                </div>
++                <div class="d-flex gap-2 flex-wrap">
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/calendar}"><i class="bi bi-calendar3 me-1"></i>Calendar</a>
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/executions}"><i class="bi bi-list-check me-1"></i>Executions</a>
++                    <a class="btn btn-primary" th:href="@{/control-center/backups/schedules/new}"><i class="bi bi-calendar-plus me-1"></i>New schedule</a>
++                </div>
++            </div>
++
++            <section class="matrix26-backup-summary mb-4">
++                <article><span><i class="bi bi-calendar2-check"></i></span><div><strong th:text="${summary.activeSchedules}">0</strong><small>Active schedules</small></div></article>
++                <article><span><i class="bi bi-check2-circle"></i></span><div><strong th:text="${summary.completedExecutions}">0</strong><small>Completed runs</small></div></article>
++                <article><span><i class="bi bi-x-octagon"></i></span><div><strong th:text="${summary.failedExecutions}">0</strong><small>Failed runs</small></div></article>
++                <article><span><i class="bi bi-bell"></i></span><div><strong th:text="${summary.openAlerts}">0</strong><small>Open alerts</small></div></article>
++            </section>
++
++            <div class="row g-4 mb-4">
++                <div class="col-12 col-xl-6">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Encryption</span><h2>Master key</h2></div></div>
++                        <div class="matrix26-backup-tool" th:classappend="${keyStatus.available} ? ' is-ready' : ' is-blocked'">
++                            <span><i class="bi" th:classappend="${keyStatus.available} ? ' bi-shield-lock-fill' : ' bi-shield-exclamation'"></i></span>
++                            <div>
++                                <strong th:text="${keyStatus.available ? 'Ready' : 'Blocked'}">Status</strong>
++                                <small th:text="${keyStatus.message}">Message</small>
++                                <code th:if="${keyStatus.available}" th:text="${keyStatus.keyId}">Key</code>
++                            </div>
++                        </div>
++                    </section>
++                </div>
++                <div class="col-12 col-xl-6">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Database tooling</span><h2>Dump executable</h2></div></div>
++                        <div class="matrix26-backup-tool" th:classappend="${tool.available} ? ' is-ready' : ' is-blocked'">
++                            <span><i class="bi" th:classappend="${tool.available} ? ' bi-check2-circle' : ' bi-exclamation-triangle'"></i></span>
++                            <div>
++                                <strong th:text="${tool.available ? 'Ready' : 'Blocked'}">Status</strong>
++                                <small th:text="${tool.message}">Message</small>
++                                <code th:if="${tool.available}" th:text="${tool.executable}">Tool</code>
++                            </div>
++                        </div>
++                    </section>
++                </div>
++            </div>
++
++            <section class="matrix26-panel">
++                <div class="matrix26-panel-header">
++                    <div><span>Policies</span><h2>Configured schedules</h2></div>
++                    <a th:href="@{/control-center/backups/alerts}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-bell me-1"></i>Alerts</a>
++                </div>
++                <div th:if="${#lists.isEmpty(schedules)}" class="matrix26-empty-state">
++                    <i class="bi bi-calendar2-plus"></i>
++                    <strong>No automatic backup schedules</strong>
++                    <span>Create the first encrypted schedule for the appearance laboratory.</span>
++                </div>
++                <div th:unless="${#lists.isEmpty(schedules)}" class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Schedule</th><th>Instance</th><th>Frequency</th><th>Next run</th><th>Last status</th><th>State</th><th></th></tr></thead>
++                        <tbody>
++                        <tr th:each="item : ${schedules}">
++                            <td><strong th:text="${item.name}">Schedule</strong><small th:text="${item.retentionClass.label + ' · ' + item.timezone}">Policy</small></td>
++                            <td><strong th:text="${item.instanceName}">Instance</strong><small><code th:text="${item.instanceCode}">code</code></small></td>
++                            <td th:text="${item.scheduleLabel()}">Daily</td>
++                            <td th:text="${item.nextRunAt != null ? #temporals.format(item.nextRunAt, 'dd/MM/yyyy HH:mm') : 'Disabled'}">Date</td>
++                            <td><span class="badge text-bg-secondary" th:text="${item.lastStatus != null ? item.lastStatus : 'Never'}">Never</span></td>
++                            <td><span class="badge" th:classappend="${item.enabled} ? ' text-bg-success' : ' text-bg-secondary'" th:text="${item.enabled ? 'Enabled' : 'Disabled'}">State</span></td>
++                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/backups/schedules/{id}(id=${item.id})}" title="View schedule"><i class="bi bi-eye"></i></a></td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+--- /mnt/data/matrix26_backup3e4_work_1782449995/matrix26-backups-phase3e4-context-20260625-235510/src/main/resources/templates/control_center/fragments/sidebar.html	2026-06-26 04:59:55.813241628 +0000
++++ /mnt/data/matrix26_backup3e4_impl/src/main/resources/templates/control_center/fragments/sidebar.html	2026-06-26 05:04:39.309864715 +0000
+@@ -60,6 +60,26 @@
+             <i class="bi bi-database-check"></i>
+             <span>Backups</span>
+         </a>
++        <a th:href="@{/control-center/backups/schedules}"
++           th:classappend="${activePage == 'matrix26_backup_schedules'} ? ' active' : ''">
++            <i class="bi bi-calendar2-week"></i>
++            <span>Schedules</span>
++        </a>
++        <a th:href="@{/control-center/backups/calendar}"
++           th:classappend="${activePage == 'matrix26_backup_calendar'} ? ' active' : ''">
++            <i class="bi bi-calendar3"></i>
++            <span>Backup calendar</span>
++        </a>
++        <a th:href="@{/control-center/backups/executions}"
++           th:classappend="${activePage == 'matrix26_backup_executions'} ? ' active' : ''">
++            <i class="bi bi-list-check"></i>
++            <span>Executions</span>
++        </a>
++        <a th:href="@{/control-center/backups/alerts}"
++           th:classappend="${activePage == 'matrix26_backup_alerts'} ? ' active' : ''">
++            <i class="bi bi-bell"></i>
++            <span>Backup alerts</span>
++        </a>
+         <a th:href="@{/control-center/backups/policies}"
+            th:classappend="${activePage == 'matrix26_backup_policies'} ? ' active' : ''">
+             <i class="bi bi-calendar2-check"></i>

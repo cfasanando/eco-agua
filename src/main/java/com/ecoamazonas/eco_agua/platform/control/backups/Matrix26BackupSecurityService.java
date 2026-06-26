@@ -111,8 +111,9 @@ public class Matrix26BackupSecurityService {
         if (!job.isCompleted()) {
             throw new Matrix26BackupException("Only completed backups can be encrypted.");
         }
-        if (!"MANUAL_FULL".equalsIgnoreCase(job.backupType())) {
-            throw new Matrix26BackupException("Phase 3E.3 encrypts full instance backups only.");
+        if (!"MANUAL_FULL".equalsIgnoreCase(job.backupType())
+                && !"SCHEDULED_FULL".equalsIgnoreCase(job.backupType())) {
+            throw new Matrix26BackupException("Only full instance backups can be encrypted.");
         }
         if (securityRepository.findEncryption(jobId).map(Matrix26BackupEncryption::encrypted).orElse(false)) {
             throw new Matrix26BackupException("This backup is already encrypted.");
@@ -595,7 +596,7 @@ public class Matrix26BackupSecurityService {
         values.put("formatVersion", FORMAT_VERSION);
         values.put("backupId", job.publicId());
         values.put("instanceCode", instance.getCode());
-        values.put("backupType", "MANUAL_FULL_ENCRYPTED");
+        values.put("backupType", job.backupType() + "_ENCRYPTED");
         values.put("createdAt", LocalDateTime.now().toString());
         values.put("algorithm", ALGORITHM);
         values.put("keyId", key.keyId());
@@ -620,6 +621,7 @@ public class Matrix26BackupSecurityService {
         String content = "Matrix26 encrypted backup report" + System.lineSeparator()
                 + "Backup ID: " + job.publicId() + System.lineSeparator()
                 + "Instance: " + instance.getBusinessName() + " (" + instance.getCode() + ")" + System.lineSeparator()
+                + "Backup type: " + job.backupType() + "_ENCRYPTED" + System.lineSeparator()
                 + "Encrypted at: " + LocalDateTime.now() + System.lineSeparator()
                 + "Algorithm: " + ALGORITHM + System.lineSeparator()
                 + "Key identifier: " + key.keyId() + System.lineSeparator()

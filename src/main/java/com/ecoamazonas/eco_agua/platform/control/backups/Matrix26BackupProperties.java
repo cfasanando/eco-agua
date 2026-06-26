@@ -23,6 +23,11 @@ public class Matrix26BackupProperties {
     private boolean encryptionEnabled = true;
     private String masterKeyEnvironment = "MATRIX26_BACKUP_MASTER_KEY";
     private boolean retentionEnabled = true;
+    private boolean schedulingEnabled = true;
+    private long schedulerPollMilliseconds = 60000L;
+    private long schedulerInitialDelayMilliseconds = 15000L;
+    private int schedulerGraceMinutes = 2;
+    private String scheduleTimezone = "America/Lima";
     private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of("matrix26-appearance-lab"));
 
     public boolean isEnabled() {
@@ -130,6 +135,48 @@ public class Matrix26BackupProperties {
 
     public void setRetentionEnabled(boolean retentionEnabled) {
         this.retentionEnabled = retentionEnabled;
+    }
+
+
+
+    public boolean isSchedulingEnabled() {
+        return schedulingEnabled;
+    }
+
+    public void setSchedulingEnabled(boolean schedulingEnabled) {
+        this.schedulingEnabled = schedulingEnabled;
+    }
+
+    public long getSchedulerPollMilliseconds() {
+        return schedulerPollMilliseconds;
+    }
+
+    public void setSchedulerPollMilliseconds(long schedulerPollMilliseconds) {
+        this.schedulerPollMilliseconds = schedulerPollMilliseconds;
+    }
+
+    public long getSchedulerInitialDelayMilliseconds() {
+        return schedulerInitialDelayMilliseconds;
+    }
+
+    public void setSchedulerInitialDelayMilliseconds(long schedulerInitialDelayMilliseconds) {
+        this.schedulerInitialDelayMilliseconds = schedulerInitialDelayMilliseconds;
+    }
+
+    public int getSchedulerGraceMinutes() {
+        return schedulerGraceMinutes;
+    }
+
+    public void setSchedulerGraceMinutes(int schedulerGraceMinutes) {
+        this.schedulerGraceMinutes = schedulerGraceMinutes;
+    }
+
+    public String getScheduleTimezone() {
+        return scheduleTimezone;
+    }
+
+    public void setScheduleTimezone(String scheduleTimezone) {
+        this.scheduleTimezone = scheduleTimezone;
     }
 
     public Set<String> getAllowedInstanceCodes() {

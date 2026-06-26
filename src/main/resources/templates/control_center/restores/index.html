@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Restore Manager')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Restore Manager', 'Verified encrypted backups restored only into isolated clone targets.')}" ></header>
+        <main class="matrix26-main">
+            <div th:if="${restoreSuccess}" class="alert alert-success" th:text="${restoreSuccess}"></div>
+            <div th:if="${restoreError}" class="alert alert-danger" th:text="${restoreError}"></div>
+
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                <div>
+                    <span class="matrix26-eyebrow">Matrix26 Restore Manager · Phase 3F.1</span>
+                    <h1 class="matrix26-page-title">Isolated clone restoration</h1>
+                    <p class="matrix26-page-subtitle mb-0">Decrypt, verify, import, restore files, generate a runtime, and register a separate recovery clone.</p>
+                </div>
+                <a class="btn btn-primary" th:href="@{/control-center/restores/new}"><i class="bi bi-arrow-counterclockwise me-1"></i>New clone restore</a>
+            </div>
+
+            <section class="matrix26-backup-summary mb-4">
+                <article><span><i class="bi bi-arrow-repeat"></i></span><div><strong th:text="${summary.total}">0</strong><small>Total jobs</small></div></article>
+                <article><span><i class="bi bi-check2-circle"></i></span><div><strong th:text="${summary.completed}">0</strong><small>Completed</small></div></article>
+                <article><span><i class="bi bi-x-octagon"></i></span><div><strong th:text="${summary.failed}">0</strong><small>Failed / cleanup</small></div></article>
+                <article><span><i class="bi bi-hourglass-split"></i></span><div><strong th:text="${summary.running}">0</strong><small>In progress</small></div></article>
+            </section>
+
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-xl-7">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Fixed recovery target</span><h2>Phase 3F.1 safety boundary</h2></div></div>
+                        <dl class="matrix26-settings-list">
+                            <div><dt>Instance code</dt><dd><code th:text="${restoreProperties.targetInstanceCode}">matrix26-restore-test</code></dd></div>
+                            <div><dt>Database</dt><dd><code th:text="${restoreProperties.targetDatabaseName}">matrix26_restore_test</code></dd></div>
+                            <div><dt>Runtime</dt><dd><code th:text="${restoreProperties.targetRuntimeProfile}">matrix26_restore_test</code></dd></div>
+                            <div><dt>Port</dt><dd th:text="${restoreProperties.targetRuntimePort}">8095</dd></div>
+                            <div><dt>URL</dt><dd><code th:text="${restoreProperties.targetPublicUrl}">http://localhost:8095</code></dd></div>
+                        </dl>
+                    </section>
+                </div>
+                <div class="col-12 col-xl-5">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Isolation rules</span><h2>No overwrite mode</h2></div></div>
+                        <ul class="matrix26-check-list mb-0">
+                            <li><i class="bi bi-check-circle-fill"></i>Encrypted and verified full backups only.</li>
+                            <li><i class="bi bi-check-circle-fill"></i>No existing database, runtime, instance, directory, or port reuse.</li>
+                            <li><i class="bi bi-check-circle-fill"></i>The original 8094 instance remains unchanged.</li>
+                            <li><i class="bi bi-check-circle-fill"></i>Partial results require explicit cleanup review.</li>
+                        </ul>
+                    </section>
+                </div>
+            </div>
+
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header"><div><span>Recovery sources</span><h2>Eligible encrypted backups</h2></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle matrix26-table">
+                        <thead><tr><th>Backup</th><th>Source</th><th>Created</th><th>Encryption</th><th>Status</th><th class="text-end">Action</th></tr></thead>
+                        <tbody>
+                        <tr th:each="candidate : ${candidates}">
+                            <td><strong th:text="${candidate.backup.publicId}">BKP</strong><small th:text="${candidate.backup.backupType}">FULL</small></td>
+                            <td><strong th:text="${candidate.backup.instanceName}">Instance</strong><small><code th:text="${candidate.backup.instanceCode}">code</code></small></td>
+                            <td th:text="${#temporals.format(candidate.backup.requestedAt, 'dd/MM/yyyy HH:mm')}">date</td>
+                            <td><span th:if="${candidate.encryption != null}" class="badge text-bg-success" th:text="${candidate.encryption.algorithm}">AES</span><span th:unless="${candidate.encryption != null}" class="badge text-bg-secondary">None</span></td>
+                            <td><span class="badge" th:classappend="${candidate.eligible ? 'text-bg-success' : 'text-bg-warning'}" th:text="${candidate.eligible ? 'Ready' : 'Blocked'}">Ready</span><small th:text="${candidate.reason}">reason</small></td>
+                            <td class="text-end"><a th:if="${candidate.eligible}" class="btn btn-sm btn-outline-primary" th:href="@{/control-center/restores/new(backupId=${candidate.backup.id})}"><i class="bi bi-arrow-counterclockwise"></i><span class="visually-hidden">Restore</span></a></td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(candidates)}"><td colspan="6" class="text-center text-muted py-4">No encrypted verified full backup is available.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><span>History</span><h2>Restore jobs</h2></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle matrix26-table">
+                        <thead><tr><th>Job</th><th>Backup</th><th>Target</th><th>Requested</th><th>Status</th><th class="text-end">Details</th></tr></thead>
+                        <tbody>
+                        <tr th:each="job : ${jobs}">
+                            <td><strong th:text="${job.publicId}">RST</strong><small th:text="${job.requestedBy}">actor</small></td>
+                            <td><code th:text="${job.backupPublicId}">BKP</code></td>
+                            <td><strong th:text="${job.targetInstanceName}">Clone</strong><small><code th:text="${job.targetInstanceCode}">code</code> · port <span th:text="${job.targetRuntimePort}">8095</span></small></td>
+                            <td th:text="${#temporals.format(job.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">date</td>
+                            <td><span class="badge" th:classappend="${job.status.badgeClass}" th:text="${job.status.label}">Status</span></td>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/restores/{id}(id=${job.id})}"><i class="bi bi-eye"></i><span class="visually-hidden">Open</span></a></td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(jobs)}"><td colspan="6" class="text-center text-muted py-4">No restore jobs yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

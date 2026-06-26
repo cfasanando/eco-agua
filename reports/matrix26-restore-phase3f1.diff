@@ -1,0 +1,1930 @@
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupExtraction.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupExtraction.java	2026-06-26 06:40:59.218984591 +0000
+@@ -0,0 +1,12 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import java.nio.file.Path;
++
++public record Matrix26BackupExtraction(
++        Matrix26BackupJob job,
++        Matrix26BackupEncryption encryption,
++        Path extractedDirectory,
++        int entryCount,
++        String verificationMessage
++) {
++}
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityService.java	2026-06-26 06:38:22.766951858 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityService.java	2026-06-26 06:40:59.219963883 +0000
+@@ -290,6 +290,79 @@
+         }
+     }
+ 
++    public Matrix26BackupExtraction extractVerifiedBackup(long jobId, Path destination) {
++        Matrix26BackupJob job = backupRepository.findById(jobId)
++                .orElseThrow(() -> new Matrix26BackupException("The requested backup does not exist."));
++        Matrix26BackupEncryption metadata = securityRepository.findEncryption(jobId)
++                .orElseThrow(() -> new Matrix26BackupException("The backup is not encrypted."));
++        if (!job.isCompleted()) {
++            throw new Matrix26BackupException("Only completed backups can be restored.");
++        }
++        if (!metadata.encrypted() || metadata.verificationStatus() != Matrix26BackupVerificationState.VERIFIED) {
++            throw new Matrix26BackupException("The backup must be encrypted and verified before restoration.");
++        }
++
++        KeyMaterial key = keyMaterial();
++        if (!key.keyId().equals(metadata.keyId())) {
++            throw new Matrix26BackupException(
++                    "The available master key does not match backup key identifier " + metadata.keyId() + "."
++            );
++        }
++
++        Path root = backupRoot();
++        Path packageFile = root.resolve(metadata.packagePath()).normalize();
++        ensureInside(root, packageFile);
++        if (!Files.isRegularFile(packageFile)) {
++            throw new Matrix26BackupException("The encrypted package file is missing.");
++        }
++        try {
++            String currentSha = sha256(packageFile);
++            if (!currentSha.equalsIgnoreCase(metadata.packageSha256())) {
++                throw new Matrix26BackupException("The encrypted package SHA-256 no longer matches its registered value.");
++            }
++
++            Path output = destination.toAbsolutePath().normalize();
++            if (Files.exists(output)) {
++                try (var entries = Files.list(output)) {
++                    if (entries.findAny().isPresent()) {
++                        throw new Matrix26BackupException("The restore extraction directory must be empty.");
++                    }
++                }
++            }
++            Files.createDirectories(output);
++            Path decryptedZip = output.resolve("payload.zip");
++            decrypt(packageFile, decryptedZip, key);
++            Path extracted = output.resolve("payload");
++            Files.createDirectories(extracted);
++            int entryCount = extractZipSafely(decryptedZip, extracted);
++            Files.deleteIfExists(decryptedZip);
++
++            Path checksums = extracted.resolve("checksums.sha256");
++            if (!Files.isRegularFile(checksums)) {
++                throw new Matrix26BackupException("Internal checksums.sha256 is missing.");
++            }
++            List<String> failures = verifyInternalChecksums(extracted, checksums);
++            if (!failures.isEmpty()) {
++                throw new Matrix26BackupException("Internal checksum failures: " + String.join(", ", failures));
++            }
++            if (!Files.isRegularFile(extracted.resolve("database.sql.gz"))
++                    || !Files.isRegularFile(extracted.resolve("manifest.json"))
++                    || !Files.isRegularFile(extracted.resolve("instance-files.zip"))) {
++                throw new Matrix26BackupException(
++                        "Required database, manifest, or instance archive artifact is missing."
++                );
++            }
++            String message = entryCount + " encrypted entries and all internal SHA-256 checks passed.";
++            return new Matrix26BackupExtraction(job, metadata, extracted, entryCount, message);
++        } catch (Matrix26BackupException ex) {
++            throw ex;
++        } catch (GeneralSecurityException ex) {
++            throw new Matrix26BackupException("AES-GCM authentication failed or the key is incorrect.", ex);
++        } catch (IOException ex) {
++            throw new Matrix26BackupException("The encrypted backup could not be extracted: " + safeMessage(ex), ex);
++        }
++    }
++
+     public Matrix26BackupPolicy policy(long instanceId) {
+         PlatformBusinessClient instance = clientRepository.findById(instanceId)
+                 .orElseThrow(() -> new Matrix26BackupException("The requested instance does not exist."));
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsProperties.java	2026-06-26 06:38:22.771011220 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsProperties.java	2026-06-26 06:43:59.316142022 +0000
+@@ -20,7 +20,8 @@
+     private boolean runtimeControlEnabled = true;
+     private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of(
+             "matrix26-restaurant-lab",
+-            "matrix26-appearance-lab"
++            "matrix26-appearance-lab",
++            "matrix26-restore-test"
+     ));
+     private int startTimeoutSeconds = 45;
+     private int stopTimeoutSeconds = 25;
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreArtifact.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreArtifact.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreArtifact.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreArtifact.java	2026-06-26 06:41:21.517033734 +0000
+@@ -0,0 +1,15 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++import java.time.LocalDateTime;
++
++public record Matrix26RestoreArtifact(
++        Long id,
++        Long restoreJobId,
++        String artifactType,
++        String path,
++        Long sizeBytes,
++        String sha256,
++        String status,
++        LocalDateTime createdAt
++) {
++}
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreCandidate.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreCandidate.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreCandidate.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreCandidate.java	2026-06-26 06:41:21.517160464 +0000
+@@ -0,0 +1,12 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupEncryption;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupJob;
++
++public record Matrix26RestoreCandidate(
++        Matrix26BackupJob backup,
++        Matrix26BackupEncryption encryption,
++        boolean eligible,
++        String reason
++) {
++}
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreController.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreController.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreController.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreController.java	2026-06-26 06:43:11.212422643 +0000
+@@ -0,0 +1,82 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Controller;
++import org.springframework.ui.Model;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
++import org.springframework.web.servlet.mvc.support.RedirectAttributes;
++
++import java.security.Principal;
++
++@Controller
++@RequestMapping("/control-center/restores")
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26RestoreController {
++
++    private final Matrix26RestoreService restoreService;
++
++    public Matrix26RestoreController(Matrix26RestoreService restoreService) {
++        this.restoreService = restoreService;
++    }
++
++    @GetMapping
++    public String index(Model model) {
++        model.addAttribute("activePage", "matrix26_restores");
++        model.addAttribute("summary", restoreService.summary());
++        model.addAttribute("jobs", restoreService.recentJobs());
++        model.addAttribute("candidates", restoreService.candidates());
++        model.addAttribute("restoreProperties", restoreService.properties());
++        return "control_center/restores/index";
++    }
++
++    @GetMapping("/new")
++    public String newRestore(@RequestParam(value = "backupId", required = false) Long backupId, Model model) {
++        model.addAttribute("activePage", "matrix26_restores");
++        model.addAttribute("candidates", restoreService.candidates());
++        model.addAttribute("selectedBackupId", backupId);
++        model.addAttribute("restoreProperties", restoreService.properties());
++        return "control_center/restores/new";
++    }
++
++    @PostMapping
++    public String execute(
++            @RequestParam("backupId") long backupId,
++            @RequestParam(value = "startAfterRestore", defaultValue = "false") boolean startAfterRestore,
++            @RequestParam("confirmation") String confirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            Matrix26RestoreJob job = restoreService.restoreClone(
++                    backupId,
++                    startAfterRestore,
++                    confirmation,
++                    principal == null ? "matrix26-admin" : principal.getName()
++            );
++            redirectAttributes.addFlashAttribute("restoreSuccess", "Restore job completed: " + job.publicId());
++            return "redirect:/control-center/restores/" + job.id();
++        } catch (Matrix26RestoreException ex) {
++            redirectAttributes.addFlashAttribute("restoreError", ex.getMessage());
++            return "redirect:/control-center/restores/new?backupId=" + backupId;
++        }
++    }
++
++    @GetMapping("/{id}")
++    public String detail(@PathVariable long id, Model model) {
++        model.addAttribute("activePage", "matrix26_restores");
++        model.addAttribute("job", restoreService.job(id));
++        model.addAttribute("steps", restoreService.steps(id));
++        model.addAttribute("artifacts", restoreService.artifacts(id));
++        model.addAttribute("verifications", restoreService.verifications(id));
++        return "control_center/restores/detail";
++    }
++
++    @GetMapping("/{id}/steps")
++    public String steps(@PathVariable long id) {
++        return "redirect:/control-center/restores/" + id + "#restore-steps";
++    }
++}
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreException.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreException.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreException.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreException.java	2026-06-26 06:41:21.517360675 +0000
+@@ -0,0 +1,6 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++public class Matrix26RestoreException extends RuntimeException {
++    public Matrix26RestoreException(String message) { super(message); }
++    public Matrix26RestoreException(String message, Throwable cause) { super(message, cause); }
++}
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreInitializer.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreInitializer.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreInitializer.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreInitializer.java	2026-06-26 06:41:32.418004872 +0000
+@@ -0,0 +1,106 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.stereotype.Component;
++
++import jakarta.annotation.PostConstruct;
++
++@Component
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26RestoreInitializer {
++
++    private final JdbcTemplate jdbcTemplate;
++
++    public Matrix26RestoreInitializer(JdbcTemplate jdbcTemplate) {
++        this.jdbcTemplate = jdbcTemplate;
++    }
++
++    @PostConstruct
++    public void initialize() {
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_restore_job (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    public_id VARCHAR(80) NOT NULL,
++                    backup_job_id BIGINT NOT NULL,
++                    backup_public_id VARCHAR(80) NOT NULL,
++                    source_instance_id BIGINT NOT NULL,
++                    source_instance_code VARCHAR(80) NOT NULL,
++                    source_instance_name VARCHAR(180) NOT NULL,
++                    source_database_name VARCHAR(120) NOT NULL,
++                    target_instance_id BIGINT NULL,
++                    target_instance_code VARCHAR(80) NOT NULL,
++                    target_instance_name VARCHAR(180) NOT NULL,
++                    target_database_name VARCHAR(120) NOT NULL,
++                    target_runtime_profile VARCHAR(120) NOT NULL,
++                    target_runtime_port INT NOT NULL,
++                    target_public_url VARCHAR(500) NOT NULL,
++                    status VARCHAR(40) NOT NULL,
++                    start_after_restore BIT NOT NULL DEFAULT 1,
++                    requested_by VARCHAR(120) NOT NULL,
++                    requested_at DATETIME(6) NOT NULL,
++                    started_at DATETIME(6) NULL,
++                    completed_at DATETIME(6) NULL,
++                    temporary_directory VARCHAR(900) NULL,
++                    last_error TEXT NULL,
++                    PRIMARY KEY (id),
++                    UNIQUE KEY uk_matrix26_restore_public_id (public_id),
++                    KEY idx_matrix26_restore_backup (backup_job_id),
++                    KEY idx_matrix26_restore_status (status, requested_at),
++                    KEY idx_matrix26_restore_target (target_instance_code, target_database_name)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_restore_step (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    restore_job_id BIGINT NOT NULL,
++                    step_code VARCHAR(80) NOT NULL,
++                    sequence_number INT NOT NULL,
++                    label VARCHAR(180) NOT NULL,
++                    status VARCHAR(30) NOT NULL,
++                    detail TEXT NULL,
++                    started_at DATETIME(6) NULL,
++                    completed_at DATETIME(6) NULL,
++                    PRIMARY KEY (id),
++                    UNIQUE KEY uk_matrix26_restore_step (restore_job_id, step_code),
++                    KEY idx_matrix26_restore_step_order (restore_job_id, sequence_number),
++                    CONSTRAINT fk_matrix26_restore_step_job
++                        FOREIGN KEY (restore_job_id) REFERENCES matrix26_restore_job(id)
++                        ON DELETE CASCADE
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_restore_artifact (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    restore_job_id BIGINT NOT NULL,
++                    artifact_type VARCHAR(60) NOT NULL,
++                    path VARCHAR(900) NOT NULL,
++                    size_bytes BIGINT NULL,
++                    sha256 VARCHAR(64) NULL,
++                    status VARCHAR(30) NOT NULL,
++                    created_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    KEY idx_matrix26_restore_artifact_job (restore_job_id),
++                    CONSTRAINT fk_matrix26_restore_artifact_job
++                        FOREIGN KEY (restore_job_id) REFERENCES matrix26_restore_job(id)
++                        ON DELETE CASCADE
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_restore_verification (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    restore_job_id BIGINT NOT NULL,
++                    check_code VARCHAR(80) NOT NULL,
++                    label VARCHAR(180) NOT NULL,
++                    status VARCHAR(30) NOT NULL,
++                    detail TEXT NULL,
++                    checked_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    KEY idx_matrix26_restore_verification_job (restore_job_id),
++                    CONSTRAINT fk_matrix26_restore_verification_job
++                        FOREIGN KEY (restore_job_id) REFERENCES matrix26_restore_job(id)
++                        ON DELETE CASCADE
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++    }
++}
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreJob.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreJob.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreJob.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreJob.java	2026-06-26 06:41:21.516894655 +0000
+@@ -0,0 +1,32 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++import java.time.LocalDateTime;
++
++public record Matrix26RestoreJob(
++        Long id,
++        String publicId,
++        Long backupJobId,
++        String backupPublicId,
++        Long sourceInstanceId,
++        String sourceInstanceCode,
++        String sourceInstanceName,
++        String sourceDatabaseName,
++        Long targetInstanceId,
++        String targetInstanceCode,
++        String targetInstanceName,
++        String targetDatabaseName,
++        String targetRuntimeProfile,
++        Integer targetRuntimePort,
++        String targetPublicUrl,
++        Matrix26RestoreStatus status,
++        boolean startAfterRestore,
++        String requestedBy,
++        LocalDateTime requestedAt,
++        LocalDateTime startedAt,
++        LocalDateTime completedAt,
++        String temporaryDirectory,
++        String lastError
++) {
++    public boolean completed() { return status == Matrix26RestoreStatus.COMPLETED; }
++    public boolean failed() { return status == Matrix26RestoreStatus.FAILED || status == Matrix26RestoreStatus.CLEANUP_REQUIRED; }
++}
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreProperties.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreProperties.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreProperties.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreProperties.java	2026-06-26 06:41:21.517300054 +0000
+@@ -0,0 +1,52 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++import org.springframework.boot.context.properties.ConfigurationProperties;
++import org.springframework.stereotype.Component;
++
++import java.util.LinkedHashSet;
++import java.util.Set;
++
++@Component
++@ConfigurationProperties(prefix = "matrix26.control-center.restores")
++public class Matrix26RestoreProperties {
++    private boolean enabled = true;
++    private Set<String> allowedSourceInstanceCodes = new LinkedHashSet<>(Set.of("matrix26-appearance-lab"));
++    private String targetInstanceCode = "matrix26-restore-test";
++    private String targetInstanceName = "Matrix26 Restore Test";
++    private String targetDatabaseName = "matrix26_restore_test";
++    private String targetRuntimeProfile = "matrix26_restore_test";
++    private int targetRuntimePort = 8095;
++    private String targetPublicUrl = "http://localhost:8095";
++    private String runtimeDirectory = "runtime-clients";
++    private String runtimeDataDirectory = "runtime-data";
++    private String importExecutable = "";
++    private long processTimeoutSeconds = 1200L;
++    private boolean startAfterRestoreDefault = true;
++
++    public boolean isEnabled() { return enabled; }
++    public void setEnabled(boolean enabled) { this.enabled = enabled; }
++    public Set<String> getAllowedSourceInstanceCodes() { return allowedSourceInstanceCodes; }
++    public void setAllowedSourceInstanceCodes(Set<String> values) { allowedSourceInstanceCodes = values == null ? new LinkedHashSet<>() : new LinkedHashSet<>(values); }
++    public String getTargetInstanceCode() { return targetInstanceCode; }
++    public void setTargetInstanceCode(String value) { targetInstanceCode = value; }
++    public String getTargetInstanceName() { return targetInstanceName; }
++    public void setTargetInstanceName(String value) { targetInstanceName = value; }
++    public String getTargetDatabaseName() { return targetDatabaseName; }
++    public void setTargetDatabaseName(String value) { targetDatabaseName = value; }
++    public String getTargetRuntimeProfile() { return targetRuntimeProfile; }
++    public void setTargetRuntimeProfile(String value) { targetRuntimeProfile = value; }
++    public int getTargetRuntimePort() { return targetRuntimePort; }
++    public void setTargetRuntimePort(int value) { targetRuntimePort = value; }
++    public String getTargetPublicUrl() { return targetPublicUrl; }
++    public void setTargetPublicUrl(String value) { targetPublicUrl = value; }
++    public String getRuntimeDirectory() { return runtimeDirectory; }
++    public void setRuntimeDirectory(String value) { runtimeDirectory = value; }
++    public String getRuntimeDataDirectory() { return runtimeDataDirectory; }
++    public void setRuntimeDataDirectory(String value) { runtimeDataDirectory = value; }
++    public String getImportExecutable() { return importExecutable; }
++    public void setImportExecutable(String value) { importExecutable = value; }
++    public long getProcessTimeoutSeconds() { return processTimeoutSeconds; }
++    public void setProcessTimeoutSeconds(long value) { processTimeoutSeconds = value; }
++    public boolean isStartAfterRestoreDefault() { return startAfterRestoreDefault; }
++    public void setStartAfterRestoreDefault(boolean value) { startAfterRestoreDefault = value; }
++}
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreRepository.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreRepository.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreRepository.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreRepository.java	2026-06-26 06:41:51.996127807 +0000
+@@ -0,0 +1,216 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.core.RowMapper;
++import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
++import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
++import org.springframework.stereotype.Repository;
++
++import java.time.LocalDateTime;
++import java.util.List;
++import java.util.Optional;
++
++@Repository
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26RestoreRepository {
++
++    private final JdbcTemplate jdbcTemplate;
++
++    public Matrix26RestoreRepository(JdbcTemplate jdbcTemplate) {
++        this.jdbcTemplate = jdbcTemplate;
++    }
++
++    public long insertJob(Matrix26RestoreJob job) {
++        Number key = new SimpleJdbcInsert(jdbcTemplate)
++                .withTableName("matrix26_restore_job")
++                .usingGeneratedKeyColumns("id")
++                .executeAndReturnKey(new MapSqlParameterSource()
++                        .addValue("public_id", job.publicId())
++                        .addValue("backup_job_id", job.backupJobId())
++                        .addValue("backup_public_id", job.backupPublicId())
++                        .addValue("source_instance_id", job.sourceInstanceId())
++                        .addValue("source_instance_code", job.sourceInstanceCode())
++                        .addValue("source_instance_name", job.sourceInstanceName())
++                        .addValue("source_database_name", job.sourceDatabaseName())
++                        .addValue("target_instance_id", job.targetInstanceId())
++                        .addValue("target_instance_code", job.targetInstanceCode())
++                        .addValue("target_instance_name", job.targetInstanceName())
++                        .addValue("target_database_name", job.targetDatabaseName())
++                        .addValue("target_runtime_profile", job.targetRuntimeProfile())
++                        .addValue("target_runtime_port", job.targetRuntimePort())
++                        .addValue("target_public_url", job.targetPublicUrl())
++                        .addValue("status", job.status().name())
++                        .addValue("start_after_restore", job.startAfterRestore())
++                        .addValue("requested_by", job.requestedBy())
++                        .addValue("requested_at", job.requestedAt())
++                        .addValue("temporary_directory", job.temporaryDirectory()));
++        return key.longValue();
++    }
++
++    public void insertStep(long jobId, String code, int sequence, String label) {
++        jdbcTemplate.update("""
++                INSERT INTO matrix26_restore_step (
++                    restore_job_id, step_code, sequence_number, label, status
++                ) VALUES (?, ?, ?, ?, ?)
++                """, jobId, code, sequence, label, Matrix26RestoreStepStatus.PENDING.name());
++    }
++
++    public void updateJobStatus(long id, Matrix26RestoreStatus status) {
++        jdbcTemplate.update("UPDATE matrix26_restore_job SET status = ? WHERE id = ?", status.name(), id);
++    }
++
++    public void markStarted(long id, String temporaryDirectory) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_restore_job
++                SET status = ?, started_at = ?, temporary_directory = ?, last_error = NULL
++                WHERE id = ?
++                """, Matrix26RestoreStatus.VALIDATING.name(), LocalDateTime.now(), temporaryDirectory, id);
++    }
++
++    public void setTargetInstance(long id, long targetInstanceId) {
++        jdbcTemplate.update("UPDATE matrix26_restore_job SET target_instance_id = ? WHERE id = ?", targetInstanceId, id);
++    }
++
++    public void complete(long id) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_restore_job
++                SET status = ?, completed_at = ?, temporary_directory = NULL, last_error = NULL
++                WHERE id = ?
++                """, Matrix26RestoreStatus.COMPLETED.name(), LocalDateTime.now(), id);
++    }
++
++    public void fail(long id, Matrix26RestoreStatus status, String error) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_restore_job
++                SET status = ?, completed_at = ?, last_error = ?
++                WHERE id = ?
++                """, status.name(), LocalDateTime.now(), limit(error, 8000), id);
++    }
++
++    public void startStep(long jobId, String code, String detail) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_restore_step
++                SET status = ?, detail = ?, started_at = ?, completed_at = NULL
++                WHERE restore_job_id = ? AND step_code = ?
++                """, Matrix26RestoreStepStatus.RUNNING.name(), limit(detail, 8000), LocalDateTime.now(), jobId, code);
++    }
++
++    public void completeStep(long jobId, String code, String detail) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_restore_step
++                SET status = ?, detail = ?, completed_at = ?
++                WHERE restore_job_id = ? AND step_code = ?
++                """, Matrix26RestoreStepStatus.COMPLETED.name(), limit(detail, 8000), LocalDateTime.now(), jobId, code);
++    }
++
++    public void failStep(long jobId, String code, String detail) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_restore_step
++                SET status = ?, detail = ?, completed_at = ?
++                WHERE restore_job_id = ? AND step_code = ?
++                """, Matrix26RestoreStepStatus.FAILED.name(), limit(detail, 8000), LocalDateTime.now(), jobId, code);
++    }
++
++    public void skipStep(long jobId, String code, String detail) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_restore_step
++                SET status = ?, detail = ?, completed_at = ?
++                WHERE restore_job_id = ? AND step_code = ?
++                """, Matrix26RestoreStepStatus.SKIPPED.name(), limit(detail, 8000), LocalDateTime.now(), jobId, code);
++    }
++
++    public void insertArtifact(long jobId, String type, String path, Long size, String sha, String status) {
++        jdbcTemplate.update("""
++                INSERT INTO matrix26_restore_artifact (
++                    restore_job_id, artifact_type, path, size_bytes, sha256, status, created_at
++                ) VALUES (?, ?, ?, ?, ?, ?, ?)
++                """, jobId, type, path, size, sha, status, LocalDateTime.now());
++    }
++
++    public void insertVerification(long jobId, String code, String label, String status, String detail) {
++        jdbcTemplate.update("""
++                INSERT INTO matrix26_restore_verification (
++                    restore_job_id, check_code, label, status, detail, checked_at
++                ) VALUES (?, ?, ?, ?, ?, ?)
++                """, jobId, code, label, status, limit(detail, 8000), LocalDateTime.now());
++    }
++
++    public Optional<Matrix26RestoreJob> findById(long id) {
++        return jdbcTemplate.query("SELECT * FROM matrix26_restore_job WHERE id = ?", jobMapper(), id)
++                .stream().findFirst();
++    }
++
++    public List<Matrix26RestoreJob> findRecent() {
++        return jdbcTemplate.query("SELECT * FROM matrix26_restore_job ORDER BY requested_at DESC, id DESC LIMIT 100", jobMapper());
++    }
++
++    public List<Matrix26RestoreStep> findSteps(long jobId) {
++        return jdbcTemplate.query("SELECT * FROM matrix26_restore_step WHERE restore_job_id = ? ORDER BY sequence_number, id",
++                (rs, rowNum) -> new Matrix26RestoreStep(
++                        rs.getLong("id"), rs.getLong("restore_job_id"), rs.getString("step_code"),
++                        rs.getInt("sequence_number"), rs.getString("label"),
++                        Matrix26RestoreStepStatus.valueOf(rs.getString("status")), rs.getString("detail"),
++                        rs.getObject("started_at", LocalDateTime.class), rs.getObject("completed_at", LocalDateTime.class)
++                ), jobId);
++    }
++
++    public List<Matrix26RestoreArtifact> findArtifacts(long jobId) {
++        return jdbcTemplate.query("SELECT * FROM matrix26_restore_artifact WHERE restore_job_id = ? ORDER BY id",
++                (rs, rowNum) -> new Matrix26RestoreArtifact(
++                        rs.getLong("id"), rs.getLong("restore_job_id"), rs.getString("artifact_type"),
++                        rs.getString("path"), rs.getObject("size_bytes", Long.class), rs.getString("sha256"),
++                        rs.getString("status"), rs.getObject("created_at", LocalDateTime.class)
++                ), jobId);
++    }
++
++    public List<Matrix26RestoreVerification> findVerifications(long jobId) {
++        return jdbcTemplate.query("SELECT * FROM matrix26_restore_verification WHERE restore_job_id = ? ORDER BY id",
++                (rs, rowNum) -> new Matrix26RestoreVerification(
++                        rs.getLong("id"), rs.getLong("restore_job_id"), rs.getString("check_code"),
++                        rs.getString("label"), rs.getString("status"), rs.getString("detail"),
++                        rs.getObject("checked_at", LocalDateTime.class)
++                ), jobId);
++    }
++
++    public Matrix26RestoreSummary summary() {
++        return jdbcTemplate.queryForObject("""
++                SELECT COUNT(*) AS total,
++                       SUM(status = 'COMPLETED') AS completed,
++                       SUM(status IN ('FAILED','CLEANUP_REQUIRED')) AS failed,
++                       SUM(status NOT IN ('COMPLETED','FAILED','CLEANUP_REQUIRED','CANCELLED')) AS running
++                FROM matrix26_restore_job
++                """, (rs, rowNum) -> new Matrix26RestoreSummary(
++                        rs.getLong("total"), rs.getLong("completed"), rs.getLong("failed"), rs.getLong("running")
++                ));
++    }
++
++    public boolean hasActiveRestore() {
++        Integer count = jdbcTemplate.queryForObject("""
++                SELECT COUNT(*) FROM matrix26_restore_job
++                WHERE status NOT IN ('COMPLETED','FAILED','CLEANUP_REQUIRED','CANCELLED')
++                """, Integer.class);
++        return count != null && count > 0;
++    }
++
++    private RowMapper<Matrix26RestoreJob> jobMapper() {
++        return (rs, rowNum) -> new Matrix26RestoreJob(
++                rs.getLong("id"), rs.getString("public_id"), rs.getLong("backup_job_id"),
++                rs.getString("backup_public_id"), rs.getLong("source_instance_id"),
++                rs.getString("source_instance_code"), rs.getString("source_instance_name"),
++                rs.getString("source_database_name"), rs.getObject("target_instance_id", Long.class),
++                rs.getString("target_instance_code"), rs.getString("target_instance_name"),
++                rs.getString("target_database_name"), rs.getString("target_runtime_profile"),
++                rs.getInt("target_runtime_port"), rs.getString("target_public_url"),
++                Matrix26RestoreStatus.valueOf(rs.getString("status")), rs.getBoolean("start_after_restore"),
++                rs.getString("requested_by"), rs.getObject("requested_at", LocalDateTime.class),
++                rs.getObject("started_at", LocalDateTime.class), rs.getObject("completed_at", LocalDateTime.class),
++                rs.getString("temporary_directory"), rs.getString("last_error")
++        );
++    }
++
++    private String limit(String value, int max) {
++        if (value == null || value.length() <= max) return value;
++        return value.substring(0, max);
++    }
++}
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreService.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreService.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreService.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreService.java	2026-06-26 06:46:48.610960325 +0000
+@@ -0,0 +1,619 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClient;
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClientRepository;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceAuditLog;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceAuditLogRepository;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceHealthService;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceManagementService;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26TargetDatabaseService;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupEncryption;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupExtraction;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupJob;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupProperties;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupRepository;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupSecurityService;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupVerificationState;
++import com.ecoamazonas.eco_agua.platform.control.operations.Matrix26RuntimeControlResult;
++import com.ecoamazonas.eco_agua.platform.control.operations.Matrix26RuntimeControlService;
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Service;
++
++import java.io.BufferedInputStream;
++import java.io.BufferedOutputStream;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.OutputStream;
++import java.net.ServerSocket;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.AtomicMoveNotSupportedException;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.StandardCopyOption;
++import java.security.MessageDigest;
++import java.time.LocalDateTime;
++import java.time.format.DateTimeFormatter;
++import java.util.ArrayList;
++import java.util.Comparator;
++import java.util.HexFormat;
++import java.util.List;
++import java.util.Locale;
++import java.util.Properties;
++import java.util.Set;
++import java.util.concurrent.TimeUnit;
++import java.util.regex.Matcher;
++import java.util.regex.Pattern;
++import java.util.zip.GZIPInputStream;
++import java.util.zip.ZipEntry;
++import java.util.zip.ZipFile;
++
++@Service
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26RestoreService {
++
++    private static final Pattern JDBC_MYSQL = Pattern.compile("^jdbc:mysql://([^/:?]+)(?::(\\d+))?/([^?]+)(?:\\?.*)?$");
++    private static final Pattern SAFE_IDENTIFIER = Pattern.compile("^[A-Za-z0-9_]+$");
++    private static final DateTimeFormatter ID_TIME = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
++
++    private final Matrix26RestoreRepository restoreRepository;
++    private final Matrix26BackupRepository backupRepository;
++    private final Matrix26BackupSecurityService backupSecurityService;
++    private final Matrix26BackupProperties backupProperties;
++    private final Matrix26RestoreProperties properties;
++    private final PlatformBusinessClientRepository clientRepository;
++    private final Matrix26InstanceManagementService instanceManagementService;
++    private final Matrix26TargetDatabaseService targetDatabaseService;
++    private final Matrix26RuntimeControlService runtimeControlService;
++    private final Matrix26InstanceHealthService healthService;
++    private final Matrix26InstanceAuditLogRepository auditRepository;
++    private final String controlJdbcUrl;
++    private final String databaseUsername;
++    private final String databasePassword;
++
++    public Matrix26RestoreService(
++            Matrix26RestoreRepository restoreRepository,
++            Matrix26BackupRepository backupRepository,
++            Matrix26BackupSecurityService backupSecurityService,
++            Matrix26BackupProperties backupProperties,
++            Matrix26RestoreProperties properties,
++            PlatformBusinessClientRepository clientRepository,
++            Matrix26InstanceManagementService instanceManagementService,
++            Matrix26TargetDatabaseService targetDatabaseService,
++            Matrix26RuntimeControlService runtimeControlService,
++            Matrix26InstanceHealthService healthService,
++            Matrix26InstanceAuditLogRepository auditRepository,
++            @Value("${spring.datasource.url}") String controlJdbcUrl,
++            @Value("${spring.datasource.username}") String databaseUsername,
++            @Value("${spring.datasource.password:}") String databasePassword
++    ) {
++        this.restoreRepository = restoreRepository;
++        this.backupRepository = backupRepository;
++        this.backupSecurityService = backupSecurityService;
++        this.backupProperties = backupProperties;
++        this.properties = properties;
++        this.clientRepository = clientRepository;
++        this.instanceManagementService = instanceManagementService;
++        this.targetDatabaseService = targetDatabaseService;
++        this.runtimeControlService = runtimeControlService;
++        this.healthService = healthService;
++        this.auditRepository = auditRepository;
++        this.controlJdbcUrl = controlJdbcUrl;
++        this.databaseUsername = databaseUsername;
++        this.databasePassword = databasePassword;
++    }
++
++    public List<Matrix26RestoreCandidate> candidates() {
++        List<Matrix26RestoreCandidate> result = new ArrayList<>();
++        for (Matrix26BackupJob backup : backupRepository.findRecent()) {
++            Matrix26BackupEncryption encryption = backupSecurityService.metadata(backup.id());
++            boolean allowedSource = properties.getAllowedSourceInstanceCodes().stream()
++                    .anyMatch(code -> code.equalsIgnoreCase(backup.instanceCode()));
++            boolean full = "MANUAL_FULL".equalsIgnoreCase(backup.backupType())
++                    || "SCHEDULED_FULL".equalsIgnoreCase(backup.backupType());
++            boolean verified = encryption != null
++                    && encryption.encrypted()
++                    && encryption.verificationStatus() == Matrix26BackupVerificationState.VERIFIED;
++            boolean eligible = backup.isCompleted() && allowedSource && full && verified;
++            String reason = eligible ? "Ready for isolated clone restoration."
++                    : !allowedSource ? "Source instance is outside the restore allowlist."
++                    : !full ? "Only full instance backups can be restored as clones."
++                    : !verified ? "Backup must be encrypted and verified."
++                    : "Backup is not completed.";
++            if (allowedSource) {
++                result.add(new Matrix26RestoreCandidate(backup, encryption, eligible, reason));
++            }
++        }
++        return result;
++    }
++
++    public Matrix26RestoreSummary summary() { return restoreRepository.summary(); }
++    public List<Matrix26RestoreJob> recentJobs() { return restoreRepository.findRecent(); }
++    public Matrix26RestoreJob job(long id) { return restoreRepository.findById(id).orElseThrow(() -> new Matrix26RestoreException("Restore job not found.")); }
++    public List<Matrix26RestoreStep> steps(long id) { return restoreRepository.findSteps(id); }
++    public List<Matrix26RestoreArtifact> artifacts(long id) { return restoreRepository.findArtifacts(id); }
++    public List<Matrix26RestoreVerification> verifications(long id) { return restoreRepository.findVerifications(id); }
++    public Matrix26RestoreProperties properties() { return properties; }
++
++    public Matrix26RestoreJob restoreClone(long backupJobId, boolean startAfterRestore, String confirmation, String actor) {
++        if (!properties.isEnabled()) {
++            throw new Matrix26RestoreException("Restore Manager is disabled.");
++        }
++        if (restoreRepository.hasActiveRestore()) {
++            throw new Matrix26RestoreException("Another restore job is already active.");
++        }
++        Matrix26RestoreCandidate candidate = candidates().stream()
++                .filter(item -> item.backup().id().equals(backupJobId))
++                .findFirst()
++                .orElseThrow(() -> new Matrix26RestoreException("The selected backup is not available for restoration."));
++        if (!candidate.eligible()) {
++            throw new Matrix26RestoreException(candidate.reason());
++        }
++        String expectedConfirmation = "RESTORE " + properties.getTargetInstanceCode();
++        if (!expectedConfirmation.equals(confirmation == null ? "" : confirmation.trim())) {
++            throw new Matrix26RestoreException("Type exactly: " + expectedConfirmation);
++        }
++        validateTargetAvailable();
++
++        Matrix26BackupJob backup = candidate.backup();
++        String publicId = "RST-" + LocalDateTime.now().format(ID_TIME) + "-" + Long.toHexString(System.nanoTime()).toUpperCase(Locale.ROOT);
++        Matrix26RestoreJob draft = new Matrix26RestoreJob(
++                null, publicId, backup.id(), backup.publicId(), backup.instanceId(), backup.instanceCode(),
++                backup.instanceName(), backup.databaseName(), null, properties.getTargetInstanceCode(),
++                properties.getTargetInstanceName(), properties.getTargetDatabaseName(), properties.getTargetRuntimeProfile(),
++                properties.getTargetRuntimePort(), properties.getTargetPublicUrl(), Matrix26RestoreStatus.DRAFT,
++                startAfterRestore, safeActor(actor), LocalDateTime.now(), null, null, null, null
++        );
++        long jobId = restoreRepository.insertJob(draft);
++        createSteps(jobId);
++        execute(jobId, candidate, actor);
++        return job(jobId);
++    }
++
++    private void execute(long jobId, Matrix26RestoreCandidate candidate, String actor) {
++        Matrix26RestoreJob job = job(jobId);
++        Path tempRoot = backupRoot().resolve(".matrix26-restore-temp").normalize();
++        Path work = tempRoot.resolve(job.publicId()).normalize();
++        boolean databaseCreated = false;
++        boolean filesCreated = false;
++        boolean instanceRegistered = false;
++        String currentStep = "VALIDATE_BACKUP";
++        try {
++            Files.createDirectories(work);
++            restoreRepository.markStarted(jobId, work.toString());
++
++            runStep(jobId, "VALIDATE_BACKUP", Matrix26RestoreStatus.VALIDATING,
++                    "Validating encrypted backup and isolated destination.", () -> {
++                        validateTargetAvailable();
++                        restoreRepository.insertVerification(jobId, "TARGET_ISOLATION", "Target isolation", "PASSED",
++                                "Database, port, runtime profile, instance code, and directories are available.");
++                    });
++
++            currentStep = "DECRYPT_PACKAGE";
++            restoreRepository.startStep(jobId, currentStep, "Decrypting AES-256-GCM package and checking internal hashes.");
++            restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.DECRYPTING);
++            Matrix26BackupExtraction extraction = backupSecurityService.extractVerifiedBackup(candidate.backup().id(), work.resolve("decrypted"));
++            Path payload = extraction.extractedDirectory();
++            restoreRepository.completeStep(jobId, currentStep, extraction.verificationMessage());
++            restoreRepository.insertVerification(jobId, "ENCRYPTED_PACKAGE", "Encrypted package", "PASSED", extraction.verificationMessage());
++            restoreRepository.insertArtifact(jobId, "SOURCE_PACKAGE", candidate.encryption().packagePath(),
++                    candidate.encryption().packageSizeBytes(), candidate.encryption().packageSha256(), "VERIFIED");
++
++            currentStep = "CREATE_DATABASE";
++            restoreRepository.startStep(jobId, currentStep, "Creating isolated database " + job.targetDatabaseName() + ".");
++            restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.CREATING_DATABASE);
++            targetDatabaseService.createDatabase(job.targetDatabaseName(), false);
++            databaseCreated = true;
++            restoreRepository.completeStep(jobId, currentStep, "Empty isolated database created.");
++
++            currentStep = "IMPORT_DATABASE";
++            restoreRepository.startStep(jobId, currentStep, "Importing verified SQL export into the isolated database.");
++            restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.IMPORTING_DATABASE);
++            Path sql = work.resolve("database.sql");
++            gunzip(payload.resolve("database.sql.gz"), sql);
++            importDatabase(job.targetDatabaseName(), sql, work.resolve("database-import.stderr.log"));
++            int tables = targetDatabaseService.tableCount(job.targetDatabaseName());
++            if (tables <= 0) {
++                throw new Matrix26RestoreException("Database import completed without restored tables.");
++            }
++            adaptRestoredDatabase(job, candidate.backup().instanceCode());
++            restoreRepository.completeStep(jobId, currentStep, tables + " tables restored and clone identifiers adapted.");
++            restoreRepository.insertVerification(jobId, "DATABASE_TABLES", "Restored database tables", "PASSED", tables + " base tables detected.");
++            restoreRepository.insertArtifact(jobId, "RESTORED_DATABASE", "mysql://" + job.targetDatabaseName(), null, null, "READY");
++            Files.deleteIfExists(sql);
++
++            currentStep = "RESTORE_FILES";
++            restoreRepository.startStep(jobId, currentStep, "Restoring instance-owned files into a new namespace.");
++            restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.RESTORING_FILES);
++            filesCreated = true;
++            int restoredFiles = restoreInstanceFiles(payload.resolve("instance-files.zip"), candidate.backup(), job);
++            restoreRepository.completeStep(jobId, currentStep, restoredFiles + " files restored under the clone namespace.");
++            restoreRepository.insertVerification(jobId, "RESTORED_FILESET", "Restored files", "PASSED", restoredFiles + " safe ZIP entries restored.");
++            restoreRepository.insertArtifact(jobId, "RUNTIME_DATA", "runtime-data/" + job.targetInstanceCode(), null, null, "RESTORED");
++
++            currentStep = "GENERATE_RUNTIME";
++            restoreRepository.startStep(jobId, currentStep, "Generating clone runtime without exposing credentials.");
++            restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.GENERATING_RUNTIME);
++            generateRuntime(candidate.backup(), job);
++            restoreRepository.completeStep(jobId, currentStep, "Runtime generated at runtime-clients/" + job.targetRuntimeProfile() + ".");
++            restoreRepository.insertArtifact(jobId, "RUNTIME_CONFIGURATION", "runtime-clients/" + job.targetRuntimeProfile(), null, null, "GENERATED");
++
++            currentStep = "REGISTER_INSTANCE";
++            restoreRepository.startStep(jobId, currentStep, "Registering the restored clone in Matrix26.");
++            restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.REGISTERING_INSTANCE);
++            PlatformBusinessClient target = registerClone(candidate.backup(), job, actor);
++            instanceRegistered = true;
++            restoreRepository.setTargetInstance(jobId, target.getId());
++            restoreRepository.completeStep(jobId, currentStep, "Clone registered with instance ID " + target.getId() + ".");
++
++            if (job.startAfterRestore()) {
++                currentStep = "START_RUNTIME";
++                restoreRepository.startStep(jobId, currentStep, "Starting restored runtime through Runtime Control Center.");
++                restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.STARTING_RUNTIME);
++                Matrix26RuntimeControlResult result = runtimeControlService.start(String.valueOf(target.getId()), actor);
++                restoreRepository.completeStep(jobId, currentStep, result.message());
++
++                currentStep = "HEALTH_CHECK";
++                restoreRepository.startStep(jobId, currentStep, "Checking restored portal availability.");
++                restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.HEALTH_CHECKING);
++                var status = healthService.refreshInstance(target.getId());
++                if (!status.online()) {
++                    throw new Matrix26RestoreException("The clone runtime started but the health check remained offline: " + status.message());
++                }
++                restoreRepository.completeStep(jobId, currentStep, "HTTP health check passed at " + job.targetPublicUrl() + ".");
++                restoreRepository.insertVerification(jobId, "HTTP_HEALTH", "Clone HTTP health", "PASSED", status.message());
++            } else {
++                restoreRepository.skipStep(jobId, "START_RUNTIME", "Start after restore was not requested.");
++                restoreRepository.skipStep(jobId, "HEALTH_CHECK", "Health check will run after the clone is started manually.");
++            }
++
++            restoreRepository.complete(jobId);
++            writeAudit(clientRepository.findById(job(jobId).targetInstanceId()).orElseThrow(), actor,
++                    "RESTORE_CLONE_COMPLETED", "Encrypted backup " + candidate.backup().publicId() + " restored as clone " + job.targetInstanceCode() + ".");
++        } catch (Exception ex) {
++            String error = safeMessage(ex);
++            restoreRepository.failStep(jobId, currentStep, error);
++            Matrix26RestoreStatus failure = (databaseCreated || filesCreated || instanceRegistered)
++                    ? Matrix26RestoreStatus.CLEANUP_REQUIRED : Matrix26RestoreStatus.FAILED;
++            restoreRepository.fail(jobId, failure, error);
++            clientRepository.findById(candidate.backup().instanceId()).ifPresent(source ->
++                    writeAudit(source, actor, "RESTORE_CLONE_FAILED", "Restore job " + job.publicId() + " failed: " + error));
++            throw ex instanceof Matrix26RestoreException restoreException
++                    ? restoreException
++                    : new Matrix26RestoreException("Clone restoration failed: " + error, ex);
++        } finally {
++            deleteTreeQuietly(work);
++        }
++    }
++
++    private void runStep(long jobId, String code, Matrix26RestoreStatus status, String detail, CheckedAction action) throws Exception {
++        restoreRepository.startStep(jobId, code, detail);
++        restoreRepository.updateJobStatus(jobId, status);
++        action.run();
++        restoreRepository.completeStep(jobId, code, detail.replace("Validating", "Validated"));
++    }
++
++    private void validateTargetAvailable() {
++        String code = safeIdentifier(properties.getTargetInstanceCode());
++        String database = safeIdentifier(properties.getTargetDatabaseName());
++        String runtime = safeIdentifier(properties.getTargetRuntimeProfile());
++        int port = properties.getTargetRuntimePort();
++        if (clientRepository.existsByCodeIgnoreCase(code)) throw new Matrix26RestoreException("Target instance code already exists: " + code);
++        if (clientRepository.existsByDatabaseNameIgnoreCase(database)) throw new Matrix26RestoreException("Target database is already registered: " + database);
++        if (clientRepository.existsByRuntimeProfileIgnoreCase(runtime)) throw new Matrix26RestoreException("Target runtime profile already exists: " + runtime);
++        if (clientRepository.existsByRuntimePort(port)) throw new Matrix26RestoreException("Target port is already registered: " + port);
++        if (targetDatabaseService.databaseExists(database)) throw new Matrix26RestoreException("Target database already exists: " + database);
++        Path runtimeDir = projectRoot().resolve(properties.getRuntimeDirectory()).resolve(runtime).normalize();
++        Path dataDir = projectRoot().resolve(properties.getRuntimeDataDirectory()).resolve(code).normalize();
++        if (Files.exists(runtimeDir)) throw new Matrix26RestoreException("Target runtime directory already exists: " + runtimeDir);
++        if (Files.exists(dataDir)) throw new Matrix26RestoreException("Target runtime-data directory already exists: " + dataDir);
++        try (ServerSocket socket = new ServerSocket(port)) {
++            socket.setReuseAddress(true);
++        } catch (IOException ex) {
++            throw new Matrix26RestoreException("Target port " + port + " is already occupied.");
++        }
++    }
++
++    private void importDatabase(String databaseName, Path sql, Path stderr) throws IOException, InterruptedException {
++        DatabaseTarget target = databaseTarget();
++        String executable = importExecutable();
++        List<String> command = new ArrayList<>();
++        command.add(executable);
++        command.add("--host=" + target.host());
++        command.add("--port=" + target.port());
++        command.add("--user=" + databaseUsername);
++        command.add("--default-character-set=utf8mb4");
++        command.add("--binary-mode=1");
++        command.add(databaseName);
++        ProcessBuilder builder = new ProcessBuilder(command);
++        builder.redirectInput(sql.toFile());
++        builder.redirectError(stderr.toFile());
++        if (databasePassword != null && !databasePassword.isBlank()) builder.environment().put("MYSQL_PWD", databasePassword);
++        else builder.environment().remove("MYSQL_PWD");
++        Process process = builder.start();
++        boolean finished = process.waitFor(Math.max(60L, properties.getProcessTimeoutSeconds()), TimeUnit.SECONDS);
++        if (!finished) {
++            process.destroy();
++            if (!process.waitFor(5, TimeUnit.SECONDS)) process.destroyForcibly();
++            throw new Matrix26RestoreException("Database import exceeded the configured timeout.");
++        }
++        if (process.exitValue() != 0) {
++            throw new Matrix26RestoreException("Database import failed: " + sanitizedFile(stderr));
++        }
++        Files.deleteIfExists(stderr);
++    }
++
++    private String importExecutable() {
++        if (properties.getImportExecutable() != null && !properties.getImportExecutable().isBlank()) {
++            Path configured = Path.of(properties.getImportExecutable()).toAbsolutePath().normalize();
++            if (Files.isRegularFile(configured)) return configured.toString();
++        }
++        String dump = firstNonBlank(System.getenv("MATRIX26_MYSQLDUMP_PATH"), backupProperties.getDumpExecutable());
++        if (dump != null && !dump.isBlank()) {
++            Path dumpPath = Path.of(dump).toAbsolutePath().normalize();
++            Path parent = dumpPath.getParent();
++            if (parent != null) {
++                for (String name : List.of("mariadb.exe", "mysql.exe", "mariadb", "mysql")) {
++                    Path candidate = parent.resolve(name);
++                    if (Files.isRegularFile(candidate)) return candidate.toString();
++                }
++            }
++        }
++        throw new Matrix26RestoreException("MariaDB/MySQL import client was not found. Configure matrix26.control-center.restores.import-executable.");
++    }
++
++    private DatabaseTarget databaseTarget() {
++        Matcher matcher = JDBC_MYSQL.matcher(controlJdbcUrl);
++        if (!matcher.matches()) throw new Matrix26RestoreException("Matrix26 control datasource does not use a supported MySQL JDBC URL.");
++        return new DatabaseTarget(matcher.group(1), matcher.group(2) == null ? 3306 : Integer.parseInt(matcher.group(2)));
++    }
++
++    private void adaptRestoredDatabase(Matrix26RestoreJob job, String sourceCode) {
++        var target = targetDatabaseService.targetJdbcTemplate(job.targetDatabaseName());
++        Integer table = target.queryForObject("""
++                SELECT COUNT(*) FROM information_schema.TABLES
++                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'matrix26_instance_appearance_config'
++                """, Integer.class);
++        if (table != null && table > 0) {
++            target.update("""
++                    UPDATE matrix26_instance_appearance_config
++                    SET instance_code = ?,
++                        overrides_json = REPLACE(COALESCE(overrides_json, ''), ?, ?),
++                        branding_json = REPLACE(COALESCE(branding_json, ''), ?, ?),
++                        asset_manifest_json = REPLACE(COALESCE(asset_manifest_json, ''), ?, ?)
++                    WHERE id = 1
++                    """, job.targetInstanceCode(), sourceCode, job.targetInstanceCode(), sourceCode,
++                    job.targetInstanceCode(), sourceCode, job.targetInstanceCode());
++        }
++    }
++
++    private int restoreInstanceFiles(Path archive, Matrix26BackupJob backup, Matrix26RestoreJob job) throws IOException {
++        if (!Files.isRegularFile(archive)) throw new Matrix26RestoreException("instance-files.zip is missing.");
++        Path runtimeRoot = projectRoot().resolve(properties.getRuntimeDirectory()).normalize();
++        Path dataRoot = projectRoot().resolve(properties.getRuntimeDataDirectory()).normalize();
++        Path targetRuntime = runtimeRoot.resolve(job.targetRuntimeProfile()).normalize();
++        Path targetData = dataRoot.resolve(job.targetInstanceCode()).normalize();
++        int restored = 0;
++        try (ZipFile zip = new ZipFile(archive.toFile())) {
++            var entries = zip.entries();
++            while (entries.hasMoreElements()) {
++                ZipEntry entry = entries.nextElement();
++                if (entry.isDirectory()) continue;
++                String name = entry.getName().replace('\\', '/');
++                if (!safeZipEntry(name)) throw new Matrix26RestoreException("Unsafe instance archive entry: " + name);
++                Path target = null;
++                String dataPrefix = "runtime-data/" + backup.instanceCode() + "/";
++                String runtimePrefix = "runtime-clients/" + sourceRuntimeProfile(backup) + "/";
++                if (name.startsWith(dataPrefix)) {
++                    target = targetData.resolve(name.substring(dataPrefix.length())).normalize();
++                    ensureInside(targetData, target);
++                } else if (name.startsWith(runtimePrefix) && !name.endsWith("application.properties")) {
++                    target = targetRuntime.resolve(name.substring(runtimePrefix.length())).normalize();
++                    ensureInside(targetRuntime, target);
++                }
++                if (target == null) continue;
++                Files.createDirectories(target.getParent());
++                if (Files.exists(target)) throw new Matrix26RestoreException("Restore target file already exists: " + target);
++                try (InputStream input = zip.getInputStream(entry)) {
++                    Files.copy(input, target);
++                }
++                restored++;
++            }
++        }
++        return restored;
++    }
++
++    private String sourceRuntimeProfile(Matrix26BackupJob backup) {
++        return clientRepository.findById(backup.instanceId()).map(PlatformBusinessClient::getRuntimeProfile)
++                .orElseThrow(() -> new Matrix26RestoreException("Source instance runtime profile no longer exists."));
++    }
++
++    private void generateRuntime(Matrix26BackupJob backup, Matrix26RestoreJob job) throws IOException {
++        PlatformBusinessClient source = clientRepository.findById(backup.instanceId())
++                .orElseThrow(() -> new Matrix26RestoreException("Source instance no longer exists."));
++        Path runtimeRoot = projectRoot().resolve(properties.getRuntimeDirectory()).normalize();
++        Path sourceDir = runtimeRoot.resolve(source.getRuntimeProfile()).normalize();
++        Path targetDir = runtimeRoot.resolve(job.targetRuntimeProfile()).normalize();
++        ensureInside(runtimeRoot, sourceDir);
++        ensureInside(runtimeRoot, targetDir);
++        if (!Files.isRegularFile(sourceDir.resolve("application.properties"))) {
++            throw new Matrix26RestoreException("Source runtime application.properties is missing.");
++        }
++        Files.createDirectories(targetDir);
++        Properties runtime = new Properties();
++        try (InputStream input = Files.newInputStream(sourceDir.resolve("application.properties"))) {
++            runtime.load(input);
++        }
++        runtime.setProperty("server.port", String.valueOf(job.targetRuntimePort()));
++        runtime.setProperty("spring.datasource.url", replaceDatabase(runtime.getProperty("spring.datasource.url", ""), job.targetDatabaseName()));
++        runtime.setProperty("matrix26.control-center.enabled", "false");
++        runtime.setProperty("ecoagua.platform.client-code", job.targetInstanceCode());
++        runtime.setProperty("ecoagua.platform.runtime-profile", job.targetRuntimeProfile());
++        runtime.setProperty("ecoagua.platform.public-url", job.targetPublicUrl());
++        runtime.setProperty("ecoagua.business.profile-code", job.targetRuntimeProfile());
++        runtime.setProperty("ecoagua.business.name", job.targetInstanceName());
++        runtime.setProperty("ecoagua.business.short-name", "Restore Test");
++        runtime.setProperty("ecoagua.business.footer-right", "Restored clone managed by Matrix26");
++        try (OutputStream output = Files.newOutputStream(targetDir.resolve("application.properties"))) {
++            runtime.store(output, "Runtime restored by Matrix26 Restore Manager");
++        }
++        Path runScript = targetDir.resolve("run.sh");
++        Files.writeString(runScript, runtimeScript(job), StandardCharsets.UTF_8);
++        runScript.toFile().setExecutable(true, false);
++        Files.writeString(targetDir.resolve("README.txt"), "Matrix26 restored clone\nInstance: " + job.targetInstanceCode()
++                + "\nDatabase: " + job.targetDatabaseName() + "\nPort: " + job.targetRuntimePort() + "\n", StandardCharsets.UTF_8);
++        Files.writeString(targetDir.resolve(".matrix26-restore-reference"), job.publicId() + System.lineSeparator(), StandardCharsets.UTF_8);
++    }
++
++    private PlatformBusinessClient registerClone(Matrix26BackupJob backup, Matrix26RestoreJob job, String actor) {
++        PlatformBusinessClient source = clientRepository.findById(backup.instanceId())
++                .orElseThrow(() -> new Matrix26RestoreException("Source instance no longer exists."));
++        PlatformBusinessClient clone = new PlatformBusinessClient();
++        clone.setCode(job.targetInstanceCode());
++        clone.setBusinessName(job.targetInstanceName());
++        clone.setLegalName(job.targetInstanceName());
++        clone.setBusinessType(source.getBusinessType());
++        clone.setDatabaseName(job.targetDatabaseName());
++        clone.setDatabaseStatus("READY");
++        clone.setStatus("ACTIVE");
++        clone.setCity(source.getCity());
++        clone.setCurrency(source.getCurrency());
++        clone.setPrimaryColor(source.getPrimaryColor());
++        clone.setRuntimeProfile(job.targetRuntimeProfile());
++        clone.setRuntimePort(job.targetRuntimePort());
++        clone.setPublicUrl(job.targetPublicUrl());
++        clone.setRuntimeStatus("STOPPED");
++        clone.setManagementMode("RESTORED_CLONE");
++        clone.setMonitorVisible(true);
++        clone.setProtectedInstance(true);
++        clone.setRuntimeCommand("bash runtime-clients/" + job.targetRuntimeProfile() + "/run.sh");
++        clone.setNotes("Restored from encrypted backup " + backup.publicId() + ". Source instance: " + backup.instanceCode() + ".");
++        PlatformBusinessClient saved = clientRepository.save(clone);
++        Set<String> modules = instanceManagementService.assignedModuleKeys(source.getId());
++        instanceManagementService.updateModules(saved.getId(), new ArrayList<>(modules), actor);
++        return saved;
++    }
++
++    private void createSteps(long jobId) {
++        int sequence = 10;
++        for (String[] step : List.of(
++                new String[]{"VALIDATE_BACKUP", "Validate encrypted backup and destination"},
++                new String[]{"DECRYPT_PACKAGE", "Decrypt and verify recovery package"},
++                new String[]{"CREATE_DATABASE", "Create isolated database"},
++                new String[]{"IMPORT_DATABASE", "Import restored database"},
++                new String[]{"RESTORE_FILES", "Restore instance files"},
++                new String[]{"GENERATE_RUNTIME", "Generate clone runtime"},
++                new String[]{"REGISTER_INSTANCE", "Register clone in Matrix26"},
++                new String[]{"START_RUNTIME", "Start clone runtime"},
++                new String[]{"HEALTH_CHECK", "Verify clone health"}
++        )) {
++            restoreRepository.insertStep(jobId, step[0], sequence, step[1]);
++            sequence += 10;
++        }
++    }
++
++    private Path backupRoot() {
++        String configured = firstNonBlank(System.getenv("MATRIX26_BACKUP_ROOT"), backupProperties.getRootDirectory());
++        return (configured == null || configured.isBlank()
++                ? Path.of(System.getProperty("user.home"), "Matrix26", "backups") : Path.of(configured))
++                .toAbsolutePath().normalize();
++    }
++
++    private Path projectRoot() { return Path.of("").toAbsolutePath().normalize(); }
++
++    private void gunzip(Path source, Path target) throws IOException {
++        try (InputStream input = new GZIPInputStream(new BufferedInputStream(Files.newInputStream(source)));
++             OutputStream output = new BufferedOutputStream(Files.newOutputStream(target))) {
++            input.transferTo(output);
++        }
++    }
++
++    private String replaceDatabase(String jdbcUrl, String database) {
++        Matcher matcher = JDBC_MYSQL.matcher(jdbcUrl);
++        if (!matcher.matches()) throw new Matrix26RestoreException("Source runtime JDBC URL is not supported.");
++        int query = jdbcUrl.indexOf('?');
++        String suffix = query >= 0 ? jdbcUrl.substring(query) : "";
++        String port = matcher.group(2) == null ? "" : ":" + matcher.group(2);
++        return "jdbc:mysql://" + matcher.group(1) + port + "/" + database + suffix;
++    }
++
++    private String runtimeScript(Matrix26RestoreJob job) {
++        return "#!/usr/bin/env bash\nset -euo pipefail\n\n"
++                + "ROOT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/../..\" && pwd)\"\n"
++                + "CONFIG_FILE=\"$ROOT_DIR/runtime-clients/" + job.targetRuntimeProfile() + "/application.properties\"\n\n"
++                + "if [[ ! -f \"$CONFIG_FILE\" ]]; then echo \"Runtime configuration was not found: $CONFIG_FILE\" >&2; exit 1; fi\n"
++                + "if command -v cygpath >/dev/null 2>&1; then CONFIG_PATH=\"$(cygpath -m \"$CONFIG_FILE\")\"; else CONFIG_PATH=\"$CONFIG_FILE\"; fi\n"
++                + "cd \"$ROOT_DIR\"\n"
++                + "JAR=\"$(find target -maxdepth 1 -type f -name '*.jar' ! -name '*sources*' | head -n 1)\"\n"
++                + "if [[ -z \"$JAR\" ]]; then echo \"No application JAR found. Run: mvn clean -DskipTests package\" >&2; exit 1; fi\n"
++                + "exec java -jar \"$JAR\" --spring.config.additional-location=\"file:${CONFIG_PATH}\"\n";
++    }
++
++    private void writeAudit(PlatformBusinessClient instance, String actor, String action, String summary) {
++        Matrix26InstanceAuditLog log = new Matrix26InstanceAuditLog();
++        log.setInstance(instance);
++        log.setActorUsername(safeActor(actor));
++        log.setAction(action);
++        log.setSummary(limit(summary, 500));
++        log.setAfterSnapshot("{\"instanceCode\":\"" + escapeJson(instance.getCode()) + "\"}");
++        auditRepository.save(log);
++    }
++
++    private String sanitizedFile(Path path) {
++        try {
++            if (!Files.isRegularFile(path)) return "No diagnostic output was produced.";
++            String value = Files.readString(path, StandardCharsets.UTF_8)
++                    .replaceAll("(?i)(password|secret|token|api[-_.]?key)[=:]\\s*\\S+", "$1=***REDACTED***");
++            return limit(value.trim(), 2000);
++        } catch (IOException ex) {
++            return "Diagnostic output could not be read.";
++        }
++    }
++
++    private String safeIdentifier(String value) {
++        String clean = value == null ? "" : value.trim();
++        if (!SAFE_IDENTIFIER.matcher(clean).matches()) throw new Matrix26RestoreException("Unsafe technical identifier: " + value);
++        return clean;
++    }
++
++    private boolean safeZipEntry(String name) {
++        return name != null && !name.isBlank() && !name.startsWith("/") && !name.startsWith("\\")
++                && !name.contains("../") && !name.matches("^[A-Za-z]:.*");
++    }
++
++    private void ensureInside(Path root, Path value) {
++        if (!value.toAbsolutePath().normalize().startsWith(root.toAbsolutePath().normalize())) {
++            throw new Matrix26RestoreException("Path escaped the allowed restore directory.");
++        }
++    }
++
++    private String sha256(Path file) throws IOException {
++        try {
++            MessageDigest digest = MessageDigest.getInstance("SHA-256");
++            try (InputStream input = Files.newInputStream(file)) {
++                byte[] buffer = new byte[64 * 1024];
++                int read;
++                while ((read = input.read(buffer)) >= 0) if (read > 0) digest.update(buffer, 0, read);
++            }
++            return HexFormat.of().formatHex(digest.digest());
++        } catch (java.security.NoSuchAlgorithmException ex) {
++            throw new IllegalStateException(ex);
++        }
++    }
++
++    private void deleteTreeQuietly(Path root) {
++        if (root == null || !Files.exists(root)) return;
++        try (var stream = Files.walk(root)) {
++            for (Path path : stream.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
++        } catch (IOException ignored) { }
++    }
++
++    private String safeActor(String actor) { return actor == null || actor.isBlank() ? "matrix26-admin" : limit(actor.trim(), 120); }
++    private String safeMessage(Throwable ex) { return limit(ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage(), 4000); }
++    private String limit(String value, int max) { return value == null || value.length() <= max ? value : value.substring(0, max); }
++    private String firstNonBlank(String first, String second) { return first != null && !first.isBlank() ? first : second; }
++    private String escapeJson(String value) { return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\""); }
++
++    private record DatabaseTarget(String host, int port) { }
++    @FunctionalInterface private interface CheckedAction { void run() throws Exception; }
++}
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreStatus.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreStatus.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreStatus.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreStatus.java	2026-06-26 06:41:21.516646962 +0000
+@@ -0,0 +1,30 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++public enum Matrix26RestoreStatus {
++    DRAFT("Draft", "text-bg-secondary"),
++    VALIDATING("Validating", "text-bg-info"),
++    DECRYPTING("Decrypting", "text-bg-info"),
++    VERIFYING("Verifying", "text-bg-info"),
++    CREATING_DATABASE("Creating database", "text-bg-primary"),
++    IMPORTING_DATABASE("Importing database", "text-bg-primary"),
++    RESTORING_FILES("Restoring files", "text-bg-primary"),
++    GENERATING_RUNTIME("Generating runtime", "text-bg-primary"),
++    REGISTERING_INSTANCE("Registering instance", "text-bg-primary"),
++    STARTING_RUNTIME("Starting runtime", "text-bg-warning"),
++    HEALTH_CHECKING("Health checking", "text-bg-warning"),
++    COMPLETED("Completed", "text-bg-success"),
++    FAILED("Failed", "text-bg-danger"),
++    CLEANUP_REQUIRED("Cleanup required", "text-bg-warning"),
++    CANCELLED("Cancelled", "text-bg-secondary");
++
++    private final String label;
++    private final String badgeClass;
++
++    Matrix26RestoreStatus(String label, String badgeClass) {
++        this.label = label;
++        this.badgeClass = badgeClass;
++    }
++
++    public String getLabel() { return label; }
++    public String getBadgeClass() { return badgeClass; }
++}
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreStep.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreStep.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreStep.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreStep.java	2026-06-26 06:41:21.516961916 +0000
+@@ -0,0 +1,16 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++import java.time.LocalDateTime;
++
++public record Matrix26RestoreStep(
++        Long id,
++        Long restoreJobId,
++        String stepCode,
++        Integer sequenceNumber,
++        String label,
++        Matrix26RestoreStepStatus status,
++        String detail,
++        LocalDateTime startedAt,
++        LocalDateTime completedAt
++) {
++}
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreStepStatus.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreStepStatus.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreStepStatus.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreStepStatus.java	2026-06-26 06:41:21.516800734 +0000
+@@ -0,0 +1,20 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++public enum Matrix26RestoreStepStatus {
++    PENDING("Pending", "text-bg-secondary"),
++    RUNNING("Running", "text-bg-info"),
++    COMPLETED("Completed", "text-bg-success"),
++    FAILED("Failed", "text-bg-danger"),
++    SKIPPED("Skipped", "text-bg-secondary");
++
++    private final String label;
++    private final String badgeClass;
++
++    Matrix26RestoreStepStatus(String label, String badgeClass) {
++        this.label = label;
++        this.badgeClass = badgeClass;
++    }
++
++    public String getLabel() { return label; }
++    public String getBadgeClass() { return badgeClass; }
++}
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreSummary.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreSummary.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreSummary.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreSummary.java	2026-06-26 06:41:21.517221616 +0000
+@@ -0,0 +1,4 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++public record Matrix26RestoreSummary(long total, long completed, long failed, long running) {
++}
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreVerification.java /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreVerification.java
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreVerification.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreVerification.java	2026-06-26 06:41:21.517098561 +0000
+@@ -0,0 +1,14 @@
++package com.ecoamazonas.eco_agua.platform.control.restores;
++
++import java.time.LocalDateTime;
++
++public record Matrix26RestoreVerification(
++        Long id,
++        Long restoreJobId,
++        String checkCode,
++        String label,
++        String status,
++        String detail,
++        LocalDateTime checkedAt
++) {
++}
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/resources/templates/control_center/fragments/sidebar.html	2026-06-26 06:38:22.930601699 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/resources/templates/control_center/fragments/sidebar.html	2026-06-26 06:43:59.315823303 +0000
+@@ -90,6 +90,11 @@
+             <i class="bi bi-trash3"></i>
+             <span>Retention</span>
+         </a>
++        <a th:href="@{/control-center/restores}"
++           th:classappend="${activePage == 'matrix26_restores'} ? ' active' : ''">
++            <i class="bi bi-arrow-counterclockwise"></i>
++            <span>Restore Manager</span>
++        </a>
+     </nav>
+ 
+     <div class="matrix26-sidebar-label">Diseño y experiencia</div>
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/resources/templates/control_center/restores/detail.html /mnt/data/matrix26_restore3f1_impl/src/main/resources/templates/control_center/restores/detail.html
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/resources/templates/control_center/restores/detail.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/resources/templates/control_center/restores/detail.html	2026-06-26 06:43:48.349946252 +0000
+@@ -0,0 +1,41 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Restore detail')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Restore job', 'Complete recovery trace for the isolated clone.')}" ></header>
++        <main class="matrix26-main">
++            <div th:if="${restoreSuccess}" class="alert alert-success" th:text="${restoreSuccess}"></div>
++            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
++                <div><span class="matrix26-eyebrow" th:text="${job.publicId}">RST</span><h1 class="matrix26-page-title" th:text="${job.targetInstanceName}">Restore test</h1><p class="matrix26-page-subtitle mb-0"><code th:text="${job.backupPublicId}">BKP</code> → <code th:text="${job.targetInstanceCode}">clone</code></p></div>
++                <div class="d-flex gap-2"><span class="badge fs-6" th:classappend="${job.status.badgeClass}" th:text="${job.status.label}">Status</span><a class="btn btn-outline-secondary" th:href="@{/control-center/restores}"><i class="bi bi-arrow-left me-1"></i>Back</a></div>
++            </div>
++
++            <div th:if="${job.lastError}" class="alert alert-danger"><strong>Last error:</strong> <span th:text="${job.lastError}">Error</span></div>
++
++            <div class="row g-4 mb-4">
++                <div class="col-12 col-xl-6"><section class="matrix26-panel h-100"><div class="matrix26-panel-header"><div><span>Source</span><h2>Encrypted recovery package</h2></div></div><dl class="matrix26-settings-list"><div><dt>Backup</dt><dd><code th:text="${job.backupPublicId}">BKP</code></dd></div><div><dt>Instance</dt><dd th:text="${job.sourceInstanceName}">Source</dd></div><div><dt>Code</dt><dd><code th:text="${job.sourceInstanceCode}">source</code></dd></div><div><dt>Database</dt><dd><code th:text="${job.sourceDatabaseName}">db</code></dd></div></dl></section></div>
++                <div class="col-12 col-xl-6"><section class="matrix26-panel h-100"><div class="matrix26-panel-header"><div><span>Target</span><h2>Isolated clone</h2></div></div><dl class="matrix26-settings-list"><div><dt>Instance</dt><dd th:text="${job.targetInstanceName}">Clone</dd></div><div><dt>Code</dt><dd><code th:text="${job.targetInstanceCode}">target</code></dd></div><div><dt>Database</dt><dd><code th:text="${job.targetDatabaseName}">db</code></dd></div><div><dt>Runtime / port</dt><dd><code th:text="${job.targetRuntimeProfile}">runtime</code> · <span th:text="${job.targetRuntimePort}">8095</span></dd></div><div><dt>URL</dt><dd><a th:if="${job.completed}" th:href="${job.targetPublicUrl}" target="_blank" rel="noopener" th:text="${job.targetPublicUrl}">URL</a><code th:unless="${job.completed}" th:text="${job.targetPublicUrl}">URL</code></dd></div></dl></section></div>
++            </div>
++
++            <section id="restore-steps" class="matrix26-panel mb-4">
++                <div class="matrix26-panel-header"><div><span>Execution trace</span><h2>Restore steps</h2></div></div>
++                <div class="matrix26-restore-timeline">
++                    <article th:each="step : ${steps}" class="matrix26-restore-step">
++                        <span class="matrix26-restore-step-number" th:text="${step.sequenceNumber / 10}">1</span>
++                        <div><div class="d-flex align-items-center gap-2 flex-wrap"><strong th:text="${step.label}">Step</strong><span class="badge" th:classappend="${step.status.badgeClass}" th:text="${step.status.label}">Status</span></div><small th:if="${step.detail}" th:text="${step.detail}">Detail</small><small th:if="${step.startedAt}" th:text="|Started ${#temporals.format(step.startedAt, 'dd/MM/yyyy HH:mm:ss')}|">time</small></div>
++                    </article>
++                </div>
++            </section>
++
++            <div class="row g-4">
++                <div class="col-12 col-xl-7"><section class="matrix26-panel h-100"><div class="matrix26-panel-header"><div><span>Verification</span><h2>Recovery checks</h2></div></div><div class="table-responsive"><table class="table matrix26-table align-middle"><thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead><tbody><tr th:each="item : ${verifications}"><td><strong th:text="${item.label}">Check</strong><small><code th:text="${item.checkCode}">CODE</code></small></td><td><span class="badge" th:classappend="${item.status == 'PASSED' ? 'text-bg-success' : 'text-bg-danger'}" th:text="${item.status}">PASSED</span></td><td th:text="${item.detail}">Detail</td></tr><tr th:if="${#lists.isEmpty(verifications)}"><td colspan="3" class="text-center text-muted">No verification records.</td></tr></tbody></table></div></section></div>
++                <div class="col-12 col-xl-5"><section class="matrix26-panel h-100"><div class="matrix26-panel-header"><div><span>Artifacts</span><h2>Recovery references</h2></div></div><div th:each="item : ${artifacts}" class="matrix26-runtime-file"><div><strong th:text="${item.artifactType}">Type</strong><small><code class="matrix26-code-wrap" th:text="${item.path}">path</code></small></div><span class="badge text-bg-success" th:text="${item.status}">VERIFIED</span></div><p th:if="${#lists.isEmpty(artifacts)}" class="text-muted mb-0">No artifacts registered.</p></section></div>
++            </div>
++        </main>
++    </div>
++</div>
++</body>
++</html>
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/resources/templates/control_center/restores/index.html /mnt/data/matrix26_restore3f1_impl/src/main/resources/templates/control_center/restores/index.html
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/resources/templates/control_center/restores/index.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/resources/templates/control_center/restores/index.html	2026-06-26 06:43:48.335162651 +0000
+@@ -0,0 +1,98 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Restore Manager')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Restore Manager', 'Verified encrypted backups restored only into isolated clone targets.')}" ></header>
++        <main class="matrix26-main">
++            <div th:if="${restoreSuccess}" class="alert alert-success" th:text="${restoreSuccess}"></div>
++            <div th:if="${restoreError}" class="alert alert-danger" th:text="${restoreError}"></div>
++
++            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
++                <div>
++                    <span class="matrix26-eyebrow">Matrix26 Restore Manager · Phase 3F.1</span>
++                    <h1 class="matrix26-page-title">Isolated clone restoration</h1>
++                    <p class="matrix26-page-subtitle mb-0">Decrypt, verify, import, restore files, generate a runtime, and register a separate recovery clone.</p>
++                </div>
++                <a class="btn btn-primary" th:href="@{/control-center/restores/new}"><i class="bi bi-arrow-counterclockwise me-1"></i>New clone restore</a>
++            </div>
++
++            <section class="matrix26-backup-summary mb-4">
++                <article><span><i class="bi bi-arrow-repeat"></i></span><div><strong th:text="${summary.total}">0</strong><small>Total jobs</small></div></article>
++                <article><span><i class="bi bi-check2-circle"></i></span><div><strong th:text="${summary.completed}">0</strong><small>Completed</small></div></article>
++                <article><span><i class="bi bi-x-octagon"></i></span><div><strong th:text="${summary.failed}">0</strong><small>Failed / cleanup</small></div></article>
++                <article><span><i class="bi bi-hourglass-split"></i></span><div><strong th:text="${summary.running}">0</strong><small>In progress</small></div></article>
++            </section>
++
++            <div class="row g-4 mb-4">
++                <div class="col-12 col-xl-7">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Fixed recovery target</span><h2>Phase 3F.1 safety boundary</h2></div></div>
++                        <dl class="matrix26-settings-list">
++                            <div><dt>Instance code</dt><dd><code th:text="${restoreProperties.targetInstanceCode}">matrix26-restore-test</code></dd></div>
++                            <div><dt>Database</dt><dd><code th:text="${restoreProperties.targetDatabaseName}">matrix26_restore_test</code></dd></div>
++                            <div><dt>Runtime</dt><dd><code th:text="${restoreProperties.targetRuntimeProfile}">matrix26_restore_test</code></dd></div>
++                            <div><dt>Port</dt><dd th:text="${restoreProperties.targetRuntimePort}">8095</dd></div>
++                            <div><dt>URL</dt><dd><code th:text="${restoreProperties.targetPublicUrl}">http://localhost:8095</code></dd></div>
++                        </dl>
++                    </section>
++                </div>
++                <div class="col-12 col-xl-5">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Isolation rules</span><h2>No overwrite mode</h2></div></div>
++                        <ul class="matrix26-check-list mb-0">
++                            <li><i class="bi bi-check-circle-fill"></i>Encrypted and verified full backups only.</li>
++                            <li><i class="bi bi-check-circle-fill"></i>No existing database, runtime, instance, directory, or port reuse.</li>
++                            <li><i class="bi bi-check-circle-fill"></i>The original 8094 instance remains unchanged.</li>
++                            <li><i class="bi bi-check-circle-fill"></i>Partial results require explicit cleanup review.</li>
++                        </ul>
++                    </section>
++                </div>
++            </div>
++
++            <section class="matrix26-panel mb-4">
++                <div class="matrix26-panel-header"><div><span>Recovery sources</span><h2>Eligible encrypted backups</h2></div></div>
++                <div class="table-responsive">
++                    <table class="table align-middle matrix26-table">
++                        <thead><tr><th>Backup</th><th>Source</th><th>Created</th><th>Encryption</th><th>Status</th><th class="text-end">Action</th></tr></thead>
++                        <tbody>
++                        <tr th:each="candidate : ${candidates}">
++                            <td><strong th:text="${candidate.backup.publicId}">BKP</strong><small th:text="${candidate.backup.backupType}">FULL</small></td>
++                            <td><strong th:text="${candidate.backup.instanceName}">Instance</strong><small><code th:text="${candidate.backup.instanceCode}">code</code></small></td>
++                            <td th:text="${#temporals.format(candidate.backup.requestedAt, 'dd/MM/yyyy HH:mm')}">date</td>
++                            <td><span th:if="${candidate.encryption != null}" class="badge text-bg-success" th:text="${candidate.encryption.algorithm}">AES</span><span th:unless="${candidate.encryption != null}" class="badge text-bg-secondary">None</span></td>
++                            <td><span class="badge" th:classappend="${candidate.eligible ? 'text-bg-success' : 'text-bg-warning'}" th:text="${candidate.eligible ? 'Ready' : 'Blocked'}">Ready</span><small th:text="${candidate.reason}">reason</small></td>
++                            <td class="text-end"><a th:if="${candidate.eligible}" class="btn btn-sm btn-outline-primary" th:href="@{/control-center/restores/new(backupId=${candidate.backup.id})}"><i class="bi bi-arrow-counterclockwise"></i><span class="visually-hidden">Restore</span></a></td>
++                        </tr>
++                        <tr th:if="${#lists.isEmpty(candidates)}"><td colspan="6" class="text-center text-muted py-4">No encrypted verified full backup is available.</td></tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++
++            <section class="matrix26-panel">
++                <div class="matrix26-panel-header"><div><span>History</span><h2>Restore jobs</h2></div></div>
++                <div class="table-responsive">
++                    <table class="table align-middle matrix26-table">
++                        <thead><tr><th>Job</th><th>Backup</th><th>Target</th><th>Requested</th><th>Status</th><th class="text-end">Details</th></tr></thead>
++                        <tbody>
++                        <tr th:each="job : ${jobs}">
++                            <td><strong th:text="${job.publicId}">RST</strong><small th:text="${job.requestedBy}">actor</small></td>
++                            <td><code th:text="${job.backupPublicId}">BKP</code></td>
++                            <td><strong th:text="${job.targetInstanceName}">Clone</strong><small><code th:text="${job.targetInstanceCode}">code</code> · port <span th:text="${job.targetRuntimePort}">8095</span></small></td>
++                            <td th:text="${#temporals.format(job.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">date</td>
++                            <td><span class="badge" th:classappend="${job.status.badgeClass}" th:text="${job.status.label}">Status</span></td>
++                            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/restores/{id}(id=${job.id})}"><i class="bi bi-eye"></i><span class="visually-hidden">Open</span></a></td>
++                        </tr>
++                        <tr th:if="${#lists.isEmpty(jobs)}"><td colspan="6" class="text-center text-muted py-4">No restore jobs yet.</td></tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++</body>
++</html>
+diff -ruN /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/resources/templates/control_center/restores/new.html /mnt/data/matrix26_restore3f1_impl/src/main/resources/templates/control_center/restores/new.html
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/resources/templates/control_center/restores/new.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/resources/templates/control_center/restores/new.html	2026-06-26 06:43:48.342293649 +0000
+@@ -0,0 +1,64 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('New clone restore')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('New clone restore', 'Restore a verified encrypted full backup into the fixed 8095 laboratory target.')}" ></header>
++        <main class="matrix26-main">
++            <div th:if="${restoreError}" class="alert alert-danger" th:text="${restoreError}"></div>
++            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
++                <div><span class="matrix26-eyebrow">Safe restore wizard</span><h1 class="matrix26-page-title">Create isolated recovery clone</h1><p class="matrix26-page-subtitle mb-0">The destination values are fixed in this phase and cannot overwrite an existing resource.</p></div>
++                <a class="btn btn-outline-secondary" th:href="@{/control-center/restores}"><i class="bi bi-arrow-left me-1"></i>Back</a>
++            </div>
++
++            <form th:action="@{/control-center/restores}" method="post" class="row g-4">
++                <div class="col-12 col-xl-7">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Source</span><h2>Verified encrypted backup</h2></div></div>
++                        <label class="form-label" for="backupId">Recovery package</label>
++                        <select class="form-select" id="backupId" name="backupId" required>
++                            <option value="">Select a backup</option>
++                            <option th:each="candidate : ${candidates}" th:if="${candidate.eligible}"
++                                    th:value="${candidate.backup.id}"
++                                    th:selected="${selectedBackupId != null and selectedBackupId == candidate.backup.id}"
++                                    th:text="|${candidate.backup.publicId} · ${candidate.backup.instanceName} · ${#temporals.format(candidate.backup.requestedAt, 'dd/MM/yyyy HH:mm')}|">Backup</option>
++                        </select>
++                        <div class="matrix26-inline-note mt-3"><i class="bi bi-shield-lock"></i><div><strong>Package requirements</strong><span>AES-256-GCM, full instance scope, latest verification VERIFIED, and source allowlist match.</span></div></div>
++                    </section>
++                </div>
++
++                <div class="col-12 col-xl-5">
++                    <section class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><span>Destination</span><h2>Fixed recovery laboratory</h2></div></div>
++                        <dl class="matrix26-settings-list">
++                            <div><dt>Name</dt><dd th:text="${restoreProperties.targetInstanceName}">Restore test</dd></div>
++                            <div><dt>Code</dt><dd><code th:text="${restoreProperties.targetInstanceCode}">code</code></dd></div>
++                            <div><dt>Database</dt><dd><code th:text="${restoreProperties.targetDatabaseName}">database</code></dd></div>
++                            <div><dt>Runtime</dt><dd><code th:text="${restoreProperties.targetRuntimeProfile}">runtime</code></dd></div>
++                            <div><dt>Port / URL</dt><dd><span th:text="${restoreProperties.targetRuntimePort}">8095</span> · <code th:text="${restoreProperties.targetPublicUrl}">url</code></dd></div>
++                        </dl>
++                    </section>
++                </div>
++
++                <div class="col-12">
++                    <section class="matrix26-panel">
++                        <div class="matrix26-panel-header"><div><span>Execution</span><h2>Explicit authorization</h2></div></div>
++                        <div class="form-check form-switch mb-3">
++                            <input class="form-check-input" type="checkbox" id="startAfterRestore" name="startAfterRestore" value="true" th:checked="${restoreProperties.startAfterRestoreDefault}">
++                            <label class="form-check-label" for="startAfterRestore">Start the restored clone and run the HTTP health check after registration.</label>
++                        </div>
++                        <p class="mb-2">Type exactly:</p>
++                        <code class="d-block mb-2" th:text="|RESTORE ${restoreProperties.targetInstanceCode}|">RESTORE code</code>
++                        <input class="form-control" name="confirmation" autocomplete="off" required th:placeholder="|RESTORE ${restoreProperties.targetInstanceCode}|">
++                        <div class="alert alert-warning mt-3 mb-0"><strong>No automatic overwrite or rollback.</strong> If an import fails after creating the target database or folders, the job is marked <code>CLEANUP_REQUIRED</code> for explicit review.</div>
++                        <div class="d-flex justify-content-end mt-4"><button class="btn btn-primary" type="submit"><i class="bi bi-arrow-counterclockwise me-1"></i>Restore verified clone</button></div>
++                    </section>
++                </div>
++            </form>
++        </main>
++    </div>
++</div>
++</body>
++</html>
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/src/main/resources/static/css/matrix26-control.css	2026-06-26 06:38:22.818962628 +0000
++++ /mnt/data/matrix26_restore3f1_impl/src/main/resources/static/css/matrix26-control.css	2026-06-26 06:43:59.445225759 +0000
+@@ -2393,3 +2393,49 @@
+         flex-wrap: wrap;
+     }
+ }
++
++/* Matrix26 Restore Manager Phase 3F.1 */
++.matrix26-restore-timeline {
++    display: grid;
++    gap: 0.85rem;
++}
++
++.matrix26-restore-step {
++    display: grid;
++    grid-template-columns: 2.5rem minmax(0, 1fr);
++    gap: 0.9rem;
++    align-items: flex-start;
++    padding: 1rem;
++    border: 1px solid var(--matrix26-border, #dbe3ef);
++    border-radius: 0.9rem;
++    background: var(--matrix26-surface, #fff);
++}
++
++.matrix26-restore-step-number {
++    display: inline-grid;
++    place-items: center;
++    width: 2.5rem;
++    height: 2.5rem;
++    border-radius: 999px;
++    background: var(--matrix26-primary-soft, #e8efff);
++    color: var(--matrix26-primary, #2457f5);
++    font-weight: 800;
++}
++
++.matrix26-restore-step small {
++    display: block;
++    margin-top: 0.25rem;
++    color: var(--matrix26-muted, #667085);
++    overflow-wrap: anywhere;
++}
++
++@media (max-width: 575.98px) {
++    .matrix26-restore-step {
++        grid-template-columns: 2rem minmax(0, 1fr);
++        padding: 0.85rem;
++    }
++    .matrix26-restore-step-number {
++        width: 2rem;
++        height: 2rem;
++    }
++}
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/scripts/check-matrix26-restore-phase3f1.sh	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/scripts/check-matrix26-restore-phase3f1.sh	2026-06-26 06:46:20.115891457 +0000
+@@ -0,0 +1,66 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++RESTORE_JAVA="$ROOT/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores"
++BACKUP_SECURITY="$ROOT/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityService.java"
++SIDEBAR="$ROOT/src/main/resources/templates/control_center/fragments/sidebar.html"
++TEMPLATES="$ROOT/src/main/resources/templates/control_center/restores"
++OPERATIONS="$ROOT/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26OperationsProperties.java"
++
++required_files=(
++  "$RESTORE_JAVA/Matrix26RestoreController.java"
++  "$RESTORE_JAVA/Matrix26RestoreService.java"
++  "$RESTORE_JAVA/Matrix26RestoreRepository.java"
++  "$RESTORE_JAVA/Matrix26RestoreInitializer.java"
++  "$TEMPLATES/index.html"
++  "$TEMPLATES/new.html"
++  "$TEMPLATES/detail.html"
++)
++for file in "${required_files[@]}"; do
++  [[ -f "$file" ]] || { echo "Missing required file: $file" >&2; exit 1; }
++done
++
++grep -q 'extractVerifiedBackup' "$BACKUP_SECURITY"
++grep -q 'AES-GCM authentication failed' "$BACKUP_SECURITY"
++echo "Encrypted package extraction and internal verification: OK"
++
++grep -q 'matrix26-restore-test' "$RESTORE_JAVA/Matrix26RestoreProperties.java"
++grep -q 'matrix26_restore_test' "$RESTORE_JAVA/Matrix26RestoreProperties.java"
++grep -q '8095' "$RESTORE_JAVA/Matrix26RestoreProperties.java"
++grep -q 'validateTargetAvailable' "$RESTORE_JAVA/Matrix26RestoreService.java"
++if grep -RqiE 'DROP[[:space:]]+DATABASE|TRUNCATE[[:space:]]+matrix26_restore|REPLACE_EXISTING.*runtime-clients' "$RESTORE_JAVA"; then
++  echo "Unsafe overwrite or database drop operation detected." >&2
++  exit 1
++fi
++echo "Fixed isolated target and no-overwrite boundary: OK"
++
++grep -q 'MYSQL_PWD' "$RESTORE_JAVA/Matrix26RestoreService.java"
++if grep -q -- '--password=' "$RESTORE_JAVA/Matrix26RestoreService.java"; then
++  echo "Password detected in database client arguments." >&2
++  exit 1
++fi
++echo "Database credentials remain outside process arguments: OK"
++
++grep -q 'safeZipEntry' "$RESTORE_JAVA/Matrix26RestoreService.java"
++grep -q 'ensureInside' "$RESTORE_JAVA/Matrix26RestoreService.java"
++grep -q 'matrix26_instance_appearance_config' "$RESTORE_JAVA/Matrix26RestoreService.java"
++echo "Safe archive extraction and clone identity remapping: OK"
++
++grep -q 'matrix26-restore-test' "$OPERATIONS"
++grep -q '/control-center/restores' "$SIDEBAR"
++echo "Runtime Control integration and navigation: OK"
++
++python - "$TEMPLATES" <<'PY'
++from pathlib import Path
++import sys
++for path in Path(sys.argv[1]).glob('*.html'):
++    text = path.read_text(encoding='utf-8')
++    if text.count('<html') != 1 or text.count('</html>') != 1:
++        raise SystemExit(f'Invalid HTML document structure: {path}')
++    if text.count('<form') != text.count('</form>'):
++        raise SystemExit(f'Unbalanced form tags: {path}')
++print('Restore templates: OK')
++PY
++
++echo "Matrix26 Restore Manager Phase 3F.1 static checks passed."
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/scripts/configure-matrix26-restore-phase3f1.sh	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/scripts/configure-matrix26-restore-phase3f1.sh	2026-06-26 06:46:20.104246629 +0000
+@@ -0,0 +1,42 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++CONFIG_FILE="$PROJECT_ROOT/runtime-clients/matrix26_control/application.properties"
++MAINTENANCE_DIR="$PROJECT_ROOT/runtime-data/matrix26-control/maintenance"
++BACKUP_FILE="$MAINTENANCE_DIR/application.properties.phase3f1.bak"
++
++if [[ ! -f "$CONFIG_FILE" ]]; then
++  echo "Matrix26 runtime configuration was not found: $CONFIG_FILE" >&2
++  exit 1
++fi
++
++mkdir -p "$MAINTENANCE_DIR"
++cp -f "$CONFIG_FILE" "$BACKUP_FILE"
++
++TEMP_FILE="$(mktemp)"
++grep -v '^matrix26\.control-center\.restores\.' "$CONFIG_FILE" > "$TEMP_FILE" || true
++cat >> "$TEMP_FILE" <<'PROPERTIES'
++
++# Matrix26 Restore Manager Phase 3F.1
++matrix26.control-center.restores.enabled=true
++matrix26.control-center.restores.allowed-source-instance-codes=matrix26-appearance-lab
++matrix26.control-center.restores.target-instance-code=matrix26-restore-test
++matrix26.control-center.restores.target-instance-name=Matrix26 Restore Test
++matrix26.control-center.restores.target-database-name=matrix26_restore_test
++matrix26.control-center.restores.target-runtime-profile=matrix26_restore_test
++matrix26.control-center.restores.target-runtime-port=8095
++matrix26.control-center.restores.target-public-url=http://localhost:8095
++matrix26.control-center.restores.runtime-directory=runtime-clients
++matrix26.control-center.restores.runtime-data-directory=runtime-data
++matrix26.control-center.restores.import-executable=${MATRIX26_MYSQL_PATH:C:/wamp64/bin/mariadb/mariadb10.10.2/bin/mariadb.exe}
++matrix26.control-center.restores.process-timeout-seconds=1200
++matrix26.control-center.restores.start-after-restore-default=true
++PROPERTIES
++
++mv "$TEMP_FILE" "$CONFIG_FILE"
++
++echo "Restore Manager configuration updated:"
++echo "$CONFIG_FILE"
++echo "Previous configuration preserved at:"
++echo "$BACKUP_FILE"
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/docs/project/matrix26-restore-phase3f1-test-guide.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/docs/project/matrix26-restore-phase3f1-test-guide.md	2026-06-26 06:47:09.483269408 +0000
+@@ -0,0 +1,104 @@
++# Matrix26 Restore Manager — Phase 3F.1 test guide
++
++## Scope
++
++Phase 3F.1 restores one verified encrypted full backup of `matrix26-appearance-lab` as an isolated clone:
++
++- instance code: `matrix26-restore-test`
++- database: `matrix26_restore_test`
++- runtime profile: `matrix26_restore_test`
++- port: `8095`
++- URL: `http://localhost:8095`
++
++The source instance, database, runtime, and files are never overwritten.
++
++## Preconditions
++
++1. Matrix26 Control Center is stopped before compiling.
++2. At least one full encrypted backup is `COMPLETED` and `VERIFIED`.
++3. `MATRIX26_BACKUP_MASTER_KEY` is available to the Matrix26 process.
++4. `mariadb.exe` or `mysql.exe` is installed.
++5. Database `matrix26_restore_test` does not exist.
++6. Port `8095` is free.
++7. These paths do not exist:
++   - `runtime-clients/matrix26_restore_test`
++   - `runtime-data/matrix26-restore-test`
++8. No Matrix26 instance is registered with the target code, database, runtime, or port.
++
++## Apply
++
++```bash
++unzip "$HOME/Downloads/matrix26-restore-phase3f1-final.zip" -d "$HOME/Downloads"
++SRC="$HOME/Downloads/matrix26-restore-phase3f1-final"
++cp -rf "$SRC/src/." src/
++cp -rf "$SRC/scripts/." scripts/
++cp -rf "$SRC/docs/." docs/
++cp -rf "$SRC/reports/." reports/
++chmod +x scripts/check-matrix26-restore-phase3f1.sh
++chmod +x scripts/configure-matrix26-restore-phase3f1.sh
++bash scripts/configure-matrix26-restore-phase3f1.sh
++bash scripts/check-matrix26-restore-phase3f1.sh
++mvn clean -DskipTests package
++```
++
++## Main test
++
++1. Start Matrix26.
++2. Open `/control-center/restores`.
++3. Select an eligible encrypted full backup.
++4. Keep **Start the restored clone** enabled.
++5. Type exactly `RESTORE matrix26-restore-test`.
++6. Execute the restore once.
++
++Expected steps:
++
++1. Validate encrypted backup and destination — `COMPLETED`
++2. Decrypt and verify recovery package — `COMPLETED`
++3. Create isolated database — `COMPLETED`
++4. Import restored database — `COMPLETED`
++5. Restore instance files — `COMPLETED`
++6. Generate clone runtime — `COMPLETED`
++7. Register clone in Matrix26 — `COMPLETED`
++8. Start clone runtime — `COMPLETED`
++9. Verify clone health — `COMPLETED`
++
++Expected final state: `COMPLETED`.
++
++## Functional checks
++
++Open:
++
++- `http://localhost:8095`
++- `http://localhost:8095/login`
++- `http://localhost:8095/admin/restaurant/dashboard`
++- `http://localhost:8095/restaurant/menu`
++
++Confirm:
++
++- the source portal on `8094` remains online and unchanged;
++- the restored portal uses database `matrix26_restore_test`;
++- restored business data exists;
++- branding, logo, favicon, login image, theme, and layouts match the backup;
++- runtime files exist only under `runtime-clients/matrix26_restore_test`;
++- assets exist only under `runtime-data/matrix26-restore-test`;
++- Runtime Control can stop and start the clone;
++- the clone is protected from deletion.
++
++## Negative tests
++
++The restore must be blocked if any target resource already exists. Test only after preserving the completed clone or in a disposable environment:
++
++- target database exists;
++- port `8095` is occupied;
++- target runtime directory exists;
++- target runtime-data directory exists;
++- target instance code is registered;
++- wrong confirmation phrase;
++- backup is not encrypted or not verified;
++- master key is unavailable or incorrect.
++
++## Failure behavior
++
++If failure occurs before creating target resources, status is `FAILED`.
++
++If failure occurs after creating a database, directory, or registered instance, status is `CLEANUP_REQUIRED`. Matrix26 does not automatically drop a database or delete partially restored resources in Phase 3F.1.
+--- /mnt/data/matrix26_restore3f1_work_2005bcd1/matrix26-restore-phase3f1-context-20260626-005000/reports/matrix26-restore-phase3f1-report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_restore3f1_impl/reports/matrix26-restore-phase3f1-report.md	2026-06-26 06:47:09.491127711 +0000
+@@ -0,0 +1,36 @@
++# Matrix26 Restore Manager — Phase 3F.1 implementation report
++
++## Delivered
++
++- Restore dashboard, candidate list, creation form, job detail, steps, artifacts, and verifications.
++- Restore metadata tables created idempotently in `matrix26_platform_control`.
++- Public extraction API for verified AES-256-GCM backup packages.
++- Fixed no-overwrite clone target on port 8095.
++- MariaDB/MySQL import using credentials through `MYSQL_PWD`, never command arguments.
++- Safe ZIP extraction with traversal checks and namespace remapping.
++- Source-to-clone appearance identity remapping.
++- Runtime generation from the real local source runtime while preserving credentials locally.
++- Clone registration and module declaration copy.
++- Optional start and HTTP health verification through Runtime Control Center.
++- Runtime Control allowlist extension for `matrix26-restore-test`.
++- Audit events for completed and failed clone restores.
++- Persistent status, steps, artifacts, and verification trace.
++- `FAILED` versus `CLEANUP_REQUIRED` separation.
++
++## Safety boundaries
++
++- No `DROP DATABASE` operation.
++- No reuse or overwrite of existing database, port, instance, runtime profile, runtime directory, or runtime-data directory.
++- Only verified encrypted full backups from `matrix26-appearance-lab` are eligible.
++- The source instance and backup files are read-only.
++- Temporary decrypted content is removed after execution.
++- No master key or database password is stored in restore tables, logs, manifests, or process arguments.
++- The restored clone is registered as a protected instance.
++
++## Validation performed in the generation environment
++
++- Static security checker passed.
++- Restore package compiled against controlled Java 17 stubs, validating syntax and project API usage.
++- HTML structure and form balance checks passed.
++- Clean package application test prepared.
++- Full Maven build must be confirmed in the project environment because Maven distribution download is unavailable in the generation environment.

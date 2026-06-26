@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Restore detail')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Restore job', 'Complete recovery trace for the isolated clone.')}" ></header>
+        <main class="matrix26-main">
+            <div th:if="${restoreSuccess}" class="alert alert-success" th:text="${restoreSuccess}"></div>
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                <div><span class="matrix26-eyebrow" th:text="${job.publicId}">RST</span><h1 class="matrix26-page-title" th:text="${job.targetInstanceName}">Restore test</h1><p class="matrix26-page-subtitle mb-0"><code th:text="${job.backupPublicId}">BKP</code> → <code th:text="${job.targetInstanceCode}">clone</code></p></div>
+                <div class="d-flex gap-2"><span class="badge fs-6" th:classappend="${job.status.badgeClass}" th:text="${job.status.label}">Status</span><a class="btn btn-outline-secondary" th:href="@{/control-center/restores}"><i class="bi bi-arrow-left me-1"></i>Back</a></div>
+            </div>
+
+            <div th:if="${job.lastError}" class="alert alert-danger"><strong>Last error:</strong> <span th:text="${job.lastError}">Error</span></div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-xl-6"><section class="matrix26-panel h-100"><div class="matrix26-panel-header"><div><span>Source</span><h2>Encrypted recovery package</h2></div></div><dl class="matrix26-settings-list"><div><dt>Backup</dt><dd><code th:text="${job.backupPublicId}">BKP</code></dd></div><div><dt>Instance</dt><dd th:text="${job.sourceInstanceName}">Source</dd></div><div><dt>Code</dt><dd><code th:text="${job.sourceInstanceCode}">source</code></dd></div><div><dt>Database</dt><dd><code th:text="${job.sourceDatabaseName}">db</code></dd></div></dl></section></div>
+                <div class="col-12 col-xl-6"><section class="matrix26-panel h-100"><div class="matrix26-panel-header"><div><span>Target</span><h2>Isolated clone</h2></div></div><dl class="matrix26-settings-list"><div><dt>Instance</dt><dd th:text="${job.targetInstanceName}">Clone</dd></div><div><dt>Code</dt><dd><code th:text="${job.targetInstanceCode}">target</code></dd></div><div><dt>Database</dt><dd><code th:text="${job.targetDatabaseName}">db</code></dd></div><div><dt>Runtime / port</dt><dd><code th:text="${job.targetRuntimeProfile}">runtime</code> · <span th:text="${job.targetRuntimePort}">8095</span></dd></div><div><dt>URL</dt><dd><a th:if="${job.completed}" th:href="${job.targetPublicUrl}" target="_blank" rel="noopener" th:text="${job.targetPublicUrl}">URL</a><code th:unless="${job.completed}" th:text="${job.targetPublicUrl}">URL</code></dd></div></dl></section></div>
+            </div>
+
+            <section id="restore-steps" class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header"><div><span>Execution trace</span><h2>Restore steps</h2></div></div>
+                <div class="matrix26-restore-timeline">
+                    <article th:each="step : ${steps}" class="matrix26-restore-step">
+                        <span class="matrix26-restore-step-number" th:text="${step.sequenceNumber / 10}">1</span>
+                        <div><div class="d-flex align-items-center gap-2 flex-wrap"><strong th:text="${step.label}">Step</strong><span class="badge" th:classappend="${step.status.badgeClass}" th:text="${step.status.label}">Status</span></div><small th:if="${step.detail}" th:text="${step.detail}">Detail</small><small th:if="${step.startedAt}" th:text="|Started ${#temporals.format(step.startedAt, 'dd/MM/yyyy HH:mm:ss')}|">time</small></div>
+                    </article>
+                </div>
+            </section>
+
+            <div class="row g-4">
+                <div class="col-12 col-xl-7"><section class="matrix26-panel h-100"><div class="matrix26-panel-header"><div><span>Verification</span><h2>Recovery checks</h2></div></div><div class="table-responsive"><table class="table matrix26-table align-middle"><thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead><tbody><tr th:each="item : ${verifications}"><td><strong th:text="${item.label}">Check</strong><small><code th:text="${item.checkCode}">CODE</code></small></td><td><span class="badge" th:classappend="${item.status == 'PASSED' ? 'text-bg-success' : 'text-bg-danger'}" th:text="${item.status}">PASSED</span></td><td th:text="${item.detail}">Detail</td></tr><tr th:if="${#lists.isEmpty(verifications)}"><td colspan="3" class="text-center text-muted">No verification records.</td></tr></tbody></table></div></section></div>
+                <div class="col-12 col-xl-5"><section class="matrix26-panel h-100"><div class="matrix26-panel-header"><div><span>Artifacts</span><h2>Recovery references</h2></div></div><div th:each="item : ${artifacts}" class="matrix26-runtime-file"><div><strong th:text="${item.artifactType}">Type</strong><small><code class="matrix26-code-wrap" th:text="${item.path}">path</code></small></div><span class="badge text-bg-success" th:text="${item.status}">VERIFIED</span></div><p th:if="${#lists.isEmpty(artifacts)}" class="text-muted mb-0">No artifacts registered.</p></section></div>
+            </div>
+        </main>
+    </div>
+</div>
+</body>
+</html>

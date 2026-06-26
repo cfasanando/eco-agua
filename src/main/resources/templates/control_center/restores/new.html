@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('New clone restore')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('New clone restore', 'Restore a verified encrypted full backup into the fixed 8095 laboratory target.')}" ></header>
+        <main class="matrix26-main">
+            <div th:if="${restoreError}" class="alert alert-danger" th:text="${restoreError}"></div>
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                <div><span class="matrix26-eyebrow">Safe restore wizard</span><h1 class="matrix26-page-title">Create isolated recovery clone</h1><p class="matrix26-page-subtitle mb-0">The destination values are fixed in this phase and cannot overwrite an existing resource.</p></div>
+                <a class="btn btn-outline-secondary" th:href="@{/control-center/restores}"><i class="bi bi-arrow-left me-1"></i>Back</a>
+            </div>
+
+            <form th:action="@{/control-center/restores}" method="post" class="row g-4">
+                <div class="col-12 col-xl-7">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Source</span><h2>Verified encrypted backup</h2></div></div>
+                        <label class="form-label" for="backupId">Recovery package</label>
+                        <select class="form-select" id="backupId" name="backupId" required>
+                            <option value="">Select a backup</option>
+                            <option th:each="candidate : ${candidates}" th:if="${candidate.eligible}"
+                                    th:value="${candidate.backup.id}"
+                                    th:selected="${selectedBackupId != null and selectedBackupId == candidate.backup.id}"
+                                    th:text="|${candidate.backup.publicId} · ${candidate.backup.instanceName} · ${#temporals.format(candidate.backup.requestedAt, 'dd/MM/yyyy HH:mm')}|">Backup</option>
+                        </select>
+                        <div class="matrix26-inline-note mt-3"><i class="bi bi-shield-lock"></i><div><strong>Package requirements</strong><span>AES-256-GCM, full instance scope, latest verification VERIFIED, and source allowlist match.</span></div></div>
+                    </section>
+                </div>
+
+                <div class="col-12 col-xl-5">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Destination</span><h2>Fixed recovery laboratory</h2></div></div>
+                        <dl class="matrix26-settings-list">
+                            <div><dt>Name</dt><dd th:text="${restoreProperties.targetInstanceName}">Restore test</dd></div>
+                            <div><dt>Code</dt><dd><code th:text="${restoreProperties.targetInstanceCode}">code</code></dd></div>
+                            <div><dt>Database</dt><dd><code th:text="${restoreProperties.targetDatabaseName}">database</code></dd></div>
+                            <div><dt>Runtime</dt><dd><code th:text="${restoreProperties.targetRuntimeProfile}">runtime</code></dd></div>
+                            <div><dt>Port / URL</dt><dd><span th:text="${restoreProperties.targetRuntimePort}">8095</span> · <code th:text="${restoreProperties.targetPublicUrl}">url</code></dd></div>
+                        </dl>
+                    </section>
+                </div>
+
+                <div class="col-12">
+                    <section class="matrix26-panel">
+                        <div class="matrix26-panel-header"><div><span>Execution</span><h2>Explicit authorization</h2></div></div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="startAfterRestore" name="startAfterRestore" value="true" th:checked="${restoreProperties.startAfterRestoreDefault}">
+                            <label class="form-check-label" for="startAfterRestore">Start the restored clone and run the HTTP health check after registration.</label>
+                        </div>
+                        <p class="mb-2">Type exactly:</p>
+                        <code class="d-block mb-2" th:text="|RESTORE ${restoreProperties.targetInstanceCode}|">RESTORE code</code>
+                        <input class="form-control" name="confirmation" autocomplete="off" required th:placeholder="|RESTORE ${restoreProperties.targetInstanceCode}|">
+                        <div class="alert alert-warning mt-3 mb-0"><strong>No automatic overwrite or rollback.</strong> If an import fails after creating the target database or folders, the job is marked <code>CLEANUP_REQUIRED</code> for explicit review.</div>
+                        <div class="d-flex justify-content-end mt-4"><button class="btn btn-primary" type="submit"><i class="bi bi-arrow-counterclockwise me-1"></i>Restore verified clone</button></div>
+                    </section>
+                </div>
+            </form>
+        </main>
+    </div>
+</div>
+</body>
+</html>

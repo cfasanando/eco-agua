@@ -20,7 +20,8 @@ public class Matrix26OperationsProperties {
     private boolean runtimeControlEnabled = true;
     private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of(
             "matrix26-restaurant-lab",
-            "matrix26-appearance-lab"
+            "matrix26-appearance-lab",
+            "matrix26-restore-test"
     ));
     private int startTimeoutSeconds = 45;
     private int stopTimeoutSeconds = 25;

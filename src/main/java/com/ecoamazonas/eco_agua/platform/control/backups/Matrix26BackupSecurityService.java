@@ -290,6 +290,79 @@ public class Matrix26BackupSecurityService {
         }
     }
 
+    public Matrix26BackupExtraction extractVerifiedBackup(long jobId, Path destination) {
+        Matrix26BackupJob job = backupRepository.findById(jobId)
+                .orElseThrow(() -> new Matrix26BackupException("The requested backup does not exist."));
+        Matrix26BackupEncryption metadata = securityRepository.findEncryption(jobId)
+                .orElseThrow(() -> new Matrix26BackupException("The backup is not encrypted."));
+        if (!job.isCompleted()) {
+            throw new Matrix26BackupException("Only completed backups can be restored.");
+        }
+        if (!metadata.encrypted() || metadata.verificationStatus() != Matrix26BackupVerificationState.VERIFIED) {
+            throw new Matrix26BackupException("The backup must be encrypted and verified before restoration.");
+        }
+
+        KeyMaterial key = keyMaterial();
+        if (!key.keyId().equals(metadata.keyId())) {
+            throw new Matrix26BackupException(
+                    "The available master key does not match backup key identifier " + metadata.keyId() + "."
+            );
+        }
+
+        Path root = backupRoot();
+        Path packageFile = root.resolve(metadata.packagePath()).normalize();
+        ensureInside(root, packageFile);
+        if (!Files.isRegularFile(packageFile)) {
+            throw new Matrix26BackupException("The encrypted package file is missing.");
+        }
+        try {
+            String currentSha = sha256(packageFile);
+            if (!currentSha.equalsIgnoreCase(metadata.packageSha256())) {
+                throw new Matrix26BackupException("The encrypted package SHA-256 no longer matches its registered value.");
+            }
+
+            Path output = destination.toAbsolutePath().normalize();
+            if (Files.exists(output)) {
+                try (var entries = Files.list(output)) {
+                    if (entries.findAny().isPresent()) {
+                        throw new Matrix26BackupException("The restore extraction directory must be empty.");
+                    }
+                }
+            }
+            Files.createDirectories(output);
+            Path decryptedZip = output.resolve("payload.zip");
+            decrypt(packageFile, decryptedZip, key);
+            Path extracted = output.resolve("payload");
+            Files.createDirectories(extracted);
+            int entryCount = extractZipSafely(decryptedZip, extracted);
+            Files.deleteIfExists(decryptedZip);
+
+            Path checksums = extracted.resolve("checksums.sha256");
+            if (!Files.isRegularFile(checksums)) {
+                throw new Matrix26BackupException("Internal checksums.sha256 is missing.");
+            }
+            List<String> failures = verifyInternalChecksums(extracted, checksums);
+            if (!failures.isEmpty()) {
+                throw new Matrix26BackupException("Internal checksum failures: " + String.join(", ", failures));
+            }
+            if (!Files.isRegularFile(extracted.resolve("database.sql.gz"))
+                    || !Files.isRegularFile(extracted.resolve("manifest.json"))
+                    || !Files.isRegularFile(extracted.resolve("instance-files.zip"))) {
+                throw new Matrix26BackupException(
+                        "Required database, manifest, or instance archive artifact is missing."
+                );
+            }
+            String message = entryCount + " encrypted entries and all internal SHA-256 checks passed.";
+            return new Matrix26BackupExtraction(job, metadata, extracted, entryCount, message);
+        } catch (Matrix26BackupException ex) {
+            throw ex;
+        } catch (GeneralSecurityException ex) {
+            throw new Matrix26BackupException("AES-GCM authentication failed or the key is incorrect.", ex);
+        } catch (IOException ex) {
+            throw new Matrix26BackupException("The encrypted backup could not be extracted: " + safeMessage(ex), ex);
+        }
+    }
+
     public Matrix26BackupPolicy policy(long instanceId) {
         PlatformBusinessClient instance = clientRepository.findById(instanceId)
                 .orElseThrow(() -> new Matrix26BackupException("The requested instance does not exist."));

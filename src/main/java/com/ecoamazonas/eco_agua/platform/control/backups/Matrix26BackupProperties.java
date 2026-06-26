@@ -20,6 +20,9 @@ public class Matrix26BackupProperties {
     private long maximumSingleFileBytes = 512L * 1024L * 1024L;
     private long maximumArchiveSourceBytes = 2L * 1024L * 1024L * 1024L;
     private int diagnosticLogTailLines = 400;
+    private boolean encryptionEnabled = true;
+    private String masterKeyEnvironment = "MATRIX26_BACKUP_MASTER_KEY";
+    private boolean retentionEnabled = true;
     private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of("matrix26-appearance-lab"));
 
     public boolean isEnabled() {
@@ -102,6 +105,31 @@ public class Matrix26BackupProperties {
 
     public void setDiagnosticLogTailLines(int diagnosticLogTailLines) {
         this.diagnosticLogTailLines = diagnosticLogTailLines;
+    }
+
+
+    public boolean isEncryptionEnabled() {
+        return encryptionEnabled;
+    }
+
+    public void setEncryptionEnabled(boolean encryptionEnabled) {
+        this.encryptionEnabled = encryptionEnabled;
+    }
+
+    public String getMasterKeyEnvironment() {
+        return masterKeyEnvironment;
+    }
+
+    public void setMasterKeyEnvironment(String masterKeyEnvironment) {
+        this.masterKeyEnvironment = masterKeyEnvironment;
+    }
+
+    public boolean isRetentionEnabled() {
+        return retentionEnabled;
+    }
+
+    public void setRetentionEnabled(boolean retentionEnabled) {
+        this.retentionEnabled = retentionEnabled;
     }
 
     public Set<String> getAllowedInstanceCodes() {

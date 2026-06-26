@@ -12,13 +12,15 @@
 
             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
                 <div>
-                    <span class="matrix26-eyebrow">Matrix26 Backups · Phase 3E.2</span>
+                    <span class="matrix26-eyebrow">Matrix26 Backups · Phase 3E.3</span>
                     <h1 class="matrix26-page-title">Recovery backups</h1>
-                    <p class="matrix26-page-subtitle mb-0">Database-only and full instance packages with GZIP, ZIP, SHA-256, redaction, manifest, and structural verification.</p>
+                    <p class="matrix26-page-subtitle mb-0">Encrypted recovery packages, independent reverification, retention policies, and manual cleanup preview.</p>
                 </div>
-                <a class="btn btn-primary" th:href="@{/control-center/backups/new}">
-                    <i class="bi bi-database-add me-1"></i>New backup
-                </a>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/policies}"><i class="bi bi-calendar-check me-1"></i>Policies</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/retention}"><i class="bi bi-trash3 me-1"></i>Retention</a>
+                    <a class="btn btn-primary" th:href="@{/control-center/backups/new}"><i class="bi bi-database-add me-1"></i>New backup</a>
+                </div>
             </div>
 
             <section class="matrix26-backup-summary mb-4">
@@ -58,6 +60,18 @@
                     </section>
                 </div>
             </div>
+
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header"><div><span>Encryption</span><h2>Master key status</h2></div></div>
+                <div class="matrix26-backup-key-status" th:classappend="${keyStatus.available} ? ' is-ready' : ' is-blocked'">
+                    <span><i class="bi" th:classappend="${keyStatus.available} ? ' bi-shield-lock-fill' : ' bi-shield-exclamation'"></i></span>
+                    <div>
+                        <strong th:text="${keyStatus.available ? 'AES-256-GCM ready' : 'Encryption blocked'}">Status</strong>
+                        <small th:text="${keyStatus.message}">Message</small>
+                        <code th:if="${keyStatus.available}" th:text="${keyStatus.keyId}">KEY-ID</code>
+                    </div>
+                </div>
+            </section>
 
             <section class="matrix26-panel">
                 <div class="matrix26-panel-header">

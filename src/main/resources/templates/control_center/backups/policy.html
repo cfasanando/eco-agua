@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Retention policy')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Retention policy', 'Count-based retention with final-archive protection.')}"></header>
+        <main class="matrix26-main">
+            <div th:if="${backupSuccess}" class="alert alert-success" th:text="${backupSuccess}"></div>
+            <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                <div><span class="matrix26-eyebrow">Instance policy</span><h1 class="matrix26-page-title" th:text="${instance.businessName}">Instance</h1><code th:text="${instance.code}">code</code></div>
+                <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/policies}"><i class="bi bi-arrow-left me-1"></i>Policies</a>
+            </div>
+            <form class="matrix26-panel" method="post" th:action="@{/control-center/backups/policies/{id}(id=${instance.id})}">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <div class="matrix26-panel-header"><div><span>Rules</span><h2>Recovery point retention</h2></div></div>
+                <div class="row g-3">
+                    <div class="col-12 col-md-4"><label class="form-label" for="dailyKeep">Daily backups to keep</label><input class="form-control" id="dailyKeep" name="dailyKeep" type="number" min="1" max="365" th:value="${policy.dailyKeep}" required></div>
+                    <div class="col-12 col-md-4"><label class="form-label" for="weeklyKeep">Weekly backups to keep</label><input class="form-control" id="weeklyKeep" name="weeklyKeep" type="number" min="1" max="104" th:value="${policy.weeklyKeep}" required></div>
+                    <div class="col-12 col-md-4"><label class="form-label" for="monthlyKeep">Monthly backups to keep</label><input class="form-control" id="monthlyKeep" name="monthlyKeep" type="number" min="1" max="120" th:value="${policy.monthlyKeep}" required></div>
+                </div>
+                <label class="matrix26-confirmation mt-4"><input type="checkbox" name="finalKeepIndefinitely" value="true" th:checked="${policy.finalKeepIndefinitely}"><span>Keep final archives indefinitely.</span></label>
+                <label class="matrix26-confirmation mt-3"><input type="checkbox" name="enabled" value="true" th:checked="${policy.enabled}"><span>Enable manual retention cleanup for this instance.</span></label>
+                <div class="alert alert-info mt-4 mb-0">The newest verified backup is always protected. Final archives and manually protected packages are never deleted by retention cleanup.</div>
+                <div class="d-flex justify-content-end gap-2 mt-4"><a class="btn btn-outline-secondary" th:href="@{/control-center/backups/retention(instanceId=${instance.id})}">Preview retention</a><button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i>Save policy</button></div>
+            </form>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Backup policies')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup policies', 'Retention rules remain isolated per Matrix26 instance.')}"></header>
+        <main class="matrix26-main">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                <div><span class="matrix26-eyebrow">Backup governance</span><h1 class="matrix26-page-title">Retention policies</h1><p class="matrix26-page-subtitle">Define how many verified encrypted daily, weekly, and monthly recovery points are kept.</p></div>
+                <a class="btn btn-outline-secondary" th:href="@{/control-center/backups}"><i class="bi bi-arrow-left me-1"></i>Backups</a>
+            </div>
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><span>Instances</span><h2>Available policies</h2></div></div>
+                <div class="row g-3">
+                    <div class="col-12 col-xl-6" th:each="candidate : ${candidates}">
+                        <article class="matrix26-policy-card" th:classappend="${candidate.allowed} ? '' : ' is-disabled'">
+                            <span><i class="bi bi-calendar2-check"></i></span>
+                            <div>
+                                <strong th:text="${candidate.businessName}">Instance</strong>
+                                <small><code th:text="${candidate.instanceCode}">code</code> · <code th:text="${candidate.databaseName}">database</code></small>
+                                <small th:unless="${candidate.allowed}" class="text-danger" th:text="${candidate.restrictionReason}">Blocked</small>
+                            </div>
+                            <a th:if="${candidate.allowed}" class="btn btn-outline-primary" th:href="@{/control-center/backups/policies/{id}(id=${candidate.instanceId})}">Configure</a>
+                        </article>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

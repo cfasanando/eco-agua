@@ -5,16 +5,18 @@
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('New backup', 'Create a verified database-only or full instance recovery package.')}"></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('New backup', 'Create a verified and optionally encrypted recovery package.')}"></header>
         <main class="matrix26-main">
             <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
             <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
-                <div><span class="matrix26-eyebrow">Manual backup</span><h1 class="matrix26-page-title">Configure the recovery package</h1></div>
+                <div><span class="matrix26-eyebrow">Manual backup · Phase 3E.3</span><h1 class="matrix26-page-title">Configure the recovery package</h1></div>
                 <a class="btn btn-outline-secondary" th:href="@{/control-center/backups}"><i class="bi bi-arrow-left me-1"></i>Back</a>
             </div>
 
-            <div class="alert alert-info">
-                Phase 3E.2 can create a complete recovery package with the database, runtime configuration, appearance, modules, branding resources, uploads, documents, and verified metadata.
+            <div class="alert" th:classappend="${keyStatus.available} ? ' alert-success' : ' alert-warning'">
+                <strong th:text="${keyStatus.available ? 'Encryption key ready.' : 'Encryption key unavailable.'}">Key status</strong>
+                <span th:text="${keyStatus.message}">Message</span>
+                <code th:if="${keyStatus.available}" th:text="${keyStatus.keyId}">KEY-ID</code>
             </div>
             <div th:unless="${tool.available}" class="alert alert-danger">
                 <strong>Backup tool unavailable.</strong>
@@ -31,8 +33,8 @@
                         <span class="matrix26-backup-scope-icon"><i class="bi bi-box-seam"></i></span>
                         <span>
                             <strong>Full instance backup</strong>
-                            <small>Database, runtime configuration, launchers, modules, appearance, branding resources, uploads, documents, inventory, and diagnostic tail.</small>
-                            <em>Recommended for recovery</em>
+                            <small>Database, runtime configuration, modules, appearance, branding, uploads, documents, inventory, and diagnostics.</small>
+                            <em>Required for encrypted recovery packages</em>
                         </span>
                     </label>
                     <label class="matrix26-backup-scope">
@@ -40,8 +42,8 @@
                         <span class="matrix26-backup-scope-icon"><i class="bi bi-database"></i></span>
                         <span>
                             <strong>Database only</strong>
-                            <small>Creates the Phase 3E.1 logical database export without instance files.</small>
-                            <em>Useful for quick data snapshots</em>
+                            <small>Creates the logical database export without instance files or encryption.</small>
+                            <em>Quick data snapshot</em>
                         </span>
                     </label>
                 </div>
@@ -55,37 +57,63 @@
                         <span class="matrix26-backup-candidate-copy">
                             <strong th:text="${candidate.businessName}">Instance</strong>
                             <small><code th:text="${candidate.instanceCode}">code</code> · <code th:text="${candidate.databaseName}">database</code></small>
-                            <small th:if="${candidate.allowed}" class="text-success">Eligible for Phase 3E.2</small>
+                            <small th:if="${candidate.allowed}" class="text-success">Eligible for encrypted backups</small>
                             <small th:unless="${candidate.allowed}" class="text-danger" th:text="${candidate.restrictionReason}">Blocked</small>
                         </span>
                     </label>
                 </div>
 
+                <section class="matrix26-backup-security-card mt-4">
+                    <div>
+                        <span class="matrix26-backup-security-icon"><i class="bi bi-shield-lock"></i></span>
+                        <div>
+                            <strong>Encrypt the full package with AES-256-GCM</strong>
+                            <small>The master key stays outside Matrix26, the database, Git, and the backup package.</small>
+                        </div>
+                    </div>
+                    <label class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" role="switch" name="encryptPackage" value="true"
+                               th:disabled="${!keyStatus.available}" th:checked="${keyStatus.available}">
+                        <span class="form-check-label" th:text="${keyStatus.available ? 'Enabled' : 'Key required'}">Enabled</span>
+                    </label>
+                </section>
+
+                <div class="row g-3 mt-1">
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label" for="retentionClass">Retention class</label>
+                        <select class="form-select" id="retentionClass" name="retentionClass">
+                            <option th:each="retention : ${retentionClasses}" th:value="${retention.name()}"
+                                    th:text="|${retention.label} — ${retention.description}|">Daily</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label">Key identifier</label>
+                        <div class="form-control bg-light" th:text="${keyStatus.available ? keyStatus.keyId : 'Unavailable'}">KEY-ID</div>
+                    </div>
+                </div>
+
                 <div class="matrix26-backup-plan mt-4">
-                    <h3>Full backup verification plan</h3>
+                    <h3>Encrypted backup verification plan</h3>
                     <ul>
-                        <li><i class="bi bi-check2"></i> Validate Matrix26 registration and runtime database</li>
-                        <li><i class="bi bi-check2"></i> Check table count and free storage</li>
-                        <li><i class="bi bi-check2"></i> Export with a transaction-consistent database dump</li>
-                        <li><i class="bi bi-check2"></i> Compress with GZIP</li>
-                        <li><i class="bi bi-check2"></i> Inspect SQL structure and ownership marker</li>
-                        <li><i class="bi bi-check2"></i> Calculate and recheck SHA-256</li>
-                        <li><i class="bi bi-check2"></i> Package instance-owned resources and approved runtime files</li>
-                        <li><i class="bi bi-check2"></i> Redact secrets from runtime configuration</li>
-                        <li><i class="bi bi-check2"></i> Export modules, appearance, and instance metadata</li>
-                        <li><i class="bi bi-check2"></i> Inspect ZIP paths and read every archive entry</li>
-                        <li><i class="bi bi-check2"></i> Generate complete checksums, manifest, inventory, and report</li>
+                        <li><i class="bi bi-check2"></i> Create and verify the full recovery package</li>
+                        <li><i class="bi bi-check2"></i> Build the internal payload ZIP with safe paths</li>
+                        <li><i class="bi bi-check2"></i> Encrypt using AES-256-GCM with authenticated metadata</li>
+                        <li><i class="bi bi-check2"></i> Decrypt to an isolated temporary directory</li>
+                        <li><i class="bi bi-check2"></i> Recheck all internal SHA-256 values and required artifacts</li>
+                        <li><i class="bi bi-check2"></i> Remove plaintext recovery artifacts only after verification</li>
+                        <li><i class="bi bi-check2"></i> Keep public manifest, public checksums, and a safe report</li>
                     </ul>
                 </div>
 
                 <dl class="matrix26-settings-list mt-4">
                     <div><dt>Backup root</dt><dd><code class="matrix26-code-wrap" th:text="${backupRoot}">path</code></dd></div>
-                    <div><dt>Tool</dt><dd th:text="${tool.available ? tool.version : 'Unavailable'}">Tool</dd></div>
+                    <div><dt>Database tool</dt><dd th:text="${tool.available ? tool.version : 'Unavailable'}">Tool</dd></div>
+                    <div><dt>Encryption</dt><dd>AES-256-GCM · authenticated package format v1</dd></div>
                 </dl>
 
                 <label class="matrix26-confirmation mt-4">
                     <input type="checkbox" name="confirmation" value="true" required>
-                    <span>I confirm that Matrix26 may create the selected verified recovery package for this laboratory instance.</span>
+                    <span>I confirm that Matrix26 may create and verify the selected recovery package for this laboratory instance.</span>
                 </label>
 
                 <div class="d-flex justify-content-end gap-2 mt-4">

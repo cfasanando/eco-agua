@@ -1,0 +1,2343 @@
+diff -ruN '--exclude=runtime-clients' '--exclude=backup-sample' '--exclude=reports' /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupController.java /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupController.java
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupController.java	2026-06-25 15:38:18.011662288 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupController.java	2026-06-25 15:33:29.665447051 +0000
+@@ -20,13 +20,16 @@
+ public class Matrix26BackupController {
+ 
+     private final Matrix26BackupService backupService;
++    private final Matrix26BackupSecurityService backupSecurityService;
+     private final PlatformBusinessClientRepository clientRepository;
+ 
+     public Matrix26BackupController(
+             Matrix26BackupService backupService,
++            Matrix26BackupSecurityService backupSecurityService,
+             PlatformBusinessClientRepository clientRepository
+     ) {
+         this.backupService = backupService;
++        this.backupSecurityService = backupSecurityService;
+         this.clientRepository = clientRepository;
+     }
+ 
+@@ -37,6 +40,7 @@
+         model.addAttribute("jobs", backupService.recentJobs());
+         model.addAttribute("tool", backupService.toolStatus());
+         model.addAttribute("backupRoot", backupService.backupRoot().toString());
++        model.addAttribute("keyStatus", backupSecurityService.keyStatus());
+         return "control_center/backups/index";
+     }
+ 
+@@ -50,6 +54,8 @@
+         model.addAttribute("selectedInstanceId", instanceId);
+         model.addAttribute("tool", backupService.toolStatus());
+         model.addAttribute("backupRoot", backupService.backupRoot().toString());
++        model.addAttribute("keyStatus", backupSecurityService.keyStatus());
++        model.addAttribute("retentionClasses", Matrix26BackupRetentionClass.values());
+         return "control_center/backups/new";
+     }
+ 
+@@ -57,18 +63,31 @@
+     public String createBackup(
+             @RequestParam("instanceId") long instanceId,
+             @RequestParam(value = "backupScope", defaultValue = "FULL") String backupScope,
++            @RequestParam(value = "encryptPackage", defaultValue = "false") boolean encryptPackage,
++            @RequestParam(value = "retentionClass", defaultValue = "DAILY") String retentionClass,
+             @RequestParam(value = "confirmation", defaultValue = "false") boolean confirmation,
+             Principal principal,
+             RedirectAttributes redirectAttributes
+     ) {
+         try {
+             boolean fullBackup = "FULL".equalsIgnoreCase(backupScope);
++            if (encryptPackage && !fullBackup) {
++                throw new Matrix26BackupException("Encryption is available only for full instance backups in Phase 3E.3.");
++            }
++            String actor = actor(principal);
+             Matrix26BackupJob job = fullBackup
+-                    ? backupService.createManualFullBackup(instanceId, actor(principal), confirmation)
+-                    : backupService.createManualDatabaseBackup(instanceId, actor(principal), confirmation);
++                    ? backupService.createManualFullBackup(instanceId, actor, confirmation)
++                    : backupService.createManualDatabaseBackup(instanceId, actor, confirmation);
++            if (encryptPackage) {
++                job = backupSecurityService.encryptBackup(
++                        job.id(),
++                        Matrix26BackupRetentionClass.from(retentionClass),
++                        actor
++                );
++            }
+             redirectAttributes.addFlashAttribute(
+                     "backupSuccess",
+-                    (fullBackup ? "Full instance backup" : "Database backup")
++                    (encryptPackage ? "Encrypted full instance backup" : fullBackup ? "Full instance backup" : "Database backup")
+                             + " completed and verified: " + job.publicId()
+             );
+             return "redirect:/control-center/backups/" + job.id();
+@@ -82,6 +101,8 @@
+     public String detail(@PathVariable long backupId, Model model) {
+         model.addAttribute("activePage", "matrix26_backups");
+         model.addAttribute("backup", backupService.detail(backupId));
++        model.addAttribute("encryption", backupSecurityService.metadata(backupId));
++        model.addAttribute("keyStatus", backupSecurityService.keyStatus());
+         return "control_center/backups/detail";
+     }
+ 
+@@ -99,6 +120,88 @@
+         return "control_center/backups/instance";
+     }
+ 
++    @PostMapping("/backups/{backupId}/verify")
++    public String verifyEncryptedBackup(
++            @PathVariable long backupId,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            backupSecurityService.verifyEncryptedBackup(backupId, actor(principal));
++            redirectAttributes.addFlashAttribute("backupSuccess", "Encrypted backup verification completed successfully.");
++        } catch (Matrix26BackupException ex) {
++            redirectAttributes.addFlashAttribute("backupError", ex.getMessage());
++        }
++        return "redirect:/control-center/backups/" + backupId;
++    }
++
++    @GetMapping("/backups/policies")
++    public String policies(Model model) {
++        model.addAttribute("activePage", "matrix26_backup_policies");
++        model.addAttribute("candidates", backupService.candidates());
++        return "control_center/backups/policies";
++    }
++
++    @GetMapping("/backups/policies/{instanceId}")
++    public String policy(@PathVariable long instanceId, Model model) {
++        PlatformBusinessClient instance = clientRepository.findById(instanceId)
++                .orElseThrow(() -> new IllegalArgumentException("The requested instance does not exist."));
++        model.addAttribute("activePage", "matrix26_backup_policies");
++        model.addAttribute("instance", instance);
++        model.addAttribute("policy", backupSecurityService.policy(instanceId));
++        return "control_center/backups/policy";
++    }
++
++    @PostMapping("/backups/policies/{instanceId}")
++    public String savePolicy(
++            @PathVariable long instanceId,
++            @RequestParam("dailyKeep") int dailyKeep,
++            @RequestParam("weeklyKeep") int weeklyKeep,
++            @RequestParam("monthlyKeep") int monthlyKeep,
++            @RequestParam(value = "finalKeepIndefinitely", defaultValue = "false") boolean finalKeepIndefinitely,
++            @RequestParam(value = "enabled", defaultValue = "false") boolean enabled,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            backupSecurityService.savePolicy(instanceId, dailyKeep, weeklyKeep, monthlyKeep,
++                    finalKeepIndefinitely, enabled, actor(principal));
++            redirectAttributes.addFlashAttribute("backupSuccess", "Retention policy saved.");
++        } catch (Matrix26BackupException ex) {
++            redirectAttributes.addFlashAttribute("backupError", ex.getMessage());
++        }
++        return "redirect:/control-center/backups/policies/" + instanceId;
++    }
++
++    @GetMapping("/backups/retention")
++    public String retention(
++            @RequestParam(value = "instanceId", required = false) Long instanceId,
++            Model model
++    ) {
++        model.addAttribute("activePage", "matrix26_backup_retention");
++        model.addAttribute("candidates", backupService.candidates());
++        if (instanceId != null) {
++            model.addAttribute("preview", backupSecurityService.retentionPreview(instanceId));
++        }
++        return "control_center/backups/retention";
++    }
++
++    @PostMapping("/backups/retention/execute")
++    public String executeRetention(
++            @RequestParam("instanceId") long instanceId,
++            @RequestParam("confirmation") String confirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            backupSecurityService.executeRetention(instanceId, confirmation, actor(principal));
++            redirectAttributes.addFlashAttribute("backupSuccess", "Manual retention cleanup completed.");
++        } catch (Matrix26BackupException ex) {
++            redirectAttributes.addFlashAttribute("backupError", ex.getMessage());
++        }
++        return "redirect:/control-center/backups/retention?instanceId=" + instanceId;
++    }
++
+     private String actor(Principal principal) {
+         return principal == null || principal.getName() == null || principal.getName().isBlank()
+                 ? "matrix26-system"
+diff -ruN '--exclude=runtime-clients' '--exclude=backup-sample' '--exclude=reports' /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupEncryption.java /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupEncryption.java
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupEncryption.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupEncryption.java	2026-06-25 15:30:58.208774901 +0000
+@@ -0,0 +1,27 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import java.time.LocalDateTime;
++
++public record Matrix26BackupEncryption(
++        Long id,
++        Long jobId,
++        boolean encrypted,
++        String algorithm,
++        Integer formatVersion,
++        String keyId,
++        String packagePath,
++        Long packageSizeBytes,
++        String packageSha256,
++        Matrix26BackupVerificationState verificationStatus,
++        LocalDateTime verifiedAt,
++        Matrix26BackupRetentionClass retentionClass,
++        LocalDateTime expiresAt,
++        boolean protectedFlag,
++        String protectionReason,
++        LocalDateTime encryptedAt,
++        LocalDateTime updatedAt
++) {
++    public String packageSizeLabel() {
++        return Matrix26BackupService.formatBytes(packageSizeBytes);
++    }
++}
+diff -ruN '--exclude=runtime-clients' '--exclude=backup-sample' '--exclude=reports' /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupInitializer.java /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupInitializer.java
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupInitializer.java	2026-06-25 15:38:18.013826990 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupInitializer.java	2026-06-25 15:33:08.721357751 +0000
+@@ -89,5 +89,69 @@
+                         ON DELETE CASCADE
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                 """);
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_backup_encryption (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    job_id BIGINT NOT NULL,
++                    encrypted BIT NOT NULL DEFAULT 1,
++                    algorithm VARCHAR(80) NOT NULL,
++                    format_version INT NOT NULL,
++                    key_id VARCHAR(80) NOT NULL,
++                    package_path VARCHAR(900) NOT NULL,
++                    package_size_bytes BIGINT NOT NULL,
++                    package_sha256 VARCHAR(64) NOT NULL,
++                    verification_status VARCHAR(40) NOT NULL,
++                    verified_at DATETIME(6) NULL,
++                    retention_class VARCHAR(30) NOT NULL,
++                    expires_at DATETIME(6) NULL,
++                    protected_flag BIT NOT NULL DEFAULT 0,
++                    protection_reason VARCHAR(500) NULL,
++                    encrypted_at DATETIME(6) NOT NULL,
++                    created_at DATETIME(6) NOT NULL,
++                    updated_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    UNIQUE KEY uk_matrix26_backup_encryption_job (job_id),
++                    KEY idx_matrix26_backup_encryption_retention (retention_class, expires_at),
++                    KEY idx_matrix26_backup_encryption_verification (verification_status),
++                    CONSTRAINT fk_matrix26_backup_encryption_job
++                        FOREIGN KEY (job_id) REFERENCES matrix26_backup_job(id)
++                        ON DELETE CASCADE
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_backup_policy (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    instance_id BIGINT NOT NULL,
++                    instance_code VARCHAR(80) NOT NULL,
++                    daily_keep INT NOT NULL DEFAULT 7,
++                    weekly_keep INT NOT NULL DEFAULT 4,
++                    monthly_keep INT NOT NULL DEFAULT 6,
++                    final_keep_indefinitely BIT NOT NULL DEFAULT 1,
++                    enabled BIT NOT NULL DEFAULT 1,
++                    updated_by VARCHAR(120) NOT NULL,
++                    updated_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    UNIQUE KEY uk_matrix26_backup_policy_instance (instance_id),
++                    KEY idx_matrix26_backup_policy_code (instance_code)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_backup_retention_event (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    instance_id BIGINT NOT NULL,
++                    instance_code VARCHAR(80) NOT NULL,
++                    job_id BIGINT NULL,
++                    backup_public_id VARCHAR(80) NULL,
++                    action VARCHAR(40) NOT NULL,
++                    actor VARCHAR(120) NOT NULL,
++                    reason VARCHAR(1000) NULL,
++                    bytes_affected BIGINT NOT NULL DEFAULT 0,
++                    created_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    KEY idx_matrix26_retention_instance_created (instance_id, created_at),
++                    KEY idx_matrix26_retention_backup_public (backup_public_id)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++
+     }
+ }
+diff -ruN '--exclude=runtime-clients' '--exclude=backup-sample' '--exclude=reports' /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupKeyStatus.java /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupKeyStatus.java
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupKeyStatus.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupKeyStatus.java	2026-06-25 15:30:58.197497553 +0000
+@@ -0,0 +1,8 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++public record Matrix26BackupKeyStatus(
++        boolean available,
++        String keyId,
++        String message
++) {
++}
+diff -ruN '--exclude=runtime-clients' '--exclude=backup-sample' '--exclude=reports' /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupPolicy.java /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupPolicy.java
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupPolicy.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupPolicy.java	2026-06-25 15:30:58.218929202 +0000
+@@ -0,0 +1,20 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import java.time.LocalDateTime;
++
++public record Matrix26BackupPolicy(
++        Long id,
++        Long instanceId,
++        String instanceCode,
++        int dailyKeep,
++        int weeklyKeep,
++        int monthlyKeep,
++        boolean finalKeepIndefinitely,
++        boolean enabled,
++        String updatedBy,
++        LocalDateTime updatedAt
++) {
++    public static Matrix26BackupPolicy defaults(Long instanceId, String instanceCode) {
++        return new Matrix26BackupPolicy(null, instanceId, instanceCode, 7, 4, 6, true, true, "matrix26-system", null);
++    }
++}
+diff -ruN '--exclude=runtime-clients' '--exclude=backup-sample' '--exclude=reports' /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupProperties.java /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupProperties.java
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupProperties.java	2026-06-25 15:38:18.015432790 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupProperties.java	2026-06-25 15:32:55.567776534 +0000
+@@ -20,6 +20,9 @@
+     private long maximumSingleFileBytes = 512L * 1024L * 1024L;
+     private long maximumArchiveSourceBytes = 2L * 1024L * 1024L * 1024L;
+     private int diagnosticLogTailLines = 400;
++    private boolean encryptionEnabled = true;
++    private String masterKeyEnvironment = "MATRIX26_BACKUP_MASTER_KEY";
++    private boolean retentionEnabled = true;
+     private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of("matrix26-appearance-lab"));
+ 
+     public boolean isEnabled() {
+@@ -104,6 +107,31 @@
+         this.diagnosticLogTailLines = diagnosticLogTailLines;
+     }
+ 
++
++    public boolean isEncryptionEnabled() {
++        return encryptionEnabled;
++    }
++
++    public void setEncryptionEnabled(boolean encryptionEnabled) {
++        this.encryptionEnabled = encryptionEnabled;
++    }
++
++    public String getMasterKeyEnvironment() {
++        return masterKeyEnvironment;
++    }
++
++    public void setMasterKeyEnvironment(String masterKeyEnvironment) {
++        this.masterKeyEnvironment = masterKeyEnvironment;
++    }
++
++    public boolean isRetentionEnabled() {
++        return retentionEnabled;
++    }
++
++    public void setRetentionEnabled(boolean retentionEnabled) {
++        this.retentionEnabled = retentionEnabled;
++    }
++
+     public Set<String> getAllowedInstanceCodes() {
+         return allowedInstanceCodes;
+     }
+diff -ruN '--exclude=runtime-clients' '--exclude=backup-sample' '--exclude=reports' /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupRetentionClass.java /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupRetentionClass.java
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupRetentionClass.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupRetentionClass.java	2026-06-25 15:30:58.174728671 +0000
+@@ -0,0 +1,35 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++public enum Matrix26BackupRetentionClass {
++    DAILY("Daily", "Daily recovery point"),
++    WEEKLY("Weekly", "Weekly recovery point"),
++    MONTHLY("Monthly", "Monthly recovery point"),
++    FINAL("Final archive", "Protected final customer archive");
++
++    private final String label;
++    private final String description;
++
++    Matrix26BackupRetentionClass(String label, String description) {
++        this.label = label;
++        this.description = description;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++
++    public String getDescription() {
++        return description;
++    }
++
++    public static Matrix26BackupRetentionClass from(String value) {
++        if (value == null || value.isBlank()) {
++            return DAILY;
++        }
++        try {
++            return valueOf(value.trim().toUpperCase(java.util.Locale.ROOT));
++        } catch (IllegalArgumentException ex) {
++            return DAILY;
++        }
++    }
++}
+diff -ruN '--exclude=runtime-clients' '--exclude=backup-sample' '--exclude=reports' /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityRepository.java /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityRepository.java
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityRepository.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityRepository.java	2026-06-25 15:37:57.073502540 +0000
+@@ -0,0 +1,295 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.stereotype.Repository;
++
++import java.time.LocalDateTime;
++import java.util.List;
++import java.util.Optional;
++
++@Repository
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26BackupSecurityRepository {
++
++    private final JdbcTemplate jdbcTemplate;
++
++    public Matrix26BackupSecurityRepository(JdbcTemplate jdbcTemplate) {
++        this.jdbcTemplate = jdbcTemplate;
++    }
++
++    public void upsertEncryption(
++            long jobId,
++            String algorithm,
++            int formatVersion,
++            String keyId,
++            String packagePath,
++            long packageSizeBytes,
++            String packageSha256,
++            Matrix26BackupVerificationState verificationStatus,
++            LocalDateTime verifiedAt,
++            Matrix26BackupRetentionClass retentionClass,
++            LocalDateTime expiresAt,
++            boolean protectedFlag,
++            String protectionReason,
++            LocalDateTime encryptedAt
++    ) {
++        jdbcTemplate.update(
++                """
++                INSERT INTO matrix26_backup_encryption (
++                    job_id, encrypted, algorithm, format_version, key_id, package_path,
++                    package_size_bytes, package_sha256, verification_status, verified_at,
++                    retention_class, expires_at, protected_flag, protection_reason,
++                    encrypted_at, created_at, updated_at
++                ) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
++                ON DUPLICATE KEY UPDATE
++                    encrypted = VALUES(encrypted),
++                    algorithm = VALUES(algorithm),
++                    format_version = VALUES(format_version),
++                    key_id = VALUES(key_id),
++                    package_path = VALUES(package_path),
++                    package_size_bytes = VALUES(package_size_bytes),
++                    package_sha256 = VALUES(package_sha256),
++                    verification_status = VALUES(verification_status),
++                    verified_at = VALUES(verified_at),
++                    retention_class = VALUES(retention_class),
++                    expires_at = VALUES(expires_at),
++                    protected_flag = VALUES(protected_flag),
++                    protection_reason = VALUES(protection_reason),
++                    encrypted_at = VALUES(encrypted_at),
++                    updated_at = VALUES(updated_at)
++                """,
++                jobId,
++                algorithm,
++                formatVersion,
++                keyId,
++                packagePath,
++                packageSizeBytes,
++                packageSha256,
++                verificationStatus.name(),
++                verifiedAt,
++                retentionClass.name(),
++                expiresAt,
++                protectedFlag,
++                protectionReason,
++                encryptedAt,
++                LocalDateTime.now(),
++                LocalDateTime.now()
++        );
++    }
++
++    public Optional<Matrix26BackupEncryption> findEncryption(long jobId) {
++        return jdbcTemplate.query(
++                "SELECT * FROM matrix26_backup_encryption WHERE job_id = ?",
++                (rs, rowNum) -> new Matrix26BackupEncryption(
++                        rs.getLong("id"),
++                        rs.getLong("job_id"),
++                        rs.getBoolean("encrypted"),
++                        rs.getString("algorithm"),
++                        rs.getObject("format_version", Integer.class),
++                        rs.getString("key_id"),
++                        rs.getString("package_path"),
++                        rs.getObject("package_size_bytes", Long.class),
++                        rs.getString("package_sha256"),
++                        Matrix26BackupVerificationState.valueOf(rs.getString("verification_status")),
++                        rs.getObject("verified_at", LocalDateTime.class),
++                        Matrix26BackupRetentionClass.from(rs.getString("retention_class")),
++                        rs.getObject("expires_at", LocalDateTime.class),
++                        rs.getBoolean("protected_flag"),
++                        rs.getString("protection_reason"),
++                        rs.getObject("encrypted_at", LocalDateTime.class),
++                        rs.getObject("updated_at", LocalDateTime.class)
++                ),
++                jobId
++        ).stream().findFirst();
++    }
++
++    public void updateVerification(
++            long jobId,
++            Matrix26BackupVerificationState status,
++            LocalDateTime verifiedAt
++    ) {
++        jdbcTemplate.update(
++                """
++                UPDATE matrix26_backup_encryption
++                SET verification_status = ?, verified_at = ?, updated_at = ?
++                WHERE job_id = ?
++                """,
++                status.name(), verifiedAt, LocalDateTime.now(), jobId
++        );
++    }
++
++    public void updateJobPackage(
++            long jobId,
++            long packageBytes,
++            String packageSha256,
++            String manifestPath,
++            String reportPath,
++            String verificationSummary
++    ) {
++        jdbcTemplate.update(
++                """
++                UPDATE matrix26_backup_job
++                SET backup_type = 'MANUAL_FULL_ENCRYPTED', compressed_size_bytes = ?, sha256 = ?,
++                    manifest_path = ?, report_path = ?, verification_summary = ?, completed_at = ?,
++                    status = ?, last_error = NULL
++                WHERE id = ?
++                """,
++                packageBytes,
++                packageSha256,
++                manifestPath,
++                reportPath,
++                verificationSummary,
++                LocalDateTime.now(),
++                Matrix26BackupStatus.COMPLETED.name(),
++                jobId
++        );
++    }
++
++    public void replaceArtifacts(
++            long jobId,
++            List<Matrix26BackupArtifact> artifacts
++    ) {
++        jdbcTemplate.update("DELETE FROM matrix26_backup_artifact WHERE job_id = ?", jobId);
++        for (Matrix26BackupArtifact artifact : artifacts) {
++            jdbcTemplate.update(
++                    """
++                    INSERT INTO matrix26_backup_artifact (
++                        job_id, artifact_type, file_name, relative_path, size_bytes, sha256, status, created_at
++                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
++                    """,
++                    jobId,
++                    artifact.artifactType(),
++                    artifact.fileName(),
++                    artifact.relativePath(),
++                    artifact.sizeBytes(),
++                    artifact.sha256(),
++                    artifact.status(),
++                    LocalDateTime.now()
++            );
++        }
++    }
++
++    public Matrix26BackupPolicy findPolicy(long instanceId, String instanceCode) {
++        return jdbcTemplate.query(
++                "SELECT * FROM matrix26_backup_policy WHERE instance_id = ?",
++                (rs, rowNum) -> new Matrix26BackupPolicy(
++                        rs.getLong("id"),
++                        rs.getLong("instance_id"),
++                        rs.getString("instance_code"),
++                        rs.getInt("daily_keep"),
++                        rs.getInt("weekly_keep"),
++                        rs.getInt("monthly_keep"),
++                        rs.getBoolean("final_keep_indefinitely"),
++                        rs.getBoolean("enabled"),
++                        rs.getString("updated_by"),
++                        rs.getObject("updated_at", LocalDateTime.class)
++                ),
++                instanceId
++        ).stream().findFirst().orElse(Matrix26BackupPolicy.defaults(instanceId, instanceCode));
++    }
++
++    public void upsertPolicy(Matrix26BackupPolicy policy) {
++        jdbcTemplate.update(
++                """
++                INSERT INTO matrix26_backup_policy (
++                    instance_id, instance_code, daily_keep, weekly_keep, monthly_keep,
++                    final_keep_indefinitely, enabled, updated_by, updated_at
++                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
++                ON DUPLICATE KEY UPDATE
++                    instance_code = VALUES(instance_code),
++                    daily_keep = VALUES(daily_keep),
++                    weekly_keep = VALUES(weekly_keep),
++                    monthly_keep = VALUES(monthly_keep),
++                    final_keep_indefinitely = VALUES(final_keep_indefinitely),
++                    enabled = VALUES(enabled),
++                    updated_by = VALUES(updated_by),
++                    updated_at = VALUES(updated_at)
++                """,
++                policy.instanceId(),
++                policy.instanceCode(),
++                policy.dailyKeep(),
++                policy.weeklyKeep(),
++                policy.monthlyKeep(),
++                policy.finalKeepIndefinitely(),
++                policy.enabled(),
++                policy.updatedBy(),
++                LocalDateTime.now()
++        );
++    }
++
++    public List<RetentionRow> findRetentionRows(long instanceId) {
++        return jdbcTemplate.query(
++                """
++                SELECT j.id, j.public_id, j.requested_at, j.backup_directory,
++                       COALESCE(e.package_size_bytes, j.compressed_size_bytes, 0) AS stored_bytes,
++                       e.retention_class, e.verification_status, e.protected_flag,
++                       e.protection_reason
++                FROM matrix26_backup_job j
++                JOIN matrix26_backup_encryption e ON e.job_id = j.id
++                WHERE j.instance_id = ?
++                  AND j.status = 'COMPLETED'
++                  AND e.encrypted = 1
++                ORDER BY j.requested_at DESC, j.id DESC
++                """,
++                (rs, rowNum) -> new RetentionRow(
++                        rs.getLong("id"),
++                        rs.getString("public_id"),
++                        rs.getObject("requested_at", LocalDateTime.class),
++                        rs.getString("backup_directory"),
++                        rs.getLong("stored_bytes"),
++                        Matrix26BackupRetentionClass.from(rs.getString("retention_class")),
++                        Matrix26BackupVerificationState.valueOf(rs.getString("verification_status")),
++                        rs.getBoolean("protected_flag"),
++                        rs.getString("protection_reason")
++                ),
++                instanceId
++        );
++    }
++
++    public void insertRetentionEvent(
++            long instanceId,
++            String instanceCode,
++            Long jobId,
++            String backupPublicId,
++            String action,
++            String actor,
++            String reason,
++            long bytes
++    ) {
++        jdbcTemplate.update(
++                """
++                INSERT INTO matrix26_backup_retention_event (
++                    instance_id, instance_code, job_id, backup_public_id, action,
++                    actor, reason, bytes_affected, created_at
++                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
++                """,
++                instanceId,
++                instanceCode,
++                jobId,
++                backupPublicId,
++                action,
++                actor,
++                reason,
++                bytes,
++                LocalDateTime.now()
++        );
++    }
++
++    public void deleteJob(long jobId) {
++        jdbcTemplate.update("DELETE FROM matrix26_backup_job WHERE id = ?", jobId);
++    }
++
++    public record RetentionRow(
++            long jobId,
++            String publicId,
++            LocalDateTime requestedAt,
++            String backupDirectory,
++            long storedBytes,
++            Matrix26BackupRetentionClass retentionClass,
++            Matrix26BackupVerificationState verificationStatus,
++            boolean protectedFlag,
++            String protectionReason
++    ) {
++    }
++}
+diff -ruN '--exclude=runtime-clients' '--exclude=backup-sample' '--exclude=reports' /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityService.java /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityService.java
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityService.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupSecurityService.java	2026-06-25 15:38:41.730401297 +0000
+@@ -0,0 +1,854 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClient;
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClientRepository;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceAuditLog;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceAuditLogRepository;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
++
++import javax.crypto.Cipher;
++import javax.crypto.CipherInputStream;
++import javax.crypto.CipherOutputStream;
++import javax.crypto.spec.GCMParameterSpec;
++import javax.crypto.spec.SecretKeySpec;
++import java.io.BufferedInputStream;
++import java.io.BufferedOutputStream;
++import java.io.DataInputStream;
++import java.io.DataOutputStream;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.OutputStream;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.AtomicMoveNotSupportedException;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.StandardCopyOption;
++import java.security.GeneralSecurityException;
++import java.security.MessageDigest;
++import java.security.NoSuchAlgorithmException;
++import java.security.SecureRandom;
++import java.time.LocalDateTime;
++import java.util.ArrayList;
++import java.util.Base64;
++import java.util.Comparator;
++import java.util.EnumMap;
++import java.util.HashMap;
++import java.util.HexFormat;
++import java.util.LinkedHashMap;
++import java.util.List;
++import java.util.Locale;
++import java.util.Map;
++import java.util.Set;
++import java.util.regex.Pattern;
++import java.util.zip.ZipEntry;
++import java.util.zip.ZipFile;
++import java.util.zip.ZipOutputStream;
++
++@Service
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26BackupSecurityService {
++
++    private static final byte[] MAGIC = "M26BKP01".getBytes(StandardCharsets.US_ASCII);
++    private static final int FORMAT_VERSION = 1;
++    private static final int NONCE_BYTES = 12;
++    private static final int GCM_TAG_BITS = 128;
++    private static final String ALGORITHM = "AES-256-GCM";
++    private static final Set<String> PUBLIC_FILES = Set.of(
++            "package.m26backup", "public-manifest.json"
++    );
++    private static final Pattern CHECKSUM_LINE = Pattern.compile("^([0-9a-fA-F]{64})\\s{2}(.+)$");
++
++    private final Matrix26BackupRepository backupRepository;
++    private final Matrix26BackupSecurityRepository securityRepository;
++    private final Matrix26BackupProperties properties;
++    private final PlatformBusinessClientRepository clientRepository;
++    private final Matrix26InstanceAuditLogRepository auditLogRepository;
++    private final SecureRandom secureRandom = new SecureRandom();
++
++    public Matrix26BackupSecurityService(
++            Matrix26BackupRepository backupRepository,
++            Matrix26BackupSecurityRepository securityRepository,
++            Matrix26BackupProperties properties,
++            PlatformBusinessClientRepository clientRepository,
++            Matrix26InstanceAuditLogRepository auditLogRepository
++    ) {
++        this.backupRepository = backupRepository;
++        this.securityRepository = securityRepository;
++        this.properties = properties;
++        this.clientRepository = clientRepository;
++        this.auditLogRepository = auditLogRepository;
++    }
++
++    public Matrix26BackupKeyStatus keyStatus() {
++        if (!properties.isEncryptionEnabled()) {
++            return new Matrix26BackupKeyStatus(false, "", "Backup encryption is disabled in Matrix26 configuration.");
++        }
++        try {
++            KeyMaterial material = keyMaterial();
++            return new Matrix26BackupKeyStatus(true, material.keyId(),
++                    "AES-256-GCM master key is available through " + properties.getMasterKeyEnvironment() + ".");
++        } catch (Matrix26BackupException ex) {
++            return new Matrix26BackupKeyStatus(false, "", ex.getMessage());
++        }
++    }
++
++    public Matrix26BackupEncryption metadata(long jobId) {
++        return securityRepository.findEncryption(jobId).orElse(null);
++    }
++
++    public Matrix26BackupJob encryptBackup(
++            long jobId,
++            Matrix26BackupRetentionClass retentionClass,
++            String actor
++    ) {
++        if (!properties.isEncryptionEnabled()) {
++            throw new Matrix26BackupException("Backup encryption is disabled in Matrix26 configuration.");
++        }
++        Matrix26BackupJob job = backupRepository.findById(jobId)
++                .orElseThrow(() -> new Matrix26BackupException("The requested backup does not exist."));
++        if (!job.isCompleted()) {
++            throw new Matrix26BackupException("Only completed backups can be encrypted.");
++        }
++        if (!"MANUAL_FULL".equalsIgnoreCase(job.backupType())) {
++            throw new Matrix26BackupException("Phase 3E.3 encrypts full instance backups only.");
++        }
++        if (securityRepository.findEncryption(jobId).map(Matrix26BackupEncryption::encrypted).orElse(false)) {
++            throw new Matrix26BackupException("This backup is already encrypted.");
++        }
++
++        PlatformBusinessClient instance = clientRepository.findById(job.instanceId())
++                .orElseThrow(() -> new Matrix26BackupException("The backup instance no longer exists."));
++        validateAllowedInstance(instance);
++        KeyMaterial key = keyMaterial();
++        Path root = backupRoot();
++        Path directory = Path.of(job.backupDirectory()).toAbsolutePath().normalize();
++        ensureInside(root, directory);
++        if (!Files.isDirectory(directory)) {
++            throw new Matrix26BackupException("The backup directory no longer exists.");
++        }
++
++        Path tempBase = root.resolve(".matrix26-temp").normalize();
++        ensureInside(root, tempBase);
++        Path work = null;
++        Path packagePart = directory.resolve("package.m26backup.part");
++        Path packageFile = directory.resolve("package.m26backup");
++        boolean packageVerified = false;
++        try {
++            Files.createDirectories(tempBase);
++            work = Files.createTempDirectory(tempBase, "encrypt-");
++            Path payloadZip = work.resolve("payload.zip");
++            List<Path> payload = payloadFiles(directory);
++            if (payload.isEmpty()) {
++                throw new Matrix26BackupException("No recovery artifacts were found to encrypt.");
++            }
++            createPayloadZip(directory, payload, payloadZip);
++
++            byte[] nonce = new byte[NONCE_BYTES];
++            secureRandom.nextBytes(nonce);
++            encrypt(payloadZip, packagePart, key, nonce);
++            moveAtomically(packagePart, packageFile);
++
++            PackageInspection inspection = inspectEncryptedPackage(packageFile, key);
++            if (!inspection.valid()) {
++                throw new Matrix26BackupException("The encrypted package did not pass verification: " + inspection.message());
++            }
++            packageVerified = true;
++
++            String packageSha = sha256(packageFile);
++            Matrix26BackupPolicy policy = securityRepository.findPolicy(instance.getId(), instance.getCode());
++            LocalDateTime expiresAt = expiry(retentionClass, policy);
++            boolean protectedFlag = retentionClass == Matrix26BackupRetentionClass.FINAL;
++            String protectionReason = protectedFlag ? "Final archive" : "";
++
++            Path stagedManifest = work.resolve("public-manifest.json");
++            writePublicManifest(stagedManifest, job, instance, key, retentionClass, expiresAt,
++                    Files.size(packageFile), packageSha);
++            String manifestSha = sha256(stagedManifest);
++
++            Path stagedChecksums = work.resolve("checksums.sha256");
++            Files.writeString(stagedChecksums,
++                    packageSha + "  package.m26backup" + System.lineSeparator()
++                            + manifestSha + "  public-manifest.json" + System.lineSeparator(),
++                    StandardCharsets.UTF_8);
++
++            Path stagedReport = work.resolve("backup-report.txt");
++            writePublicReport(stagedReport, job, instance, key, retentionClass, packageFile, packageSha, inspection);
++
++            for (Path file : payload) {
++                Files.deleteIfExists(file);
++            }
++
++            Path publicManifest = directory.resolve("public-manifest.json");
++            Path checksums = directory.resolve("checksums.sha256");
++            Path report = directory.resolve("backup-report.txt");
++            moveAtomically(stagedManifest, publicManifest);
++            moveAtomically(stagedChecksums, checksums);
++            moveAtomically(stagedReport, report);
++
++            LocalDateTime now = LocalDateTime.now();
++            securityRepository.upsertEncryption(
++                    job.id(),
++                    ALGORITHM,
++                    FORMAT_VERSION,
++                    key.keyId(),
++                    relative(root, packageFile),
++                    Files.size(packageFile),
++                    packageSha,
++                    Matrix26BackupVerificationState.VERIFIED,
++                    now,
++                    retentionClass,
++                    expiresAt,
++                    protectedFlag,
++                    protectionReason,
++                    now
++            );
++            securityRepository.updateJobPackage(
++                    job.id(),
++                    Files.size(packageFile) + Files.size(publicManifest) + Files.size(checksums) + Files.size(report),
++                    packageSha,
++                    relative(root, publicManifest),
++                    relative(root, report),
++                    "Encrypted package passed public checksum, AES-GCM authentication, ZIP structure, and internal checksum verification."
++            );
++            securityRepository.replaceArtifacts(job.id(), List.of(
++                    artifact(job.id(), "ENCRYPTED_PACKAGE", packageFile, root, packageSha),
++                    artifact(job.id(), "PUBLIC_MANIFEST", publicManifest, root, manifestSha),
++                    artifact(job.id(), "CHECKSUMS", checksums, root, sha256(checksums)),
++                    artifact(job.id(), "REPORT", report, root, sha256(report))
++            ));
++            backupRepository.insertVerification(job.id(), "ENCRYPTED_PACKAGE", "AES-GCM package authentication",
++                    Matrix26BackupVerificationStatus.PASSED,
++                    "The encrypted package was decrypted with key identifier " + key.keyId() + ".");
++            backupRepository.insertVerification(job.id(), "INTERNAL_CHECKSUMS", "Internal artifact checksums",
++                    Matrix26BackupVerificationStatus.PASSED, inspection.message());
++            writeAudit(instance, actor, "BACKUP_ENCRYPTED",
++                    "Encrypted backup " + job.publicId() + " using key " + key.keyId() + ".");
++            return backupRepository.findById(job.id()).orElseThrow();
++        } catch (Matrix26BackupException ex) {
++            deleteQuietly(packagePart);
++            if (!packageVerified) {
++                deleteQuietly(packageFile);
++            }
++            throw ex;
++        } catch (Exception ex) {
++            deleteQuietly(packagePart);
++            if (!packageVerified) {
++                deleteQuietly(packageFile);
++            }
++            throw new Matrix26BackupException("The backup could not be encrypted: " + safeMessage(ex), ex);
++        } finally {
++            deleteTreeQuietly(work);
++        }
++    }
++
++    public Matrix26BackupEncryption verifyEncryptedBackup(long jobId, String actor) {
++        Matrix26BackupJob job = backupRepository.findById(jobId)
++                .orElseThrow(() -> new Matrix26BackupException("The requested backup does not exist."));
++        Matrix26BackupEncryption metadata = securityRepository.findEncryption(jobId)
++                .orElseThrow(() -> new Matrix26BackupException("This backup does not have encrypted package metadata."));
++        PlatformBusinessClient instance = clientRepository.findById(job.instanceId())
++                .orElseThrow(() -> new Matrix26BackupException("The backup instance no longer exists."));
++        validateAllowedInstance(instance);
++        securityRepository.updateVerification(jobId, Matrix26BackupVerificationState.VERIFYING, null);
++        try {
++            KeyMaterial key = keyMaterial();
++            if (!key.keyId().equals(metadata.keyId())) {
++                securityRepository.updateVerification(jobId, Matrix26BackupVerificationState.KEY_UNAVAILABLE, null);
++                throw new Matrix26BackupException("The available master key does not match backup key identifier " + metadata.keyId() + ".");
++            }
++            Path root = backupRoot();
++            Path packageFile = root.resolve(metadata.packagePath()).normalize();
++            ensureInside(root, packageFile);
++            if (!Files.isRegularFile(packageFile)) {
++                securityRepository.updateVerification(jobId, Matrix26BackupVerificationState.CORRUPTED, null);
++                throw new Matrix26BackupException("The encrypted package file is missing.");
++            }
++            String currentSha = sha256(packageFile);
++            if (!currentSha.equalsIgnoreCase(metadata.packageSha256())) {
++                securityRepository.updateVerification(jobId, Matrix26BackupVerificationState.CORRUPTED, null);
++                throw new Matrix26BackupException("The encrypted package SHA-256 no longer matches its registered value.");
++            }
++            PackageInspection inspection = inspectEncryptedPackage(packageFile, key);
++            if (!inspection.valid()) {
++                securityRepository.updateVerification(jobId, Matrix26BackupVerificationState.VERIFICATION_FAILED, null);
++                throw new Matrix26BackupException(inspection.message());
++            }
++            LocalDateTime verifiedAt = LocalDateTime.now();
++            securityRepository.updateVerification(jobId, Matrix26BackupVerificationState.VERIFIED, verifiedAt);
++            backupRepository.insertVerification(jobId, "REVERIFY_ENCRYPTED_PACKAGE", "Encrypted package reverification",
++                    Matrix26BackupVerificationStatus.PASSED, inspection.message());
++            writeAudit(instance, actor, "BACKUP_REVERIFIED", "Encrypted backup reverified: " + job.publicId());
++            return securityRepository.findEncryption(jobId).orElseThrow();
++        } catch (Matrix26BackupException ex) {
++            throw ex;
++        } catch (Exception ex) {
++            securityRepository.updateVerification(jobId, Matrix26BackupVerificationState.VERIFICATION_FAILED, null);
++            throw new Matrix26BackupException("Encrypted backup verification failed: " + safeMessage(ex), ex);
++        }
++    }
++
++    public Matrix26BackupPolicy policy(long instanceId) {
++        PlatformBusinessClient instance = clientRepository.findById(instanceId)
++                .orElseThrow(() -> new Matrix26BackupException("The requested instance does not exist."));
++        validateAllowedInstance(instance);
++        return securityRepository.findPolicy(instanceId, instance.getCode());
++    }
++
++    public Matrix26BackupPolicy savePolicy(
++            long instanceId,
++            int dailyKeep,
++            int weeklyKeep,
++            int monthlyKeep,
++            boolean finalKeepIndefinitely,
++            boolean enabled,
++            String actor
++    ) {
++        PlatformBusinessClient instance = clientRepository.findById(instanceId)
++                .orElseThrow(() -> new Matrix26BackupException("The requested instance does not exist."));
++        validateAllowedInstance(instance);
++        Matrix26BackupPolicy policy = new Matrix26BackupPolicy(
++                null,
++                instanceId,
++                instance.getCode(),
++                bounded(dailyKeep, 1, 365),
++                bounded(weeklyKeep, 1, 104),
++                bounded(monthlyKeep, 1, 120),
++                finalKeepIndefinitely,
++                enabled,
++                safeActor(actor),
++                LocalDateTime.now()
++        );
++        securityRepository.upsertPolicy(policy);
++        writeAudit(instance, actor, "BACKUP_POLICY_UPDATED",
++                "Backup retention policy updated for " + instance.getCode() + ".");
++        return securityRepository.findPolicy(instanceId, instance.getCode());
++    }
++
++    public Matrix26RetentionPreview retentionPreview(long instanceId) {
++        if (!properties.isRetentionEnabled()) {
++            throw new Matrix26BackupException("Backup retention is disabled in Matrix26 configuration.");
++        }
++        PlatformBusinessClient instance = clientRepository.findById(instanceId)
++                .orElseThrow(() -> new Matrix26BackupException("The requested instance does not exist."));
++        validateAllowedInstance(instance);
++        Matrix26BackupPolicy policy = securityRepository.findPolicy(instanceId, instance.getCode());
++        List<Matrix26BackupSecurityRepository.RetentionRow> rows = securityRepository.findRetentionRows(instanceId);
++        Long newestVerified = rows.stream()
++                .filter(row -> row.verificationStatus() == Matrix26BackupVerificationState.VERIFIED)
++                .map(Matrix26BackupSecurityRepository.RetentionRow::jobId)
++                .findFirst()
++                .orElse(null);
++        Map<Matrix26BackupRetentionClass, Integer> positions = new EnumMap<>(Matrix26BackupRetentionClass.class);
++        List<Matrix26RetentionItem> items = new ArrayList<>();
++        long reclaimable = 0L;
++        for (Matrix26BackupSecurityRepository.RetentionRow row : rows) {
++            int position = positions.merge(row.retentionClass(), 1, Integer::sum);
++            int keep = keepCount(policy, row.retentionClass());
++            boolean beyondPolicy = row.retentionClass() != Matrix26BackupRetentionClass.FINAL && position > keep;
++            boolean latest = newestVerified != null && newestVerified.equals(row.jobId());
++            boolean verified = row.verificationStatus() == Matrix26BackupVerificationState.VERIFIED;
++            boolean deletable = policy.enabled()
++                    && beyondPolicy
++                    && verified
++                    && !row.protectedFlag()
++                    && !latest;
++            String reason;
++            if (!policy.enabled()) {
++                reason = "Retention cleanup is disabled.";
++            } else if (row.retentionClass() == Matrix26BackupRetentionClass.FINAL) {
++                reason = "Final archives are protected.";
++            } else if (row.protectedFlag()) {
++                reason = firstNonBlank(row.protectionReason(), "Backup is protected.");
++            } else if (latest) {
++                reason = "Newest verified backup is always protected.";
++            } else if (!verified) {
++                reason = "Backup requires investigation before deletion.";
++            } else if (!beyondPolicy) {
++                reason = "Kept by the current " + row.retentionClass().getLabel().toLowerCase(Locale.ROOT) + " policy.";
++            } else {
++                reason = "Eligible for manual retention cleanup.";
++            }
++            if (deletable) {
++                reclaimable += row.storedBytes();
++            }
++            items.add(new Matrix26RetentionItem(
++                    row.jobId(), row.publicId(), row.requestedAt(), row.retentionClass(),
++                    row.verificationStatus(), row.protectedFlag(), row.storedBytes(),
++                    row.backupDirectory(), deletable, reason
++            ));
++        }
++        return new Matrix26RetentionPreview(instanceId, instance.getCode(), instance.getBusinessName(), policy,
++                List.copyOf(items), reclaimable);
++    }
++
++    public Matrix26RetentionPreview executeRetention(long instanceId, String confirmation, String actor) {
++        Matrix26RetentionPreview preview = retentionPreview(instanceId);
++        String expected = "CLEAN BACKUPS " + preview.instanceCode();
++        if (!expected.equals(confirmation == null ? "" : confirmation.trim())) {
++            throw new Matrix26BackupException("Type exactly: " + expected);
++        }
++        Path root = backupRoot();
++        long deletedBytes = 0L;
++        for (Matrix26RetentionItem item : preview.items()) {
++            if (!item.deletable()) {
++                continue;
++            }
++            Path directory = Path.of(item.backupDirectory()).toAbsolutePath().normalize();
++            ensureInside(root, directory);
++            securityRepository.insertRetentionEvent(
++                    instanceId, preview.instanceCode(), item.jobId(), item.publicId(),
++                    "DELETE_REQUESTED", safeActor(actor), item.reason(), item.sizeBytes()
++            );
++            deleteTree(directory);
++            securityRepository.deleteJob(item.jobId());
++            securityRepository.insertRetentionEvent(
++                    instanceId, preview.instanceCode(), item.jobId(), item.publicId(),
++                    "DELETED", safeActor(actor), item.reason(), item.sizeBytes()
++            );
++            deletedBytes += item.sizeBytes();
++        }
++        PlatformBusinessClient instance = clientRepository.findById(instanceId).orElseThrow();
++        writeAudit(instance, actor, "BACKUP_RETENTION_EXECUTED",
++                "Manual retention cleanup reclaimed " + Matrix26BackupService.formatBytes(deletedBytes) + ".");
++        return retentionPreview(instanceId);
++    }
++
++    private PackageInspection inspectEncryptedPackage(Path packageFile, KeyMaterial key) {
++        Path root = backupRoot();
++        Path tempBase = root.resolve(".matrix26-temp").normalize();
++        Path work = null;
++        try {
++            Files.createDirectories(tempBase);
++            work = Files.createTempDirectory(tempBase, "verify-");
++            Path decryptedZip = work.resolve("payload.zip");
++            decrypt(packageFile, decryptedZip, key);
++            Path extracted = work.resolve("extracted");
++            Files.createDirectories(extracted);
++            int entries = extractZipSafely(decryptedZip, extracted);
++            Path internalChecksums = extracted.resolve("checksums.sha256");
++            if (!Files.isRegularFile(internalChecksums)) {
++                return new PackageInspection(false, entries, "Internal checksums.sha256 is missing.");
++            }
++            List<String> failures = verifyInternalChecksums(extracted, internalChecksums);
++            if (!failures.isEmpty()) {
++                return new PackageInspection(false, entries, "Internal checksum failures: " + String.join(", ", failures));
++            }
++            if (!Files.isRegularFile(extracted.resolve("database.sql.gz"))
++                    || !Files.isRegularFile(extracted.resolve("manifest.json"))
++                    || !Files.isRegularFile(extracted.resolve("instance-files.zip"))) {
++                return new PackageInspection(false, entries,
++                        "Required database, manifest, or instance archive artifact is missing.");
++            }
++            return new PackageInspection(true, entries,
++                    entries + " encrypted entries and all internal SHA-256 checks passed.");
++        } catch (GeneralSecurityException ex) {
++            return new PackageInspection(false, 0, "AES-GCM authentication failed or the key is incorrect.");
++        } catch (Exception ex) {
++            return new PackageInspection(false, 0, safeMessage(ex));
++        } finally {
++            deleteTreeQuietly(work);
++        }
++    }
++
++    private void createPayloadZip(Path directory, List<Path> payload, Path target) throws IOException {
++        try (ZipOutputStream zip = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(target)))) {
++            for (Path file : payload) {
++                String entryName = directory.relativize(file).toString().replace('\\', '/');
++                if (!safeEntry(entryName)) {
++                    throw new Matrix26BackupException("Unsafe backup payload path: " + entryName);
++                }
++                ZipEntry entry = new ZipEntry(entryName);
++                entry.setTime(Files.getLastModifiedTime(file).toMillis());
++                zip.putNextEntry(entry);
++                try (InputStream input = new BufferedInputStream(Files.newInputStream(file))) {
++                    input.transferTo(zip);
++                }
++                zip.closeEntry();
++            }
++        }
++    }
++
++    private void encrypt(Path source, Path target, KeyMaterial key, byte[] nonce)
++            throws IOException, GeneralSecurityException {
++        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
++        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key.key(), "AES"), new GCMParameterSpec(GCM_TAG_BITS, nonce));
++        byte[] aad = aad(key.keyId());
++        cipher.updateAAD(aad);
++        try (DataOutputStream output = new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(target)))) {
++            output.write(MAGIC);
++            output.writeInt(FORMAT_VERSION);
++            byte[] keyId = key.keyId().getBytes(StandardCharsets.US_ASCII);
++            output.writeInt(keyId.length);
++            output.write(keyId);
++            output.writeInt(nonce.length);
++            output.write(nonce);
++            try (CipherOutputStream encrypted = new CipherOutputStream(output, cipher);
++                 InputStream input = new BufferedInputStream(Files.newInputStream(source))) {
++                input.transferTo(encrypted);
++            }
++        }
++    }
++
++    private void decrypt(Path source, Path target, KeyMaterial key)
++            throws IOException, GeneralSecurityException {
++        try (DataInputStream input = new DataInputStream(new BufferedInputStream(Files.newInputStream(source)))) {
++            byte[] magic = input.readNBytes(MAGIC.length);
++            if (!MessageDigest.isEqual(MAGIC, magic)) {
++                throw new Matrix26BackupException("The file is not a Matrix26 encrypted backup package.");
++            }
++            int version = input.readInt();
++            if (version != FORMAT_VERSION) {
++                throw new Matrix26BackupException("Unsupported encrypted backup format version: " + version);
++            }
++            int keyIdLength = input.readInt();
++            if (keyIdLength < 4 || keyIdLength > 128) {
++                throw new Matrix26BackupException("Invalid encrypted package key identifier.");
++            }
++            String packageKeyId = new String(input.readNBytes(keyIdLength), StandardCharsets.US_ASCII);
++            if (!packageKeyId.equals(key.keyId())) {
++                throw new Matrix26BackupException("The available key does not match package key identifier " + packageKeyId + ".");
++            }
++            int nonceLength = input.readInt();
++            if (nonceLength != NONCE_BYTES) {
++                throw new Matrix26BackupException("Invalid AES-GCM nonce length.");
++            }
++            byte[] nonce = input.readNBytes(nonceLength);
++            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
++            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key.key(), "AES"), new GCMParameterSpec(GCM_TAG_BITS, nonce));
++            cipher.updateAAD(aad(packageKeyId));
++            try (CipherInputStream decrypted = new CipherInputStream(input, cipher);
++                 OutputStream output = new BufferedOutputStream(Files.newOutputStream(target))) {
++                decrypted.transferTo(output);
++            }
++        }
++    }
++
++    private byte[] aad(String keyId) {
++        return (new String(MAGIC, StandardCharsets.US_ASCII) + ":" + FORMAT_VERSION + ":" + keyId)
++                .getBytes(StandardCharsets.US_ASCII);
++    }
++
++    private int extractZipSafely(Path archive, Path destination) throws IOException {
++        int entries = 0;
++        try (ZipFile zip = new ZipFile(archive.toFile())) {
++            var iterator = zip.entries();
++            while (iterator.hasMoreElements()) {
++                ZipEntry entry = iterator.nextElement();
++                if (entry.isDirectory()) {
++                    continue;
++                }
++                if (!safeEntry(entry.getName())) {
++                    throw new Matrix26BackupException("Unsafe ZIP entry detected: " + entry.getName());
++                }
++                Path target = destination.resolve(entry.getName()).normalize();
++                ensureInside(destination, target);
++                Files.createDirectories(target.getParent());
++                try (InputStream input = zip.getInputStream(entry)) {
++                    Files.copy(input, target, StandardCopyOption.REPLACE_EXISTING);
++                }
++                entries++;
++            }
++        }
++        return entries;
++    }
++
++    private List<String> verifyInternalChecksums(Path extracted, Path checksums) throws IOException {
++        List<String> failures = new ArrayList<>();
++        for (String line : Files.readAllLines(checksums, StandardCharsets.UTF_8)) {
++            var matcher = CHECKSUM_LINE.matcher(line.trim());
++            if (!matcher.matches()) {
++                continue;
++            }
++            Path artifact = extracted.resolve(matcher.group(2)).normalize();
++            ensureInside(extracted, artifact);
++            if (!Files.isRegularFile(artifact) || !matcher.group(1).equalsIgnoreCase(sha256(artifact))) {
++                failures.add(matcher.group(2));
++            }
++        }
++        return failures;
++    }
++
++    private List<Path> payloadFiles(Path directory) throws IOException {
++        try (var stream = Files.list(directory)) {
++            return stream
++                    .filter(Files::isRegularFile)
++                    .filter(path -> !PUBLIC_FILES.contains(path.getFileName().toString()))
++                    .filter(path -> !path.getFileName().toString().endsWith(".part"))
++                    .sorted()
++                    .toList();
++        }
++    }
++
++    private void writePublicManifest(
++            Path target,
++            Matrix26BackupJob job,
++            PlatformBusinessClient instance,
++            KeyMaterial key,
++            Matrix26BackupRetentionClass retentionClass,
++            LocalDateTime expiresAt,
++            long packageBytes,
++            String packageSha
++    ) throws IOException {
++        Map<String, Object> values = new LinkedHashMap<>();
++        values.put("formatVersion", FORMAT_VERSION);
++        values.put("backupId", job.publicId());
++        values.put("instanceCode", instance.getCode());
++        values.put("backupType", "MANUAL_FULL_ENCRYPTED");
++        values.put("createdAt", LocalDateTime.now().toString());
++        values.put("algorithm", ALGORITHM);
++        values.put("keyId", key.keyId());
++        values.put("package", "package.m26backup");
++        values.put("packageSizeBytes", packageBytes);
++        values.put("packageSha256", packageSha);
++        values.put("retentionClass", retentionClass.name());
++        values.put("expiresAt", expiresAt == null ? null : expiresAt.toString());
++        Files.writeString(target, toJson(values), StandardCharsets.UTF_8);
++    }
++
++    private void writePublicReport(
++            Path target,
++            Matrix26BackupJob job,
++            PlatformBusinessClient instance,
++            KeyMaterial key,
++            Matrix26BackupRetentionClass retentionClass,
++            Path packageFile,
++            String packageSha,
++            PackageInspection inspection
++    ) throws IOException {
++        String content = "Matrix26 encrypted backup report" + System.lineSeparator()
++                + "Backup ID: " + job.publicId() + System.lineSeparator()
++                + "Instance: " + instance.getBusinessName() + " (" + instance.getCode() + ")" + System.lineSeparator()
++                + "Encrypted at: " + LocalDateTime.now() + System.lineSeparator()
++                + "Algorithm: " + ALGORITHM + System.lineSeparator()
++                + "Key identifier: " + key.keyId() + System.lineSeparator()
++                + "Retention class: " + retentionClass.name() + System.lineSeparator()
++                + "Package size: " + Matrix26BackupService.formatBytes(Files.size(packageFile)) + System.lineSeparator()
++                + "Package SHA-256: " + packageSha + System.lineSeparator()
++                + "Verification: " + inspection.message() + System.lineSeparator()
++                + "Master key stored in backup: NO" + System.lineSeparator();
++        Files.writeString(target, content, StandardCharsets.UTF_8);
++    }
++
++    private Matrix26BackupArtifact artifact(long jobId, String type, Path file, Path root, String sha) throws IOException {
++        return new Matrix26BackupArtifact(null, jobId, type, file.getFileName().toString(),
++                relative(root, file), Files.size(file), sha, "VERIFIED", LocalDateTime.now());
++    }
++
++    private KeyMaterial keyMaterial() {
++        String variable = firstNonBlank(properties.getMasterKeyEnvironment(), "MATRIX26_BACKUP_MASTER_KEY");
++        String raw = System.getenv(variable);
++        if (raw == null || raw.isBlank()) {
++            raw = System.getProperty(variable);
++        }
++        if (raw == null || raw.isBlank()) {
++            throw new Matrix26BackupException("Backup encryption key is unavailable. Set environment variable " + variable + ".");
++        }
++        byte[] material;
++        try {
++            material = Base64.getDecoder().decode(raw.trim());
++        } catch (IllegalArgumentException ex) {
++            material = raw.getBytes(StandardCharsets.UTF_8);
++        }
++        if (material.length < 32) {
++            throw new Matrix26BackupException("Backup master key must provide at least 32 bytes of key material.");
++        }
++        byte[] key = digest(material);
++        String keyId = HexFormat.of().formatHex(digest(key)).substring(0, 16).toUpperCase(Locale.ROOT);
++        return new KeyMaterial(key, keyId);
++    }
++
++    private LocalDateTime expiry(Matrix26BackupRetentionClass retentionClass, Matrix26BackupPolicy policy) {
++        LocalDateTime now = LocalDateTime.now();
++        return switch (retentionClass) {
++            case DAILY -> now.plusDays(Math.max(1, policy.dailyKeep()));
++            case WEEKLY -> now.plusWeeks(Math.max(1, policy.weeklyKeep()));
++            case MONTHLY -> now.plusMonths(Math.max(1, policy.monthlyKeep()));
++            case FINAL -> null;
++        };
++    }
++
++    private int keepCount(Matrix26BackupPolicy policy, Matrix26BackupRetentionClass retentionClass) {
++        return switch (retentionClass) {
++            case DAILY -> policy.dailyKeep();
++            case WEEKLY -> policy.weeklyKeep();
++            case MONTHLY -> policy.monthlyKeep();
++            case FINAL -> Integer.MAX_VALUE;
++        };
++    }
++
++    private void validateAllowedInstance(PlatformBusinessClient instance) {
++        boolean allowed = properties.getAllowedInstanceCodes().stream()
++                .anyMatch(code -> code.equalsIgnoreCase(instance.getCode()));
++        if (!allowed) {
++            throw new Matrix26BackupException("Encryption and retention are not enabled for this instance.");
++        }
++    }
++
++    private Path backupRoot() {
++        String configured = firstNonBlank(System.getenv("MATRIX26_BACKUP_ROOT"), properties.getRootDirectory());
++        Path root = configured.isBlank()
++                ? Path.of(System.getProperty("user.home"), "Matrix26", "backups")
++                : Path.of(configured);
++        return root.toAbsolutePath().normalize();
++    }
++
++    private void deleteTree(Path root) {
++        if (root == null || !Files.exists(root)) {
++            return;
++        }
++        try (var stream = Files.walk(root)) {
++            for (Path path : stream.sorted(Comparator.reverseOrder()).toList()) {
++                Files.deleteIfExists(path);
++            }
++        } catch (IOException ex) {
++            throw new Matrix26BackupException("Backup directory could not be removed: " + safeMessage(ex), ex);
++        }
++    }
++
++    private void deleteTreeQuietly(Path root) {
++        try {
++            deleteTree(root);
++        } catch (RuntimeException ignored) {
++            // Temporary cleanup must not replace the primary result.
++        }
++    }
++
++    private void deleteQuietly(Path file) {
++        if (file == null) {
++            return;
++        }
++        try {
++            Files.deleteIfExists(file);
++        } catch (IOException ignored) {
++            // Partial artifact cleanup is best effort.
++        }
++    }
++
++    private void moveAtomically(Path source, Path target) throws IOException {
++        try {
++            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
++        } catch (AtomicMoveNotSupportedException ex) {
++            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
++        }
++    }
++
++    private boolean safeEntry(String name) {
++        if (name == null || name.isBlank() || name.startsWith("/") || name.startsWith("\\")) {
++            return false;
++        }
++        String normalized = name.replace('\\', '/');
++        return !normalized.contains("../") && !normalized.matches("^[A-Za-z]:.*");
++    }
++
++    private String sha256(Path file) throws IOException {
++        MessageDigest digest = messageDigest();
++        try (InputStream input = new BufferedInputStream(Files.newInputStream(file))) {
++            byte[] buffer = new byte[64 * 1024];
++            int read;
++            while ((read = input.read(buffer)) >= 0) {
++                if (read > 0) {
++                    digest.update(buffer, 0, read);
++                }
++            }
++        }
++        return HexFormat.of().formatHex(digest.digest());
++    }
++
++    private byte[] digest(byte[] value) {
++        return messageDigest().digest(value);
++    }
++
++    private MessageDigest messageDigest() {
++        try {
++            return MessageDigest.getInstance("SHA-256");
++        } catch (NoSuchAlgorithmException ex) {
++            throw new IllegalStateException("SHA-256 is not available.", ex);
++        }
++    }
++
++    private void ensureInside(Path parent, Path child) {
++        if (!child.toAbsolutePath().normalize().startsWith(parent.toAbsolutePath().normalize())) {
++            throw new Matrix26BackupException("A backup path escaped the configured storage boundary.");
++        }
++    }
++
++    private String relative(Path root, Path file) {
++        return root.toAbsolutePath().normalize().relativize(file.toAbsolutePath().normalize())
++                .toString().replace('\\', '/');
++    }
++
++    private String firstNonBlank(String first, String second) {
++        if (first != null && !first.isBlank()) {
++            return first.trim();
++        }
++        return second == null ? "" : second.trim();
++    }
++
++    private int bounded(int value, int minimum, int maximum) {
++        if (value < minimum || value > maximum) {
++            throw new Matrix26BackupException("Retention values must be between " + minimum + " and " + maximum + ".");
++        }
++        return value;
++    }
++
++    private String safeActor(String actor) {
++        if (actor == null || actor.isBlank()) {
++            return "matrix26-system";
++        }
++        return actor.length() <= 120 ? actor.trim() : actor.trim().substring(0, 120);
++    }
++
++    private String safeMessage(Exception ex) {
++        String value = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
++        return value.replaceAll("(?i)(password|secret|token|key)(\\s*[:=]\\s*)([^\\s,;]+)", "$1$2***REDACTED***")
++                .replaceAll("[\\r\\n]+", " ")
++                .trim();
++    }
++
++    private String toJson(Map<String, Object> values) {
++        StringBuilder json = new StringBuilder("{\n");
++        int index = 0;
++        for (Map.Entry<String, Object> entry : values.entrySet()) {
++            if (index++ > 0) {
++                json.append(",\n");
++            }
++            json.append("  \"").append(json(entry.getKey())).append("\": ");
++            Object value = entry.getValue();
++            if (value == null) {
++                json.append("null");
++            } else if (value instanceof Number || value instanceof Boolean) {
++                json.append(value);
++            } else {
++                json.append("\"").append(json(value.toString())).append("\"");
++            }
++        }
++        return json.append("\n}\n").toString();
++    }
++
++    private String json(String value) {
++        return value == null ? "" : value.replace("\\", "\\\\")
++                .replace("\"", "\\\"")
++                .replace("\n", "\\n")
++                .replace("\r", "\\r")
++                .replace("\t", "\\t");
++    }
++
++    @Transactional
++    protected void writeAudit(PlatformBusinessClient instance, String actor, String action, String summary) {
++        Matrix26InstanceAuditLog log = new Matrix26InstanceAuditLog();
++        log.setInstance(instance);
++        log.setActorUsername(safeActor(actor));
++        log.setAction(action);
++        log.setSummary(summary.length() <= 500 ? summary : summary.substring(0, 499) + "…");
++        log.setAfterSnapshot("{\"instanceCode\":\"" + json(instance.getCode()) + "\"}");
++        auditLogRepository.save(log);
++    }
++
++    private record KeyMaterial(byte[] key, String keyId) {
++    }
++
++    private record PackageInspection(boolean valid, int entries, String message) {
++    }
++}
+diff -ruN '--exclude=runtime-clients' '--exclude=backup-sample' '--exclude=reports' /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupVerificationState.java /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupVerificationState.java
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupVerificationState.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26BackupVerificationState.java	2026-06-25 15:30:58.185873002 +0000
+@@ -0,0 +1,26 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++public enum Matrix26BackupVerificationState {
++    NOT_VERIFIED("Not verified", "text-bg-secondary"),
++    VERIFYING("Verifying", "text-bg-info"),
++    VERIFIED("Verified", "text-bg-success"),
++    VERIFICATION_FAILED("Verification failed", "text-bg-danger"),
++    KEY_UNAVAILABLE("Key unavailable", "text-bg-warning"),
++    CORRUPTED("Corrupted", "text-bg-danger");
++
++    private final String label;
++    private final String badgeClass;
++
++    Matrix26BackupVerificationState(String label, String badgeClass) {
++        this.label = label;
++        this.badgeClass = badgeClass;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++
++    public String getBadgeClass() {
++        return badgeClass;
++    }
++}
+diff -ruN '--exclude=runtime-clients' '--exclude=backup-sample' '--exclude=reports' /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26RetentionItem.java /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26RetentionItem.java
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26RetentionItem.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26RetentionItem.java	2026-06-25 15:30:58.230033467 +0000
+@@ -0,0 +1,20 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import java.time.LocalDateTime;
++
++public record Matrix26RetentionItem(
++        Long jobId,
++        String publicId,
++        LocalDateTime requestedAt,
++        Matrix26BackupRetentionClass retentionClass,
++        Matrix26BackupVerificationState verificationStatus,
++        boolean protectedFlag,
++        long sizeBytes,
++        String backupDirectory,
++        boolean deletable,
++        String reason
++) {
++    public String sizeLabel() {
++        return Matrix26BackupService.formatBytes(sizeBytes);
++    }
++}
+diff -ruN '--exclude=runtime-clients' '--exclude=backup-sample' '--exclude=reports' /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26RetentionPreview.java /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26RetentionPreview.java
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26RetentionPreview.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups/Matrix26RetentionPreview.java	2026-06-25 15:30:58.243556699 +0000
+@@ -0,0 +1,20 @@
++package com.ecoamazonas.eco_agua.platform.control.backups;
++
++import java.util.List;
++
++public record Matrix26RetentionPreview(
++        Long instanceId,
++        String instanceCode,
++        String instanceName,
++        Matrix26BackupPolicy policy,
++        List<Matrix26RetentionItem> items,
++        long reclaimableBytes
++) {
++    public long deletableCount() {
++        return items.stream().filter(Matrix26RetentionItem::deletable).count();
++    }
++
++    public String reclaimableLabel() {
++        return Matrix26BackupService.formatBytes(reclaimableBytes);
++    }
++}
+diff -ruN /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/detail.html /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/detail.html
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/detail.html	2026-06-25 15:38:18.558422782 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/detail.html	2026-06-25 15:35:36.639035556 +0000
+@@ -8,6 +8,7 @@
+         <header th:replace="~{control_center/fragments/topbar :: topbar('Backup detail', 'Artifacts, checksums, and verification results.')}"></header>
+         <main class="matrix26-main">
+             <div th:if="${backupSuccess}" class="alert alert-success" th:text="${backupSuccess}"></div>
++            <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
+             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                 <div>
+                     <span class="matrix26-eyebrow" th:text="${backup.job.backupType}">Type</span>
+@@ -56,6 +57,38 @@
+                 </div>
+             </div>
+ 
++            <section class="matrix26-panel mb-4" th:if="${encryption != null}">
++                <div class="matrix26-panel-header">
++                    <div><span>Encryption</span><h2>Encrypted package protection</h2></div>
++                    <form th:action="@{/control-center/backups/{id}/verify(id=${backup.job.id})}" method="post">
++                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
++                        <button class="btn btn-outline-primary" type="submit" th:disabled="${!keyStatus.available}">
++                            <i class="bi bi-shield-check me-1"></i>Verify again
++                        </button>
++                    </form>
++                </div>
++                <div class="row g-4">
++                    <div class="col-12 col-lg-7">
++                        <dl class="matrix26-settings-list mb-0">
++                            <div><dt>Algorithm</dt><dd th:text="${encryption.algorithm}">AES-256-GCM</dd></div>
++                            <div><dt>Key identifier</dt><dd><code th:text="${encryption.keyId}">KEY-ID</code></dd></div>
++                            <div><dt>Package</dt><dd><code class="matrix26-code-wrap" th:text="${encryption.packagePath}">package.m26backup</code></dd></div>
++                            <div><dt>Package size</dt><dd th:text="${encryption.packageSizeLabel()}">—</dd></div>
++                            <div><dt>Retention class</dt><dd th:text="${encryption.retentionClass.label}">Daily</dd></div>
++                            <div><dt>Expires</dt><dd th:text="${encryption.expiresAt != null ? #temporals.format(encryption.expiresAt, 'dd/MM/yyyy HH:mm:ss') : 'Protected indefinitely'}">—</dd></div>
++                        </dl>
++                    </div>
++                    <div class="col-12 col-lg-5">
++                        <div class="matrix26-backup-result" th:classappend="${encryption.verificationStatus.name() == 'VERIFIED'} ? ' is-valid' : ' is-invalid'">
++                            <i class="bi bi-shield-lock-fill"></i>
++                            <strong th:text="${encryption.verificationStatus.label}">Verified</strong>
++                            <span th:text="${encryption.verifiedAt != null ? 'Last verified ' + #temporals.format(encryption.verifiedAt, 'dd/MM/yyyy HH:mm:ss') : 'Not verified after encryption.'}">Date</span>
++                        </div>
++                        <div class="alert alert-warning small mb-0 mt-3" th:unless="${keyStatus.available}" th:text="${keyStatus.message}">Key unavailable</div>
++                    </div>
++                </div>
++            </section>
++
+             <section class="matrix26-panel mb-4">
+                 <div class="matrix26-panel-header"><div><span>Checks</span><h2>Verification results</h2></div></div>
+                 <div class="table-responsive">
+diff -ruN /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/index.html /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/index.html
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/index.html	2026-06-25 15:38:18.558913413 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/index.html	2026-06-25 15:35:36.639676528 +0000
+@@ -12,13 +12,15 @@
+ 
+             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+                 <div>
+-                    <span class="matrix26-eyebrow">Matrix26 Backups · Phase 3E.2</span>
++                    <span class="matrix26-eyebrow">Matrix26 Backups · Phase 3E.3</span>
+                     <h1 class="matrix26-page-title">Recovery backups</h1>
+-                    <p class="matrix26-page-subtitle mb-0">Database-only and full instance packages with GZIP, ZIP, SHA-256, redaction, manifest, and structural verification.</p>
++                    <p class="matrix26-page-subtitle mb-0">Encrypted recovery packages, independent reverification, retention policies, and manual cleanup preview.</p>
++                </div>
++                <div class="d-flex gap-2 flex-wrap">
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/policies}"><i class="bi bi-calendar-check me-1"></i>Policies</a>
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/retention}"><i class="bi bi-trash3 me-1"></i>Retention</a>
++                    <a class="btn btn-primary" th:href="@{/control-center/backups/new}"><i class="bi bi-database-add me-1"></i>New backup</a>
+                 </div>
+-                <a class="btn btn-primary" th:href="@{/control-center/backups/new}">
+-                    <i class="bi bi-database-add me-1"></i>New backup
+-                </a>
+             </div>
+ 
+             <section class="matrix26-backup-summary mb-4">
+@@ -59,6 +61,18 @@
+                 </div>
+             </div>
+ 
++            <section class="matrix26-panel mb-4">
++                <div class="matrix26-panel-header"><div><span>Encryption</span><h2>Master key status</h2></div></div>
++                <div class="matrix26-backup-key-status" th:classappend="${keyStatus.available} ? ' is-ready' : ' is-blocked'">
++                    <span><i class="bi" th:classappend="${keyStatus.available} ? ' bi-shield-lock-fill' : ' bi-shield-exclamation'"></i></span>
++                    <div>
++                        <strong th:text="${keyStatus.available ? 'AES-256-GCM ready' : 'Encryption blocked'}">Status</strong>
++                        <small th:text="${keyStatus.message}">Message</small>
++                        <code th:if="${keyStatus.available}" th:text="${keyStatus.keyId}">KEY-ID</code>
++                    </div>
++                </div>
++            </section>
++
+             <section class="matrix26-panel">
+                 <div class="matrix26-panel-header">
+                     <div><span>History</span><h2>Recent backup jobs</h2></div>
+diff -ruN /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/new.html /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/new.html
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/new.html	2026-06-25 15:38:18.560095545 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/new.html	2026-06-25 15:35:36.641004753 +0000
+@@ -5,16 +5,18 @@
+ <div class="matrix26-shell">
+     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+     <div class="matrix26-content">
+-        <header th:replace="~{control_center/fragments/topbar :: topbar('New backup', 'Create a verified database-only or full instance recovery package.')}"></header>
++        <header th:replace="~{control_center/fragments/topbar :: topbar('New backup', 'Create a verified and optionally encrypted recovery package.')}"></header>
+         <main class="matrix26-main">
+             <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
+             <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
+-                <div><span class="matrix26-eyebrow">Manual backup</span><h1 class="matrix26-page-title">Configure the recovery package</h1></div>
++                <div><span class="matrix26-eyebrow">Manual backup · Phase 3E.3</span><h1 class="matrix26-page-title">Configure the recovery package</h1></div>
+                 <a class="btn btn-outline-secondary" th:href="@{/control-center/backups}"><i class="bi bi-arrow-left me-1"></i>Back</a>
+             </div>
+ 
+-            <div class="alert alert-info">
+-                Phase 3E.2 can create a complete recovery package with the database, runtime configuration, appearance, modules, branding resources, uploads, documents, and verified metadata.
++            <div class="alert" th:classappend="${keyStatus.available} ? ' alert-success' : ' alert-warning'">
++                <strong th:text="${keyStatus.available ? 'Encryption key ready.' : 'Encryption key unavailable.'}">Key status</strong>
++                <span th:text="${keyStatus.message}">Message</span>
++                <code th:if="${keyStatus.available}" th:text="${keyStatus.keyId}">KEY-ID</code>
+             </div>
+             <div th:unless="${tool.available}" class="alert alert-danger">
+                 <strong>Backup tool unavailable.</strong>
+@@ -31,8 +33,8 @@
+                         <span class="matrix26-backup-scope-icon"><i class="bi bi-box-seam"></i></span>
+                         <span>
+                             <strong>Full instance backup</strong>
+-                            <small>Database, runtime configuration, launchers, modules, appearance, branding resources, uploads, documents, inventory, and diagnostic tail.</small>
+-                            <em>Recommended for recovery</em>
++                            <small>Database, runtime configuration, modules, appearance, branding, uploads, documents, inventory, and diagnostics.</small>
++                            <em>Required for encrypted recovery packages</em>
+                         </span>
+                     </label>
+                     <label class="matrix26-backup-scope">
+@@ -40,8 +42,8 @@
+                         <span class="matrix26-backup-scope-icon"><i class="bi bi-database"></i></span>
+                         <span>
+                             <strong>Database only</strong>
+-                            <small>Creates the Phase 3E.1 logical database export without instance files.</small>
+-                            <em>Useful for quick data snapshots</em>
++                            <small>Creates the logical database export without instance files or encryption.</small>
++                            <em>Quick data snapshot</em>
+                         </span>
+                     </label>
+                 </div>
+@@ -55,37 +57,63 @@
+                         <span class="matrix26-backup-candidate-copy">
+                             <strong th:text="${candidate.businessName}">Instance</strong>
+                             <small><code th:text="${candidate.instanceCode}">code</code> · <code th:text="${candidate.databaseName}">database</code></small>
+-                            <small th:if="${candidate.allowed}" class="text-success">Eligible for Phase 3E.2</small>
++                            <small th:if="${candidate.allowed}" class="text-success">Eligible for encrypted backups</small>
+                             <small th:unless="${candidate.allowed}" class="text-danger" th:text="${candidate.restrictionReason}">Blocked</small>
+                         </span>
+                     </label>
+                 </div>
+ 
++                <section class="matrix26-backup-security-card mt-4">
++                    <div>
++                        <span class="matrix26-backup-security-icon"><i class="bi bi-shield-lock"></i></span>
++                        <div>
++                            <strong>Encrypt the full package with AES-256-GCM</strong>
++                            <small>The master key stays outside Matrix26, the database, Git, and the backup package.</small>
++                        </div>
++                    </div>
++                    <label class="form-check form-switch m-0">
++                        <input class="form-check-input" type="checkbox" role="switch" name="encryptPackage" value="true"
++                               th:disabled="${!keyStatus.available}" th:checked="${keyStatus.available}">
++                        <span class="form-check-label" th:text="${keyStatus.available ? 'Enabled' : 'Key required'}">Enabled</span>
++                    </label>
++                </section>
++
++                <div class="row g-3 mt-1">
++                    <div class="col-12 col-lg-6">
++                        <label class="form-label" for="retentionClass">Retention class</label>
++                        <select class="form-select" id="retentionClass" name="retentionClass">
++                            <option th:each="retention : ${retentionClasses}" th:value="${retention.name()}"
++                                    th:text="|${retention.label} — ${retention.description}|">Daily</option>
++                        </select>
++                    </div>
++                    <div class="col-12 col-lg-6">
++                        <label class="form-label">Key identifier</label>
++                        <div class="form-control bg-light" th:text="${keyStatus.available ? keyStatus.keyId : 'Unavailable'}">KEY-ID</div>
++                    </div>
++                </div>
++
+                 <div class="matrix26-backup-plan mt-4">
+-                    <h3>Full backup verification plan</h3>
++                    <h3>Encrypted backup verification plan</h3>
+                     <ul>
+-                        <li><i class="bi bi-check2"></i> Validate Matrix26 registration and runtime database</li>
+-                        <li><i class="bi bi-check2"></i> Check table count and free storage</li>
+-                        <li><i class="bi bi-check2"></i> Export with a transaction-consistent database dump</li>
+-                        <li><i class="bi bi-check2"></i> Compress with GZIP</li>
+-                        <li><i class="bi bi-check2"></i> Inspect SQL structure and ownership marker</li>
+-                        <li><i class="bi bi-check2"></i> Calculate and recheck SHA-256</li>
+-                        <li><i class="bi bi-check2"></i> Package instance-owned resources and approved runtime files</li>
+-                        <li><i class="bi bi-check2"></i> Redact secrets from runtime configuration</li>
+-                        <li><i class="bi bi-check2"></i> Export modules, appearance, and instance metadata</li>
+-                        <li><i class="bi bi-check2"></i> Inspect ZIP paths and read every archive entry</li>
+-                        <li><i class="bi bi-check2"></i> Generate complete checksums, manifest, inventory, and report</li>
++                        <li><i class="bi bi-check2"></i> Create and verify the full recovery package</li>
++                        <li><i class="bi bi-check2"></i> Build the internal payload ZIP with safe paths</li>
++                        <li><i class="bi bi-check2"></i> Encrypt using AES-256-GCM with authenticated metadata</li>
++                        <li><i class="bi bi-check2"></i> Decrypt to an isolated temporary directory</li>
++                        <li><i class="bi bi-check2"></i> Recheck all internal SHA-256 values and required artifacts</li>
++                        <li><i class="bi bi-check2"></i> Remove plaintext recovery artifacts only after verification</li>
++                        <li><i class="bi bi-check2"></i> Keep public manifest, public checksums, and a safe report</li>
+                     </ul>
+                 </div>
+ 
+                 <dl class="matrix26-settings-list mt-4">
+                     <div><dt>Backup root</dt><dd><code class="matrix26-code-wrap" th:text="${backupRoot}">path</code></dd></div>
+-                    <div><dt>Tool</dt><dd th:text="${tool.available ? tool.version : 'Unavailable'}">Tool</dd></div>
++                    <div><dt>Database tool</dt><dd th:text="${tool.available ? tool.version : 'Unavailable'}">Tool</dd></div>
++                    <div><dt>Encryption</dt><dd>AES-256-GCM · authenticated package format v1</dd></div>
+                 </dl>
+ 
+                 <label class="matrix26-confirmation mt-4">
+                     <input type="checkbox" name="confirmation" value="true" required>
+-                    <span>I confirm that Matrix26 may create the selected verified recovery package for this laboratory instance.</span>
++                    <span>I confirm that Matrix26 may create and verify the selected recovery package for this laboratory instance.</span>
+                 </label>
+ 
+                 <div class="d-flex justify-content-end gap-2 mt-4">
+diff -ruN /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/policies.html /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/policies.html
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/policies.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/policies.html	2026-06-25 15:35:36.641422351 +0000
+@@ -0,0 +1,35 @@
++<!DOCTYPE html>
++<html lang="es" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Backup policies')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup policies', 'Retention rules remain isolated per Matrix26 instance.')}"></header>
++        <main class="matrix26-main">
++            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
++                <div><span class="matrix26-eyebrow">Backup governance</span><h1 class="matrix26-page-title">Retention policies</h1><p class="matrix26-page-subtitle">Define how many verified encrypted daily, weekly, and monthly recovery points are kept.</p></div>
++                <a class="btn btn-outline-secondary" th:href="@{/control-center/backups}"><i class="bi bi-arrow-left me-1"></i>Backups</a>
++            </div>
++            <section class="matrix26-panel">
++                <div class="matrix26-panel-header"><div><span>Instances</span><h2>Available policies</h2></div></div>
++                <div class="row g-3">
++                    <div class="col-12 col-xl-6" th:each="candidate : ${candidates}">
++                        <article class="matrix26-policy-card" th:classappend="${candidate.allowed} ? '' : ' is-disabled'">
++                            <span><i class="bi bi-calendar2-check"></i></span>
++                            <div>
++                                <strong th:text="${candidate.businessName}">Instance</strong>
++                                <small><code th:text="${candidate.instanceCode}">code</code> · <code th:text="${candidate.databaseName}">database</code></small>
++                                <small th:unless="${candidate.allowed}" class="text-danger" th:text="${candidate.restrictionReason}">Blocked</small>
++                            </div>
++                            <a th:if="${candidate.allowed}" class="btn btn-outline-primary" th:href="@{/control-center/backups/policies/{id}(id=${candidate.instanceId})}">Configure</a>
++                        </article>
++                    </div>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+diff -ruN /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/policy.html /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/policy.html
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/policy.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/policy.html	2026-06-25 15:35:36.641879933 +0000
+@@ -0,0 +1,34 @@
++<!DOCTYPE html>
++<html lang="es" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Retention policy')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Retention policy', 'Count-based retention with final-archive protection.')}"></header>
++        <main class="matrix26-main">
++            <div th:if="${backupSuccess}" class="alert alert-success" th:text="${backupSuccess}"></div>
++            <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
++            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
++                <div><span class="matrix26-eyebrow">Instance policy</span><h1 class="matrix26-page-title" th:text="${instance.businessName}">Instance</h1><code th:text="${instance.code}">code</code></div>
++                <a class="btn btn-outline-secondary" th:href="@{/control-center/backups/policies}"><i class="bi bi-arrow-left me-1"></i>Policies</a>
++            </div>
++            <form class="matrix26-panel" method="post" th:action="@{/control-center/backups/policies/{id}(id=${instance.id})}">
++                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
++                <div class="matrix26-panel-header"><div><span>Rules</span><h2>Recovery point retention</h2></div></div>
++                <div class="row g-3">
++                    <div class="col-12 col-md-4"><label class="form-label" for="dailyKeep">Daily backups to keep</label><input class="form-control" id="dailyKeep" name="dailyKeep" type="number" min="1" max="365" th:value="${policy.dailyKeep}" required></div>
++                    <div class="col-12 col-md-4"><label class="form-label" for="weeklyKeep">Weekly backups to keep</label><input class="form-control" id="weeklyKeep" name="weeklyKeep" type="number" min="1" max="104" th:value="${policy.weeklyKeep}" required></div>
++                    <div class="col-12 col-md-4"><label class="form-label" for="monthlyKeep">Monthly backups to keep</label><input class="form-control" id="monthlyKeep" name="monthlyKeep" type="number" min="1" max="120" th:value="${policy.monthlyKeep}" required></div>
++                </div>
++                <label class="matrix26-confirmation mt-4"><input type="checkbox" name="finalKeepIndefinitely" value="true" th:checked="${policy.finalKeepIndefinitely}"><span>Keep final archives indefinitely.</span></label>
++                <label class="matrix26-confirmation mt-3"><input type="checkbox" name="enabled" value="true" th:checked="${policy.enabled}"><span>Enable manual retention cleanup for this instance.</span></label>
++                <div class="alert alert-info mt-4 mb-0">The newest verified backup is always protected. Final archives and manually protected packages are never deleted by retention cleanup.</div>
++                <div class="d-flex justify-content-end gap-2 mt-4"><a class="btn btn-outline-secondary" th:href="@{/control-center/backups/retention(instanceId=${instance.id})}">Preview retention</a><button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle me-1"></i>Save policy</button></div>
++            </form>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+diff -ruN /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/retention.html /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/retention.html
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/retention.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/backups/retention.html	2026-06-25 15:35:36.642478115 +0000
+@@ -0,0 +1,60 @@
++<!DOCTYPE html>
++<html lang="es" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Backup retention')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Backup retention', 'Preview every deletion before reclaiming storage.')}"></header>
++        <main class="matrix26-main">
++            <div th:if="${backupSuccess}" class="alert alert-success" th:text="${backupSuccess}"></div>
++            <div th:if="${backupError}" class="alert alert-danger" th:text="${backupError}"></div>
++            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
++                <div><span class="matrix26-eyebrow">Manual cleanup</span><h1 class="matrix26-page-title">Retention preview</h1><p class="matrix26-page-subtitle">Nothing is removed until the exact confirmation phrase is submitted.</p></div>
++                <a class="btn btn-outline-secondary" th:href="@{/control-center/backups}"><i class="bi bi-arrow-left me-1"></i>Backups</a>
++            </div>
++
++            <form class="matrix26-panel mb-4" method="get" th:action="@{/control-center/backups/retention}">
++                <div class="row g-3 align-items-end">
++                    <div class="col-12 col-lg-9"><label class="form-label" for="instanceId">Laboratory instance</label><select class="form-select" id="instanceId" name="instanceId" required><option value="">Select an instance</option><option th:each="candidate : ${candidates}" th:if="${candidate.allowed}" th:value="${candidate.instanceId}" th:text="|${candidate.businessName} — ${candidate.instanceCode}|" th:selected="${preview != null and preview.instanceId == candidate.instanceId}">Instance</option></select></div>
++                    <div class="col-12 col-lg-3"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-search me-1"></i>Preview cleanup</button></div>
++                </div>
++            </form>
++
++            <div th:if="${preview != null}">
++                <section class="matrix26-backup-summary mb-4">
++                    <article><span><i class="bi bi-archive"></i></span><div><strong th:text="${#lists.size(preview.items)}">0</strong><small>Encrypted backups</small></div></article>
++                    <article><span><i class="bi bi-trash3"></i></span><div><strong th:text="${preview.deletableCount()}">0</strong><small>Eligible for cleanup</small></div></article>
++                    <article><span><i class="bi bi-hdd"></i></span><div><strong th:text="${preview.reclaimableLabel()}">0 B</strong><small>Reclaimable storage</small></div></article>
++                    <article><span><i class="bi bi-shield-check"></i></span><div><strong th:text="${preview.policy.enabled ? 'Enabled' : 'Disabled'}">Enabled</strong><small>Retention policy</small></div></article>
++                </section>
++
++                <section class="matrix26-panel mb-4">
++                    <div class="matrix26-panel-header"><div><span>Dry run</span><h2 th:text="${preview.instanceName}">Instance</h2></div><a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/backups/policies/{id}(id=${preview.instanceId})}">Edit policy</a></div>
++                    <div class="table-responsive"><table class="table align-middle mb-0 matrix26-table"><thead><tr><th>Backup</th><th>Class</th><th>Verification</th><th>Size</th><th>Decision</th></tr></thead><tbody>
++                    <tr th:each="item : ${preview.items}">
++                        <td><strong th:text="${item.publicId}">Backup</strong><small th:text="${#temporals.format(item.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">Date</small></td>
++                        <td th:text="${item.retentionClass.label}">Daily</td>
++                        <td><span class="badge" th:classappend="${item.verificationStatus.badgeClass}" th:text="${item.verificationStatus.label}">Verified</span></td>
++                        <td th:text="${item.sizeLabel()}">Size</td>
++                        <td><span class="badge" th:classappend="${item.deletable ? ' text-bg-danger' : ' text-bg-success'}" th:text="${item.deletable ? 'DELETE' : 'KEEP'}">KEEP</span><small th:text="${item.reason}">Reason</small></td>
++                    </tr>
++                    <tr th:if="${#lists.isEmpty(preview.items)}"><td colspan="5" class="text-center text-muted py-4">No encrypted backups are available for retention evaluation.</td></tr>
++                    </tbody></table></div>
++                </section>
++
++                <form class="matrix26-panel matrix26-danger-panel" method="post" th:action="@{/control-center/backups/retention/execute}" th:if="${preview.deletableCount() > 0}">
++                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
++                    <input type="hidden" name="instanceId" th:value="${preview.instanceId}">
++                    <div class="matrix26-panel-header"><div><span>Destructive operation</span><h2>Execute manual cleanup</h2></div></div>
++                    <p>Type exactly <code th:text="|CLEAN BACKUPS ${preview.instanceCode}|">CLEAN BACKUPS code</code>. Only the packages marked DELETE in the preview will be removed.</p>
++                    <input class="form-control" name="confirmation" autocomplete="off" required th:placeholder="|CLEAN BACKUPS ${preview.instanceCode}|">
++                    <div class="d-flex justify-content-end mt-3"><button class="btn btn-danger" type="submit"><i class="bi bi-trash3 me-1"></i>Delete eligible backups</button></div>
++                </form>
++            </div>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/fragments/sidebar.html	2026-06-25 15:38:18.561199090 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/templates/control_center/fragments/sidebar.html	2026-06-25 15:34:50.200356124 +0000
+@@ -60,6 +60,16 @@
+             <i class="bi bi-database-check"></i>
+             <span>Backups</span>
+         </a>
++        <a th:href="@{/control-center/backups/policies}"
++           th:classappend="${activePage == 'matrix26_backup_policies'} ? ' active' : ''">
++            <i class="bi bi-calendar2-check"></i>
++            <span>Backup policies</span>
++        </a>
++        <a th:href="@{/control-center/backups/retention}"
++           th:classappend="${activePage == 'matrix26_backup_retention'} ? ' active' : ''">
++            <i class="bi bi-trash3"></i>
++            <span>Retention</span>
++        </a>
+     </nav>
+ 
+     <div class="matrix26-sidebar-label">Diseño y experiencia</div>
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/static/css/matrix26-control.css	2026-06-25 15:38:18.222933801 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/src/main/resources/static/css/matrix26-control.css	2026-06-25 15:35:01.278622713 +0000
+@@ -2219,3 +2219,113 @@
+         grid-template-columns: 1fr;
+     }
+ }
++
++/* Matrix26 Backups Phase 3E.3 */
++.matrix26-backup-security-card,
++.matrix26-backup-key-status,
++.matrix26-policy-card {
++    display: flex;
++    align-items: center;
++    justify-content: space-between;
++    gap: 1rem;
++    padding: 1rem 1.1rem;
++    border: 1px solid var(--bs-border-color, #dbe3ef);
++    border-radius: 1rem;
++    background: #f8fafc;
++}
++
++.matrix26-backup-security-card > div,
++.matrix26-backup-key-status,
++.matrix26-policy-card {
++    min-width: 0;
++}
++
++.matrix26-backup-security-card > div,
++.matrix26-backup-key-status > div,
++.matrix26-policy-card > div {
++    display: flex;
++    align-items: flex-start;
++    gap: .85rem;
++    min-width: 0;
++}
++
++.matrix26-backup-security-card strong,
++.matrix26-backup-security-card small,
++.matrix26-backup-key-status strong,
++.matrix26-backup-key-status small,
++.matrix26-policy-card strong,
++.matrix26-policy-card small {
++    display: block;
++}
++
++.matrix26-backup-security-card small,
++.matrix26-backup-key-status small,
++.matrix26-policy-card small {
++    color: #64748b;
++    margin-top: .15rem;
++}
++
++.matrix26-backup-security-icon,
++.matrix26-backup-key-status > span,
++.matrix26-policy-card > span {
++    width: 2.75rem;
++    height: 2.75rem;
++    border-radius: .85rem;
++    display: inline-flex;
++    align-items: center;
++    justify-content: center;
++    flex: 0 0 auto;
++    background: #e0e7ff;
++    color: #3730a3;
++    font-size: 1.2rem;
++}
++
++.matrix26-backup-key-status.is-ready {
++    border-color: #86efac;
++    background: #f0fdf4;
++}
++
++.matrix26-backup-key-status.is-ready > span {
++    background: #dcfce7;
++    color: #15803d;
++}
++
++.matrix26-backup-key-status.is-blocked {
++    border-color: #fde68a;
++    background: #fffbeb;
++}
++
++.matrix26-backup-key-status.is-blocked > span {
++    background: #fef3c7;
++    color: #b45309;
++}
++
++.matrix26-policy-card.is-disabled {
++    opacity: .68;
++    background: #f1f5f9;
++}
++
++.matrix26-policy-card > a {
++    flex: 0 0 auto;
++}
++
++.matrix26-danger-panel {
++    border-color: #fecaca;
++    background: #fff7f7;
++}
++
++.matrix26-danger-panel .matrix26-panel-header span {
++    color: #b91c1c;
++}
++
++@media (max-width: 767.98px) {
++    .matrix26-backup-security-card,
++    .matrix26-policy-card {
++        align-items: stretch;
++        flex-direction: column;
++    }
++
++    .matrix26-policy-card > a {
++        width: 100%;
++    }
++}
+diff -ruN /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/scripts/check-matrix26-backups-phase3e3.sh /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/scripts/check-matrix26-backups-phase3e3.sh
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/scripts/check-matrix26-backups-phase3e3.sh	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/scripts/check-matrix26-backups-phase3e3.sh	2026-06-25 15:37:22.186003150 +0000
+@@ -0,0 +1,129 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "$0")/.." && pwd)"
++PACKAGE="$ROOT/src/main/java/com/ecoamazonas/eco_agua/platform/control/backups"
++TEMPLATES="$ROOT/src/main/resources/templates/control_center/backups"
++CSS="$ROOT/src/main/resources/static/css/matrix26-control.css"
++CONFIG_SCRIPT="$ROOT/scripts/configure-matrix26-backup-security-phase3e3.sh"
++KEY_SCRIPT="$ROOT/scripts/configure-matrix26-backup-master-key-phase3e3.ps1"
++
++required_files=(
++  "$PACKAGE/Matrix26BackupSecurityService.java"
++  "$PACKAGE/Matrix26BackupSecurityRepository.java"
++  "$PACKAGE/Matrix26BackupEncryption.java"
++  "$PACKAGE/Matrix26BackupPolicy.java"
++  "$PACKAGE/Matrix26RetentionPreview.java"
++  "$PACKAGE/Matrix26BackupInitializer.java"
++  "$TEMPLATES/policies.html"
++  "$TEMPLATES/policy.html"
++  "$TEMPLATES/retention.html"
++  "$CONFIG_SCRIPT"
++  "$KEY_SCRIPT"
++)
++
++for file in "${required_files[@]}"; do
++  test -f "$file" || { echo "Missing required file: $file" >&2; exit 1; }
++done
++
++grep -q 'AES/GCM/NoPadding' "$PACKAGE/Matrix26BackupSecurityService.java"
++grep -q 'M26BKP01' "$PACKAGE/Matrix26BackupSecurityService.java"
++grep -q 'MATRIX26_BACKUP_MASTER_KEY' "$PACKAGE/Matrix26BackupProperties.java"
++grep -q 'package.m26backup' "$PACKAGE/Matrix26BackupSecurityService.java"
++grep -q 'public-manifest.json' "$PACKAGE/Matrix26BackupSecurityService.java"
++grep -q 'INTERNAL_CHECKSUMS' "$PACKAGE/Matrix26BackupSecurityService.java"
++grep -q 'CLEAN BACKUPS' "$PACKAGE/Matrix26BackupSecurityService.java"
++grep -q 'Newest verified backup is always protected' "$PACKAGE/Matrix26BackupSecurityService.java"
++grep -q 'matrix26_backup_encryption' "$PACKAGE/Matrix26BackupInitializer.java"
++grep -q 'matrix26_backup_policy' "$PACKAGE/Matrix26BackupInitializer.java"
++grep -q 'matrix26_backup_retention_event' "$PACKAGE/Matrix26BackupInitializer.java"
++grep -q 'Verify again' "$TEMPLATES/detail.html"
++grep -q 'Retention preview' "$TEMPLATES/retention.html"
++
++if grep -RniE 'matrix26\.control-center\.backups\.(master-key|master-key-value)=' \
++  "$ROOT/runtime-clients" "$ROOT/src/main/resources" 2>/dev/null; then
++  echo "A backup master key must never be stored in runtime properties." >&2
++  exit 1
++fi
++
++if grep -RniE 'MATRIX26_BACKUP_MASTER_KEY[[:space:]]*=[[:space:]]*[A-Za-z0-9+/]{20,}' \
++  "$ROOT" --exclude='check-matrix26-backups-phase3e3.sh' 2>/dev/null; then
++  echo "A possible plaintext backup key was found in project files." >&2
++  exit 1
++fi
++
++if grep -RniE 'Files\.delete.*matrix26_platform_control|DROP DATABASE|Runtime\.getRuntime\(\)\.exec' "$PACKAGE"; then
++  echo "Backup security boundary violation detected." >&2
++  exit 1
++fi
++
++python - "$TEMPLATES" "$CSS" <<'PY'
++from pathlib import Path
++from html.parser import HTMLParser
++import sys
++
++class Parser(HTMLParser):
++    pass
++
++for path in Path(sys.argv[1]).glob('*.html'):
++    parser = Parser()
++    parser.feed(path.read_text(encoding='utf-8'))
++
++css = Path(sys.argv[2]).read_text(encoding='utf-8')
++if css.count('{') != css.count('}'):
++    raise SystemExit('Unbalanced CSS braces')
++print('Backup encryption and retention templates: OK')
++PY
++
++TMP="$(mktemp -d)"
++trap 'rm -rf "$TMP"' EXIT
++cat > "$TMP/AesGcmSelfTest.java" <<'JAVA'
++import javax.crypto.Cipher;
++import javax.crypto.AEADBadTagException;
++import javax.crypto.spec.GCMParameterSpec;
++import javax.crypto.spec.SecretKeySpec;
++import java.security.SecureRandom;
++import java.util.Arrays;
++
++public class AesGcmSelfTest {
++    public static void main(String[] args) throws Exception {
++        byte[] key = new byte[32];
++        byte[] nonce = new byte[12];
++        new SecureRandom().nextBytes(key);
++        new SecureRandom().nextBytes(nonce);
++        byte[] payload = "matrix26-encrypted-backup".getBytes(java.nio.charset.StandardCharsets.UTF_8);
++        byte[] aad = "M26BKP01:1:SELFTEST".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
++
++        Cipher encrypt = Cipher.getInstance("AES/GCM/NoPadding");
++        encrypt.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(128, nonce));
++        encrypt.updateAAD(aad);
++        byte[] ciphertext = encrypt.doFinal(payload);
++
++        Cipher decrypt = Cipher.getInstance("AES/GCM/NoPadding");
++        decrypt.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(128, nonce));
++        decrypt.updateAAD(aad);
++        if (!Arrays.equals(payload, decrypt.doFinal(ciphertext))) {
++            throw new IllegalStateException("AES-GCM round trip failed");
++        }
++
++        ciphertext[0] ^= 1;
++        try {
++            Cipher tampered = Cipher.getInstance("AES/GCM/NoPadding");
++            tampered.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(128, nonce));
++            tampered.updateAAD(aad);
++            tampered.doFinal(ciphertext);
++            throw new IllegalStateException("Tampered ciphertext was accepted");
++        } catch (AEADBadTagException expected) {
++            System.out.println("AES-GCM authentication and tamper detection: OK");
++        }
++    }
++}
++JAVA
++javac --release 17 -d "$TMP" "$TMP/AesGcmSelfTest.java"
++java -cp "$TMP" AesGcmSelfTest
++
++echo "Master key remains outside database, properties, Git, and backup package: OK"
++echo "Encrypted package format and internal checksum reverification: OK"
++echo "Count-based retention preview and newest-backup protection: OK"
++echo "Final archive and explicit cleanup confirmation boundaries: OK"
++echo "Matrix26 Backups Phase 3E.3 static checks passed."
+diff -ruN /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/scripts/configure-matrix26-backup-master-key-phase3e3.ps1 /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/scripts/configure-matrix26-backup-master-key-phase3e3.ps1
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/scripts/configure-matrix26-backup-master-key-phase3e3.ps1	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/scripts/configure-matrix26-backup-master-key-phase3e3.ps1	2026-06-25 15:37:07.088970678 +0000
+@@ -0,0 +1,31 @@
++param(
++    [switch]$ReplaceExisting
++)
++
++$ErrorActionPreference = "Stop"
++$variableName = "MATRIX26_BACKUP_MASTER_KEY"
++$existing = [Environment]::GetEnvironmentVariable($variableName, "User")
++
++if ($existing -and -not $ReplaceExisting) {
++    Write-Host "$variableName is already configured for the current Windows user."
++    Write-Host "Use -ReplaceExisting only when you intentionally rotate the key."
++    exit 0
++}
++
++$bytes = New-Object byte[] 32
++$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
++try {
++    $rng.GetBytes($bytes)
++}
++finally {
++    $rng.Dispose()
++}
++
++$key = [Convert]::ToBase64String($bytes)
++[Environment]::SetEnvironmentVariable($variableName, $key, "User")
++
++Write-Host "A 256-bit Matrix26 backup master key was generated."
++Write-Host "It was stored as a user environment variable, not in Git or application.properties."
++Write-Host "Open a new Git Bash terminal before starting Matrix26."
++Write-Host "Store the following recovery value in a password manager. It is shown only now:"
++Write-Host $key
+diff -ruN /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/scripts/configure-matrix26-backup-security-phase3e3.sh /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/scripts/configure-matrix26-backup-security-phase3e3.sh
+--- /mnt/data/matrix26_backup3e3_original/matrix26-backups-phase3e3-context-20260625-102437/scripts/configure-matrix26-backup-security-phase3e3.sh	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_backup3e3_work/matrix26-backups-phase3e3-context-20260625-102437/scripts/configure-matrix26-backup-security-phase3e3.sh	2026-06-25 15:37:07.074790187 +0000
+@@ -0,0 +1,46 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++ROOT="$(cd "$(dirname "$0")/.." && pwd)"
++TARGET="$ROOT/runtime-clients/matrix26_control/application.properties"
++CONFIG_BACKUP_DIR="$ROOT/runtime-data/matrix26-control/maintenance"
++mkdir -p "$CONFIG_BACKUP_DIR"
++
++if [[ ! -f "$TARGET" ]]; then
++  echo "Matrix26 runtime configuration was not found: $TARGET" >&2
++  exit 1
++fi
++
++python - "$TARGET" "$CONFIG_BACKUP_DIR" <<'PY'
++from pathlib import Path
++import sys
++
++path = Path(sys.argv[1])
++backup_dir = Path(sys.argv[2])
++keys = (
++    "matrix26.control-center.backups.encryption-enabled=",
++    "matrix26.control-center.backups.master-key-environment=",
++    "matrix26.control-center.backups.retention-enabled=",
++)
++
++original = path.read_text(encoding="utf-8")
++lines = [line for line in original.splitlines() if not line.strip().startswith(keys)]
++while lines and not lines[-1].strip():
++    lines.pop()
++
++lines.extend([
++    "",
++    "# Matrix26 Backups Phase 3E.3",
++    "matrix26.control-center.backups.encryption-enabled=true",
++    "matrix26.control-center.backups.master-key-environment=MATRIX26_BACKUP_MASTER_KEY",
++    "matrix26.control-center.backups.retention-enabled=true",
++])
++
++backup_dir.mkdir(parents=True, exist_ok=True)
++backup = backup_dir / "application.properties.phase3e3.bak"
++backup.write_text(original, encoding="utf-8")
++path.write_text("\n".join(lines) + "\n", encoding="utf-8")
++print(f"Matrix26 backup security settings updated: {path}")
++print(f"Previous configuration preserved at: {backup}")
++print("No encryption key was written to application.properties.")
++PY

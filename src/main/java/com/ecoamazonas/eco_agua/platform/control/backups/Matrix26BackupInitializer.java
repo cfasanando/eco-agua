@@ -89,5 +89,69 @@ public class Matrix26BackupInitializer implements ApplicationRunner {
                         ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS matrix26_backup_encryption (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    job_id BIGINT NOT NULL,
+                    encrypted BIT NOT NULL DEFAULT 1,
+                    algorithm VARCHAR(80) NOT NULL,
+                    format_version INT NOT NULL,
+                    key_id VARCHAR(80) NOT NULL,
+                    package_path VARCHAR(900) NOT NULL,
+                    package_size_bytes BIGINT NOT NULL,
+                    package_sha256 VARCHAR(64) NOT NULL,
+                    verification_status VARCHAR(40) NOT NULL,
+                    verified_at DATETIME(6) NULL,
+                    retention_class VARCHAR(30) NOT NULL,
+                    expires_at DATETIME(6) NULL,
+                    protected_flag BIT NOT NULL DEFAULT 0,
+                    protection_reason VARCHAR(500) NULL,
+                    encrypted_at DATETIME(6) NOT NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    updated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_matrix26_backup_encryption_job (job_id),
+                    KEY idx_matrix26_backup_encryption_retention (retention_class, expires_at),
+                    KEY idx_matrix26_backup_encryption_verification (verification_status),
+                    CONSTRAINT fk_matrix26_backup_encryption_job
+                        FOREIGN KEY (job_id) REFERENCES matrix26_backup_job(id)
+                        ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS matrix26_backup_policy (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    instance_id BIGINT NOT NULL,
+                    instance_code VARCHAR(80) NOT NULL,
+                    daily_keep INT NOT NULL DEFAULT 7,
+                    weekly_keep INT NOT NULL DEFAULT 4,
+                    monthly_keep INT NOT NULL DEFAULT 6,
+                    final_keep_indefinitely BIT NOT NULL DEFAULT 1,
+                    enabled BIT NOT NULL DEFAULT 1,
+                    updated_by VARCHAR(120) NOT NULL,
+                    updated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_matrix26_backup_policy_instance (instance_id),
+                    KEY idx_matrix26_backup_policy_code (instance_code)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS matrix26_backup_retention_event (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    instance_id BIGINT NOT NULL,
+                    instance_code VARCHAR(80) NOT NULL,
+                    job_id BIGINT NULL,
+                    backup_public_id VARCHAR(80) NULL,
+                    action VARCHAR(40) NOT NULL,
+                    actor VARCHAR(120) NOT NULL,
+                    reason VARCHAR(1000) NULL,
+                    bytes_affected BIGINT NOT NULL DEFAULT 0,
+                    created_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_matrix26_retention_instance_created (instance_id, created_at),
+                    KEY idx_matrix26_retention_backup_public (backup_public_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+
     }
 }

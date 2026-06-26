@@ -36,8 +36,11 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
@@ -170,6 +173,316 @@ public class Matrix26RestoreService {
         return job(jobId);
     }
 
+
+    public Matrix26RestoreResumePlan resumePlan(long restoreJobId) {
+        Matrix26RestoreJob job = job(restoreJobId);
+        String expected = "RESUME " + job.publicId();
+        if (!properties.isResumeEnabled()) {
+            return new Matrix26RestoreResumePlan(false, null, null, List.of(),
+                    List.of("Restore resumption is disabled."), expected, "Resumption is disabled.");
+        }
+        if (!job.failed()) {
+            return new Matrix26RestoreResumePlan(false, null, null, List.of(),
+                    List.of("Only FAILED or CLEANUP_REQUIRED jobs can be resumed."), expected,
+                    "This restore job is not waiting for resumption.");
+        }
+
+        List<Matrix26RestoreStep> steps = restoreRepository.findSteps(restoreJobId);
+        Map<String, Matrix26RestoreStep> byCode = new LinkedHashMap<>();
+        List<String> completed = new ArrayList<>();
+        for (Matrix26RestoreStep step : steps) {
+            byCode.put(step.stepCode(), step);
+            if (step.status() == Matrix26RestoreStepStatus.COMPLETED
+                    || step.status() == Matrix26RestoreStepStatus.SKIPPED) {
+                completed.add(step.label());
+            }
+        }
+        Matrix26RestoreStep next = steps.stream()
+                .filter(step -> step.status() != Matrix26RestoreStepStatus.COMPLETED
+                        && step.status() != Matrix26RestoreStepStatus.SKIPPED)
+                .findFirst().orElse(null);
+        List<String> blockers = new ArrayList<>();
+
+        boolean databaseExists = targetDatabaseService.databaseExists(job.targetDatabaseName());
+        int tableCount = databaseExists ? targetDatabaseService.tableCount(job.targetDatabaseName()) : 0;
+        if (!stepCompleted(byCode, "IMPORT_DATABASE") && tableCount > 0) {
+            blockers.add("The database contains a partial or unverified import. Cleanup review is required before another import.");
+        }
+
+        Path dataDirectory = targetDataDirectory(job);
+        if (!stepCompleted(byCode, "RESTORE_FILES") && directoryNonEmpty(dataDirectory)) {
+            blockers.add("The runtime-data directory contains partial files without a completed restore step.");
+        }
+
+        Path runtimeDirectory = targetRuntimeDirectory(job);
+        Path marker = runtimeDirectory.resolve(".matrix26-restore-reference");
+        if (Files.isRegularFile(marker)) {
+            try {
+                String owner = Files.readString(marker, StandardCharsets.UTF_8).trim();
+                if (!job.publicId().equals(owner)) {
+                    blockers.add("The runtime directory belongs to another restore job.");
+                }
+            } catch (IOException ex) {
+                blockers.add("The runtime ownership marker cannot be read.");
+            }
+        }
+
+        clientRepository.findByCodeIgnoreCase(job.targetInstanceCode()).ifPresent(target -> {
+            if (!matchingTarget(job, target)) {
+                blockers.add("The registered target instance does not match this restore job.");
+            }
+        });
+
+        boolean resumable = next != null && blockers.isEmpty();
+        String summary = resumable
+                ? "The job can continue from “" + next.label() + "” after completed steps are revalidated."
+                : blockers.isEmpty() ? "No incomplete step remains." : "Resumption is blocked until partial resources are reviewed.";
+        return new Matrix26RestoreResumePlan(
+                resumable,
+                next == null ? null : next.stepCode(),
+                next == null ? null : next.label(),
+                List.copyOf(completed),
+                List.copyOf(blockers),
+                expected,
+                summary
+        );
+    }
+
+    public Matrix26RestoreCleanupPreview cleanupPreview(long restoreJobId) {
+        Matrix26RestoreJob job = job(restoreJobId);
+        List<Matrix26RestoreCleanupItem> items = new ArrayList<>();
+        boolean cleanupCandidate = job.failed();
+
+        boolean databaseExists = targetDatabaseService.databaseExists(job.targetDatabaseName());
+        items.add(new Matrix26RestoreCleanupItem(
+                "DATABASE", job.targetDatabaseName(), databaseExists, "EXPECTED_RESTORE_TARGET",
+                cleanupCandidate && databaseExists ? "WOULD_REMOVE_AFTER_EXPLICIT_CLEANUP" : "KEEP",
+                databaseExists ? targetDatabaseService.tableCount(job.targetDatabaseName()) + " tables detected."
+                        : "No target database exists."
+        ));
+
+        Path runtime = targetRuntimeDirectory(job);
+        String runtimeOwnership = ownership(runtime.resolve(".matrix26-restore-reference"), job.publicId());
+        items.add(new Matrix26RestoreCleanupItem(
+                "RUNTIME_DIRECTORY", projectRoot().relativize(runtime).toString(), Files.exists(runtime), runtimeOwnership,
+                cleanupCandidate && Files.exists(runtime) && "OWNED".equals(runtimeOwnership)
+                        ? "WOULD_REMOVE_AFTER_EXPLICIT_CLEANUP" : Files.exists(runtime) ? "BLOCKED_FOR_REVIEW" : "KEEP",
+                Files.exists(runtime) ? "Runtime files remain on disk." : "No runtime directory exists."
+        ));
+
+        Path data = targetDataDirectory(job);
+        String dataOwnership = ownership(data.resolve(".matrix26-restore-reference"), job.publicId());
+        if (Files.exists(data) && "MISSING".equals(dataOwnership)) dataOwnership = "EXPECTED_TARGET_REVIEW";
+        items.add(new Matrix26RestoreCleanupItem(
+                "RUNTIME_DATA", projectRoot().relativize(data).toString(), Files.exists(data), dataOwnership,
+                cleanupCandidate && Files.exists(data) && ("OWNED".equals(dataOwnership) || "EXPECTED_TARGET_REVIEW".equals(dataOwnership))
+                        ? "WOULD_REMOVE_AFTER_EXPLICIT_CLEANUP" : Files.exists(data) ? "BLOCKED_FOR_REVIEW" : "KEEP",
+                Files.exists(data) ? "Instance-owned restored resources remain on disk." : "No runtime-data directory exists."
+        ));
+
+        PlatformBusinessClient registered = clientRepository.findByCodeIgnoreCase(job.targetInstanceCode()).orElse(null);
+        boolean matchingRegistration = registered != null && matchingTarget(job, registered);
+        items.add(new Matrix26RestoreCleanupItem(
+                "INSTANCE_REGISTRATION", job.targetInstanceCode(), registered != null,
+                registered == null ? "MISSING" : matchingRegistration ? "OWNED" : "CONFLICT",
+                cleanupCandidate && matchingRegistration ? "WOULD_REMOVE_AFTER_EXPLICIT_CLEANUP"
+                        : registered == null ? "KEEP" : "BLOCKED_FOR_REVIEW",
+                registered == null ? "No central clone registration exists."
+                        : matchingRegistration ? "The registration matches this restore target."
+                        : "A conflicting registration uses the target instance code."
+        ));
+
+        Path temporary = backupRoot().resolve(".matrix26-restore-temp").resolve(job.publicId()).normalize();
+        items.add(new Matrix26RestoreCleanupItem(
+                "TEMPORARY_EXTRACTION", temporary.toString(), Files.exists(temporary), "EPHEMERAL",
+                Files.exists(temporary) ? "WOULD_REMOVE_AFTER_EXPLICIT_CLEANUP" : "KEEP",
+                Files.exists(temporary) ? "A temporary extraction directory remains." : "No temporary extraction remains."
+        ));
+
+        long existing = items.stream().filter(Matrix26RestoreCleanupItem::exists).count();
+        long blocked = items.stream().filter(item -> item.proposedAction().startsWith("BLOCKED")).count();
+        String summary = cleanupCandidate
+                ? existing + " residual resources detected; this phase is dry-run only and deletes nothing."
+                : "The completed restore is not a cleanup candidate.";
+        return new Matrix26RestoreCleanupPreview(restoreJobId, cleanupCandidate, existing, blocked,
+                List.copyOf(items), summary);
+    }
+
+    public Matrix26RestoreJob resume(long restoreJobId, String confirmation, String actor) {
+        Matrix26RestoreJob job = job(restoreJobId);
+        Matrix26RestoreResumePlan plan = resumePlan(restoreJobId);
+        if (!plan.resumable()) {
+            throw new Matrix26RestoreException(plan.summary() + (plan.blockers().isEmpty() ? "" : " " + String.join(" ", plan.blockers())));
+        }
+        if (!plan.expectedConfirmation().equals(confirmation == null ? "" : confirmation.trim())) {
+            throw new Matrix26RestoreException("Type exactly: " + plan.expectedConfirmation());
+        }
+        if (restoreRepository.hasActiveRestore()) {
+            throw new Matrix26RestoreException("Another restore job is already active.");
+        }
+        Matrix26RestoreCandidate candidate = candidateForBackup(job.backupJobId());
+        long eventId = restoreRepository.insertResumeEvent(job.id(), safeActor(actor), plan.nextStepCode(), plan.summary());
+        try {
+            executeResume(job.id(), candidate, actor);
+            restoreRepository.completeResumeEvent(eventId, "Restore resumed and completed successfully.");
+            return job(job.id());
+        } catch (RuntimeException ex) {
+            restoreRepository.failResumeEvent(eventId, safeMessage(ex));
+            throw ex;
+        }
+    }
+
+    private void executeResume(long jobId, Matrix26RestoreCandidate candidate, String actor) {
+        Matrix26RestoreJob job = job(jobId);
+        Path work = backupRoot().resolve(".matrix26-restore-temp").resolve(job.publicId() + "-resume").normalize();
+        String currentStep = "VALIDATE_BACKUP";
+        try {
+            Files.createDirectories(work);
+            restoreRepository.markResumed(jobId, work.toString());
+            Map<String, Matrix26RestoreStep> steps = stepMap(jobId);
+
+            restoreRepository.startStep(jobId, currentStep, "Revalidating encrypted backup and restore ownership before resumption.");
+            restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.RESUMING);
+            validateResumeIdentity(job);
+            restoreRepository.completeStep(jobId, currentStep, "Encrypted backup and target ownership revalidated for resumption.");
+
+            currentStep = "DECRYPT_PACKAGE";
+            restoreRepository.startStep(jobId, currentStep, "Decrypting the backup again for safe step resumption.");
+            restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.DECRYPTING);
+            Matrix26BackupExtraction extraction = backupSecurityService.extractVerifiedBackup(candidate.backup().id(), work.resolve("decrypted"));
+            Path payload = extraction.extractedDirectory();
+            restoreRepository.completeStep(jobId, currentStep, extraction.verificationMessage());
+
+            currentStep = "CREATE_DATABASE";
+            boolean databaseExists = targetDatabaseService.databaseExists(job.targetDatabaseName());
+            int tables = databaseExists ? targetDatabaseService.tableCount(job.targetDatabaseName()) : 0;
+            if (!databaseExists) {
+                restoreRepository.startStep(jobId, currentStep, "Creating the missing isolated database.");
+                restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.CREATING_DATABASE);
+                targetDatabaseService.createDatabase(job.targetDatabaseName(), false);
+                restoreRepository.completeStep(jobId, currentStep, "Empty isolated database created during resumption.");
+                tables = 0;
+            } else {
+                restoreRepository.completeStep(jobId, currentStep, tables == 0
+                        ? "Existing empty restore database revalidated."
+                        : "Existing restored database revalidated with " + tables + " tables.");
+            }
+
+            currentStep = "IMPORT_DATABASE";
+            if (stepCompleted(steps, currentStep)) {
+                if (targetDatabaseService.tableCount(job.targetDatabaseName()) <= 0) {
+                    throw new Matrix26RestoreException("The completed database-import step no longer has restored tables.");
+                }
+                restoreRepository.completeStep(jobId, currentStep, "Completed database import revalidated during resumption.");
+            } else {
+                if (targetDatabaseService.tableCount(job.targetDatabaseName()) > 0) {
+                    throw new Matrix26RestoreException("A partial database import cannot be safely replayed without cleanup.");
+                }
+                restoreRepository.startStep(jobId, currentStep, "Importing verified SQL into the empty restore database.");
+                restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.IMPORTING_DATABASE);
+                Path sql = work.resolve("database.sql");
+                gunzip(payload.resolve("database.sql.gz"), sql);
+                importDatabase(job.targetDatabaseName(), sql, work.resolve("database-import.stderr.log"));
+                int restoredTables = targetDatabaseService.tableCount(job.targetDatabaseName());
+                if (restoredTables <= 0) throw new Matrix26RestoreException("Database resumption produced no restored tables.");
+                adaptRestoredDatabase(job, candidate.backup().instanceCode());
+                restoreRepository.completeStep(jobId, currentStep, restoredTables + " tables imported during resumption.");
+                Files.deleteIfExists(sql);
+            }
+
+            currentStep = "RESTORE_FILES";
+            Path dataDirectory = targetDataDirectory(job);
+            if (stepCompleted(steps, currentStep)) {
+                if (!Files.isDirectory(dataDirectory)) {
+                    throw new Matrix26RestoreException("The completed file-restore step no longer has its runtime-data directory.");
+                }
+                writeRestoreMarker(dataDirectory, job.publicId());
+                restoreRepository.completeStep(jobId, currentStep, "Completed restored files revalidated during resumption.");
+            } else {
+                if (directoryNonEmpty(dataDirectory)) {
+                    throw new Matrix26RestoreException("Partial restored files require cleanup before the file step can be replayed.");
+                }
+                restoreRepository.startStep(jobId, currentStep, "Restoring instance-owned files into the empty clone namespace.");
+                restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.RESTORING_FILES);
+                int restoredFiles = restoreInstanceFiles(payload.resolve("instance-files.zip"), candidate.backup(), job);
+                writeRestoreMarker(dataDirectory, job.publicId());
+                restoreRepository.completeStep(jobId, currentStep, restoredFiles + " files restored during resumption.");
+            }
+
+            currentStep = "GENERATE_RUNTIME";
+            Path runtimeDirectory = targetRuntimeDirectory(job);
+            String runtimeOwnership = ownership(runtimeDirectory.resolve(".matrix26-restore-reference"), job.publicId());
+            if ("CONFLICT".equals(runtimeOwnership)) {
+                throw new Matrix26RestoreException("The runtime directory belongs to another restore job.");
+            }
+            if (stepCompleted(steps, currentStep) && Files.isRegularFile(runtimeDirectory.resolve("application.properties"))) {
+                writeRestoreMarker(runtimeDirectory, job.publicId());
+                restoreRepository.completeStep(jobId, currentStep, "Completed runtime generation revalidated during resumption.");
+            } else {
+                restoreRepository.startStep(jobId, currentStep, "Generating or completing the clone runtime.");
+                restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.GENERATING_RUNTIME);
+                generateRuntime(candidate.backup(), job);
+                restoreRepository.completeStep(jobId, currentStep, "Clone runtime generated during resumption.");
+            }
+
+            currentStep = "REGISTER_INSTANCE";
+            PlatformBusinessClient target = clientRepository.findByCodeIgnoreCase(job.targetInstanceCode()).orElse(null);
+            if (target != null) {
+                if (!matchingTarget(job, target)) {
+                    throw new Matrix26RestoreException("The existing target registration conflicts with this restore job.");
+                }
+                restoreRepository.setTargetInstance(jobId, target.getId());
+                restoreRepository.completeStep(jobId, currentStep, "Existing matching clone registration adopted during resumption.");
+            } else {
+                restoreRepository.startStep(jobId, currentStep, "Registering the restored clone in Matrix26.");
+                restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.REGISTERING_INSTANCE);
+                target = registerClone(candidate.backup(), job, actor);
+                restoreRepository.setTargetInstance(jobId, target.getId());
+                restoreRepository.completeStep(jobId, currentStep, "Clone registered during resumption with instance ID " + target.getId() + ".");
+            }
+
+            if (job.startAfterRestore()) {
+                currentStep = "START_RUNTIME";
+                var healthBeforeStart = healthService.refreshInstance(target.getId());
+                if (!healthBeforeStart.online()) {
+                    restoreRepository.startStep(jobId, currentStep, "Starting restored runtime during resumption.");
+                    restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.STARTING_RUNTIME);
+                    Matrix26RuntimeControlResult result = runtimeControlService.start(String.valueOf(target.getId()), actor);
+                    restoreRepository.completeStep(jobId, currentStep, result.message());
+                } else {
+                    restoreRepository.completeStep(jobId, currentStep, "Clone runtime was already online.");
+                }
+
+                currentStep = "HEALTH_CHECK";
+                restoreRepository.startStep(jobId, currentStep, "Checking restored portal availability after resumption.");
+                restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.HEALTH_CHECKING);
+                var status = healthService.refreshInstance(target.getId());
+                if (!status.online()) {
+                    throw new Matrix26RestoreException("The resumed clone remains offline: " + status.message());
+                }
+                restoreRepository.completeStep(jobId, currentStep, "HTTP health check passed after resumption.");
+            } else {
+                restoreRepository.skipStep(jobId, "START_RUNTIME", "Start after restore was not requested.");
+                restoreRepository.skipStep(jobId, "HEALTH_CHECK", "Health check will run after manual startup.");
+            }
+
+            restoreRepository.complete(jobId);
+            writeAudit(target, actor, "RESTORE_CLONE_RESUMED",
+                    "Restore job " + job.publicId() + " resumed safely and completed.");
+        } catch (Exception ex) {
+            String error = safeMessage(ex);
+            restoreRepository.failStep(jobId, currentStep, error);
+            Matrix26RestoreStatus failure = partialResourcesExist(job)
+                    ? Matrix26RestoreStatus.CLEANUP_REQUIRED : Matrix26RestoreStatus.FAILED;
+            restoreRepository.fail(jobId, failure, error);
+            throw ex instanceof Matrix26RestoreException restoreException
+                    ? restoreException
+                    : new Matrix26RestoreException("Restore resumption failed: " + error, ex);
+        } finally {
+            deleteTreeQuietly(work);
+        }
+    }
+
     private void execute(long jobId, Matrix26RestoreCandidate candidate, String actor) {
         Matrix26RestoreJob job = job(jobId);
         Path tempRoot = backupRoot().resolve(".matrix26-restore-temp").normalize();
@@ -227,6 +540,7 @@ public class Matrix26RestoreService {
             restoreRepository.updateJobStatus(jobId, Matrix26RestoreStatus.RESTORING_FILES);
             filesCreated = true;
             int restoredFiles = restoreInstanceFiles(payload.resolve("instance-files.zip"), candidate.backup(), job);
+            writeRestoreMarker(targetDataDirectory(job), job.publicId());
             restoreRepository.completeStep(jobId, currentStep, restoredFiles + " files restored under the clone namespace.");
             restoreRepository.insertVerification(jobId, "RESTORED_FILESET", "Restored files", "PASSED", restoredFiles + " safe ZIP entries restored.");
             restoreRepository.insertArtifact(jobId, "RUNTIME_DATA", "runtime-data/" + job.targetInstanceCode(), null, null, "RESTORED");
@@ -492,6 +806,107 @@ public class Matrix26RestoreService {
         Set<String> modules = instanceManagementService.assignedModuleKeys(source.getId());
         instanceManagementService.updateModules(saved.getId(), new ArrayList<>(modules), actor);
         return saved;
+    }
+
+
+    private Matrix26RestoreCandidate candidateForBackup(long backupJobId) {
+        Matrix26BackupJob backup = backupRepository.findById(backupJobId)
+                .orElseThrow(() -> new Matrix26RestoreException("The source backup no longer exists."));
+        Matrix26BackupEncryption encryption = backupSecurityService.metadata(backup.id());
+        boolean allowedSource = properties.getAllowedSourceInstanceCodes().stream()
+                .anyMatch(code -> code.equalsIgnoreCase(backup.instanceCode()));
+        boolean full = "MANUAL_FULL".equalsIgnoreCase(backup.backupType())
+                || "SCHEDULED_FULL".equalsIgnoreCase(backup.backupType());
+        boolean verified = encryption != null && encryption.encrypted()
+                && encryption.verificationStatus() == Matrix26BackupVerificationState.VERIFIED;
+        boolean eligible = backup.isCompleted() && allowedSource && full && verified;
+        if (!eligible) {
+            throw new Matrix26RestoreException("The original encrypted backup is no longer eligible for restore resumption.");
+        }
+        return new Matrix26RestoreCandidate(backup, encryption, true, "Ready for resumption.");
+    }
+
+    private void validateResumeIdentity(Matrix26RestoreJob job) {
+        if (job.sourceDatabaseName().equalsIgnoreCase(job.targetDatabaseName())) {
+            throw new Matrix26RestoreException("Source and target database names must remain different.");
+        }
+        clientRepository.findByCodeIgnoreCase(job.targetInstanceCode()).ifPresent(target -> {
+            if (!matchingTarget(job, target)) {
+                throw new Matrix26RestoreException("The target registration conflicts with this restore job.");
+            }
+        });
+        Path runtime = targetRuntimeDirectory(job);
+        String ownership = ownership(runtime.resolve(".matrix26-restore-reference"), job.publicId());
+        if ("CONFLICT".equals(ownership)) {
+            throw new Matrix26RestoreException("The target runtime belongs to another restore job.");
+        }
+    }
+
+    private Map<String, Matrix26RestoreStep> stepMap(long jobId) {
+        Map<String, Matrix26RestoreStep> result = new HashMap<>();
+        for (Matrix26RestoreStep step : restoreRepository.findSteps(jobId)) result.put(step.stepCode(), step);
+        return result;
+    }
+
+    private boolean stepCompleted(Map<String, Matrix26RestoreStep> steps, String code) {
+        Matrix26RestoreStep step = steps.get(code);
+        return step != null && (step.status() == Matrix26RestoreStepStatus.COMPLETED
+                || step.status() == Matrix26RestoreStepStatus.SKIPPED);
+    }
+
+    private boolean matchingTarget(Matrix26RestoreJob job, PlatformBusinessClient target) {
+        return target != null
+                && job.targetInstanceCode().equalsIgnoreCase(target.getCode())
+                && job.targetDatabaseName().equalsIgnoreCase(target.getDatabaseName())
+                && job.targetRuntimeProfile().equalsIgnoreCase(target.getRuntimeProfile())
+                && target.getRuntimePort() != null
+                && target.getRuntimePort().intValue() == job.targetRuntimePort();
+    }
+
+    private Path targetRuntimeDirectory(Matrix26RestoreJob job) {
+        Path root = projectRoot().resolve(properties.getRuntimeDirectory()).normalize();
+        Path target = root.resolve(job.targetRuntimeProfile()).normalize();
+        ensureInside(root, target);
+        return target;
+    }
+
+    private Path targetDataDirectory(Matrix26RestoreJob job) {
+        Path root = projectRoot().resolve(properties.getRuntimeDataDirectory()).normalize();
+        Path target = root.resolve(job.targetInstanceCode()).normalize();
+        ensureInside(root, target);
+        return target;
+    }
+
+    private boolean directoryNonEmpty(Path directory) {
+        if (!Files.isDirectory(directory)) return false;
+        try (var entries = Files.list(directory)) {
+            return entries.findAny().isPresent();
+        } catch (IOException ex) {
+            return true;
+        }
+    }
+
+    private String ownership(Path marker, String expectedReference) {
+        if (!Files.exists(marker)) return "MISSING";
+        if (!Files.isRegularFile(marker)) return "CONFLICT";
+        try {
+            return expectedReference.equals(Files.readString(marker, StandardCharsets.UTF_8).trim())
+                    ? "OWNED" : "CONFLICT";
+        } catch (IOException ex) {
+            return "CONFLICT";
+        }
+    }
+
+    private void writeRestoreMarker(Path directory, String reference) throws IOException {
+        Files.createDirectories(directory);
+        Files.writeString(directory.resolve(".matrix26-restore-reference"), reference + System.lineSeparator(), StandardCharsets.UTF_8);
+    }
+
+    private boolean partialResourcesExist(Matrix26RestoreJob job) {
+        return targetDatabaseService.databaseExists(job.targetDatabaseName())
+                || Files.exists(targetRuntimeDirectory(job))
+                || Files.exists(targetDataDirectory(job))
+                || clientRepository.findByCodeIgnoreCase(job.targetInstanceCode()).isPresent();
     }
 
     private void createSteps(long jobId) {

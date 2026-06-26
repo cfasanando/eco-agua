@@ -3,7 +3,9 @@ package com.ecoamazonas.eco_agua.platform.control.restores;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 @Component
@@ -22,6 +24,10 @@ public class Matrix26RestoreProperties {
     private String importExecutable = "";
     private long processTimeoutSeconds = 1200L;
     private boolean startAfterRestoreDefault = true;
+    private boolean verificationEnabled = true;
+    private boolean resumeEnabled = true;
+    private int verificationHttpTimeoutSeconds = 10;
+    private List<String> verificationHttpPaths = new ArrayList<>(List.of("/", "/login", "/restaurant/menu", "/admin/restaurant/dashboard"));
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -49,4 +55,12 @@ public class Matrix26RestoreProperties {
     public void setProcessTimeoutSeconds(long value) { processTimeoutSeconds = value; }
     public boolean isStartAfterRestoreDefault() { return startAfterRestoreDefault; }
     public void setStartAfterRestoreDefault(boolean value) { startAfterRestoreDefault = value; }
+    public boolean isVerificationEnabled() { return verificationEnabled; }
+    public void setVerificationEnabled(boolean value) { verificationEnabled = value; }
+    public boolean isResumeEnabled() { return resumeEnabled; }
+    public void setResumeEnabled(boolean value) { resumeEnabled = value; }
+    public int getVerificationHttpTimeoutSeconds() { return verificationHttpTimeoutSeconds; }
+    public void setVerificationHttpTimeoutSeconds(int value) { verificationHttpTimeoutSeconds = value; }
+    public List<String> getVerificationHttpPaths() { return verificationHttpPaths; }
+    public void setVerificationHttpPaths(List<String> values) { verificationHttpPaths = values == null ? new ArrayList<>() : new ArrayList<>(values); }
 }

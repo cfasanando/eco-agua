@@ -3,6 +3,7 @@ package com.ecoamazonas.eco_agua.platform.control.restores;
 public enum Matrix26RestoreStatus {
     DRAFT("Draft", "text-bg-secondary"),
     VALIDATING("Validating", "text-bg-info"),
+    RESUMING("Resuming", "text-bg-info"),
     DECRYPTING("Decrypting", "text-bg-info"),
     VERIFYING("Verifying", "text-bg-info"),
     CREATING_DATABASE("Creating database", "text-bg-primary"),

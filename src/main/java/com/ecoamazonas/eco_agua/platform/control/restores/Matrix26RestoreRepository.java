@@ -193,6 +193,141 @@ public class Matrix26RestoreRepository {
         return count != null && count > 0;
     }
 
+
+    public void markResumed(long id, String temporaryDirectory) {
+        jdbcTemplate.update("""
+                UPDATE matrix26_restore_job
+                SET status = ?, completed_at = NULL, temporary_directory = ?, last_error = NULL
+                WHERE id = ?
+                """, Matrix26RestoreStatus.VALIDATING.name(), temporaryDirectory, id);
+    }
+
+    public long insertResumeEvent(long jobId, String actor, String startingStepCode, String detail) {
+        Number key = new SimpleJdbcInsert(jdbcTemplate)
+                .withTableName("matrix26_restore_resume_event")
+                .usingGeneratedKeyColumns("id")
+                .executeAndReturnKey(new MapSqlParameterSource()
+                        .addValue("restore_job_id", jobId)
+                        .addValue("requested_by", actor)
+                        .addValue("requested_at", LocalDateTime.now())
+                        .addValue("starting_step_code", startingStepCode)
+                        .addValue("status", "RUNNING")
+                        .addValue("detail", limit(detail, 8000)));
+        return key.longValue();
+    }
+
+    public void completeResumeEvent(long id, String detail) {
+        jdbcTemplate.update("""
+                UPDATE matrix26_restore_resume_event
+                SET status = 'COMPLETED', detail = ?, completed_at = ?
+                WHERE id = ?
+                """, limit(detail, 8000), LocalDateTime.now(), id);
+    }
+
+    public void failResumeEvent(long id, String detail) {
+        jdbcTemplate.update("""
+                UPDATE matrix26_restore_resume_event
+                SET status = 'FAILED', detail = ?, completed_at = ?
+                WHERE id = ?
+                """, limit(detail, 8000), LocalDateTime.now(), id);
+    }
+
+    public long insertValidationRun(long jobId, String publicId, String actor) {
+        Number key = new SimpleJdbcInsert(jdbcTemplate)
+                .withTableName("matrix26_restore_validation_run")
+                .usingGeneratedKeyColumns("id")
+                .executeAndReturnKey(new MapSqlParameterSource()
+                        .addValue("public_id", publicId)
+                        .addValue("restore_job_id", jobId)
+                        .addValue("status", Matrix26RestoreValidationStatus.RUNNING.name())
+                        .addValue("requested_by", actor)
+                        .addValue("requested_at", LocalDateTime.now())
+                        .addValue("started_at", LocalDateTime.now()));
+        return key.longValue();
+    }
+
+    public void insertValidationItem(
+            long runId,
+            String code,
+            String category,
+            String label,
+            Matrix26RestoreCheckStatus status,
+            String sourceValue,
+            String targetValue,
+            String detail
+    ) {
+        jdbcTemplate.update("""
+                INSERT INTO matrix26_restore_validation_item (
+                    validation_run_id, check_code, category, label, status,
+                    source_value, target_value, detail, checked_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, runId, code, category, label, status.name(), limit(sourceValue, 8000),
+                limit(targetValue, 8000), limit(detail, 8000), LocalDateTime.now());
+    }
+
+    public void completeValidationRun(long runId, Matrix26RestoreValidationStatus status, String summary) {
+        jdbcTemplate.update("""
+                UPDATE matrix26_restore_validation_run
+                SET status = ?, summary = ?, completed_at = ?
+                WHERE id = ?
+                """, status.name(), limit(summary, 8000), LocalDateTime.now(), runId);
+    }
+
+    public Optional<Matrix26RestoreValidationRun> findValidationRun(long runId) {
+        return jdbcTemplate.query(
+                "SELECT * FROM matrix26_restore_validation_run WHERE id = ?",
+                validationRunMapper(), runId
+        ).stream().findFirst();
+    }
+
+    public Optional<Matrix26RestoreValidationRun> findLatestValidationRun(long jobId) {
+        return jdbcTemplate.query("""
+                SELECT * FROM matrix26_restore_validation_run
+                WHERE restore_job_id = ?
+                ORDER BY requested_at DESC, id DESC
+                LIMIT 1
+                """, validationRunMapper(), jobId).stream().findFirst();
+    }
+
+    public List<Matrix26RestoreValidationRun> findRecentValidationRuns() {
+        return jdbcTemplate.query("""
+                SELECT * FROM matrix26_restore_validation_run
+                ORDER BY requested_at DESC, id DESC
+                LIMIT 100
+                """, validationRunMapper());
+    }
+
+    public List<Matrix26RestoreValidationItem> findValidationItems(long runId) {
+        return jdbcTemplate.query("""
+                SELECT * FROM matrix26_restore_validation_item
+                WHERE validation_run_id = ?
+                ORDER BY id
+                """, (rs, rowNum) -> new Matrix26RestoreValidationItem(
+                rs.getLong("id"), rs.getLong("validation_run_id"), rs.getString("check_code"),
+                rs.getString("category"), rs.getString("label"),
+                Matrix26RestoreCheckStatus.valueOf(rs.getString("status")),
+                rs.getString("source_value"), rs.getString("target_value"), rs.getString("detail"),
+                rs.getObject("checked_at", LocalDateTime.class)
+        ), runId);
+    }
+
+    public boolean hasActiveValidation(long jobId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM matrix26_restore_validation_run
+                WHERE restore_job_id = ? AND status = 'RUNNING'
+                """, Integer.class, jobId);
+        return count != null && count > 0;
+    }
+
+    private RowMapper<Matrix26RestoreValidationRun> validationRunMapper() {
+        return (rs, rowNum) -> new Matrix26RestoreValidationRun(
+                rs.getLong("id"), rs.getString("public_id"), rs.getLong("restore_job_id"),
+                Matrix26RestoreValidationStatus.valueOf(rs.getString("status")), rs.getString("requested_by"),
+                rs.getObject("requested_at", LocalDateTime.class), rs.getObject("started_at", LocalDateTime.class),
+                rs.getObject("completed_at", LocalDateTime.class), rs.getString("summary")
+        );
+    }
+
     private RowMapper<Matrix26RestoreJob> jobMapper() {
         return (rs, rowNum) -> new Matrix26RestoreJob(
                 rs.getLong("id"), rs.getString("public_id"), rs.getLong("backup_job_id"),

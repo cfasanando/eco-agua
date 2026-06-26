@@ -1,10 +1,9 @@
 package com.ecoamazonas.eco_agua.platform.control.restores;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
-
-import jakarta.annotation.PostConstruct;
 
 @Component
 @ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
@@ -98,6 +97,63 @@ public class Matrix26RestoreInitializer {
                     PRIMARY KEY (id),
                     KEY idx_matrix26_restore_verification_job (restore_job_id),
                     CONSTRAINT fk_matrix26_restore_verification_job
+                        FOREIGN KEY (restore_job_id) REFERENCES matrix26_restore_job(id)
+                        ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS matrix26_restore_validation_run (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    public_id VARCHAR(80) NOT NULL,
+                    restore_job_id BIGINT NOT NULL,
+                    status VARCHAR(40) NOT NULL,
+                    requested_by VARCHAR(120) NOT NULL,
+                    requested_at DATETIME(6) NOT NULL,
+                    started_at DATETIME(6) NOT NULL,
+                    completed_at DATETIME(6) NULL,
+                    summary TEXT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_matrix26_restore_validation_public_id (public_id),
+                    KEY idx_matrix26_restore_validation_job (restore_job_id, requested_at),
+                    KEY idx_matrix26_restore_validation_status (status, requested_at),
+                    CONSTRAINT fk_matrix26_restore_validation_job
+                        FOREIGN KEY (restore_job_id) REFERENCES matrix26_restore_job(id)
+                        ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS matrix26_restore_validation_item (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    validation_run_id BIGINT NOT NULL,
+                    check_code VARCHAR(100) NOT NULL,
+                    category VARCHAR(60) NOT NULL,
+                    label VARCHAR(180) NOT NULL,
+                    status VARCHAR(30) NOT NULL,
+                    source_value TEXT NULL,
+                    target_value TEXT NULL,
+                    detail TEXT NULL,
+                    checked_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_matrix26_restore_validation_item (validation_run_id, check_code),
+                    KEY idx_matrix26_restore_validation_item_status (validation_run_id, status),
+                    CONSTRAINT fk_matrix26_restore_validation_item_run
+                        FOREIGN KEY (validation_run_id) REFERENCES matrix26_restore_validation_run(id)
+                        ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS matrix26_restore_resume_event (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    restore_job_id BIGINT NOT NULL,
+                    requested_by VARCHAR(120) NOT NULL,
+                    requested_at DATETIME(6) NOT NULL,
+                    starting_step_code VARCHAR(80) NULL,
+                    status VARCHAR(30) NOT NULL,
+                    detail TEXT NULL,
+                    completed_at DATETIME(6) NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_matrix26_restore_resume_job (restore_job_id, requested_at),
+                    CONSTRAINT fk_matrix26_restore_resume_job
                         FOREIGN KEY (restore_job_id) REFERENCES matrix26_restore_job(id)
                         ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci

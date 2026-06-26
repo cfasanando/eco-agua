@@ -5,16 +5,16 @@
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('Restore Manager', 'Verified encrypted backups restored only into isolated clone targets.')}" ></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Restore Manager', 'Restore, compare, verify, and safely resume isolated recovery clones.')}" ></header>
         <main class="matrix26-main">
             <div th:if="${restoreSuccess}" class="alert alert-success" th:text="${restoreSuccess}"></div>
             <div th:if="${restoreError}" class="alert alert-danger" th:text="${restoreError}"></div>
 
             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
                 <div>
-                    <span class="matrix26-eyebrow">Matrix26 Restore Manager · Phase 3F.1</span>
-                    <h1 class="matrix26-page-title">Isolated clone restoration</h1>
-                    <p class="matrix26-page-subtitle mb-0">Decrypt, verify, import, restore files, generate a runtime, and register a separate recovery clone.</p>
+                    <span class="matrix26-eyebrow">Matrix26 Restore Manager · Phase 3F.2</span>
+                    <h1 class="matrix26-page-title">Verified clone recovery</h1>
+                    <p class="matrix26-page-subtitle mb-0">Restore an encrypted package, compare the clone with the backup snapshot, and resume safe interrupted steps.</p>
                 </div>
                 <a class="btn btn-primary" th:href="@{/control-center/restores/new}"><i class="bi bi-arrow-counterclockwise me-1"></i>New clone restore</a>
             </div>
@@ -29,24 +29,23 @@
             <div class="row g-4 mb-4">
                 <div class="col-12 col-xl-7">
                     <section class="matrix26-panel h-100">
-                        <div class="matrix26-panel-header"><div><span>Fixed recovery target</span><h2>Phase 3F.1 safety boundary</h2></div></div>
+                        <div class="matrix26-panel-header"><div><span>Recovery target</span><h2>Isolated laboratory</h2></div></div>
                         <dl class="matrix26-settings-list">
                             <div><dt>Instance code</dt><dd><code th:text="${restoreProperties.targetInstanceCode}">matrix26-restore-test</code></dd></div>
                             <div><dt>Database</dt><dd><code th:text="${restoreProperties.targetDatabaseName}">matrix26_restore_test</code></dd></div>
                             <div><dt>Runtime</dt><dd><code th:text="${restoreProperties.targetRuntimeProfile}">matrix26_restore_test</code></dd></div>
-                            <div><dt>Port</dt><dd th:text="${restoreProperties.targetRuntimePort}">8095</dd></div>
-                            <div><dt>URL</dt><dd><code th:text="${restoreProperties.targetPublicUrl}">http://localhost:8095</code></dd></div>
+                            <div><dt>Port / URL</dt><dd><span th:text="${restoreProperties.targetRuntimePort}">8095</span> · <code th:text="${restoreProperties.targetPublicUrl}">http://localhost:8095</code></dd></div>
                         </dl>
                     </section>
                 </div>
                 <div class="col-12 col-xl-5">
                     <section class="matrix26-panel h-100">
-                        <div class="matrix26-panel-header"><div><span>Isolation rules</span><h2>No overwrite mode</h2></div></div>
+                        <div class="matrix26-panel-header"><div><span>Phase 3F.2</span><h2>Evidence-based verification</h2></div></div>
                         <ul class="matrix26-check-list mb-0">
-                            <li><i class="bi bi-check-circle-fill"></i>Encrypted and verified full backups only.</li>
-                            <li><i class="bi bi-check-circle-fill"></i>No existing database, runtime, instance, directory, or port reuse.</li>
-                            <li><i class="bi bi-check-circle-fill"></i>The original 8094 instance remains unchanged.</li>
-                            <li><i class="bi bi-check-circle-fill"></i>Partial results require explicit cleanup review.</li>
+                            <li><i class="bi bi-check-circle-fill"></i>Database schema and row counts are compared with the encrypted SQL dump.</li>
+                            <li><i class="bi bi-check-circle-fill"></i>Modules, appearance, and resource hashes are compared with backup metadata.</li>
+                            <li><i class="bi bi-check-circle-fill"></i>Runtime isolation and key HTTP routes are checked independently.</li>
+                            <li><i class="bi bi-check-circle-fill"></i>Cleanup remains dry-run only; no resource is deleted in this phase.</li>
                         </ul>
                     </section>
                 </div>
@@ -73,10 +72,10 @@
             </section>
 
             <section class="matrix26-panel">
-                <div class="matrix26-panel-header"><div><span>History</span><h2>Restore jobs</h2></div></div>
+                <div class="matrix26-panel-header"><div><span>History</span><h2>Restore jobs and verification</h2></div></div>
                 <div class="table-responsive">
                     <table class="table align-middle matrix26-table">
-                        <thead><tr><th>Job</th><th>Backup</th><th>Target</th><th>Requested</th><th>Status</th><th class="text-end">Details</th></tr></thead>
+                        <thead><tr><th>Job</th><th>Backup</th><th>Target</th><th>Requested</th><th>Restore</th><th>Verification</th><th class="text-end">Details</th></tr></thead>
                         <tbody>
                         <tr th:each="job : ${jobs}">
                             <td><strong th:text="${job.publicId}">RST</strong><small th:text="${job.requestedBy}">actor</small></td>
@@ -84,9 +83,15 @@
                             <td><strong th:text="${job.targetInstanceName}">Clone</strong><small><code th:text="${job.targetInstanceCode}">code</code> · port <span th:text="${job.targetRuntimePort}">8095</span></small></td>
                             <td th:text="${#temporals.format(job.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">date</td>
                             <td><span class="badge" th:classappend="${job.status.badgeClass}" th:text="${job.status.label}">Status</span></td>
+                            <td>
+                                <span th:if="${latestValidations.containsKey(job.id)}" class="badge"
+                                      th:classappend="${latestValidations.get(job.id).status.badgeClass}"
+                                      th:text="${latestValidations.get(job.id).status.label}">Verified</span>
+                                <span th:unless="${latestValidations.containsKey(job.id)}" class="badge text-bg-secondary">Not verified</span>
+                            </td>
                             <td class="text-end"><a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/restores/{id}(id=${job.id})}"><i class="bi bi-eye"></i><span class="visually-hidden">Open</span></a></td>
                         </tr>
-                        <tr th:if="${#lists.isEmpty(jobs)}"><td colspan="6" class="text-center text-muted py-4">No restore jobs yet.</td></tr>
+                        <tr th:if="${#lists.isEmpty(jobs)}"><td colspan="7" class="text-center text-muted py-4">No restore jobs yet.</td></tr>
                         </tbody>
                     </table>
                 </div>

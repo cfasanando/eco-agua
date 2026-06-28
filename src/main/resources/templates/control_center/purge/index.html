@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Purge dry run')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Purge Manager', 'Phase 3H.1 classifies purge candidates without deleting any resource.')}"></header>
+        <main class="matrix26-main">
+            <div th:if="${purgeSuccess}" class="alert alert-success" th:text="${purgeSuccess}"></div>
+            <div th:if="${purgeError}" class="alert alert-danger" th:text="${purgeError}"></div>
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <div>
+                    <h1 class="h4 mb-1">Purge dry run</h1>
+                    <p class="text-muted mb-0">No database, runtime, runtime-data, backup or metadata is deleted in this phase.</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/archive}"><i class="bi bi-safe2 me-1"></i>Final archives</a>
+                    <a class="btn btn-primary" th:href="@{/control-center/purge/new}"><i class="bi bi-search me-1"></i>Prepare dry run</a>
+                </div>
+            </div>
+
+            <div class="matrix26-alert-safe mb-4">
+                <i class="bi bi-shield-lock"></i>
+                <div>
+                    <strong>Read-only classification</strong>
+                    <p>Phase 3H.1 only calculates WOULD_DELETE, WOULD_KEEP, BLOCKED, PROTECTED, REQUIRES_REVIEW and NOT_FOUND items. Deleted resources: <strong>0</strong>.</p>
+                </div>
+            </div>
+
+            <section class="row g-3 mb-4">
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Dry runs</span><strong th:text="${summary.totalPlans()}">0</strong></div></div>
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Ready</span><strong th:text="${summary.dryRunReady()}">0</strong></div></div>
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Blocked</span><strong th:text="${summary.blocked()}">0</strong></div></div>
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Would delete later</span><strong th:text="${summary.totalWouldDelete()}">0</strong></div></div>
+            </section>
+
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header">
+                    <div><h2>Eligible final archives</h2><p>Only decommissioned allowlisted laboratories can be evaluated.</p></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Instance</th><th>Archive</th><th>Final backup</th><th>Retention</th><th>Allowed</th><th>Action</th></tr></thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(candidates)}"><td colspan="6" class="text-center text-muted py-4">No archived decommissioned instance is available for dry run.</td></tr>
+                        <tr th:each="candidate : ${candidates}">
+                            <td><strong th:text="${candidate.instanceName()}">Instance</strong><small class="d-block text-muted" th:text="${candidate.instanceCode()}">code</small></td>
+                            <td><code th:text="${candidate.archivePublicId()}">ARC</code><small class="d-block"><span class="badge" th:classappend="${candidate.archiveStatus() == 'READY' ? ' text-bg-success' : ' text-bg-warning'}" th:text="${candidate.archiveStatus()}">READY</span></small></td>
+                            <td><code th:text="${candidate.finalBackupPublicId()}">BKP</code></td>
+                            <td><span class="badge text-bg-info" th:text="${candidate.retentionStatus()}">RETENTION</span><small class="d-block text-muted" th:text="${candidate.retentionUntil() != null ? #temporals.format(candidate.retentionUntil(), 'yyyy-MM-dd HH:mm:ss') : 'No date'}">date</small></td>
+                            <td><span class="badge" th:classappend="${candidate.allowed() ? ' text-bg-success' : ' text-bg-danger'}" th:text="${candidate.allowed() ? 'YES' : 'NO'}">YES</span></td>
+                            <td><a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/purge/new}">Prepare</a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><h2>Recent dry run plans</h2><p>Historical dry run evidence is retained for audit.</p></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Plan</th><th>Instance</th><th>Status</th><th>Would delete</th><th>Protected</th><th>Requested</th><th>Action</th></tr></thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(plans)}"><td colspan="7" class="text-center text-muted py-4">No purge dry run has been prepared yet.</td></tr>
+                        <tr th:each="plan : ${plans}">
+                            <td><code th:text="${plan.publicId()}">PUR</code></td>
+                            <td><strong th:text="${plan.instanceName()}">Instance</strong><small class="d-block text-muted" th:text="${plan.instanceCode()}">code</small></td>
+                            <td><span class="badge" th:classappend="${plan.status().name() == 'DRY_RUN_READY' ? ' text-bg-success' : (plan.status().name() == 'BLOCKED' ? ' text-bg-warning' : ' text-bg-secondary')}" th:text="${plan.status()}">status</span></td>
+                            <td th:text="${plan.wouldDelete()}">0</td>
+                            <td th:text="${plan.protectedResources()}">0</td>
+                            <td th:text="${#temporals.format(plan.requestedAt(), 'yyyy-MM-dd HH:mm:ss')}">time</td>
+                            <td><a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/purge/{id}(id=${plan.id()})}"><i class="bi bi-eye me-1"></i>Open</a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

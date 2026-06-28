@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Purge dry run detail')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Purge dry run detail', 'Read-only classification evidence for a decommissioned instance.')} "></header>
+        <main class="matrix26-main">
+            <div th:if="${purgeSuccess}" class="alert alert-success" th:text="${purgeSuccess}"></div>
+            <div th:if="${purgeError}" class="alert alert-danger" th:text="${purgeError}"></div>
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <div>
+                    <h1 class="h4 mb-1" th:text="${plan.publicId()}">PUR</h1>
+                    <p class="text-muted mb-0" th:text="|${plan.instanceName()} · ${plan.instanceCode()}|">Instance</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <span class="badge fs-6" th:classappend="${plan.status().name() == 'DRY_RUN_READY' ? ' text-bg-success' : (plan.status().name() == 'BLOCKED' ? ' text-bg-warning' : ' text-bg-secondary')}" th:text="${plan.status()}">status</span>
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/purge}"><i class="bi bi-arrow-left me-1"></i>Purge Manager</a>
+                    <a class="btn btn-outline-primary" th:href="@{/control-center/purge/{id}/report(id=${plan.id()})}"><i class="bi bi-download me-1"></i>Report</a>
+                    <form method="post" th:action="@{/control-center/purge/{id}/refresh(id=${plan.id()})}">
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Refresh dry run</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="matrix26-alert-safe mb-4">
+                <i class="bi bi-shield-lock"></i>
+                <div>
+                    <strong>Deleted resources: 0</strong>
+                    <p>This detail page is evidence only. A future purge phase will require a separate signed plan and separate confirmations before any real removal exists.</p>
+                </div>
+            </div>
+
+            <section class="row g-3 mb-4">
+                <div class="col-md-2"><div class="matrix26-stat-card"><span>Blockers</span><strong th:text="${plan.blockers()}">0</strong></div></div>
+                <div class="col-md-2"><div class="matrix26-stat-card"><span>Would delete later</span><strong th:text="${plan.wouldDelete()}">0</strong></div></div>
+                <div class="col-md-2"><div class="matrix26-stat-card"><span>Would keep</span><strong th:text="${plan.wouldKeep()}">0</strong></div></div>
+                <div class="col-md-2"><div class="matrix26-stat-card"><span>Protected</span><strong th:text="${plan.protectedResources()}">0</strong></div></div>
+                <div class="col-md-2"><div class="matrix26-stat-card"><span>Review</span><strong th:text="${plan.reviewResources()}">0</strong></div></div>
+                <div class="col-md-2"><div class="matrix26-stat-card"><span>Not found</span><strong th:text="${plan.missingResources()}">0</strong></div></div>
+            </section>
+
+            <section class="row g-3 mb-4">
+                <div class="col-xl-6">
+                    <div class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><h2>Plan metadata</h2><p>Original instance and final archive references.</p></div></div>
+                        <dl class="row mb-0 matrix26-definition-list">
+                            <dt class="col-sm-4">Instance</dt><dd class="col-sm-8"><strong th:text="${plan.instanceName()}">Instance</strong><small class="d-block text-muted" th:text="${plan.instanceCode()}">code</small></dd>
+                            <dt class="col-sm-4">Database</dt><dd class="col-sm-8"><code th:text="${plan.databaseName()}">db</code></dd>
+                            <dt class="col-sm-4">Runtime</dt><dd class="col-sm-8"><code th:text="${plan.runtimeProfile()}">runtime</code><span th:text="| · port ${plan.runtimePort()}|">port</span></dd>
+                            <dt class="col-sm-4">Final backup</dt><dd class="col-sm-8"><code th:text="${plan.finalBackupPublicId()}">BKP</code></dd>
+                            <dt class="col-sm-4">Retention</dt><dd class="col-sm-8" th:text="|${plan.retentionStatus()} · ${plan.retentionUntil() != null ? #temporals.format(plan.retentionUntil(), 'yyyy-MM-dd HH:mm:ss') : 'No date'}|">retention</dd>
+                            <dt class="col-sm-4">Eligible later</dt><dd class="col-sm-8"><span class="badge" th:classappend="${plan.eligibleForFuturePurge() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${plan.eligibleForFuturePurge() ? 'YES' : 'NO'}">NO</span></dd>
+                            <dt class="col-sm-4">Last error</dt><dd class="col-sm-8 text-danger" th:text="${plan.lastError() != null ? plan.lastError() : '—'}">—</dd>
+                        </dl>
+                    </div>
+                </div>
+                <div class="col-xl-6">
+                    <div class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><h2>Safety checks</h2><p>Blockers prevent any future operational purge.</p></div></div>
+                        <div class="table-responsive">
+                            <table class="table align-middle mb-0 matrix26-table">
+                                <thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
+                                <tbody>
+                                <tr th:if="${#lists.isEmpty(checks)}"><td colspan="3" class="text-center text-muted py-4">No checks recorded.</td></tr>
+                                <tr th:each="check : ${checks}">
+                                    <td><strong th:text="${check.label()}">check</strong><small class="d-block text-muted" th:text="${check.checkCode()}">code</small></td>
+                                    <td><span class="badge" th:classappend="${check.status() == 'PASSED' ? ' text-bg-success' : ' text-bg-danger'}" th:text="${check.status()}">status</span></td>
+                                    <td th:text="${check.detail()}">detail</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header"><div><h2>Resource classification</h2><p>Items are classified only. They are not removed.</p></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Disposition</th><th>Resource</th><th>Path / reference</th><th>Size</th><th>Files</th><th>Detail</th></tr></thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(items)}"><td colspan="6" class="text-center text-muted py-4">No items recorded.</td></tr>
+                        <tr th:each="item : ${items}">
+                            <td><span class="badge" th:classappend="${item.disposition().name() == 'WOULD_DELETE' ? ' text-bg-warning' : (item.disposition().name() == 'PROTECTED' ? ' text-bg-success' : (item.disposition().name() == 'BLOCKED' ? ' text-bg-danger' : ' text-bg-secondary'))}" th:text="${item.disposition()}">status</span></td>
+                            <td><strong th:text="${item.resourceType()}">type</strong><small class="d-block text-muted" th:text="${item.resourceName()}">name</small></td>
+                            <td><code th:text="${item.resourcePath()}">path</code></td>
+                            <td th:text="${item.sizeLabel()}">size</td>
+                            <td th:text="${item.fileCount() != null ? item.fileCount() : '—'}">files</td>
+                            <td th:text="${item.detail()}">detail</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><h2>Audit timeline</h2><p>Dry run events.</p></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Time</th><th>Event</th><th>Status</th><th>Actor</th><th>Detail</th></tr></thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(events)}"><td colspan="5" class="text-center text-muted py-4">No events recorded.</td></tr>
+                        <tr th:each="event : ${events}">
+                            <td th:text="${#temporals.format(event.createdAt(), 'yyyy-MM-dd HH:mm:ss')}">time</td>
+                            <td th:text="${event.eventType()}">event</td>
+                            <td><span class="badge" th:classappend="${event.status() == 'COMPLETED' || event.status() == 'DRY_RUN_READY' ? ' text-bg-success' : (event.status() == 'FAILED' ? ' text-bg-danger' : ' text-bg-secondary')}" th:text="${event.status()}">status</span></td>
+                            <td th:text="${event.actor()}">actor</td>
+                            <td th:text="${event.detail()}">detail</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

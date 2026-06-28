@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Prepare purge dry run')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Prepare purge dry run', 'Create a read-only purge classification plan. Nothing will be deleted.')}"></header>
+        <main class="matrix26-main">
+            <div th:if="${purgeError}" class="alert alert-danger" th:text="${purgeError}"></div>
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <div>
+                    <h1 class="h4 mb-1">Prepare dry run</h1>
+                    <p class="text-muted mb-0">Use the exact confirmation shown for the selected archived instance.</p>
+                </div>
+                <a class="btn btn-outline-secondary" th:href="@{/control-center/purge}"><i class="bi bi-arrow-left me-1"></i>Purge Manager</a>
+            </div>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><h2>Dry run form</h2><p>The selected final archive must be READY and the original instance must be DECOMMISSIONED.</p></div></div>
+                <form method="post" th:action="@{/control-center/purge/prepare}" class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label">Final archive</label>
+                        <select class="form-select" name="archiveRecordId" required>
+                            <option value="">Choose an archive</option>
+                            <option th:each="candidate : ${candidates}"
+                                    th:value="${candidate.archiveRecordId()}"
+                                    th:text="|${candidate.instanceName()} · ${candidate.instanceCode()} · ${candidate.archivePublicId()} · ${candidate.archiveStatus()}|">
+                                Archive
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Deleted resources</label>
+                        <input class="form-control" value="0" disabled>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Reason</label>
+                        <textarea class="form-control" name="reason" rows="4" required th:placeholder="|Minimum ${minimumReasonLength} characters|">Purge dry run for archived Matrix26 laboratory.</textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Exact confirmation</label>
+                        <input class="form-control" name="confirmation" required placeholder="PREPARE PURGE DRY RUN matrix26-appearance-lab">
+                        <div class="form-text">For the current laboratory type exactly: <code>PREPARE PURGE DRY RUN matrix26-appearance-lab</code></div>
+                    </div>
+                    <div class="col-12">
+                        <div class="matrix26-alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <div><strong>Dry run only</strong><p>This phase stores a plan and classifies resources. It does not run schema removal, file removal, backup removal, metadata deletion or real purge commands.</p></div>
+                        </div>
+                    </div>
+                    <div class="col-12 d-flex justify-content-end gap-2">
+                        <a class="btn btn-outline-secondary" th:href="@{/control-center/purge}">Cancel</a>
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>Prepare dry run</button>
+                    </div>
+                </form>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

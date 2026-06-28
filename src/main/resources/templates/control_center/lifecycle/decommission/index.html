@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Decommission Manager')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Decommission Manager', 'Final encrypted archive and non-destructive operational retirement for allowlisted laboratories.')}" ></header>
+        <main class="matrix26-main">
+            <div th:if="${decommissionSuccess}" class="alert alert-success" th:text="${decommissionSuccess}"></div>
+            <div th:if="${decommissionError}" class="alert alert-danger" th:text="${decommissionError}"></div>
+
+            <div class="matrix26-alert-safe mb-4">
+                <i class="bi bi-archive"></i>
+                <div>
+                    <strong>No data is deleted in Phase 3G.2</strong>
+                    <p>Decommission requires a newly generated encrypted FINAL archive, a stopped runtime, disabled schedules, and a separate execution confirmation. Database, runtime, resources, modules, appearance, and backups remain preserved.</p>
+                </div>
+            </div>
+
+            <section class="row g-3 mb-4">
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Decommission jobs</span><strong th:text="${summary.totalJobs()}">0</strong></div></div>
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Ready</span><strong th:text="${summary.readyJobs()}">0</strong></div></div>
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Decommissioned</span><strong th:text="${summary.decommissionedInstances()}">0</strong></div></div>
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Review required</span><strong th:text="${summary.failedJobs()}">0</strong></div></div>
+            </section>
+
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div><h2>Laboratory readiness</h2><p>Only suspended, stopped, allowlisted laboratories can prepare a decommission plan.</p></div>
+                    <div class="d-flex gap-2">
+                        <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission/decommissioned}"><i class="bi bi-clock-history me-1"></i>Historical inventory</a>
+                        <a class="btn btn-primary" th:href="@{/control-center/lifecycle/decommission/new}"><i class="bi bi-archive me-1"></i>Prepare decommission</a>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Instance</th><th>Status</th><th>Runtime</th><th>Schedules</th><th>Boundary</th><th>Readiness</th></tr></thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(candidates)}"><td colspan="6" class="text-center text-muted py-4">No registered instances.</td></tr>
+                        <tr th:each="candidate : ${candidates}">
+                            <td><strong th:text="${candidate.instance().businessName}">Instance</strong><small th:text="${candidate.instance().code}">code</small></td>
+                            <td><span class="badge" th:classappend="${candidate.instance().status == 'DECOMMISSIONED' ? ' text-bg-dark' : (candidate.instance().status == 'SUSPENDED' ? ' text-bg-secondary' : ' text-bg-success')}" th:text="${candidate.instance().status}">Status</span></td>
+                            <td><span class="badge" th:classappend="${candidate.runtimeStopped() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${candidate.runtimeStopped() ? 'Stopped' : 'Not stopped'}">Stopped</span></td>
+                            <td th:text="${candidate.enabledSchedules()}">0</td>
+                            <td th:text="${candidate.allowlisted() ? 'Laboratory allowlist' : 'Read only'}">Boundary</td>
+                            <td>
+                                <span th:if="${candidate.eligible()}" class="badge text-bg-success">Eligible</span>
+                                <span th:unless="${candidate.eligible()}" class="text-muted small" th:text="${candidate.blocker()}">Blocked</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><h2>Recent decommission jobs</h2><p>Preparation and execution remain separate audited operations.</p></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Job</th><th>Instance</th><th>Status</th><th>Final archive</th><th>Retention</th><th>Requested</th><th></th></tr></thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(jobs)}"><td colspan="7" class="text-center text-muted py-4">No decommission jobs yet.</td></tr>
+                        <tr th:each="job : ${jobs}">
+                            <td><code th:text="${job.publicId()}">DCM</code></td>
+                            <td><strong th:text="${job.instanceName()}">Instance</strong><small th:text="${job.instanceCode()}">code</small></td>
+                            <td><span class="badge" th:classappend="| ${job.status.badgeClass}|" th:text="${job.status.label}">Status</span></td>
+                            <td><code th:text="${job.finalBackupPublicId() != null ? job.finalBackupPublicId() : 'Pending'}">Backup</code></td>
+                            <td th:text="|${job.retentionDays()} days|">30 days</td>
+                            <td th:text="${#temporals.format(job.requestedAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</td>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission/{id}(id=${job.id()})}" title="View decommission job"><i class="bi bi-eye"></i></a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

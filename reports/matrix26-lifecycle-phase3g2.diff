@@ -1,0 +1,1819 @@
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionBackupView.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionBackupView.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionBackupView.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionBackupView.java	2026-06-26 19:32:31.977842370 +0000
+@@ -0,0 +1,22 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++import java.time.LocalDateTime;
++
++public record Matrix26DecommissionBackupView(
++        Long jobId,
++        String publicId,
++        LocalDateTime completedAt,
++        LocalDateTime verifiedAt,
++        String keyId,
++        String packageSha256,
++        String retentionClass,
++        boolean protectedFlag,
++        String verificationStatus
++) {
++    public boolean finalArchiveVerified() {
++        return jobId != null
++                && "FINAL".equalsIgnoreCase(retentionClass)
++                && protectedFlag
++                && "VERIFIED".equalsIgnoreCase(verificationStatus);
++    }
++}
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionCandidate.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionCandidate.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionCandidate.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionCandidate.java	2026-06-26 19:32:31.984118233 +0000
+@@ -0,0 +1,14 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClient;
++
++public record Matrix26DecommissionCandidate(
++        PlatformBusinessClient instance,
++        boolean allowlisted,
++        boolean eligible,
++        String blocker,
++        boolean runtimeStopped,
++        int enabledSchedules,
++        String prepareConfirmation
++) {
++}
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionCheck.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionCheck.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionCheck.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionCheck.java	2026-06-26 19:32:31.956009148 +0000
+@@ -0,0 +1,14 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++import java.time.LocalDateTime;
++
++public record Matrix26DecommissionCheck(
++        Long id,
++        Long decommissionJobId,
++        String checkCode,
++        String label,
++        String status,
++        String detail,
++        LocalDateTime checkedAt
++) {
++}
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionController.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionController.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionController.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionController.java	2026-06-26 19:34:28.953833513 +0000
+@@ -0,0 +1,122 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Controller;
++import org.springframework.ui.Model;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
++import org.springframework.web.servlet.mvc.support.RedirectAttributes;
++
++import java.security.Principal;
++
++@Controller
++@RequestMapping("/control-center/lifecycle/decommission")
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26DecommissionController {
++
++    private final Matrix26DecommissionService service;
++    private final Matrix26DecommissionProperties properties;
++
++    public Matrix26DecommissionController(
++            Matrix26DecommissionService service,
++            Matrix26DecommissionProperties properties
++    ) {
++        this.service = service;
++        this.properties = properties;
++    }
++
++    @GetMapping
++    public String index(Model model) {
++        model.addAttribute("activePage", "matrix26_decommission");
++        model.addAttribute("summary", service.summary());
++        model.addAttribute("candidates", service.candidates());
++        model.addAttribute("jobs", service.recentJobs());
++        model.addAttribute("defaultRetentionDays", properties.getDefaultRetentionDays());
++        return "control_center/lifecycle/decommission/index";
++    }
++
++    @GetMapping("/new")
++    public String create(Model model) {
++        model.addAttribute("activePage", "matrix26_decommission");
++        model.addAttribute("candidates", service.candidates());
++        model.addAttribute("defaultRetentionDays", properties.getDefaultRetentionDays());
++        return "control_center/lifecycle/decommission/new";
++    }
++
++    @GetMapping("/{jobId:\\d+}")
++    public String detail(@PathVariable long jobId, Model model) {
++        Matrix26DecommissionJob job = service.job(jobId);
++        model.addAttribute("activePage", "matrix26_decommission");
++        model.addAttribute("job", job);
++        model.addAttribute("checks", service.checks(jobId));
++        model.addAttribute("events", service.events(jobId));
++        model.addAttribute("scheduleStates", service.scheduleStates(jobId));
++        return "control_center/lifecycle/decommission/detail";
++    }
++
++    @GetMapping("/decommissioned")
++    public String decommissioned(Model model) {
++        model.addAttribute("activePage", "matrix26_decommissioned");
++        model.addAttribute("jobs", service.decommissionedJobs());
++        return "control_center/lifecycle/decommission/decommissioned";
++    }
++
++    @PostMapping("/prepare")
++    public String prepare(
++            @RequestParam("instanceId") long instanceId,
++            @RequestParam("reason") String reason,
++            @RequestParam(value = "administrativeNotes", defaultValue = "") String administrativeNotes,
++            @RequestParam("retentionDays") int retentionDays,
++            @RequestParam("confirmation") String confirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            Matrix26DecommissionJob job = service.prepare(
++                    instanceId,
++                    reason,
++                    administrativeNotes,
++                    retentionDays,
++                    confirmation,
++                    actor(principal)
++            );
++            redirectAttributes.addFlashAttribute(
++                    "decommissionSuccess",
++                    "The final archive is verified and the plan is ready for a separate decommission confirmation."
++            );
++            return "redirect:/control-center/lifecycle/decommission/" + job.id();
++        } catch (Matrix26DecommissionException ex) {
++            redirectAttributes.addFlashAttribute("decommissionError", ex.getMessage());
++            return "redirect:/control-center/lifecycle/decommission/new";
++        }
++    }
++
++    @PostMapping("/{jobId:\\d+}/execute")
++    public String execute(
++            @PathVariable long jobId,
++            @RequestParam("confirmation") String confirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            Matrix26DecommissionJob job = service.execute(jobId, confirmation, actor(principal));
++            redirectAttributes.addFlashAttribute(
++                    "decommissionSuccess",
++                    "The instance is decommissioned. Database, runtime, resources, and final archive remain preserved."
++            );
++            return "redirect:/control-center/lifecycle/decommission/" + job.id();
++        } catch (Matrix26DecommissionException ex) {
++            redirectAttributes.addFlashAttribute("decommissionError", ex.getMessage());
++            return "redirect:/control-center/lifecycle/decommission/" + jobId;
++        }
++    }
++
++    private String actor(Principal principal) {
++        return principal == null || principal.getName() == null || principal.getName().isBlank()
++                ? "matrix26-system"
++                : principal.getName();
++    }
++}
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionEvent.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionEvent.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionEvent.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionEvent.java	2026-06-26 19:32:31.964713444 +0000
+@@ -0,0 +1,14 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++import java.time.LocalDateTime;
++
++public record Matrix26DecommissionEvent(
++        Long id,
++        Long decommissionJobId,
++        String eventType,
++        String status,
++        String actor,
++        String detail,
++        LocalDateTime createdAt
++) {
++}
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionException.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionException.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionException.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionException.java	2026-06-26 19:32:32.006360759 +0000
+@@ -0,0 +1,11 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++public class Matrix26DecommissionException extends RuntimeException {
++    public Matrix26DecommissionException(String message) {
++        super(message);
++    }
++
++    public Matrix26DecommissionException(String message, Throwable cause) {
++        super(message, cause);
++    }
++}
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionInitializer.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionInitializer.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionInitializer.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionInitializer.java	2026-06-26 19:33:18.546686778 +0000
+@@ -0,0 +1,115 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++import org.springframework.boot.ApplicationArguments;
++import org.springframework.boot.ApplicationRunner;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.core.Ordered;
++import org.springframework.core.annotation.Order;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.stereotype.Component;
++
++@Component
++@Order(Ordered.HIGHEST_PRECEDENCE + 70)
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26DecommissionInitializer implements ApplicationRunner {
++
++    private final JdbcTemplate jdbcTemplate;
++
++    public Matrix26DecommissionInitializer(JdbcTemplate jdbcTemplate) {
++        this.jdbcTemplate = jdbcTemplate;
++    }
++
++    @Override
++    public void run(ApplicationArguments args) {
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_decommission_job (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    public_id VARCHAR(80) NOT NULL,
++                    instance_id BIGINT NOT NULL,
++                    instance_code VARCHAR(80) NOT NULL,
++                    instance_name VARCHAR(180) NOT NULL,
++                    status VARCHAR(50) NOT NULL,
++                    reason VARCHAR(1000) NOT NULL,
++                    administrative_notes TEXT NULL,
++                    requested_by VARCHAR(120) NOT NULL,
++                    requested_at DATETIME(6) NOT NULL,
++                    started_at DATETIME(6) NULL,
++                    completed_at DATETIME(6) NULL,
++                    retention_days INT NOT NULL,
++                    retention_until DATETIME(6) NULL,
++                    previous_instance_status VARCHAR(50) NULL,
++                    resulting_instance_status VARCHAR(50) NULL,
++                    final_backup_job_id BIGINT NULL,
++                    final_backup_public_id VARCHAR(80) NULL,
++                    final_backup_completed_at DATETIME(6) NULL,
++                    final_backup_verified_at DATETIME(6) NULL,
++                    final_backup_key_id VARCHAR(100) NULL,
++                    final_backup_sha256 VARCHAR(64) NULL,
++                    disabled_schedule_count INT NOT NULL DEFAULT 0,
++                    last_error TEXT NULL,
++                    PRIMARY KEY (id),
++                    UNIQUE KEY uk_matrix26_decommission_public (public_id),
++                    KEY idx_matrix26_decommission_instance (instance_id, requested_at),
++                    KEY idx_matrix26_decommission_status (status, requested_at),
++                    KEY idx_matrix26_decommission_backup (final_backup_job_id),
++                    CONSTRAINT fk_matrix26_decommission_instance
++                        FOREIGN KEY (instance_id) REFERENCES platform_business_client(id)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_decommission_check (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    decommission_job_id BIGINT NOT NULL,
++                    check_code VARCHAR(100) NOT NULL,
++                    label VARCHAR(180) NOT NULL,
++                    status VARCHAR(30) NOT NULL,
++                    detail TEXT NULL,
++                    checked_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    UNIQUE KEY uk_matrix26_decommission_check (decommission_job_id, check_code),
++                    KEY idx_matrix26_decommission_check_job (decommission_job_id, checked_at),
++                    CONSTRAINT fk_matrix26_decommission_check_job
++                        FOREIGN KEY (decommission_job_id) REFERENCES matrix26_decommission_job(id)
++                        ON DELETE CASCADE
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_decommission_event (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    decommission_job_id BIGINT NOT NULL,
++                    event_type VARCHAR(100) NOT NULL,
++                    status VARCHAR(30) NOT NULL,
++                    actor VARCHAR(120) NOT NULL,
++                    detail TEXT NULL,
++                    created_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    KEY idx_matrix26_decommission_event_job (decommission_job_id, created_at),
++                    CONSTRAINT fk_matrix26_decommission_event_job
++                        FOREIGN KEY (decommission_job_id) REFERENCES matrix26_decommission_job(id)
++                        ON DELETE CASCADE
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_decommission_schedule_state (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    decommission_job_id BIGINT NOT NULL,
++                    schedule_id BIGINT NOT NULL,
++                    schedule_name VARCHAR(160) NOT NULL,
++                    was_enabled BIT NOT NULL DEFAULT 0,
++                    previous_next_run_at DATETIME(6) NULL,
++                    disabled BIT NOT NULL DEFAULT 0,
++                    disabled_at DATETIME(6) NULL,
++                    created_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    UNIQUE KEY uk_matrix26_decommission_schedule (decommission_job_id, schedule_id),
++                    KEY idx_matrix26_decommission_schedule_id (schedule_id),
++                    CONSTRAINT fk_matrix26_decommission_schedule_job
++                        FOREIGN KEY (decommission_job_id) REFERENCES matrix26_decommission_job(id)
++                        ON DELETE CASCADE
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++    }
++}
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionJob.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionJob.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionJob.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionJob.java	2026-06-26 19:32:31.949666526 +0000
+@@ -0,0 +1,34 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++import java.time.LocalDateTime;
++
++public record Matrix26DecommissionJob(
++        Long id,
++        String publicId,
++        Long instanceId,
++        String instanceCode,
++        String instanceName,
++        Matrix26DecommissionStatus status,
++        String reason,
++        String administrativeNotes,
++        String requestedBy,
++        LocalDateTime requestedAt,
++        LocalDateTime startedAt,
++        LocalDateTime completedAt,
++        Integer retentionDays,
++        LocalDateTime retentionUntil,
++        String previousInstanceStatus,
++        String resultingInstanceStatus,
++        Long finalBackupJobId,
++        String finalBackupPublicId,
++        LocalDateTime finalBackupCompletedAt,
++        LocalDateTime finalBackupVerifiedAt,
++        String finalBackupKeyId,
++        String finalBackupSha256,
++        Integer disabledScheduleCount,
++        String lastError
++) {
++    public boolean readyToExecute() {
++        return status == Matrix26DecommissionStatus.READY_TO_DECOMMISSION;
++    }
++}
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionProperties.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionProperties.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionProperties.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionProperties.java	2026-06-26 19:32:31.999603084 +0000
+@@ -0,0 +1,69 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++import org.springframework.boot.context.properties.ConfigurationProperties;
++import org.springframework.stereotype.Component;
++
++import java.util.LinkedHashSet;
++import java.util.Set;
++
++@Component
++@ConfigurationProperties(prefix = "matrix26.control-center.lifecycle.decommission")
++public class Matrix26DecommissionProperties {
++
++    private boolean enabled = true;
++    private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of("matrix26-appearance-lab"));
++    private int minimumReasonLength = 10;
++    private int defaultRetentionDays = 30;
++    private int minimumRetentionDays = 1;
++    private int maximumRetentionDays = 3650;
++
++    public boolean isEnabled() {
++        return enabled;
++    }
++
++    public void setEnabled(boolean enabled) {
++        this.enabled = enabled;
++    }
++
++    public Set<String> getAllowedInstanceCodes() {
++        return allowedInstanceCodes;
++    }
++
++    public void setAllowedInstanceCodes(Set<String> allowedInstanceCodes) {
++        this.allowedInstanceCodes = allowedInstanceCodes == null
++                ? new LinkedHashSet<>()
++                : new LinkedHashSet<>(allowedInstanceCodes);
++    }
++
++    public int getMinimumReasonLength() {
++        return minimumReasonLength;
++    }
++
++    public void setMinimumReasonLength(int minimumReasonLength) {
++        this.minimumReasonLength = minimumReasonLength;
++    }
++
++    public int getDefaultRetentionDays() {
++        return defaultRetentionDays;
++    }
++
++    public void setDefaultRetentionDays(int defaultRetentionDays) {
++        this.defaultRetentionDays = defaultRetentionDays;
++    }
++
++    public int getMinimumRetentionDays() {
++        return minimumRetentionDays;
++    }
++
++    public void setMinimumRetentionDays(int minimumRetentionDays) {
++        this.minimumRetentionDays = minimumRetentionDays;
++    }
++
++    public int getMaximumRetentionDays() {
++        return maximumRetentionDays;
++    }
++
++    public void setMaximumRetentionDays(int maximumRetentionDays) {
++        this.maximumRetentionDays = maximumRetentionDays;
++    }
++}
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionRepository.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionRepository.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionRepository.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionRepository.java	2026-06-26 19:33:18.553782960 +0000
+@@ -0,0 +1,384 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.core.RowMapper;
++import org.springframework.jdbc.support.GeneratedKeyHolder;
++import org.springframework.jdbc.support.KeyHolder;
++import org.springframework.stereotype.Repository;
++
++import java.sql.Statement;
++import java.time.LocalDateTime;
++import java.util.List;
++import java.util.Optional;
++
++@Repository
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26DecommissionRepository {
++
++    private final JdbcTemplate jdbcTemplate;
++
++    public Matrix26DecommissionRepository(JdbcTemplate jdbcTemplate) {
++        this.jdbcTemplate = jdbcTemplate;
++    }
++
++    public long insertJob(
++            String publicId,
++            long instanceId,
++            String instanceCode,
++            String instanceName,
++            String reason,
++            String notes,
++            String actor,
++            int retentionDays,
++            String previousStatus
++    ) {
++        KeyHolder keyHolder = new GeneratedKeyHolder();
++        jdbcTemplate.update(connection -> {
++            var statement = connection.prepareStatement("""
++                    INSERT INTO matrix26_decommission_job (
++                        public_id, instance_id, instance_code, instance_name, status,
++                        reason, administrative_notes, requested_by, requested_at,
++                        retention_days, previous_instance_status, disabled_schedule_count
++                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
++                    """, Statement.RETURN_GENERATED_KEYS);
++            statement.setString(1, publicId);
++            statement.setLong(2, instanceId);
++            statement.setString(3, instanceCode);
++            statement.setString(4, instanceName);
++            statement.setString(5, Matrix26DecommissionStatus.REQUESTED.name());
++            statement.setString(6, limit(reason, 1000));
++            statement.setString(7, limit(notes, 8000));
++            statement.setString(8, limit(actor, 120));
++            statement.setObject(9, LocalDateTime.now());
++            statement.setInt(10, retentionDays);
++            statement.setString(11, previousStatus);
++            return statement;
++        }, keyHolder);
++        Number key = keyHolder.getKey();
++        if (key == null) {
++            throw new Matrix26DecommissionException("Matrix26 could not persist the decommission job.");
++        }
++        return key.longValue();
++    }
++
++    public Optional<Matrix26DecommissionJob> findJob(long id) {
++        return jdbcTemplate.query("SELECT * FROM matrix26_decommission_job WHERE id = ?", jobMapper(), id)
++                .stream().findFirst();
++    }
++
++    public List<Matrix26DecommissionJob> findRecentJobs() {
++        return jdbcTemplate.query(
++                "SELECT * FROM matrix26_decommission_job ORDER BY requested_at DESC, id DESC LIMIT 100",
++                jobMapper()
++        );
++    }
++
++    public List<Matrix26DecommissionJob> findDecommissionedJobs() {
++        return jdbcTemplate.query("""
++                SELECT * FROM matrix26_decommission_job
++                WHERE status = 'DECOMMISSIONED'
++                ORDER BY completed_at DESC, id DESC
++                """, jobMapper());
++    }
++
++    public boolean hasActiveJob(long instanceId) {
++        return positive("""
++                SELECT COUNT(*) FROM matrix26_decommission_job
++                WHERE instance_id = ?
++                  AND status IN ('REQUESTED','PRECHECKING','FINAL_BACKUP_RUNNING',
++                                 'FINAL_BACKUP_VERIFYING','READY_TO_DECOMMISSION','DECOMMISSIONING')
++                """, instanceId);
++    }
++
++    public boolean hasOtherActiveJob(long instanceId, long excludedJobId) {
++        return positive("""
++                SELECT COUNT(*) FROM matrix26_decommission_job
++                WHERE instance_id = ? AND id <> ?
++                  AND status IN ('REQUESTED','PRECHECKING','FINAL_BACKUP_RUNNING',
++                                 'FINAL_BACKUP_VERIFYING','READY_TO_DECOMMISSION','DECOMMISSIONING')
++                """, instanceId, excludedJobId);
++    }
++
++    public void markStarted(long jobId, Matrix26DecommissionStatus status) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_decommission_job
++                SET status = ?, started_at = COALESCE(started_at, ?), last_error = NULL
++                WHERE id = ?
++                """, status.name(), LocalDateTime.now(), jobId);
++    }
++
++    public void updateStatus(long jobId, Matrix26DecommissionStatus status) {
++        jdbcTemplate.update(
++                "UPDATE matrix26_decommission_job SET status = ?, last_error = NULL WHERE id = ?",
++                status.name(), jobId
++        );
++    }
++
++    public void attachFinalBackup(long jobId, Matrix26DecommissionBackupView backup) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_decommission_job
++                SET final_backup_job_id = ?, final_backup_public_id = ?,
++                    final_backup_completed_at = ?, final_backup_verified_at = ?,
++                    final_backup_key_id = ?, final_backup_sha256 = ?
++                WHERE id = ?
++                """,
++                backup.jobId(), backup.publicId(), backup.completedAt(), backup.verifiedAt(),
++                backup.keyId(), backup.packageSha256(), jobId
++        );
++    }
++
++    public void setRetentionUntil(long jobId, LocalDateTime retentionUntil) {
++        jdbcTemplate.update(
++                "UPDATE matrix26_decommission_job SET retention_until = ? WHERE id = ?",
++                retentionUntil, jobId
++        );
++    }
++
++    public void setDisabledScheduleCount(long jobId, int count) {
++        jdbcTemplate.update(
++                "UPDATE matrix26_decommission_job SET disabled_schedule_count = ? WHERE id = ?",
++                count, jobId
++        );
++    }
++
++    public void complete(long jobId, String resultingStatus, LocalDateTime retentionUntil) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_decommission_job
++                SET status = ?, resulting_instance_status = ?, retention_until = ?,
++                    completed_at = ?, last_error = NULL
++                WHERE id = ?
++                """, Matrix26DecommissionStatus.DECOMMISSIONED.name(), resultingStatus,
++                retentionUntil, LocalDateTime.now(), jobId);
++    }
++
++    public void fail(long jobId, Matrix26DecommissionStatus status, String error) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_decommission_job
++                SET status = ?, completed_at = ?, last_error = ?
++                WHERE id = ?
++                """, status.name(), LocalDateTime.now(), limit(error, 8000), jobId);
++    }
++
++    public void upsertCheck(long jobId, String code, String label, String status, String detail) {
++        jdbcTemplate.update("""
++                INSERT INTO matrix26_decommission_check (
++                    decommission_job_id, check_code, label, status, detail, checked_at
++                ) VALUES (?, ?, ?, ?, ?, ?)
++                ON DUPLICATE KEY UPDATE
++                    label = VALUES(label), status = VALUES(status), detail = VALUES(detail),
++                    checked_at = VALUES(checked_at)
++                """, jobId, code, label, status, limit(detail, 8000), LocalDateTime.now());
++    }
++
++    public List<Matrix26DecommissionCheck> findChecks(long jobId) {
++        return jdbcTemplate.query("""
++                SELECT * FROM matrix26_decommission_check
++                WHERE decommission_job_id = ? ORDER BY id
++                """, (rs, rowNum) -> new Matrix26DecommissionCheck(
++                rs.getLong("id"),
++                rs.getLong("decommission_job_id"),
++                rs.getString("check_code"),
++                rs.getString("label"),
++                rs.getString("status"),
++                rs.getString("detail"),
++                rs.getObject("checked_at", LocalDateTime.class)
++        ), jobId);
++    }
++
++    public void addEvent(long jobId, String eventType, String status, String actor, String detail) {
++        jdbcTemplate.update("""
++                INSERT INTO matrix26_decommission_event (
++                    decommission_job_id, event_type, status, actor, detail, created_at
++                ) VALUES (?, ?, ?, ?, ?, ?)
++                """, jobId, eventType, status, limit(actor, 120), limit(detail, 8000), LocalDateTime.now());
++    }
++
++    public List<Matrix26DecommissionEvent> findEvents(long jobId) {
++        return jdbcTemplate.query("""
++                SELECT * FROM matrix26_decommission_event
++                WHERE decommission_job_id = ? ORDER BY created_at, id
++                """, (rs, rowNum) -> new Matrix26DecommissionEvent(
++                rs.getLong("id"),
++                rs.getLong("decommission_job_id"),
++                rs.getString("event_type"),
++                rs.getString("status"),
++                rs.getString("actor"),
++                rs.getString("detail"),
++                rs.getObject("created_at", LocalDateTime.class)
++        ), jobId);
++    }
++
++    public void snapshotSchedules(long jobId, long instanceId) {
++        jdbcTemplate.update("""
++                INSERT IGNORE INTO matrix26_decommission_schedule_state (
++                    decommission_job_id, schedule_id, schedule_name, was_enabled,
++                    previous_next_run_at, disabled, created_at
++                )
++                SELECT ?, id, name, enabled, next_run_at, 0, ?
++                FROM matrix26_backup_schedule
++                WHERE instance_id = ?
++                """, jobId, LocalDateTime.now(), instanceId);
++    }
++
++    public int disableSchedules(long jobId, long instanceId, String actor) {
++        int updated = jdbcTemplate.update("""
++                UPDATE matrix26_backup_schedule
++                SET enabled = 0, next_run_at = NULL, updated_by = ?, updated_at = ?
++                WHERE instance_id = ? AND enabled = 1
++                """, actor, LocalDateTime.now(), instanceId);
++        jdbcTemplate.update("""
++                UPDATE matrix26_decommission_schedule_state
++                SET disabled = 1, disabled_at = ?
++                WHERE decommission_job_id = ? AND was_enabled = 1
++                """, LocalDateTime.now(), jobId);
++        return updated;
++    }
++
++    public List<Matrix26DecommissionScheduleState> findScheduleStates(long jobId) {
++        return jdbcTemplate.query("""
++                SELECT * FROM matrix26_decommission_schedule_state
++                WHERE decommission_job_id = ? ORDER BY schedule_name, schedule_id
++                """, (rs, rowNum) -> new Matrix26DecommissionScheduleState(
++                rs.getLong("id"),
++                rs.getLong("decommission_job_id"),
++                rs.getLong("schedule_id"),
++                rs.getString("schedule_name"),
++                rs.getBoolean("was_enabled"),
++                rs.getObject("previous_next_run_at", LocalDateTime.class),
++                rs.getBoolean("disabled"),
++                rs.getObject("disabled_at", LocalDateTime.class)
++        ), jobId);
++    }
++
++    public int countEnabledSchedules(long instanceId) {
++        Integer count = jdbcTemplate.queryForObject(
++                "SELECT COUNT(*) FROM matrix26_backup_schedule WHERE instance_id = ? AND enabled = 1",
++                Integer.class,
++                instanceId
++        );
++        return count == null ? 0 : count;
++    }
++
++    public Matrix26DecommissionBackupView finalBackup(long backupJobId) {
++        return jdbcTemplate.query("""
++                SELECT j.id, j.public_id, j.completed_at, e.verified_at, e.key_id,
++                       e.package_sha256, e.retention_class, e.protected_flag,
++                       e.verification_status
++                FROM matrix26_backup_job j
++                JOIN matrix26_backup_encryption e ON e.job_id = j.id
++                WHERE j.id = ? AND j.status = 'COMPLETED' AND e.encrypted = 1
++                """, (rs, rowNum) -> new Matrix26DecommissionBackupView(
++                rs.getLong("id"),
++                rs.getString("public_id"),
++                rs.getObject("completed_at", LocalDateTime.class),
++                rs.getObject("verified_at", LocalDateTime.class),
++                rs.getString("key_id"),
++                rs.getString("package_sha256"),
++                rs.getString("retention_class"),
++                rs.getBoolean("protected_flag"),
++                rs.getString("verification_status")
++        ), backupJobId).stream().findFirst().orElse(new Matrix26DecommissionBackupView(
++                null, null, null, null, null, null, null, false, null
++        ));
++    }
++
++    public boolean hasActiveBackup(long instanceId) {
++        return positive("""
++                SELECT COUNT(*) FROM matrix26_backup_job
++                WHERE instance_id = ? AND status IN ('PENDING','VALIDATING','RUNNING','COMPRESSING','VERIFYING')
++                """, instanceId);
++    }
++
++    public boolean hasActiveScheduleExecution(long instanceId) {
++        return positive("""
++                SELECT COUNT(*) FROM matrix26_backup_schedule_execution
++                WHERE instance_id = ? AND status IN ('SCHEDULED','QUEUED','RUNNING','RETRY_WAITING')
++                """, instanceId);
++    }
++
++    public boolean hasActiveRuntimeOperation(long instanceId) {
++        return positive("""
++                SELECT COUNT(*) FROM matrix26_runtime_operation
++                WHERE instance_id = ? AND status IN ('REQUESTED','RUNNING','STOP_TIMEOUT')
++                """, instanceId);
++    }
++
++    public boolean hasActiveCloneRestore(long instanceId, String instanceCode) {
++        return positive("""
++                SELECT COUNT(*) FROM matrix26_restore_job
++                WHERE (source_instance_id = ? OR target_instance_code = ?)
++                  AND status NOT IN ('COMPLETED','FAILED','CLEANUP_REQUIRED','PARTIALLY_CLEANED','CLEANED','CANCELLED')
++                """, instanceId, instanceCode);
++    }
++
++    public boolean hasActiveInPlaceRestore(long instanceId) {
++        return positive("""
++                SELECT COUNT(*) FROM matrix26_inplace_restore_job
++                WHERE source_instance_id = ?
++                  AND status NOT IN ('COMPLETED','ROLLED_BACK','FAILED','CANCELLED')
++                """, instanceId);
++    }
++
++    public boolean hasActiveLifecycle(long instanceId) {
++        return positive("""
++                SELECT COUNT(*) FROM matrix26_lifecycle_job
++                WHERE instance_id = ?
++                  AND status IN ('REQUESTED','VALIDATING','SUSPENDING','REACTIVATING')
++                """, instanceId);
++    }
++
++    public Matrix26DecommissionSummary summary() {
++        return jdbcTemplate.queryForObject("""
++                SELECT
++                    (SELECT COUNT(*) FROM matrix26_decommission_job) total,
++                    (SELECT COUNT(*) FROM matrix26_decommission_job WHERE status = 'READY_TO_DECOMMISSION') ready,
++                    (SELECT COUNT(*) FROM platform_business_client WHERE status = 'DECOMMISSIONED') decommissioned,
++                    (SELECT COUNT(*) FROM matrix26_decommission_job
++                        WHERE status IN ('FAILED','MANUAL_REVIEW_REQUIRED')) failed
++                """, (rs, rowNum) -> new Matrix26DecommissionSummary(
++                rs.getLong("total"), rs.getLong("ready"), rs.getLong("decommissioned"), rs.getLong("failed")
++        ));
++    }
++
++    private boolean positive(String sql, Object... args) {
++        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, args);
++        return count != null && count > 0;
++    }
++
++    private RowMapper<Matrix26DecommissionJob> jobMapper() {
++        return (rs, rowNum) -> new Matrix26DecommissionJob(
++                rs.getLong("id"),
++                rs.getString("public_id"),
++                rs.getLong("instance_id"),
++                rs.getString("instance_code"),
++                rs.getString("instance_name"),
++                Matrix26DecommissionStatus.valueOf(rs.getString("status")),
++                rs.getString("reason"),
++                rs.getString("administrative_notes"),
++                rs.getString("requested_by"),
++                rs.getObject("requested_at", LocalDateTime.class),
++                rs.getObject("started_at", LocalDateTime.class),
++                rs.getObject("completed_at", LocalDateTime.class),
++                rs.getObject("retention_days", Integer.class),
++                rs.getObject("retention_until", LocalDateTime.class),
++                rs.getString("previous_instance_status"),
++                rs.getString("resulting_instance_status"),
++                rs.getObject("final_backup_job_id", Long.class),
++                rs.getString("final_backup_public_id"),
++                rs.getObject("final_backup_completed_at", LocalDateTime.class),
++                rs.getObject("final_backup_verified_at", LocalDateTime.class),
++                rs.getString("final_backup_key_id"),
++                rs.getString("final_backup_sha256"),
++                rs.getObject("disabled_schedule_count", Integer.class),
++                rs.getString("last_error")
++        );
++    }
++
++    private String limit(String value, int maximum) {
++        if (value == null || value.length() <= maximum) {
++            return value;
++        }
++        return value.substring(0, maximum);
++    }
++}
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionScheduleState.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionScheduleState.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionScheduleState.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionScheduleState.java	2026-06-26 19:32:31.971756029 +0000
+@@ -0,0 +1,15 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++import java.time.LocalDateTime;
++
++public record Matrix26DecommissionScheduleState(
++        Long id,
++        Long decommissionJobId,
++        Long scheduleId,
++        String scheduleName,
++        boolean wasEnabled,
++        LocalDateTime previousNextRunAt,
++        boolean disabled,
++        LocalDateTime disabledAt
++) {
++}
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionService.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionService.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionService.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionService.java	2026-06-26 19:34:28.946791713 +0000
+@@ -0,0 +1,542 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClient;
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClientRepository;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceAuditLog;
++import com.ecoamazonas.eco_agua.platform.control.Matrix26InstanceAuditLogRepository;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupEncryption;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupJob;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupRetentionClass;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupSecurityService;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupService;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupVerificationState;
++import com.ecoamazonas.eco_agua.platform.control.operations.Matrix26OperationsInventoryService;
++import com.ecoamazonas.eco_agua.platform.control.operations.Matrix26RuntimeInventoryItem;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Service;
++
++import java.time.LocalDateTime;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++import java.util.Map;
++import java.util.UUID;
++import java.util.concurrent.ConcurrentHashMap;
++import java.util.concurrent.locks.ReentrantLock;
++
++@Service
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26DecommissionService {
++
++    private final PlatformBusinessClientRepository clientRepository;
++    private final Matrix26DecommissionRepository repository;
++    private final Matrix26DecommissionProperties properties;
++    private final Matrix26BackupService backupService;
++    private final Matrix26BackupSecurityService backupSecurityService;
++    private final Matrix26OperationsInventoryService inventoryService;
++    private final Matrix26InstanceAuditLogRepository auditRepository;
++    private final Map<Long, ReentrantLock> locks = new ConcurrentHashMap<>();
++
++    public Matrix26DecommissionService(
++            PlatformBusinessClientRepository clientRepository,
++            Matrix26DecommissionRepository repository,
++            Matrix26DecommissionProperties properties,
++            Matrix26BackupService backupService,
++            Matrix26BackupSecurityService backupSecurityService,
++            Matrix26OperationsInventoryService inventoryService,
++            Matrix26InstanceAuditLogRepository auditRepository
++    ) {
++        this.clientRepository = clientRepository;
++        this.repository = repository;
++        this.properties = properties;
++        this.backupService = backupService;
++        this.backupSecurityService = backupSecurityService;
++        this.inventoryService = inventoryService;
++        this.auditRepository = auditRepository;
++    }
++
++    public List<Matrix26DecommissionCandidate> candidates() {
++        List<Matrix26DecommissionCandidate> result = new ArrayList<>();
++        for (PlatformBusinessClient instance : clientRepository.findAllByOrderByBusinessNameAsc()) {
++            result.add(candidate(instance));
++        }
++        return result;
++    }
++
++    public List<Matrix26DecommissionJob> recentJobs() {
++        return repository.findRecentJobs();
++    }
++
++    public List<Matrix26DecommissionJob> decommissionedJobs() {
++        return repository.findDecommissionedJobs();
++    }
++
++    public Matrix26DecommissionSummary summary() {
++        return repository.summary();
++    }
++
++    public Matrix26DecommissionJob job(long id) {
++        return repository.findJob(id)
++                .orElseThrow(() -> new Matrix26DecommissionException("The requested decommission job does not exist."));
++    }
++
++    public List<Matrix26DecommissionCheck> checks(long jobId) {
++        return repository.findChecks(jobId);
++    }
++
++    public List<Matrix26DecommissionEvent> events(long jobId) {
++        return repository.findEvents(jobId);
++    }
++
++    public List<Matrix26DecommissionScheduleState> scheduleStates(long jobId) {
++        return repository.findScheduleStates(jobId);
++    }
++
++    public Matrix26DecommissionJob prepare(
++            long instanceId,
++            String reason,
++            String notes,
++            int retentionDays,
++            String confirmation,
++            String actor
++    ) {
++        ReentrantLock lock = locks.computeIfAbsent(instanceId, ignored -> new ReentrantLock());
++        if (!lock.tryLock()) {
++            throw new Matrix26DecommissionException("Another decommission operation is already running for this instance.");
++        }
++        try {
++            PlatformBusinessClient instance = instance(instanceId);
++            validateFeatureEnabled();
++            validateAllowed(instance);
++            validateConfirmation(confirmation, "PREPARE DECOMMISSION " + instance.getCode());
++            String safeReason = validateReason(reason);
++            String safeNotes = safeNotes(notes);
++            String safeActor = safeActor(actor);
++            int safeRetentionDays = validateRetentionDays(retentionDays);
++            validateSuspended(instance);
++            validateNoActiveDecommission(instance);
++            validateOperationalBlockers(instance);
++            Matrix26RuntimeInventoryItem runtime = requireStoppedRuntime(instance);
++
++            long jobId = repository.insertJob(
++                    publicId(), instance.getId(), instance.getCode(), instance.getBusinessName(),
++                    safeReason, safeNotes, safeActor, safeRetentionDays, normalizedStatus(instance)
++            );
++            repository.markStarted(jobId, Matrix26DecommissionStatus.PRECHECKING);
++            pass(jobId, "ALLOWLIST", "Laboratory allowlist",
++                    "Instance is explicitly enabled for controlled decommission.");
++            pass(jobId, "INSTANCE_STATUS", "Suspended lifecycle state",
++                    "Instance status is SUSPENDED.");
++            pass(jobId, "RUNTIME_STOPPED", "Runtime and port stopped",
++                    "Port " + instance.getRuntimePort() + " is free and no owned runtime process is active.");
++            pass(jobId, "OPERATION_CONFLICTS", "Operational conflict gates",
++                    "No active backup, restore, runtime, lifecycle, or decommission operation was found.");
++            repository.addEvent(jobId, "PRECHECK_COMPLETED", "COMPLETED", safeActor,
++                    "The suspended laboratory passed all non-destructive decommission prechecks.");
++
++            try {
++                repository.updateStatus(jobId, Matrix26DecommissionStatus.FINAL_BACKUP_RUNNING);
++                repository.addEvent(jobId, "FINAL_BACKUP_STARTED", "RUNNING", safeActor,
++                        "Creating a new encrypted full backup specifically for final archive retention.");
++                Matrix26BackupJob plainBackup = backupService.createManualFullBackup(instanceId, safeActor, true);
++                repository.addEvent(jobId, "FULL_BACKUP_COMPLETED", "COMPLETED", safeActor,
++                        "Full backup " + plainBackup.publicId() + " completed before encryption.");
++
++                repository.updateStatus(jobId, Matrix26DecommissionStatus.FINAL_BACKUP_VERIFYING);
++                backupSecurityService.encryptBackup(plainBackup.id(), Matrix26BackupRetentionClass.FINAL, safeActor);
++                Matrix26BackupEncryption encryption = backupSecurityService.verifyEncryptedBackup(plainBackup.id(), safeActor);
++                if (encryption == null
++                        || encryption.verificationStatus() != Matrix26BackupVerificationState.VERIFIED
++                        || encryption.retentionClass() != Matrix26BackupRetentionClass.FINAL
++                        || !encryption.protectedFlag()) {
++                    throw new Matrix26DecommissionException(
++                            "The final archive did not finish as encrypted, verified, protected, and FINAL."
++                    );
++                }
++
++                Matrix26DecommissionBackupView finalBackup = repository.finalBackup(plainBackup.id());
++                if (!finalBackup.finalArchiveVerified()) {
++                    throw new Matrix26DecommissionException("The final archive metadata could not be verified.");
++                }
++                repository.attachFinalBackup(jobId, finalBackup);
++                pass(jobId, "FINAL_BACKUP", "Protected final archive",
++                        "Backup " + finalBackup.publicId() + " is encrypted, VERIFIED, FINAL, and deletion-protected.");
++                repository.addEvent(jobId, "FINAL_BACKUP_VERIFIED", "COMPLETED", safeActor,
++                        "Final archive " + finalBackup.publicId() + " passed independent encrypted verification.");
++
++                repository.snapshotSchedules(jobId, instanceId);
++                int disabled = repository.disableSchedules(jobId, instanceId, safeActor);
++                repository.setDisabledScheduleCount(jobId, disabled);
++                pass(jobId, "SCHEDULES_DISABLED", "Scheduled backups disabled",
++                        disabled + " enabled schedule(s) were disabled. Existing backups remain preserved.");
++                repository.addEvent(jobId, "SCHEDULES_DISABLED", "COMPLETED", safeActor,
++                        disabled + " schedule(s) were disabled for the decommissioned lifecycle.");
++
++                LocalDateTime retentionUntil = LocalDateTime.now().plusDays(safeRetentionDays);
++                repository.setRetentionUntil(jobId, retentionUntil);
++                repository.updateStatus(jobId, Matrix26DecommissionStatus.READY_TO_DECOMMISSION);
++                repository.addEvent(jobId, "READY_TO_DECOMMISSION", "COMPLETED", safeActor,
++                        "The final archive is protected. A separate confirmation is required to decommission the instance.");
++                audit(instance, "DECOMMISSION_PREPARED", safeActor,
++                        "Final archive prepared for decommission: " + finalBackup.publicId(),
++                        normalizedStatus(instance), normalizedStatus(instance));
++                return job(jobId);
++            } catch (RuntimeException ex) {
++                repository.fail(jobId, Matrix26DecommissionStatus.FAILED, safeMessage(ex));
++                repository.addEvent(jobId, "PREPARATION_FAILED", "FAILED", safeActor, safeMessage(ex));
++                fail(jobId, "FINAL_BACKUP", "Protected final archive", safeMessage(ex));
++                audit(instance, "DECOMMISSION_PREPARATION_FAILED", safeActor,
++                        "Decommission preparation failed: " + safeMessage(ex),
++                        normalizedStatus(instance), normalizedStatus(instance));
++                throw exception("The decommission plan could not be prepared.", ex);
++            }
++        } finally {
++            lock.unlock();
++        }
++    }
++
++    public Matrix26DecommissionJob execute(long jobId, String confirmation, String actor) {
++        Matrix26DecommissionJob initial = job(jobId);
++        ReentrantLock lock = locks.computeIfAbsent(initial.instanceId(), ignored -> new ReentrantLock());
++        if (!lock.tryLock()) {
++            throw new Matrix26DecommissionException("Another decommission operation is already running for this instance.");
++        }
++        try {
++            Matrix26DecommissionJob plan = job(jobId);
++            PlatformBusinessClient instance = instance(plan.instanceId());
++            String safeActor = safeActor(actor);
++            validateFeatureEnabled();
++            validateAllowed(instance);
++            validateConfirmation(confirmation, "DECOMMISSION " + instance.getCode());
++            if (!plan.readyToExecute()) {
++                throw new Matrix26DecommissionException("Only a READY_TO_DECOMMISSION plan can be executed.");
++            }
++            validateSuspended(instance);
++            if (repository.hasOtherActiveJob(instance.getId(), jobId)) {
++                throw new Matrix26DecommissionException("Another decommission plan is active for this instance.");
++            }
++            validateOperationalBlockers(instance);
++            requireStoppedRuntime(instance);
++            if (plan.finalBackupJobId() == null) {
++                throw new Matrix26DecommissionException("The plan does not contain a final archive backup.");
++            }
++
++            repository.updateStatus(jobId, Matrix26DecommissionStatus.DECOMMISSIONING);
++            instance.setStatus("DECOMMISSIONING");
++            clientRepository.save(instance);
++            repository.addEvent(jobId, "DECOMMISSION_STARTED", "RUNNING", safeActor,
++                    "Executing the non-destructive operational decommission transition.");
++
++            try {
++                Matrix26BackupEncryption verified = backupSecurityService.verifyEncryptedBackup(
++                        plan.finalBackupJobId(), safeActor
++                );
++                Matrix26DecommissionBackupView finalBackup = repository.finalBackup(plan.finalBackupJobId());
++                if (verified == null || verified.verificationStatus() != Matrix26BackupVerificationState.VERIFIED
++                        || !finalBackup.finalArchiveVerified()) {
++                    throw new Matrix26DecommissionException("The final archive no longer passes verification.");
++                }
++                pass(jobId, "FINAL_BACKUP_REVERIFIED", "Final archive reverified",
++                        "Backup " + finalBackup.publicId() + " remains encrypted, protected, and VERIFIED.");
++
++                repository.snapshotSchedules(jobId, instance.getId());
++                int additionallyDisabled = repository.disableSchedules(jobId, instance.getId(), safeActor);
++                int totalDisabled = value(plan.disabledScheduleCount()) + additionallyDisabled;
++                repository.setDisabledScheduleCount(jobId, totalDisabled);
++                if (repository.countEnabledSchedules(instance.getId()) != 0) {
++                    throw new Matrix26DecommissionException("One or more backup schedules remain enabled.");
++                }
++                pass(jobId, "SCHEDULES_FINAL", "Schedules permanently disabled",
++                        "No automatic backup schedule remains enabled for this decommissioned instance.");
++
++                Matrix26RuntimeInventoryItem stopped = requireStoppedRuntime(instance);
++                if (stopped.portListening() || stopped.processId() != null) {
++                    throw new Matrix26DecommissionException("The runtime is not fully stopped.");
++                }
++
++                LocalDateTime retentionUntil = plan.retentionUntil() != null
++                        ? plan.retentionUntil()
++                        : LocalDateTime.now().plusDays(Math.max(1, plan.retentionDays()));
++                instance.setStatus("DECOMMISSIONED");
++                instance.setRuntimeStatus("STOPPED");
++                instance.setLastHealthStatus("DECOMMISSIONED");
++                instance.setLastHealthMessage(
++                        "Instance decommissioned. Database, runtime, resources, and final archive remain preserved."
++                );
++                instance.setLastHealthCheckedAt(LocalDateTime.now());
++                clientRepository.save(instance);
++
++                repository.complete(jobId, "DECOMMISSIONED", retentionUntil);
++                repository.addEvent(jobId, "DECOMMISSION_COMPLETED", "COMPLETED", safeActor,
++                        "The instance is no longer operational. No database, runtime, resource, module, or backup was deleted.");
++                audit(instance, "INSTANCE_DECOMMISSIONED", safeActor,
++                        "Instance decommissioned with protected final archive " + plan.finalBackupPublicId() + ".",
++                        "SUSPENDED", "DECOMMISSIONED");
++                return job(jobId);
++            } catch (RuntimeException ex) {
++                instance.setStatus("SUSPENDED");
++                instance.setRuntimeStatus("STOPPED");
++                clientRepository.save(instance);
++                repository.fail(jobId, Matrix26DecommissionStatus.MANUAL_REVIEW_REQUIRED, safeMessage(ex));
++                repository.addEvent(jobId, "DECOMMISSION_FAILED", "FAILED", safeActor, safeMessage(ex));
++                audit(instance, "INSTANCE_DECOMMISSION_FAILED", safeActor,
++                        "Decommission execution requires review: " + safeMessage(ex),
++                        "DECOMMISSIONING", "SUSPENDED");
++                throw exception("The instance could not be decommissioned.", ex);
++            }
++        } finally {
++            lock.unlock();
++        }
++    }
++
++    private Matrix26DecommissionCandidate candidate(PlatformBusinessClient instance) {
++        boolean allowlisted = isAllowlisted(instance) && !instance.isProtectedInstance();
++        boolean runtimeStopped = false;
++        String blocker = "";
++        try {
++            Matrix26RuntimeInventoryItem runtime = runtime(instance);
++            runtimeStopped = !runtime.portListening() && runtime.processId() == null;
++            if (runtime.portListening() && !runtime.expectedProcess()) {
++                blocker = "The registered port is occupied by an unexpected process.";
++            } else if (!runtime.configurationPresent() || !runtime.configurationConsistent()) {
++                blocker = "Runtime configuration is missing or inconsistent.";
++            }
++        } catch (RuntimeException ex) {
++            blocker = safeMessage(ex);
++        }
++        if (!properties.isEnabled()) {
++            blocker = "Decommission Manager is disabled.";
++        } else if (!allowlisted) {
++            blocker = instance.isProtectedInstance()
++                    ? "Protected instances are read only."
++                    : "The instance is outside the decommission laboratory allowlist.";
++        } else if (!"SUSPENDED".equals(normalizedStatus(instance))) {
++            blocker = "The instance must be SUSPENDED before decommission preparation.";
++        } else if (!runtimeStopped && blocker.isBlank()) {
++            blocker = "The runtime must be completely stopped and its port must be free.";
++        } else if (repository.hasActiveJob(instance.getId())) {
++            blocker = "Another decommission plan is active.";
++        } else if (blocker.isBlank()) {
++            blocker = operationalBlocker(instance);
++        }
++        int enabledSchedules;
++        try {
++            enabledSchedules = repository.countEnabledSchedules(instance.getId());
++        } catch (RuntimeException ex) {
++            enabledSchedules = 0;
++            if (blocker.isBlank()) {
++                blocker = "Schedule metadata could not be read.";
++            }
++        }
++        return new Matrix26DecommissionCandidate(
++                instance,
++                allowlisted,
++                blocker.isBlank(),
++                blocker,
++                runtimeStopped,
++                enabledSchedules,
++                "PREPARE DECOMMISSION " + instance.getCode()
++        );
++    }
++
++    private void validateOperationalBlockers(PlatformBusinessClient instance) {
++        String blocker = operationalBlocker(instance);
++        if (!blocker.isBlank()) {
++            throw new Matrix26DecommissionException(blocker);
++        }
++    }
++
++    private String operationalBlocker(PlatformBusinessClient instance) {
++        if (repository.hasActiveBackup(instance.getId())) {
++            return "A backup job is currently active.";
++        }
++        if (repository.hasActiveScheduleExecution(instance.getId())) {
++            return "A scheduled backup execution is currently active.";
++        }
++        if (repository.hasActiveRuntimeOperation(instance.getId())) {
++            return "A runtime operation is currently active.";
++        }
++        if (repository.hasActiveCloneRestore(instance.getId(), instance.getCode())) {
++            return "A clone restore operation is currently active.";
++        }
++        if (repository.hasActiveInPlaceRestore(instance.getId())) {
++            return "An in-place restore is awaiting completion, confirmation, or rollback.";
++        }
++        if (repository.hasActiveLifecycle(instance.getId())) {
++            return "A suspension or reactivation lifecycle job is currently active.";
++        }
++        return "";
++    }
++
++    private Matrix26RuntimeInventoryItem requireStoppedRuntime(PlatformBusinessClient instance) {
++        Matrix26RuntimeInventoryItem runtime = runtime(instance);
++        if (!runtime.configurationPresent() || !runtime.configurationConsistent()) {
++            throw new Matrix26DecommissionException("Runtime configuration does not match the registered instance.");
++        }
++        if (runtime.portListening() || runtime.processId() != null) {
++            if (runtime.portListening() && !runtime.expectedProcess()) {
++                throw new Matrix26DecommissionException(
++                        "Port " + instance.getRuntimePort() + " is occupied by an unexpected process."
++                );
++            }
++            throw new Matrix26DecommissionException("The runtime must be stopped before decommission.");
++        }
++        return runtime;
++    }
++
++    private Matrix26RuntimeInventoryItem runtime(PlatformBusinessClient instance) {
++        try {
++            inventoryService.invalidateCache();
++            return inventoryService.runtime(String.valueOf(instance.getId()), true);
++        } catch (RuntimeException ex) {
++            throw new Matrix26DecommissionException("The registered runtime could not be inspected.", ex);
++        }
++    }
++
++    private PlatformBusinessClient instance(long instanceId) {
++        return clientRepository.findById(instanceId)
++                .orElseThrow(() -> new Matrix26DecommissionException("The selected instance does not exist."));
++    }
++
++    private void validateSuspended(PlatformBusinessClient instance) {
++        if (!"SUSPENDED".equals(normalizedStatus(instance))) {
++            throw new Matrix26DecommissionException("Only a SUSPENDED laboratory can be decommissioned.");
++        }
++    }
++
++    private void validateNoActiveDecommission(PlatformBusinessClient instance) {
++        if (repository.hasActiveJob(instance.getId())) {
++            throw new Matrix26DecommissionException("Another decommission plan is already active for this instance.");
++        }
++    }
++
++    private void validateFeatureEnabled() {
++        if (!properties.isEnabled()) {
++            throw new Matrix26DecommissionException("Decommission Manager is disabled by configuration.");
++        }
++        if (!backupSecurityService.keyStatus().available()) {
++            throw new Matrix26DecommissionException(
++                    "The backup master key must be available before preparing a final archive."
++            );
++        }
++    }
++
++    private void validateAllowed(PlatformBusinessClient instance) {
++        if (instance.isProtectedInstance()) {
++            throw new Matrix26DecommissionException("Protected instances are read only in Lifecycle Manager 3G.2.");
++        }
++        if (!isAllowlisted(instance)) {
++            throw new Matrix26DecommissionException("The instance is outside the decommission laboratory allowlist.");
++        }
++    }
++
++    private boolean isAllowlisted(PlatformBusinessClient instance) {
++        String code = instance.getCode() == null ? "" : instance.getCode().toLowerCase(Locale.ROOT);
++        return properties.getAllowedInstanceCodes().stream()
++                .filter(value -> value != null)
++                .map(value -> value.toLowerCase(Locale.ROOT))
++                .anyMatch(code::equals);
++    }
++
++    private int validateRetentionDays(int retentionDays) {
++        int minimum = Math.max(1, properties.getMinimumRetentionDays());
++        int maximum = Math.max(minimum, properties.getMaximumRetentionDays());
++        if (retentionDays < minimum || retentionDays > maximum) {
++            throw new Matrix26DecommissionException(
++                    "Retention days must be between " + minimum + " and " + maximum + "."
++            );
++        }
++        return retentionDays;
++    }
++
++    private String validateReason(String reason) {
++        String safe = reason == null ? "" : reason.trim();
++        int minimum = Math.max(5, properties.getMinimumReasonLength());
++        if (safe.length() < minimum) {
++            throw new Matrix26DecommissionException("Provide a reason of at least " + minimum + " characters.");
++        }
++        return limit(safe, 1000);
++    }
++
++    private String safeNotes(String notes) {
++        return limit(notes == null ? "" : notes.trim(), 8000);
++    }
++
++    private void validateConfirmation(String actual, String expected) {
++        if (!expected.equals(actual == null ? "" : actual.trim())) {
++            throw new Matrix26DecommissionException("The confirmation text does not match: " + expected);
++        }
++    }
++
++    private String normalizedStatus(PlatformBusinessClient instance) {
++        String value = instance.getStatus();
++        return value == null || value.isBlank() ? "ACTIVE" : value.trim().toUpperCase(Locale.ROOT);
++    }
++
++    private String safeActor(String actor) {
++        String value = actor == null || actor.isBlank() ? "matrix26-system" : actor.trim();
++        return limit(value, 120);
++    }
++
++    private String publicId() {
++        return "DCM-" + LocalDateTime.now().toString().replaceAll("[-:.T]", "").substring(0, 14)
++                + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
++    }
++
++    private void pass(long jobId, String code, String label, String detail) {
++        repository.upsertCheck(jobId, code, label, "PASSED", detail);
++    }
++
++    private void fail(long jobId, String code, String label, String detail) {
++        repository.upsertCheck(jobId, code, label, "FAILED", detail);
++    }
++
++    private int value(Integer number) {
++        return number == null ? 0 : number;
++    }
++
++    private String safeMessage(Throwable error) {
++        Throwable current = error;
++        while (current.getCause() != null && (current.getMessage() == null
++                || current.getMessage().toLowerCase(Locale.ROOT).contains("unexpected"))) {
++            current = current.getCause();
++        }
++        String message = current.getMessage();
++        if (message == null || message.isBlank()) {
++            message = current.getClass().getSimpleName();
++        }
++        return limit(message.replaceAll("[\\r\\n]+", " "), 1000);
++    }
++
++    private Matrix26DecommissionException exception(String message, RuntimeException cause) {
++        if (cause instanceof Matrix26DecommissionException decommissionException) {
++            return decommissionException;
++        }
++        return new Matrix26DecommissionException(message + " " + safeMessage(cause), cause);
++    }
++
++    private String limit(String value, int maximum) {
++        if (value == null || value.length() <= maximum) {
++            return value;
++        }
++        return value.substring(0, maximum);
++    }
++
++    private void audit(
++            PlatformBusinessClient instance,
++            String action,
++            String actor,
++            String summary,
++            String before,
++            String after
++    ) {
++        Matrix26InstanceAuditLog audit = new Matrix26InstanceAuditLog();
++        audit.setInstance(instance);
++        audit.setAction(action);
++        audit.setActorUsername(actor);
++        audit.setSummary(limit(summary, 500));
++        audit.setBeforeSnapshot("status=" + before + ";runtime=" + instance.getRuntimeProfile());
++        audit.setAfterSnapshot("status=" + after + ";runtime=" + instance.getRuntimeProfile());
++        auditRepository.save(audit);
++    }
++}
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionStatus.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionStatus.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionStatus.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionStatus.java	2026-06-26 19:32:31.943030381 +0000
+@@ -0,0 +1,36 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++public enum Matrix26DecommissionStatus {
++    REQUESTED("Requested", "text-bg-secondary"),
++    PRECHECKING("Prechecking", "text-bg-info"),
++    FINAL_BACKUP_RUNNING("Final backup running", "text-bg-warning"),
++    FINAL_BACKUP_VERIFYING("Final backup verifying", "text-bg-warning"),
++    READY_TO_DECOMMISSION("Ready to decommission", "text-bg-primary"),
++    DECOMMISSIONING("Decommissioning", "text-bg-warning"),
++    DECOMMISSIONED("Decommissioned", "text-bg-dark"),
++    FAILED("Failed", "text-bg-danger"),
++    MANUAL_REVIEW_REQUIRED("Manual review required", "text-bg-danger"),
++    CANCELLED("Cancelled", "text-bg-secondary");
++
++    private final String label;
++    private final String badgeClass;
++
++    Matrix26DecommissionStatus(String label, String badgeClass) {
++        this.label = label;
++        this.badgeClass = badgeClass;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++
++    public String getBadgeClass() {
++        return badgeClass;
++    }
++
++    public boolean isActive() {
++        return this == REQUESTED || this == PRECHECKING || this == FINAL_BACKUP_RUNNING
++                || this == FINAL_BACKUP_VERIFYING || this == READY_TO_DECOMMISSION
++                || this == DECOMMISSIONING;
++    }
++}
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionSummary.java /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionSummary.java
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionSummary.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionSummary.java	2026-06-26 19:32:31.991464744 +0000
+@@ -0,0 +1,9 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission;
++
++public record Matrix26DecommissionSummary(
++        long totalJobs,
++        long readyJobs,
++        long decommissionedInstances,
++        long failedJobs
++) {
++}
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlService.java	2026-06-26 14:23:58.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/java/com/ecoamazonas/eco_agua/platform/control/operations/Matrix26RuntimeControlService.java	2026-06-26 19:35:48.760102873 +0000
+@@ -1077,6 +1077,11 @@
+         if (target.instanceId() == null) {
+             return "The runtime is not linked to a registered instance.";
+         }
++        PlatformBusinessClient registeredInstance = clientRepository.findById(target.instanceId()).orElse(null);
++        if (registeredInstance != null
++                && "DECOMMISSIONED".equalsIgnoreCase(registeredInstance.getStatus())) {
++            return "The instance is decommissioned and cannot be controlled as an active runtime.";
++        }
+         if (!allowedCode(target.code())) {
+             return target.protectedInstance()
+                     ? "The instance is administratively protected and is not in the runtime control allowlist."
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/resources/templates/control_center/lifecycle/decommission/decommissioned.html /mnt/data/matrix26_3g2_work/src/main/resources/templates/control_center/lifecycle/decommission/decommissioned.html
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/resources/templates/control_center/lifecycle/decommission/decommissioned.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/resources/templates/control_center/lifecycle/decommission/decommissioned.html	2026-06-26 19:39:37.141462266 +0000
+@@ -0,0 +1,22 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Decommissioned instances')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Decommissioned instances', 'Historical operational inventory with protected final archives and retention evidence.')}" ></header>
++        <main class="matrix26-main">
++            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4"><div><h1 class="h4 mb-1">Historical inventory</h1><p class="text-muted mb-0">These instances are no longer operational, but their database, runtime, resources, and final archive remain preserved.</p></div><a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission}"><i class="bi bi-arrow-left me-1"></i>Decommission Manager</a></div>
++            <section class="matrix26-panel">
++                <div class="table-responsive"><table class="table align-middle mb-0 matrix26-table"><thead><tr><th>Instance</th><th>Job</th><th>Final archive</th><th>Retention until</th><th>Completed</th><th></th></tr></thead><tbody>
++                <tr th:if="${#lists.isEmpty(jobs)}"><td colspan="6" class="text-center text-muted py-4">No decommissioned instances.</td></tr>
++                <tr th:each="job : ${jobs}"><td><strong th:text="${job.instanceName()}">Instance</strong><small th:text="${job.instanceCode()}">code</small></td><td><code th:text="${job.publicId()}">DCM</code></td><td><code th:text="${job.finalBackupPublicId()}">Backup</code></td><td th:text="${job.retentionUntil() != null ? #temporals.format(job.retentionUntil(), 'yyyy-MM-dd HH:mm:ss') : 'Not set'}">Date</td><td th:text="${#temporals.format(job.completedAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</td><td class="text-end"><a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission/{id}(id=${job.id()})}" title="View evidence"><i class="bi bi-eye"></i></a></td></tr>
++                </tbody></table></div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/resources/templates/control_center/lifecycle/decommission/detail.html /mnt/data/matrix26_3g2_work/src/main/resources/templates/control_center/lifecycle/decommission/detail.html
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/resources/templates/control_center/lifecycle/decommission/detail.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/resources/templates/control_center/lifecycle/decommission/detail.html	2026-06-26 19:39:37.140969406 +0000
+@@ -0,0 +1,82 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Decommission job')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Decommission job', 'Final archive evidence, retention, checks, and audited operational retirement.')}" ></header>
++        <main class="matrix26-main">
++            <div th:if="${decommissionSuccess}" class="alert alert-success" th:text="${decommissionSuccess}"></div>
++            <div th:if="${decommissionError}" class="alert alert-danger" th:text="${decommissionError}"></div>
++            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
++                <div><h1 class="h4 mb-1" th:text="${job.publicId()}">DCM</h1><p class="text-muted mb-0" th:text="|${job.instanceName()} · ${job.instanceCode()}|">Instance</p></div>
++                <div class="d-flex gap-2"><span class="badge fs-6" th:classappend="| ${job.status.badgeClass}|" th:text="${job.status.label}">Status</span><a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission}"><i class="bi bi-arrow-left me-1"></i>Decommission Manager</a></div>
++            </div>
++
++            <section class="row g-3 mb-4">
++                <div class="col-lg-8">
++                    <div class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><h2>Plan evidence</h2><p>Final archive, retention, reason, and resulting lifecycle state.</p></div></div>
++                        <dl class="row mb-0 matrix26-definition-list">
++                            <dt class="col-sm-4">Reason</dt><dd class="col-sm-8" th:text="${job.reason()}">Reason</dd>
++                            <dt class="col-sm-4">Administrative notes</dt><dd class="col-sm-8" th:text="${job.administrativeNotes() != null && !job.administrativeNotes().isBlank() ? job.administrativeNotes() : '—'}">—</dd>
++                            <dt class="col-sm-4">Requested by</dt><dd class="col-sm-8" th:text="${job.requestedBy()}">Actor</dd>
++                            <dt class="col-sm-4">Requested at</dt><dd class="col-sm-8" th:text="${#temporals.format(job.requestedAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</dd>
++                            <dt class="col-sm-4">Previous status</dt><dd class="col-sm-8" th:text="${job.previousInstanceStatus()}">SUSPENDED</dd>
++                            <dt class="col-sm-4">Resulting status</dt><dd class="col-sm-8" th:text="${job.resultingInstanceStatus() != null ? job.resultingInstanceStatus() : 'Pending'}">Pending</dd>
++                            <dt class="col-sm-4">Retention</dt><dd class="col-sm-8" th:text="|${job.retentionDays()} days|">30 days</dd>
++                            <dt class="col-sm-4">Retention until</dt><dd class="col-sm-8" th:text="${job.retentionUntil() != null ? #temporals.format(job.retentionUntil(), 'yyyy-MM-dd HH:mm:ss') : 'Calculated after preparation'}">Date</dd>
++                            <dt class="col-sm-4">Schedules disabled</dt><dd class="col-sm-8" th:text="${job.disabledScheduleCount()}">0</dd>
++                            <dt class="col-sm-4">Last error</dt><dd class="col-sm-8 text-danger" th:text="${job.lastError() != null ? job.lastError() : '—'}">—</dd>
++                        </dl>
++                    </div>
++                </div>
++                <div class="col-lg-4">
++                    <div class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><h2>Final archive</h2><p>Protected recovery point required for decommission.</p></div></div>
++                        <p class="mb-2"><strong>Backup:</strong><br><code th:text="${job.finalBackupPublicId() != null ? job.finalBackupPublicId() : 'Pending'}">Backup</code></p>
++                        <p class="mb-2"><strong>Verified:</strong><br><span th:text="${job.finalBackupVerifiedAt() != null ? #temporals.format(job.finalBackupVerifiedAt(), 'yyyy-MM-dd HH:mm:ss') : 'Pending'}">Pending</span></p>
++                        <p class="mb-2"><strong>Key ID:</strong><br><code th:text="${job.finalBackupKeyId() != null ? job.finalBackupKeyId() : 'Pending'}">Key</code></p>
++                        <p class="mb-0"><strong>SHA-256:</strong><br><code class="matrix26-code-wrap" th:text="${job.finalBackupSha256() != null ? job.finalBackupSha256() : 'Pending'}">Hash</code></p>
++                    </div>
++                </div>
++            </section>
++
++            <section th:if="${job.readyToExecute()}" class="matrix26-panel mb-4 border-warning">
++                <div class="matrix26-panel-header"><div><h2>Execute operational decommission</h2><p>The final archive is ready. This transition stops future operations but still deletes nothing.</p></div></div>
++                <form method="post" th:action="@{/control-center/lifecycle/decommission/{id}/execute(id=${job.id()})}" class="row g-3 align-items-end">
++                    <div class="col-lg-8"><label class="form-label" for="confirmation">Exact confirmation</label><input class="form-control font-monospace" id="confirmation" name="confirmation" required th:placeholder="|DECOMMISSION ${job.instanceCode()}|"></div>
++                    <div class="col-lg-4"><button class="btn btn-warning w-100" type="submit"><i class="bi bi-archive-fill me-1"></i>Decommission instance</button></div>
++                </form>
++            </section>
++
++            <section class="matrix26-panel mb-4">
++                <div class="matrix26-panel-header"><div><h2>Verification checks</h2><p>Every decommission gate is persisted as evidence.</p></div></div>
++                <div class="table-responsive"><table class="table align-middle mb-0 matrix26-table"><thead><tr><th>Check</th><th>Status</th><th>Detail</th><th>Checked</th></tr></thead><tbody>
++                <tr th:if="${#lists.isEmpty(checks)}"><td colspan="4" class="text-center text-muted py-4">No checks recorded.</td></tr>
++                <tr th:each="check : ${checks}"><td><code th:text="${check.checkCode()}">CHECK</code><small th:text="${check.label()}">Label</small></td><td><span class="badge" th:classappend="${check.status() == 'PASSED' ? ' text-bg-success' : ' text-bg-danger'}" th:text="${check.status()}">PASSED</span></td><td th:text="${check.detail()}">Detail</td><td th:text="${#temporals.format(check.checkedAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</td></tr>
++                </tbody></table></div>
++            </section>
++
++            <section class="matrix26-panel mb-4">
++                <div class="matrix26-panel-header"><div><h2>Schedule snapshot</h2><p>Schedules are retained as metadata but remain disabled after decommission.</p></div></div>
++                <div class="table-responsive"><table class="table align-middle mb-0 matrix26-table"><thead><tr><th>Schedule</th><th>Previously enabled</th><th>Previous next run</th><th>Disabled</th></tr></thead><tbody>
++                <tr th:if="${#lists.isEmpty(scheduleStates)}"><td colspan="4" class="text-center text-muted py-4">No schedules registered for this instance.</td></tr>
++                <tr th:each="state : ${scheduleStates}"><td th:text="${state.scheduleName()}">Schedule</td><td th:text="${state.wasEnabled() ? 'Yes' : 'No'}">No</td><td th:text="${state.previousNextRunAt() != null ? #temporals.format(state.previousNextRunAt(), 'yyyy-MM-dd HH:mm:ss') : '—'}">—</td><td><span class="badge" th:classappend="${state.disabled() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${state.disabled() ? 'Disabled' : 'Already disabled'}">Disabled</span></td></tr>
++                </tbody></table></div>
++            </section>
++
++            <section class="matrix26-panel">
++                <div class="matrix26-panel-header"><div><h2>Event timeline</h2><p>Preparation, backup verification, schedule changes, and final transition.</p></div></div>
++                <div class="table-responsive"><table class="table align-middle mb-0 matrix26-table"><thead><tr><th>Time</th><th>Event</th><th>Status</th><th>Actor</th><th>Detail</th></tr></thead><tbody>
++                <tr th:if="${#lists.isEmpty(events)}"><td colspan="5" class="text-center text-muted py-4">No events recorded.</td></tr>
++                <tr th:each="event : ${events}"><td th:text="${#temporals.format(event.createdAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</td><td><code th:text="${event.eventType()}">EVENT</code></td><td><span class="badge" th:classappend="${event.status() == 'FAILED' ? ' text-bg-danger' : (event.status() == 'RUNNING' ? ' text-bg-warning' : ' text-bg-success')}" th:text="${event.status()}">Status</span></td><td th:text="${event.actor()}">Actor</td><td th:text="${event.detail()}">Detail</td></tr>
++                </tbody></table></div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/resources/templates/control_center/lifecycle/decommission/index.html /mnt/data/matrix26_3g2_work/src/main/resources/templates/control_center/lifecycle/decommission/index.html
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/resources/templates/control_center/lifecycle/decommission/index.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/resources/templates/control_center/lifecycle/decommission/index.html	2026-06-26 19:39:37.139856069 +0000
+@@ -0,0 +1,82 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Decommission Manager')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Decommission Manager', 'Final encrypted archive and non-destructive operational retirement for allowlisted laboratories.')}" ></header>
++        <main class="matrix26-main">
++            <div th:if="${decommissionSuccess}" class="alert alert-success" th:text="${decommissionSuccess}"></div>
++            <div th:if="${decommissionError}" class="alert alert-danger" th:text="${decommissionError}"></div>
++
++            <div class="matrix26-alert-safe mb-4">
++                <i class="bi bi-archive"></i>
++                <div>
++                    <strong>No data is deleted in Phase 3G.2</strong>
++                    <p>Decommission requires a newly generated encrypted FINAL archive, a stopped runtime, disabled schedules, and a separate execution confirmation. Database, runtime, resources, modules, appearance, and backups remain preserved.</p>
++                </div>
++            </div>
++
++            <section class="row g-3 mb-4">
++                <div class="col-md-3"><div class="matrix26-stat-card"><span>Decommission jobs</span><strong th:text="${summary.totalJobs()}">0</strong></div></div>
++                <div class="col-md-3"><div class="matrix26-stat-card"><span>Ready</span><strong th:text="${summary.readyJobs()}">0</strong></div></div>
++                <div class="col-md-3"><div class="matrix26-stat-card"><span>Decommissioned</span><strong th:text="${summary.decommissionedInstances()}">0</strong></div></div>
++                <div class="col-md-3"><div class="matrix26-stat-card"><span>Review required</span><strong th:text="${summary.failedJobs()}">0</strong></div></div>
++            </section>
++
++            <section class="matrix26-panel mb-4">
++                <div class="matrix26-panel-header d-flex justify-content-between align-items-center flex-wrap gap-3">
++                    <div><h2>Laboratory readiness</h2><p>Only suspended, stopped, allowlisted laboratories can prepare a decommission plan.</p></div>
++                    <div class="d-flex gap-2">
++                        <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission/decommissioned}"><i class="bi bi-clock-history me-1"></i>Historical inventory</a>
++                        <a class="btn btn-primary" th:href="@{/control-center/lifecycle/decommission/new}"><i class="bi bi-archive me-1"></i>Prepare decommission</a>
++                    </div>
++                </div>
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Instance</th><th>Status</th><th>Runtime</th><th>Schedules</th><th>Boundary</th><th>Readiness</th></tr></thead>
++                        <tbody>
++                        <tr th:if="${#lists.isEmpty(candidates)}"><td colspan="6" class="text-center text-muted py-4">No registered instances.</td></tr>
++                        <tr th:each="candidate : ${candidates}">
++                            <td><strong th:text="${candidate.instance().businessName}">Instance</strong><small th:text="${candidate.instance().code}">code</small></td>
++                            <td><span class="badge" th:classappend="${candidate.instance().status == 'DECOMMISSIONED' ? ' text-bg-dark' : (candidate.instance().status == 'SUSPENDED' ? ' text-bg-secondary' : ' text-bg-success')}" th:text="${candidate.instance().status}">Status</span></td>
++                            <td><span class="badge" th:classappend="${candidate.runtimeStopped() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${candidate.runtimeStopped() ? 'Stopped' : 'Not stopped'}">Stopped</span></td>
++                            <td th:text="${candidate.enabledSchedules()}">0</td>
++                            <td th:text="${candidate.allowlisted() ? 'Laboratory allowlist' : 'Read only'}">Boundary</td>
++                            <td>
++                                <span th:if="${candidate.eligible()}" class="badge text-bg-success">Eligible</span>
++                                <span th:unless="${candidate.eligible()}" class="text-muted small" th:text="${candidate.blocker()}">Blocked</span>
++                            </td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++
++            <section class="matrix26-panel">
++                <div class="matrix26-panel-header"><div><h2>Recent decommission jobs</h2><p>Preparation and execution remain separate audited operations.</p></div></div>
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Job</th><th>Instance</th><th>Status</th><th>Final archive</th><th>Retention</th><th>Requested</th><th></th></tr></thead>
++                        <tbody>
++                        <tr th:if="${#lists.isEmpty(jobs)}"><td colspan="7" class="text-center text-muted py-4">No decommission jobs yet.</td></tr>
++                        <tr th:each="job : ${jobs}">
++                            <td><code th:text="${job.publicId()}">DCM</code></td>
++                            <td><strong th:text="${job.instanceName()}">Instance</strong><small th:text="${job.instanceCode()}">code</small></td>
++                            <td><span class="badge" th:classappend="| ${job.status.badgeClass}|" th:text="${job.status.label}">Status</span></td>
++                            <td><code th:text="${job.finalBackupPublicId() != null ? job.finalBackupPublicId() : 'Pending'}">Backup</code></td>
++                            <td th:text="|${job.retentionDays()} days|">30 days</td>
++                            <td th:text="${#temporals.format(job.requestedAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</td>
++                            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission/{id}(id=${job.id()})}" title="View decommission job"><i class="bi bi-eye"></i></a></td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+diff -ruN /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/resources/templates/control_center/lifecycle/decommission/new.html /mnt/data/matrix26_3g2_work/src/main/resources/templates/control_center/lifecycle/decommission/new.html
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/resources/templates/control_center/lifecycle/decommission/new.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/resources/templates/control_center/lifecycle/decommission/new.html	2026-06-26 19:39:37.140211449 +0000
+@@ -0,0 +1,88 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Prepare decommission')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Prepare decommission', 'Generate and verify a protected final archive before operational retirement.')}" ></header>
++        <main class="matrix26-main">
++            <div th:if="${decommissionError}" class="alert alert-danger" th:text="${decommissionError}"></div>
++            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
++                <div><h1 class="h4 mb-1">Prepare final archive</h1><p class="text-muted mb-0">This step does not change the instance status and does not delete any resource.</p></div>
++                <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission}"><i class="bi bi-arrow-left me-1"></i>Decommission Manager</a>
++            </div>
++
++            <div class="matrix26-alert-warning mb-4">
++                <i class="bi bi-exclamation-triangle"></i>
++                <div><strong>Mandatory suspended state</strong><p>The runtime must already be stopped through Lifecycle Manager 3G.1. Matrix26 will always create a new full encrypted FINAL archive even when another recent backup exists.</p></div>
++            </div>
++
++            <section class="row g-4">
++                <div class="col-xl-8">
++                    <div class="matrix26-panel">
++                        <div class="matrix26-panel-header"><div><h2>Decommission request</h2><p>Reason, retention, and exact confirmation are permanently audited.</p></div></div>
++                        <form method="post" th:action="@{/control-center/lifecycle/decommission/prepare}">
++                            <div class="mb-3">
++                                <label class="form-label" for="instanceId">Instance</label>
++                                <select class="form-select" id="instanceId" name="instanceId" required>
++                                    <option value="">Select an eligible suspended laboratory</option>
++                                    <option th:each="candidate : ${candidates}" th:if="${candidate.eligible()}"
++                                            th:value="${candidate.instance().id}"
++                                            th:data-code="${candidate.instance().code}"
++                                            th:text="|${candidate.instance().businessName} (${candidate.instance().code})|">Instance</option>
++                                </select>
++                            </div>
++                            <div class="mb-3">
++                                <label class="form-label" for="reason">Operational reason</label>
++                                <textarea class="form-control" id="reason" name="reason" rows="3" minlength="10" maxlength="1000" required placeholder="Reason for retiring this laboratory from active operations"></textarea>
++                            </div>
++                            <div class="mb-3">
++                                <label class="form-label" for="administrativeNotes">Administrative notes</label>
++                                <textarea class="form-control" id="administrativeNotes" name="administrativeNotes" rows="3" maxlength="8000" placeholder="Optional contract, owner, or retention context"></textarea>
++                            </div>
++                            <div class="mb-3">
++                                <label class="form-label" for="retentionDays">Operational retention period</label>
++                                <div class="input-group">
++                                    <input class="form-control" id="retentionDays" name="retentionDays" type="number" min="1" max="3650" required th:value="${defaultRetentionDays}">
++                                    <span class="input-group-text">days</span>
++                                </div>
++                                <div class="form-text">This period protects the operational state before later decommission/archive decisions. Automatic purge is not enabled.</div>
++                            </div>
++                            <div class="mb-4">
++                                <label class="form-label" for="confirmation">Exact confirmation</label>
++                                <input class="form-control font-monospace" id="confirmation" name="confirmation" required placeholder="PREPARE DECOMMISSION matrix26-appearance-lab">
++                            </div>
++                            <button class="btn btn-primary" type="submit"><i class="bi bi-shield-lock me-1"></i>Create and verify final archive</button>
++                        </form>
++                    </div>
++                </div>
++                <div class="col-xl-4">
++                    <div class="matrix26-panel mb-4">
++                        <div class="matrix26-panel-header"><div><h2>Preparation creates</h2><p>New recovery evidence dedicated to the final lifecycle.</p></div></div>
++                        <ul class="matrix26-check-list mb-0">
++                            <li><i class="bi bi-check-circle"></i>Full database and resource backup</li>
++                            <li><i class="bi bi-check-circle"></i>AES-256-GCM package</li>
++                            <li><i class="bi bi-check-circle"></i>Independent verification</li>
++                            <li><i class="bi bi-check-circle"></i>FINAL retention class</li>
++                            <li><i class="bi bi-check-circle"></i>Deletion protection</li>
++                        </ul>
++                    </div>
++                    <div class="matrix26-panel">
++                        <div class="matrix26-panel-header"><div><h2>Not performed</h2><p>Destructive actions remain outside this phase.</p></div></div>
++                        <ul class="matrix26-check-list mb-0">
++                            <li><i class="bi bi-x-circle"></i>No database drop</li>
++                            <li><i class="bi bi-x-circle"></i>No runtime deletion</li>
++                            <li><i class="bi bi-x-circle"></i>No resource deletion</li>
++                            <li><i class="bi bi-x-circle"></i>No module removal</li>
++                            <li><i class="bi bi-x-circle"></i>No automatic purge</li>
++                        </ul>
++                    </div>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
++</body>
++</html>
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/resources/templates/control_center/lifecycle/index.html	2026-06-26 14:23:58.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/resources/templates/control_center/lifecycle/index.html	2026-06-26 19:35:49.949859665 +0000
+@@ -10,6 +10,15 @@
+             <div th:if="${lifecycleSuccess}" class="alert alert-success" th:text="${lifecycleSuccess}"></div>
+             <div th:if="${lifecycleError}" class="alert alert-danger" th:text="${lifecycleError}"></div>
+ 
++            <div class="d-flex justify-content-end gap-2 mb-3">
++                <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission/decommissioned}">
++                    <i class="bi bi-clock-history me-1"></i>Historical inventory
++                </a>
++                <a class="btn btn-outline-primary" th:href="@{/control-center/lifecycle/decommission}">
++                    <i class="bi bi-archive me-1"></i>Decommission Manager
++                </a>
++            </div>
++
+             <div class="matrix26-alert-safe mb-4">
+                 <i class="bi bi-shield-check"></i>
+                 <div>
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/resources/templates/control_center/fragments/sidebar.html	2026-06-26 14:23:58.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/resources/templates/control_center/fragments/sidebar.html	2026-06-26 19:35:48.756363882 +0000
+@@ -100,6 +100,16 @@
+             <i class="bi bi-pause-circle"></i>
+             <span>Lifecycle Manager</span>
+         </a>
++        <a th:href="@{/control-center/lifecycle/decommission}"
++           th:classappend="${activePage == 'matrix26_decommission'} ? ' active' : ''">
++            <i class="bi bi-archive"></i>
++            <span>Decommission</span>
++        </a>
++        <a th:href="@{/control-center/lifecycle/decommission/decommissioned}"
++           th:classappend="${activePage == 'matrix26_decommissioned'} ? ' active' : ''">
++            <i class="bi bi-clock-history"></i>
++            <span>Decommissioned</span>
++        </a>
+     </nav>
+ 
+     <div class="matrix26-sidebar-label">Diseño y experiencia</div>
+--- /mnt/data/matrix26_3g2_context/matrix26-lifecycle-phase3g2-context-20260626-142415/src/main/resources/static/css/matrix26-control.css	2026-06-26 14:23:58.000000000 +0000
++++ /mnt/data/matrix26_3g2_work/src/main/resources/static/css/matrix26-control.css	2026-06-26 19:38:33.190886422 +0000
+@@ -2609,3 +2609,18 @@
+ .matrix26-definition-list dd {
+     overflow-wrap: anywhere;
+ }
++
++/* Matrix26 Lifecycle Manager Phase 3G.2 */
++.matrix26-alert-warning {
++    display: flex;
++    gap: 14px;
++    align-items: flex-start;
++    padding: 18px 20px;
++    border-radius: 16px;
++    background: #fffbeb;
++    border: 1px solid #fde68a;
++    color: #92400e;
++}
++.matrix26-alert-warning > i { font-size: 1.4rem; }
++.matrix26-alert-warning strong { display: block; margin-bottom: 4px; }
++.matrix26-alert-warning p { margin: 0; font-size: .82rem; line-height: 1.5; }

@@ -1077,6 +1077,11 @@ public class Matrix26RuntimeControlService {
         if (target.instanceId() == null) {
             return "The runtime is not linked to a registered instance.";
         }
+        PlatformBusinessClient registeredInstance = clientRepository.findById(target.instanceId()).orElse(null);
+        if (registeredInstance != null
+                && "DECOMMISSIONED".equalsIgnoreCase(registeredInstance.getStatus())) {
+            return "The instance is decommissioned and cannot be controlled as an active runtime.";
+        }
         if (!allowedCode(target.code())) {
             return target.protectedInstance()
                     ? "The instance is administratively protected and is not in the runtime control allowlist."

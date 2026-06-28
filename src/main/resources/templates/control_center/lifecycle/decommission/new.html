@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Prepare decommission')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Prepare decommission', 'Generate and verify a protected final archive before operational retirement.')}" ></header>
+        <main class="matrix26-main">
+            <div th:if="${decommissionError}" class="alert alert-danger" th:text="${decommissionError}"></div>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <div><h1 class="h4 mb-1">Prepare final archive</h1><p class="text-muted mb-0">This step does not change the instance status and does not delete any resource.</p></div>
+                <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission}"><i class="bi bi-arrow-left me-1"></i>Decommission Manager</a>
+            </div>
+
+            <div class="matrix26-alert-warning mb-4">
+                <i class="bi bi-exclamation-triangle"></i>
+                <div><strong>Mandatory suspended state</strong><p>The runtime must already be stopped through Lifecycle Manager 3G.1. Matrix26 will always create a new full encrypted FINAL archive even when another recent backup exists.</p></div>
+            </div>
+
+            <section class="row g-4">
+                <div class="col-xl-8">
+                    <div class="matrix26-panel">
+                        <div class="matrix26-panel-header"><div><h2>Decommission request</h2><p>Reason, retention, and exact confirmation are permanently audited.</p></div></div>
+                        <form method="post" th:action="@{/control-center/lifecycle/decommission/prepare}">
+                            <div class="mb-3">
+                                <label class="form-label" for="instanceId">Instance</label>
+                                <select class="form-select" id="instanceId" name="instanceId" required>
+                                    <option value="">Select an eligible suspended laboratory</option>
+                                    <option th:each="candidate : ${candidates}" th:if="${candidate.eligible()}"
+                                            th:value="${candidate.instance().id}"
+                                            th:data-code="${candidate.instance().code}"
+                                            th:text="|${candidate.instance().businessName} (${candidate.instance().code})|">Instance</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="reason">Operational reason</label>
+                                <textarea class="form-control" id="reason" name="reason" rows="3" minlength="10" maxlength="1000" required placeholder="Reason for retiring this laboratory from active operations"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="administrativeNotes">Administrative notes</label>
+                                <textarea class="form-control" id="administrativeNotes" name="administrativeNotes" rows="3" maxlength="8000" placeholder="Optional contract, owner, or retention context"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="retentionDays">Operational retention period</label>
+                                <div class="input-group">
+                                    <input class="form-control" id="retentionDays" name="retentionDays" type="number" min="1" max="3650" required th:value="${defaultRetentionDays}">
+                                    <span class="input-group-text">days</span>
+                                </div>
+                                <div class="form-text">This period protects the operational state before later decommission/archive decisions. Automatic purge is not enabled.</div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label" for="confirmation">Exact confirmation</label>
+                                <input class="form-control font-monospace" id="confirmation" name="confirmation" required placeholder="PREPARE DECOMMISSION matrix26-appearance-lab">
+                            </div>
+                            <button class="btn btn-primary" type="submit"><i class="bi bi-shield-lock me-1"></i>Create and verify final archive</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-xl-4">
+                    <div class="matrix26-panel mb-4">
+                        <div class="matrix26-panel-header"><div><h2>Preparation creates</h2><p>New recovery evidence dedicated to the final lifecycle.</p></div></div>
+                        <ul class="matrix26-check-list mb-0">
+                            <li><i class="bi bi-check-circle"></i>Full database and resource backup</li>
+                            <li><i class="bi bi-check-circle"></i>AES-256-GCM package</li>
+                            <li><i class="bi bi-check-circle"></i>Independent verification</li>
+                            <li><i class="bi bi-check-circle"></i>FINAL retention class</li>
+                            <li><i class="bi bi-check-circle"></i>Deletion protection</li>
+                        </ul>
+                    </div>
+                    <div class="matrix26-panel">
+                        <div class="matrix26-panel-header"><div><h2>Not performed</h2><p>Destructive actions remain outside this phase.</p></div></div>
+                        <ul class="matrix26-check-list mb-0">
+                            <li><i class="bi bi-x-circle"></i>No database drop</li>
+                            <li><i class="bi bi-x-circle"></i>No runtime deletion</li>
+                            <li><i class="bi bi-x-circle"></i>No resource deletion</li>
+                            <li><i class="bi bi-x-circle"></i>No module removal</li>
+                            <li><i class="bi bi-x-circle"></i>No automatic purge</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

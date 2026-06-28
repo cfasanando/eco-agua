@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Decommission job')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Decommission job', 'Final archive evidence, retention, checks, and audited operational retirement.')}" ></header>
+        <main class="matrix26-main">
+            <div th:if="${decommissionSuccess}" class="alert alert-success" th:text="${decommissionSuccess}"></div>
+            <div th:if="${decommissionError}" class="alert alert-danger" th:text="${decommissionError}"></div>
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <div><h1 class="h4 mb-1" th:text="${job.publicId()}">DCM</h1><p class="text-muted mb-0" th:text="|${job.instanceName()} · ${job.instanceCode()}|">Instance</p></div>
+                <div class="d-flex gap-2"><span class="badge fs-6" th:classappend="| ${job.status.badgeClass}|" th:text="${job.status.label}">Status</span><a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission}"><i class="bi bi-arrow-left me-1"></i>Decommission Manager</a></div>
+            </div>
+
+            <section class="row g-3 mb-4">
+                <div class="col-lg-8">
+                    <div class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><h2>Plan evidence</h2><p>Final archive, retention, reason, and resulting lifecycle state.</p></div></div>
+                        <dl class="row mb-0 matrix26-definition-list">
+                            <dt class="col-sm-4">Reason</dt><dd class="col-sm-8" th:text="${job.reason()}">Reason</dd>
+                            <dt class="col-sm-4">Administrative notes</dt><dd class="col-sm-8" th:text="${job.administrativeNotes() != null && !job.administrativeNotes().isBlank() ? job.administrativeNotes() : '—'}">—</dd>
+                            <dt class="col-sm-4">Requested by</dt><dd class="col-sm-8" th:text="${job.requestedBy()}">Actor</dd>
+                            <dt class="col-sm-4">Requested at</dt><dd class="col-sm-8" th:text="${#temporals.format(job.requestedAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</dd>
+                            <dt class="col-sm-4">Previous status</dt><dd class="col-sm-8" th:text="${job.previousInstanceStatus()}">SUSPENDED</dd>
+                            <dt class="col-sm-4">Resulting status</dt><dd class="col-sm-8" th:text="${job.resultingInstanceStatus() != null ? job.resultingInstanceStatus() : 'Pending'}">Pending</dd>
+                            <dt class="col-sm-4">Retention</dt><dd class="col-sm-8" th:text="|${job.retentionDays()} days|">30 days</dd>
+                            <dt class="col-sm-4">Retention until</dt><dd class="col-sm-8" th:text="${job.retentionUntil() != null ? #temporals.format(job.retentionUntil(), 'yyyy-MM-dd HH:mm:ss') : 'Calculated after preparation'}">Date</dd>
+                            <dt class="col-sm-4">Schedules disabled</dt><dd class="col-sm-8" th:text="${job.disabledScheduleCount()}">0</dd>
+                            <dt class="col-sm-4">Last error</dt><dd class="col-sm-8 text-danger" th:text="${job.lastError() != null ? job.lastError() : '—'}">—</dd>
+                        </dl>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><h2>Final archive</h2><p>Protected recovery point required for decommission.</p></div></div>
+                        <p class="mb-2"><strong>Backup:</strong><br><code th:text="${job.finalBackupPublicId() != null ? job.finalBackupPublicId() : 'Pending'}">Backup</code></p>
+                        <p class="mb-2"><strong>Verified:</strong><br><span th:text="${job.finalBackupVerifiedAt() != null ? #temporals.format(job.finalBackupVerifiedAt(), 'yyyy-MM-dd HH:mm:ss') : 'Pending'}">Pending</span></p>
+                        <p class="mb-2"><strong>Key ID:</strong><br><code th:text="${job.finalBackupKeyId() != null ? job.finalBackupKeyId() : 'Pending'}">Key</code></p>
+                        <p class="mb-0"><strong>SHA-256:</strong><br><code class="matrix26-code-wrap" th:text="${job.finalBackupSha256() != null ? job.finalBackupSha256() : 'Pending'}">Hash</code></p>
+                    </div>
+                </div>
+            </section>
+
+            <section th:if="${job.readyToExecute()}" class="matrix26-panel mb-4 border-warning">
+                <div class="matrix26-panel-header"><div><h2>Execute operational decommission</h2><p>The final archive is ready. This transition stops future operations but still deletes nothing.</p></div></div>
+                <form method="post" th:action="@{/control-center/lifecycle/decommission/{id}/execute(id=${job.id()})}" class="row g-3 align-items-end">
+                    <div class="col-lg-8"><label class="form-label" for="confirmation">Exact confirmation</label><input class="form-control font-monospace" id="confirmation" name="confirmation" required th:placeholder="|DECOMMISSION ${job.instanceCode()}|"></div>
+                    <div class="col-lg-4"><button class="btn btn-warning w-100" type="submit"><i class="bi bi-archive-fill me-1"></i>Decommission instance</button></div>
+                </form>
+            </section>
+
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header"><div><h2>Verification checks</h2><p>Every decommission gate is persisted as evidence.</p></div></div>
+                <div class="table-responsive"><table class="table align-middle mb-0 matrix26-table"><thead><tr><th>Check</th><th>Status</th><th>Detail</th><th>Checked</th></tr></thead><tbody>
+                <tr th:if="${#lists.isEmpty(checks)}"><td colspan="4" class="text-center text-muted py-4">No checks recorded.</td></tr>
+                <tr th:each="check : ${checks}"><td><code th:text="${check.checkCode()}">CHECK</code><small th:text="${check.label()}">Label</small></td><td><span class="badge" th:classappend="${check.status() == 'PASSED' ? ' text-bg-success' : ' text-bg-danger'}" th:text="${check.status()}">PASSED</span></td><td th:text="${check.detail()}">Detail</td><td th:text="${#temporals.format(check.checkedAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</td></tr>
+                </tbody></table></div>
+            </section>
+
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header"><div><h2>Schedule snapshot</h2><p>Schedules are retained as metadata but remain disabled after decommission.</p></div></div>
+                <div class="table-responsive"><table class="table align-middle mb-0 matrix26-table"><thead><tr><th>Schedule</th><th>Previously enabled</th><th>Previous next run</th><th>Disabled</th></tr></thead><tbody>
+                <tr th:if="${#lists.isEmpty(scheduleStates)}"><td colspan="4" class="text-center text-muted py-4">No schedules registered for this instance.</td></tr>
+                <tr th:each="state : ${scheduleStates}"><td th:text="${state.scheduleName()}">Schedule</td><td th:text="${state.wasEnabled() ? 'Yes' : 'No'}">No</td><td th:text="${state.previousNextRunAt() != null ? #temporals.format(state.previousNextRunAt(), 'yyyy-MM-dd HH:mm:ss') : '—'}">—</td><td><span class="badge" th:classappend="${state.disabled() ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${state.disabled() ? 'Disabled' : 'Already disabled'}">Disabled</span></td></tr>
+                </tbody></table></div>
+            </section>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><h2>Event timeline</h2><p>Preparation, backup verification, schedule changes, and final transition.</p></div></div>
+                <div class="table-responsive"><table class="table align-middle mb-0 matrix26-table"><thead><tr><th>Time</th><th>Event</th><th>Status</th><th>Actor</th><th>Detail</th></tr></thead><tbody>
+                <tr th:if="${#lists.isEmpty(events)}"><td colspan="5" class="text-center text-muted py-4">No events recorded.</td></tr>
+                <tr th:each="event : ${events}"><td th:text="${#temporals.format(event.createdAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</td><td><code th:text="${event.eventType()}">EVENT</code></td><td><span class="badge" th:classappend="${event.status() == 'FAILED' ? ' text-bg-danger' : (event.status() == 'RUNNING' ? ' text-bg-warning' : ' text-bg-success')}" th:text="${event.status()}">Status</span></td><td th:text="${event.actor()}">Actor</td><td th:text="${event.detail()}">Detail</td></tr>
+                </tbody></table></div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

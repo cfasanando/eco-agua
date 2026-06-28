@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Decommissioned instances')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Decommissioned instances', 'Historical operational inventory with protected final archives and retention evidence.')}" ></header>
+        <main class="matrix26-main">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4"><div><h1 class="h4 mb-1">Historical inventory</h1><p class="text-muted mb-0">These instances are no longer operational, but their database, runtime, resources, and final archive remain preserved.</p></div><a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission}"><i class="bi bi-arrow-left me-1"></i>Decommission Manager</a></div>
+            <section class="matrix26-panel">
+                <div class="table-responsive"><table class="table align-middle mb-0 matrix26-table"><thead><tr><th>Instance</th><th>Job</th><th>Final archive</th><th>Retention until</th><th>Completed</th><th></th></tr></thead><tbody>
+                <tr th:if="${#lists.isEmpty(jobs)}"><td colspan="6" class="text-center text-muted py-4">No decommissioned instances.</td></tr>
+                <tr th:each="job : ${jobs}"><td><strong th:text="${job.instanceName()}">Instance</strong><small th:text="${job.instanceCode()}">code</small></td><td><code th:text="${job.publicId()}">DCM</code></td><td><code th:text="${job.finalBackupPublicId()}">Backup</code></td><td th:text="${job.retentionUntil() != null ? #temporals.format(job.retentionUntil(), 'yyyy-MM-dd HH:mm:ss') : 'Not set'}">Date</td><td th:text="${#temporals.format(job.completedAt(), 'yyyy-MM-dd HH:mm:ss')}">Time</td><td class="text-end"><a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission/{id}(id=${job.id()})}" title="View evidence"><i class="bi bi-eye"></i></a></td></tr>
+                </tbody></table></div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

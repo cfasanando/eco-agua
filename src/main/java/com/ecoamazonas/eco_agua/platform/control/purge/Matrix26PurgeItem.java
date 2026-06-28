@@ -13,7 +13,10 @@ public record Matrix26PurgeItem(
         Long sizeBytes,
         Integer fileCount,
         String detail,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String executionStatus,
+        LocalDateTime executedAt,
+        String executionDetail
 ) {
     public String sizeLabel() {
         if (sizeBytes == null || sizeBytes < 0) {
@@ -30,5 +33,9 @@ public record Matrix26PurgeItem(
             return String.format("%d %s", sizeBytes, units[unit]);
         }
         return String.format("%.2f %s", value, units[unit]);
+    }
+
+    public String executionStatusLabel() {
+        return executionStatus == null || executionStatus.isBlank() ? "—" : executionStatus;
     }
 }

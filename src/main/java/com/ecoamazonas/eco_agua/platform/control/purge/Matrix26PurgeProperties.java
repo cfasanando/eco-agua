@@ -10,12 +10,14 @@ import java.util.Set;
 @ConfigurationProperties(prefix = "matrix26.control-center.purge")
 public class Matrix26PurgeProperties {
     private boolean enabled = true;
+    private boolean executionEnabled = true;
     private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of("matrix26-appearance-lab"));
     private Set<String> protectedInstanceCodes = new LinkedHashSet<>(Set.of(
             "eco-agua",
             "productos-selva-belen",
             "restaurante-buen-sabor",
-            "matrix26-control-center"
+            "matrix26-control-center",
+            "matrix26-archived-restore-test"
     ));
     private int minimumReasonLength = 10;
     private boolean requireRetentionExpired = false;
@@ -29,6 +31,14 @@ public class Matrix26PurgeProperties {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public boolean isExecutionEnabled() {
+        return executionEnabled;
+    }
+
+    public void setExecutionEnabled(boolean executionEnabled) {
+        this.executionEnabled = executionEnabled;
     }
 
     public Set<String> getAllowedInstanceCodes() {

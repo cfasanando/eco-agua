@@ -77,12 +77,22 @@ public class Matrix26PurgeInitializer implements ApplicationRunner {
                     file_count INT NULL,
                     detail TEXT NULL,
                     created_at DATETIME(6) NOT NULL,
+                    execution_status VARCHAR(40) NULL,
+                    executed_at DATETIME(6) NULL,
+                    execution_detail TEXT NULL,
                     PRIMARY KEY (id),
                     KEY idx_matrix26_purge_item_plan (purge_plan_id, run_number, disposition),
+                    KEY idx_matrix26_purge_item_execution (purge_plan_id, run_number, execution_status),
                     CONSTRAINT fk_matrix26_purge_item_plan
                         FOREIGN KEY (purge_plan_id) REFERENCES matrix26_purge_plan(id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+
+        addColumnIfMissing("matrix26_purge_item", "execution_status", "VARCHAR(40) NULL");
+        addColumnIfMissing("matrix26_purge_item", "executed_at", "DATETIME(6) NULL");
+        addColumnIfMissing("matrix26_purge_item", "execution_detail", "TEXT NULL");
+        addIndexIfMissing("matrix26_purge_item", "idx_matrix26_purge_item_execution",
+                "CREATE INDEX idx_matrix26_purge_item_execution ON matrix26_purge_item (purge_plan_id, run_number, execution_status)");
 
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS matrix26_purge_check (
@@ -116,5 +126,27 @@ public class Matrix26PurgeInitializer implements ApplicationRunner {
                         FOREIGN KEY (purge_plan_id) REFERENCES matrix26_purge_plan(id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+    }
+
+    private void addColumnIfMissing(String table, String column, String definition) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?
+                """, Integer.class, table, column);
+        if (count == null || count == 0) {
+            jdbcTemplate.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+        }
+    }
+
+    private void addIndexIfMissing(String table, String indexName, String ddl) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?
+                """, Integer.class, table, indexName);
+        if (count == null || count == 0) {
+            jdbcTemplate.execute(ddl);
+        }
     }
 }

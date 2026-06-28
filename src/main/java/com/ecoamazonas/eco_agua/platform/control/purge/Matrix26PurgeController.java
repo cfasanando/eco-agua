@@ -86,12 +86,49 @@ public class Matrix26PurgeController {
         return "redirect:/control-center/purge/" + planId;
     }
 
+    @PostMapping("/{planId:\\d+}/prepare-execution")
+    public String prepareExecution(
+            @PathVariable long planId,
+            @RequestParam("confirmation") String confirmation,
+            Principal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            service.prepareExecution(planId, confirmation, actor(principal));
+            redirectAttributes.addFlashAttribute("purgeSuccess", "The dry run was frozen and is READY_TO_PURGE. No resource was deleted yet.");
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("purgeError", ex.getMessage());
+        }
+        return "redirect:/control-center/purge/" + planId;
+    }
+
+    @PostMapping("/{planId:\\d+}/execute")
+    public String execute(
+            @PathVariable long planId,
+            @RequestParam("purgeConfirmation") String purgeConfirmation,
+            @RequestParam("databaseConfirmation") String databaseConfirmation,
+            Principal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            Matrix26PurgePlan plan = service.execute(planId, purgeConfirmation, databaseConfirmation, actor(principal));
+            if (plan.status() == Matrix26PurgeStatus.PURGED) {
+                redirectAttributes.addFlashAttribute("purgeSuccess", "Operational purge completed. Final archive and audit evidence were preserved.");
+            } else {
+                redirectAttributes.addFlashAttribute("purgeError", "Operational purge needs manual review: " + plan.lastError());
+            }
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("purgeError", ex.getMessage());
+        }
+        return "redirect:/control-center/purge/" + planId;
+    }
+
     @GetMapping("/{planId:\\d+}/report")
     public ResponseEntity<byte[]> report(@PathVariable long planId) {
         Matrix26PurgePlan plan = service.plan(planId);
         byte[] body = service.report(planId).getBytes(StandardCharsets.UTF_8);
         ContentDisposition disposition = ContentDisposition.attachment()
-                .filename(plan.publicId() + "-dry-run-report.txt")
+                .filename(plan.publicId() + "-purge-report.txt")
                 .build();
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())

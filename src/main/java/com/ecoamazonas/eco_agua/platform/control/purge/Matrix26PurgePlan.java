@@ -35,7 +35,24 @@ public record Matrix26PurgePlan(
         String lastError
 ) {
     public boolean ready() {
-        return status == Matrix26PurgeStatus.DRY_RUN_READY || status == Matrix26PurgeStatus.BLOCKED;
+        return status == Matrix26PurgeStatus.DRY_RUN_READY
+                || status == Matrix26PurgeStatus.READY_TO_PURGE
+                || status == Matrix26PurgeStatus.PURGING
+                || status == Matrix26PurgeStatus.PARTIALLY_PURGED
+                || status == Matrix26PurgeStatus.PURGED
+                || status == Matrix26PurgeStatus.BLOCKED;
+    }
+
+    public boolean dryRunReady() {
+        return status == Matrix26PurgeStatus.DRY_RUN_READY;
+    }
+
+    public boolean readyToPurge() {
+        return status == Matrix26PurgeStatus.READY_TO_PURGE;
+    }
+
+    public boolean purged() {
+        return status == Matrix26PurgeStatus.PURGED;
     }
 
     public int blockers() {

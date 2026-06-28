@@ -68,7 +68,7 @@ public class Matrix26PurgeRepository {
         }, keyHolder);
         Number key = keyHolder.getKey();
         if (key == null) {
-            throw new Matrix26PurgeException("Matrix26 could not persist the purge dry run plan.");
+            throw new Matrix26PurgeException("Matrix26 could not persist the purge plan.");
         }
         return key.longValue();
     }
@@ -89,7 +89,7 @@ public class Matrix26PurgeRepository {
         return jdbcTemplate.queryForObject("""
                 SELECT
                     (SELECT COUNT(*) FROM matrix26_purge_plan) AS total_plans,
-                    (SELECT COUNT(*) FROM matrix26_purge_plan WHERE status = 'DRY_RUN_READY') AS dry_run_ready,
+                    (SELECT COUNT(*) FROM matrix26_purge_plan WHERE status IN ('DRY_RUN_READY','READY_TO_PURGE','PURGED')) AS dry_run_ready,
                     (SELECT COUNT(*) FROM matrix26_purge_plan WHERE status = 'BLOCKED') AS blocked,
                     (SELECT COALESCE(SUM(would_delete_count), 0) FROM matrix26_purge_plan) AS total_would_delete,
                     (SELECT COALESCE(SUM(protected_count), 0) FROM matrix26_purge_plan) AS total_protected
@@ -121,12 +121,16 @@ public class Matrix26PurgeRepository {
                 counts.protectedCount(), counts.review(), counts.notFound(), LocalDateTime.now(), limit(error, 8000), planId);
     }
 
-    public void failPlan(long planId, String error) {
+    public void updatePlanStatus(long planId, Matrix26PurgeStatus status, String error) {
         jdbcTemplate.update("""
                 UPDATE matrix26_purge_plan
                 SET status = ?, evaluated_at = ?, last_error = ?
                 WHERE id = ?
-                """, Matrix26PurgeStatus.FAILED.name(), LocalDateTime.now(), limit(error, 8000), planId);
+                """, status.name(), LocalDateTime.now(), limit(error, 8000), planId);
+    }
+
+    public void failPlan(long planId, String error) {
+        updatePlanStatus(planId, Matrix26PurgeStatus.FAILED, error);
     }
 
     public void addCheck(long planId, int runNumber, String code, String label, String status, String detail) {
@@ -160,10 +164,10 @@ public class Matrix26PurgeRepository {
         jdbcTemplate.update("""
                 INSERT INTO matrix26_purge_item (
                     purge_plan_id, run_number, resource_type, resource_name, resource_path,
-                    disposition, size_bytes, file_count, detail, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    disposition, size_bytes, file_count, detail, created_at, execution_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, planId, runNumber, resourceType, limit(resourceName, 255), limit(resourcePath, 1000),
-                disposition.name(), sizeBytes, fileCount, limit(detail, 8000), LocalDateTime.now());
+                disposition.name(), sizeBytes, fileCount, limit(detail, 8000), LocalDateTime.now(), null);
     }
 
     public List<Matrix26PurgeItem> items(long planId) {
@@ -173,6 +177,41 @@ public class Matrix26PurgeRepository {
                 WHERE i.purge_plan_id = ? AND i.run_number = p.run_number
                 ORDER BY FIELD(i.disposition, 'BLOCKED','PROTECTED','REQUIRES_REVIEW','WOULD_DELETE','WOULD_KEEP','NOT_FOUND'), i.id
                 """, itemMapper(), planId);
+    }
+
+    public void prepareExecutionItems(long planId, int runNumber) {
+        jdbcTemplate.update("""
+                UPDATE matrix26_purge_item
+                SET execution_status = CASE
+                        WHEN disposition = 'WOULD_DELETE' THEN 'PENDING'
+                        WHEN disposition = 'PROTECTED' THEN 'SKIPPED_PROTECTED'
+                        WHEN disposition = 'REQUIRES_REVIEW' THEN 'SKIPPED_REVIEW'
+                        WHEN disposition = 'NOT_FOUND' THEN 'NOT_FOUND'
+                        ELSE 'SKIPPED_KEEP'
+                    END,
+                    execution_detail = CASE
+                        WHEN disposition = 'WOULD_DELETE' THEN 'Ready for controlled execution after the final confirmations.'
+                        ELSE 'This item is preserved by the operational purge.'
+                    END,
+                    executed_at = NULL
+                WHERE purge_plan_id = ? AND run_number = ?
+                """, planId, runNumber);
+    }
+
+    public void updateItemExecutionStatus(long itemId, String status, String detail) {
+        jdbcTemplate.update("""
+                UPDATE matrix26_purge_item
+                SET execution_status = ?, execution_detail = ?, executed_at = ?
+                WHERE id = ?
+                """, status, limit(detail, 8000), LocalDateTime.now(), itemId);
+    }
+
+    public int deletedItemCount(long planId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM matrix26_purge_item
+                WHERE purge_plan_id = ? AND execution_status = 'DELETED'
+                """, Integer.class, planId);
+        return count == null ? 0 : count;
     }
 
     public void addEvent(long planId, String eventType, String status, String actor, String detail) {
@@ -220,6 +259,40 @@ public class Matrix26PurgeRepository {
         return value == null ? 0L : value;
     }
 
+    public void dropSchema(String databaseName) {
+        if (databaseName == null || !databaseName.matches("[A-Za-z0-9_]+")) {
+            throw new Matrix26PurgeException("Unsafe database name refused by Purge Manager: " + databaseName);
+        }
+        jdbcTemplate.execute("DROP DATABASE `" + databaseName.replace("`", "``") + "`");
+    }
+
+    public void markInstancePurging(long instanceId, String actor) {
+        jdbcTemplate.update("""
+                UPDATE platform_business_client
+                SET status = 'PURGING', runtime_status = 'STOPPED', last_health_status = 'PURGING',
+                    last_health_checked_at = ?, last_health_message = ?, updated_at = ?
+                WHERE id = ?
+                """, LocalDateTime.now(), limit("Operational purge started by " + actor, 500), LocalDateTime.now(), instanceId);
+    }
+
+    public void markInstancePurged(long instanceId, String actor) {
+        jdbcTemplate.update("""
+                UPDATE platform_business_client
+                SET status = 'PURGED', database_status = 'PURGED', runtime_status = 'PURGED', monitor_visible = 0,
+                    last_health_status = 'PURGED', last_health_checked_at = ?, last_health_message = ?, updated_at = ?
+                WHERE id = ?
+                """, LocalDateTime.now(), limit("Operational purge completed by " + actor, 500), LocalDateTime.now(), instanceId);
+    }
+
+    public void markInstanceManualReview(long instanceId, String message) {
+        jdbcTemplate.update("""
+                UPDATE platform_business_client
+                SET status = 'MANUAL_REVIEW_REQUIRED', last_health_status = 'PURGE_REVIEW',
+                    last_health_checked_at = ?, last_health_message = ?, updated_at = ?
+                WHERE id = ?
+                """, LocalDateTime.now(), limit(message, 500), LocalDateTime.now(), instanceId);
+    }
+
     public boolean hasEnabledSchedules(long instanceId) {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM matrix26_backup_schedule WHERE instance_id = ? AND enabled = 1",
@@ -262,6 +335,16 @@ public class Matrix26PurgeRepository {
                 WHERE source_instance_id = ?
                   AND status NOT IN ('COMPLETED','ROLLED_BACK','FAILED','CANCELLED')
                 """, instanceId);
+    }
+
+    public boolean hasActiveArchiveCloneRestore(long archiveRecordId) {
+        return positive("""
+                SELECT COUNT(*)
+                FROM matrix26_archive_restore_link l
+                JOIN matrix26_restore_job r ON r.id = l.restore_job_id
+                WHERE l.archive_record_id = ?
+                  AND r.status NOT IN ('COMPLETED','FAILED','CLEANUP_REQUIRED','PARTIALLY_CLEANED','CLEANED','CANCELLED')
+                """, archiveRecordId);
     }
 
     public int associatedCloneCount(long archiveRecordId) {
@@ -336,7 +419,10 @@ public class Matrix26PurgeRepository {
                 rs.getObject("size_bytes", Long.class),
                 rs.getObject("file_count", Integer.class),
                 rs.getString("detail"),
-                rs.getObject("created_at", LocalDateTime.class)
+                rs.getObject("created_at", LocalDateTime.class),
+                rs.getString("execution_status"),
+                rs.getObject("executed_at", LocalDateTime.class),
+                rs.getString("execution_detail")
         );
     }
 

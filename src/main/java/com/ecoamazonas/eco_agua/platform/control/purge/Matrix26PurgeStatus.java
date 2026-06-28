@@ -4,6 +4,11 @@ public enum Matrix26PurgeStatus {
     DRAFT,
     DRY_RUN_RUNNING,
     DRY_RUN_READY,
+    READY_TO_PURGE,
+    PURGING,
+    PARTIALLY_PURGED,
+    PURGED,
     BLOCKED,
-    FAILED
+    FAILED,
+    MANUAL_REVIEW_REQUIRED
 }

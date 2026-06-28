@@ -1,0 +1,1046 @@
+diff -ruN matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeController.java matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeController.java
+--- matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeController.java	2026-06-28 23:04:40.296472843 +0000
++++ matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeController.java	2026-06-28 23:01:42.785512227 +0000
+@@ -86,12 +86,49 @@
+         return "redirect:/control-center/purge/" + planId;
+     }
+ 
++    @PostMapping("/{planId:\\d+}/prepare-execution")
++    public String prepareExecution(
++            @PathVariable long planId,
++            @RequestParam("confirmation") String confirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            service.prepareExecution(planId, confirmation, actor(principal));
++            redirectAttributes.addFlashAttribute("purgeSuccess", "The dry run was frozen and is READY_TO_PURGE. No resource was deleted yet.");
++        } catch (RuntimeException ex) {
++            redirectAttributes.addFlashAttribute("purgeError", ex.getMessage());
++        }
++        return "redirect:/control-center/purge/" + planId;
++    }
++
++    @PostMapping("/{planId:\\d+}/execute")
++    public String execute(
++            @PathVariable long planId,
++            @RequestParam("purgeConfirmation") String purgeConfirmation,
++            @RequestParam("databaseConfirmation") String databaseConfirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            Matrix26PurgePlan plan = service.execute(planId, purgeConfirmation, databaseConfirmation, actor(principal));
++            if (plan.status() == Matrix26PurgeStatus.PURGED) {
++                redirectAttributes.addFlashAttribute("purgeSuccess", "Operational purge completed. Final archive and audit evidence were preserved.");
++            } else {
++                redirectAttributes.addFlashAttribute("purgeError", "Operational purge needs manual review: " + plan.lastError());
++            }
++        } catch (RuntimeException ex) {
++            redirectAttributes.addFlashAttribute("purgeError", ex.getMessage());
++        }
++        return "redirect:/control-center/purge/" + planId;
++    }
++
+     @GetMapping("/{planId:\\d+}/report")
+     public ResponseEntity<byte[]> report(@PathVariable long planId) {
+         Matrix26PurgePlan plan = service.plan(planId);
+         byte[] body = service.report(planId).getBytes(StandardCharsets.UTF_8);
+         ContentDisposition disposition = ContentDisposition.attachment()
+-                .filename(plan.publicId() + "-dry-run-report.txt")
++                .filename(plan.publicId() + "-purge-report.txt")
+                 .build();
+         return ResponseEntity.ok()
+                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+diff -ruN matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeInitializer.java matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeInitializer.java
+--- matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeInitializer.java	2026-06-28 23:04:40.297000144 +0000
++++ matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeInitializer.java	2026-06-28 23:00:02.226069710 +0000
+@@ -77,13 +77,23 @@
+                     file_count INT NULL,
+                     detail TEXT NULL,
+                     created_at DATETIME(6) NOT NULL,
++                    execution_status VARCHAR(40) NULL,
++                    executed_at DATETIME(6) NULL,
++                    execution_detail TEXT NULL,
+                     PRIMARY KEY (id),
+                     KEY idx_matrix26_purge_item_plan (purge_plan_id, run_number, disposition),
++                    KEY idx_matrix26_purge_item_execution (purge_plan_id, run_number, execution_status),
+                     CONSTRAINT fk_matrix26_purge_item_plan
+                         FOREIGN KEY (purge_plan_id) REFERENCES matrix26_purge_plan(id)
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                 """);
+ 
++        addColumnIfMissing("matrix26_purge_item", "execution_status", "VARCHAR(40) NULL");
++        addColumnIfMissing("matrix26_purge_item", "executed_at", "DATETIME(6) NULL");
++        addColumnIfMissing("matrix26_purge_item", "execution_detail", "TEXT NULL");
++        addIndexIfMissing("matrix26_purge_item", "idx_matrix26_purge_item_execution",
++                "CREATE INDEX idx_matrix26_purge_item_execution ON matrix26_purge_item (purge_plan_id, run_number, execution_status)");
++
+         jdbcTemplate.execute("""
+                 CREATE TABLE IF NOT EXISTS matrix26_purge_check (
+                     id BIGINT NOT NULL AUTO_INCREMENT,
+@@ -117,4 +127,26 @@
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                 """);
+     }
++
++    private void addColumnIfMissing(String table, String column, String definition) {
++        Integer count = jdbcTemplate.queryForObject("""
++                SELECT COUNT(*)
++                FROM information_schema.columns
++                WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?
++                """, Integer.class, table, column);
++        if (count == null || count == 0) {
++            jdbcTemplate.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
++        }
++    }
++
++    private void addIndexIfMissing(String table, String indexName, String ddl) {
++        Integer count = jdbcTemplate.queryForObject("""
++                SELECT COUNT(*)
++                FROM information_schema.statistics
++                WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?
++                """, Integer.class, table, indexName);
++        if (count == null || count == 0) {
++            jdbcTemplate.execute(ddl);
++        }
++    }
+ }
+diff -ruN matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeItem.java matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeItem.java
+--- matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeItem.java	2026-06-28 23:04:40.297133565 +0000
++++ matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeItem.java	2026-06-28 22:58:56.620354853 +0000
+@@ -13,7 +13,10 @@
+         Long sizeBytes,
+         Integer fileCount,
+         String detail,
+-        LocalDateTime createdAt
++        LocalDateTime createdAt,
++        String executionStatus,
++        LocalDateTime executedAt,
++        String executionDetail
+ ) {
+     public String sizeLabel() {
+         if (sizeBytes == null || sizeBytes < 0) {
+@@ -31,4 +34,8 @@
+         }
+         return String.format("%.2f %s", value, units[unit]);
+     }
++
++    public String executionStatusLabel() {
++        return executionStatus == null || executionStatus.isBlank() ? "—" : executionStatus;
++    }
+ }
+diff -ruN matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgePlan.java matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgePlan.java
+--- matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgePlan.java	2026-06-28 23:04:40.297250831 +0000
++++ matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgePlan.java	2026-06-28 22:58:56.627445572 +0000
+@@ -35,7 +35,24 @@
+         String lastError
+ ) {
+     public boolean ready() {
+-        return status == Matrix26PurgeStatus.DRY_RUN_READY || status == Matrix26PurgeStatus.BLOCKED;
++        return status == Matrix26PurgeStatus.DRY_RUN_READY
++                || status == Matrix26PurgeStatus.READY_TO_PURGE
++                || status == Matrix26PurgeStatus.PURGING
++                || status == Matrix26PurgeStatus.PARTIALLY_PURGED
++                || status == Matrix26PurgeStatus.PURGED
++                || status == Matrix26PurgeStatus.BLOCKED;
++    }
++
++    public boolean dryRunReady() {
++        return status == Matrix26PurgeStatus.DRY_RUN_READY;
++    }
++
++    public boolean readyToPurge() {
++        return status == Matrix26PurgeStatus.READY_TO_PURGE;
++    }
++
++    public boolean purged() {
++        return status == Matrix26PurgeStatus.PURGED;
+     }
+ 
+     public int blockers() {
+diff -ruN matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeProperties.java matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeProperties.java
+--- matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeProperties.java	2026-06-28 23:04:40.297376509 +0000
++++ matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeProperties.java	2026-06-28 23:00:13.750247470 +0000
+@@ -10,12 +10,14 @@
+ @ConfigurationProperties(prefix = "matrix26.control-center.purge")
+ public class Matrix26PurgeProperties {
+     private boolean enabled = true;
++    private boolean executionEnabled = true;
+     private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of("matrix26-appearance-lab"));
+     private Set<String> protectedInstanceCodes = new LinkedHashSet<>(Set.of(
+             "eco-agua",
+             "productos-selva-belen",
+             "restaurante-buen-sabor",
+-            "matrix26-control-center"
++            "matrix26-control-center",
++            "matrix26-archived-restore-test"
+     ));
+     private int minimumReasonLength = 10;
+     private boolean requireRetentionExpired = false;
+@@ -31,6 +33,14 @@
+         this.enabled = enabled;
+     }
+ 
++    public boolean isExecutionEnabled() {
++        return executionEnabled;
++    }
++
++    public void setExecutionEnabled(boolean executionEnabled) {
++        this.executionEnabled = executionEnabled;
++    }
++
+     public Set<String> getAllowedInstanceCodes() {
+         return allowedInstanceCodes;
+     }
+diff -ruN matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeRepository.java matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeRepository.java
+--- matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeRepository.java	2026-06-28 23:04:40.297557561 +0000
++++ matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeRepository.java	2026-06-28 22:59:40.004525666 +0000
+@@ -68,7 +68,7 @@
+         }, keyHolder);
+         Number key = keyHolder.getKey();
+         if (key == null) {
+-            throw new Matrix26PurgeException("Matrix26 could not persist the purge dry run plan.");
++            throw new Matrix26PurgeException("Matrix26 could not persist the purge plan.");
+         }
+         return key.longValue();
+     }
+@@ -89,7 +89,7 @@
+         return jdbcTemplate.queryForObject("""
+                 SELECT
+                     (SELECT COUNT(*) FROM matrix26_purge_plan) AS total_plans,
+-                    (SELECT COUNT(*) FROM matrix26_purge_plan WHERE status = 'DRY_RUN_READY') AS dry_run_ready,
++                    (SELECT COUNT(*) FROM matrix26_purge_plan WHERE status IN ('DRY_RUN_READY','READY_TO_PURGE','PURGED')) AS dry_run_ready,
+                     (SELECT COUNT(*) FROM matrix26_purge_plan WHERE status = 'BLOCKED') AS blocked,
+                     (SELECT COALESCE(SUM(would_delete_count), 0) FROM matrix26_purge_plan) AS total_would_delete,
+                     (SELECT COALESCE(SUM(protected_count), 0) FROM matrix26_purge_plan) AS total_protected
+@@ -121,12 +121,16 @@
+                 counts.protectedCount(), counts.review(), counts.notFound(), LocalDateTime.now(), limit(error, 8000), planId);
+     }
+ 
+-    public void failPlan(long planId, String error) {
++    public void updatePlanStatus(long planId, Matrix26PurgeStatus status, String error) {
+         jdbcTemplate.update("""
+                 UPDATE matrix26_purge_plan
+                 SET status = ?, evaluated_at = ?, last_error = ?
+                 WHERE id = ?
+-                """, Matrix26PurgeStatus.FAILED.name(), LocalDateTime.now(), limit(error, 8000), planId);
++                """, status.name(), LocalDateTime.now(), limit(error, 8000), planId);
++    }
++
++    public void failPlan(long planId, String error) {
++        updatePlanStatus(planId, Matrix26PurgeStatus.FAILED, error);
+     }
+ 
+     public void addCheck(long planId, int runNumber, String code, String label, String status, String detail) {
+@@ -160,10 +164,10 @@
+         jdbcTemplate.update("""
+                 INSERT INTO matrix26_purge_item (
+                     purge_plan_id, run_number, resource_type, resource_name, resource_path,
+-                    disposition, size_bytes, file_count, detail, created_at
+-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
++                    disposition, size_bytes, file_count, detail, created_at, execution_status
++                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 """, planId, runNumber, resourceType, limit(resourceName, 255), limit(resourcePath, 1000),
+-                disposition.name(), sizeBytes, fileCount, limit(detail, 8000), LocalDateTime.now());
++                disposition.name(), sizeBytes, fileCount, limit(detail, 8000), LocalDateTime.now(), null);
+     }
+ 
+     public List<Matrix26PurgeItem> items(long planId) {
+@@ -175,6 +179,41 @@
+                 """, itemMapper(), planId);
+     }
+ 
++    public void prepareExecutionItems(long planId, int runNumber) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_purge_item
++                SET execution_status = CASE
++                        WHEN disposition = 'WOULD_DELETE' THEN 'PENDING'
++                        WHEN disposition = 'PROTECTED' THEN 'SKIPPED_PROTECTED'
++                        WHEN disposition = 'REQUIRES_REVIEW' THEN 'SKIPPED_REVIEW'
++                        WHEN disposition = 'NOT_FOUND' THEN 'NOT_FOUND'
++                        ELSE 'SKIPPED_KEEP'
++                    END,
++                    execution_detail = CASE
++                        WHEN disposition = 'WOULD_DELETE' THEN 'Ready for controlled execution after the final confirmations.'
++                        ELSE 'This item is preserved by the operational purge.'
++                    END,
++                    executed_at = NULL
++                WHERE purge_plan_id = ? AND run_number = ?
++                """, planId, runNumber);
++    }
++
++    public void updateItemExecutionStatus(long itemId, String status, String detail) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_purge_item
++                SET execution_status = ?, execution_detail = ?, executed_at = ?
++                WHERE id = ?
++                """, status, limit(detail, 8000), LocalDateTime.now(), itemId);
++    }
++
++    public int deletedItemCount(long planId) {
++        Integer count = jdbcTemplate.queryForObject("""
++                SELECT COUNT(*) FROM matrix26_purge_item
++                WHERE purge_plan_id = ? AND execution_status = 'DELETED'
++                """, Integer.class, planId);
++        return count == null ? 0 : count;
++    }
++
+     public void addEvent(long planId, String eventType, String status, String actor, String detail) {
+         jdbcTemplate.update("""
+                 INSERT INTO matrix26_purge_event (
+@@ -220,6 +259,40 @@
+         return value == null ? 0L : value;
+     }
+ 
++    public void dropSchema(String databaseName) {
++        if (databaseName == null || !databaseName.matches("[A-Za-z0-9_]+")) {
++            throw new Matrix26PurgeException("Unsafe database name refused by Purge Manager: " + databaseName);
++        }
++        jdbcTemplate.execute("DROP DATABASE `" + databaseName.replace("`", "``") + "`");
++    }
++
++    public void markInstancePurging(long instanceId, String actor) {
++        jdbcTemplate.update("""
++                UPDATE platform_business_client
++                SET status = 'PURGING', runtime_status = 'STOPPED', last_health_status = 'PURGING',
++                    last_health_checked_at = ?, last_health_message = ?, updated_at = ?
++                WHERE id = ?
++                """, LocalDateTime.now(), limit("Operational purge started by " + actor, 500), LocalDateTime.now(), instanceId);
++    }
++
++    public void markInstancePurged(long instanceId, String actor) {
++        jdbcTemplate.update("""
++                UPDATE platform_business_client
++                SET status = 'PURGED', database_status = 'PURGED', runtime_status = 'PURGED', monitor_visible = 0,
++                    last_health_status = 'PURGED', last_health_checked_at = ?, last_health_message = ?, updated_at = ?
++                WHERE id = ?
++                """, LocalDateTime.now(), limit("Operational purge completed by " + actor, 500), LocalDateTime.now(), instanceId);
++    }
++
++    public void markInstanceManualReview(long instanceId, String message) {
++        jdbcTemplate.update("""
++                UPDATE platform_business_client
++                SET status = 'MANUAL_REVIEW_REQUIRED', last_health_status = 'PURGE_REVIEW',
++                    last_health_checked_at = ?, last_health_message = ?, updated_at = ?
++                WHERE id = ?
++                """, LocalDateTime.now(), limit(message, 500), LocalDateTime.now(), instanceId);
++    }
++
+     public boolean hasEnabledSchedules(long instanceId) {
+         Integer count = jdbcTemplate.queryForObject(
+                 "SELECT COUNT(*) FROM matrix26_backup_schedule WHERE instance_id = ? AND enabled = 1",
+@@ -264,6 +337,16 @@
+                 """, instanceId);
+     }
+ 
++    public boolean hasActiveArchiveCloneRestore(long archiveRecordId) {
++        return positive("""
++                SELECT COUNT(*)
++                FROM matrix26_archive_restore_link l
++                JOIN matrix26_restore_job r ON r.id = l.restore_job_id
++                WHERE l.archive_record_id = ?
++                  AND r.status NOT IN ('COMPLETED','FAILED','CLEANUP_REQUIRED','PARTIALLY_CLEANED','CLEANED','CANCELLED')
++                """, archiveRecordId);
++    }
++
+     public int associatedCloneCount(long archiveRecordId) {
+         Integer count = jdbcTemplate.queryForObject("""
+                 SELECT COUNT(*) FROM matrix26_archive_restore_link WHERE archive_record_id = ?
+@@ -336,7 +419,10 @@
+                 rs.getObject("size_bytes", Long.class),
+                 rs.getObject("file_count", Integer.class),
+                 rs.getString("detail"),
+-                rs.getObject("created_at", LocalDateTime.class)
++                rs.getObject("created_at", LocalDateTime.class),
++                rs.getString("execution_status"),
++                rs.getObject("executed_at", LocalDateTime.class),
++                rs.getString("execution_detail")
+         );
+     }
+ 
+diff -ruN matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeService.java matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeService.java
+--- matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeService.java	2026-06-28 23:04:40.297775678 +0000
++++ matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeService.java	2026-06-28 23:03:58.698583480 +0000
+@@ -19,6 +19,7 @@
+ import java.nio.file.Path;
+ import java.time.LocalDateTime;
+ import java.util.ArrayList;
++import java.util.Comparator;
+ import java.util.List;
+ import java.util.Locale;
+ import java.util.UUID;
+@@ -78,7 +79,7 @@
+ 
+     public Matrix26PurgePlan plan(long id) {
+         return repository.findPlan(id)
+-                .orElseThrow(() -> new Matrix26PurgeException("The purge dry run plan does not exist."));
++                .orElseThrow(() -> new Matrix26PurgeException("The purge plan does not exist."));
+     }
+ 
+     public List<Matrix26PurgeItem> items(long planId) {
+@@ -148,19 +149,92 @@
+     public Matrix26PurgePlan refresh(long planId, String actor) {
+         validateEnabled();
+         Matrix26PurgePlan plan = plan(planId);
++        if (plan.status() == Matrix26PurgeStatus.PURGING || plan.status() == Matrix26PurgeStatus.PURGED) {
++            throw new Matrix26PurgeException("This purge plan is already executing or completed and cannot be refreshed.");
++        }
+         repository.addEvent(planId, "PURGE_DRY_RUN_REFRESH_REQUESTED", "COMPLETED", safeActor(actor),
+                 "Dry run refresh requested. Previous evidence remains stored; current run will be shown on the detail page.");
+         return evaluate(planId, safeActor(actor));
+     }
+ 
++    public Matrix26PurgePlan prepareExecution(long planId, String confirmation, String actor) {
++        validateExecutionEnabled();
++        Matrix26PurgePlan plan = plan(planId);
++        if (plan.status() != Matrix26PurgeStatus.DRY_RUN_READY) {
++            throw new Matrix26PurgeException("Only a DRY_RUN_READY plan can be prepared for operational purge.");
++        }
++        String expected = "PREPARE PURGE EXECUTION " + plan.instanceCode();
++        if (!expected.equals(confirmation == null ? "" : confirmation.trim())) {
++            throw new Matrix26PurgeException("Type exactly: " + expected);
++        }
++        assertExecutionSafety(plan, true);
++        repository.prepareExecutionItems(plan.id(), currentRun(plan));
++        repository.updatePlanStatus(plan.id(), Matrix26PurgeStatus.READY_TO_PURGE, null);
++        repository.addEvent(plan.id(), "PURGE_EXECUTION_PREPARED", Matrix26PurgeStatus.READY_TO_PURGE.name(), safeActor(actor),
++                "The dry run was frozen for controlled operational purge. No resource was deleted yet.");
++        return plan(plan.id());
++    }
++
++    public Matrix26PurgePlan execute(long planId, String purgeConfirmation, String databaseConfirmation, String actor) {
++        validateExecutionEnabled();
++        Matrix26PurgePlan plan = plan(planId);
++        if (plan.status() != Matrix26PurgeStatus.READY_TO_PURGE && plan.status() != Matrix26PurgeStatus.PARTIALLY_PURGED) {
++            throw new Matrix26PurgeException("Only a READY_TO_PURGE plan can execute operational purge.");
++        }
++        String expectedPurge = "PURGE INSTANCE " + plan.instanceCode();
++        if (!expectedPurge.equals(purgeConfirmation == null ? "" : purgeConfirmation.trim())) {
++            throw new Matrix26PurgeException("Type exactly: " + expectedPurge);
++        }
++        String expectedDatabase = "DROP ARCHIVED DATABASE " + plan.databaseName();
++        if (!expectedDatabase.equals(databaseConfirmation == null ? "" : databaseConfirmation.trim())) {
++            throw new Matrix26PurgeException("Type exactly: " + expectedDatabase);
++        }
++
++        assertExecutionSafety(plan, false);
++        repository.updatePlanStatus(plan.id(), Matrix26PurgeStatus.PURGING, null);
++        repository.markInstancePurging(plan.instanceId(), safeActor(actor));
++        repository.addEvent(plan.id(), "PURGE_EXECUTION_STARTED", Matrix26PurgeStatus.PURGING.name(), safeActor(actor),
++                "Operational purge started after explicit confirmations. Final archive and audit records will be preserved.");
++
++        List<String> failures = new ArrayList<>();
++        for (Matrix26PurgeItem item : repository.items(plan.id())) {
++            if (item.disposition() != Matrix26PurgeDisposition.WOULD_DELETE) {
++                continue;
++            }
++            try {
++                executeItem(plan, item);
++            } catch (RuntimeException ex) {
++                failures.add(item.resourceType() + ": " + ex.getMessage());
++                repository.updateItemExecutionStatus(item.id(), "FAILED", ex.getMessage());
++                repository.addEvent(plan.id(), "PURGE_ITEM_FAILED", "FAILED", safeActor(actor),
++                        item.resourceType() + " failed: " + ex.getMessage());
++            }
++        }
++
++        if (failures.isEmpty()) {
++            repository.markInstancePurged(plan.instanceId(), safeActor(actor));
++            repository.updatePlanStatus(plan.id(), Matrix26PurgeStatus.PURGED, null);
++            repository.addEvent(plan.id(), "PURGE_EXECUTION_COMPLETED", Matrix26PurgeStatus.PURGED.name(), safeActor(actor),
++                    "Operational purge completed. Deleted items: " + repository.deletedItemCount(plan.id())
++                            + ". Final archive, backups, archive records, decommission records, purge records, and clone restores were preserved.");
++        } else {
++            String error = String.join(" | ", failures);
++            repository.markInstanceManualReview(plan.instanceId(), error);
++            repository.updatePlanStatus(plan.id(), Matrix26PurgeStatus.PARTIALLY_PURGED, error);
++            repository.addEvent(plan.id(), "PURGE_EXECUTION_PARTIAL", Matrix26PurgeStatus.PARTIALLY_PURGED.name(), safeActor(actor),
++                    "Operational purge stopped with " + failures.size() + " failure(s): " + error);
++        }
++        return plan(plan.id());
++    }
++
+     public String report(long planId) {
+         Matrix26PurgePlan plan = plan(planId);
+         StringBuilder builder = new StringBuilder();
+-        builder.append("Matrix26 Purge Manager - Dry Run Report\n");
++        builder.append("Matrix26 Purge Manager - Operational Report\n");
+         builder.append("Plan: ").append(plan.publicId()).append('\n');
+         builder.append("Instance: ").append(plan.instanceName()).append(" (").append(plan.instanceCode()).append(")\n");
+         builder.append("Status: ").append(plan.status()).append('\n');
+-        builder.append("Eligible for future purge: ").append(plan.eligibleForFuturePurge()).append('\n');
++        builder.append("Eligible for purge: ").append(plan.eligibleForFuturePurge()).append('\n');
+         builder.append("Reason: ").append(plan.reason()).append("\n\n");
+         builder.append("Checks\n");
+         for (Matrix26PurgeCheck check : checks(planId)) {
+@@ -172,10 +246,12 @@
+             builder.append("- [").append(item.disposition()).append("] ")
+                     .append(item.resourceType()).append(" | ").append(item.resourceName())
+                     .append(" | ").append(nullToBlank(item.resourcePath()))
+-                    .append(" | ").append(nullToBlank(item.detail()))
++                    .append(" | execution=").append(item.executionStatusLabel())
++                    .append(" | ").append(nullToBlank(item.executionDetail()))
+                     .append('\n');
+         }
+-        builder.append("\nDeleted resources in Phase 3H.1: 0\n");
++        builder.append("\nDeleted resources in Phase 3H.2: ").append(repository.deletedItemCount(planId)).append('\n');
++        builder.append("Preserved: final archive, protected backups, decommission records, archive records, purge records, and archive clone links.\n");
+         return builder.toString();
+     }
+ 
+@@ -191,34 +267,30 @@
+                     .orElseThrow(() -> new Matrix26PurgeException("The archived instance registry entry is missing."));
+ 
+             check(planId, runNumber, "FEATURE_ENABLED", "Purge Manager dry run enabled",
+-                    properties.isEnabled(), "Only non-destructive classification is available in Phase 3H.1.");
+-            check(planId, runNumber, "ALLOWLIST", "Instance is allowlisted for dry run",
++                    properties.isEnabled(), "Non-destructive classification is always completed before operational purge.");
++            check(planId, runNumber, "ALLOWLIST", "Instance is allowlisted for purge planning",
+                     allowlisted(instance.getCode()), "Allowed instance codes: " + properties.getAllowedInstanceCodes());
+             check(planId, runNumber, "PROTECTED_INSTANCE", "Instance is not protected",
+                     !instance.isProtectedInstance() && !protectedCode(instance.getCode()),
+-                    "Protected runtime clients 8081, 8082, 8084 and Matrix26 8091 are blocked.");
++                    "Protected runtime clients 8081, 8082, 8084, Matrix26 8091 and archive clones are blocked.");
+             check(planId, runNumber, "DECOMMISSIONED", "Original instance is decommissioned",
+-                    "DECOMMISSIONED".equalsIgnoreCase(instance.getStatus()),
++                    "DECOMMISSIONED".equalsIgnoreCase(instance.getStatus())
++                            || "PURGED".equalsIgnoreCase(instance.getStatus())
++                            || "PURGING".equalsIgnoreCase(instance.getStatus()),
+                     "Current instance status: " + instance.getStatus());
+             check(planId, runNumber, "ARCHIVE_READY", "Final archive is ready",
+                     "READY".equalsIgnoreCase(archive.archiveStatus()),
+                     "Current archive status: " + archive.archiveStatus());
+ 
+-            Matrix26BackupEncryption encryption = plan.finalBackupJobId() == null
+-                    ? null
+-                    : backupSecurityService.metadata(plan.finalBackupJobId());
+-            boolean finalBackupOk = encryption != null
+-                    && encryption.encrypted()
+-                    && encryption.retentionClass() == Matrix26BackupRetentionClass.FINAL
+-                    && encryption.protectedFlag()
+-                    && encryption.verificationStatus() == Matrix26BackupVerificationState.VERIFIED;
++            Matrix26BackupEncryption encryption = finalBackupMetadata(plan);
++            boolean finalBackupOk = finalBackupOk(encryption);
+             check(planId, runNumber, "FINAL_BACKUP", "Final backup is encrypted, FINAL, protected, and VERIFIED",
+                     finalBackupOk,
+                     encryption == null ? "No encrypted backup metadata found." : "Package SHA-256: " + nullToBlank(encryption.packageSha256()));
+ 
+             boolean retentionExpired = archive.retentionUntil() != null && !archive.retentionUntil().isAfter(LocalDateTime.now());
+             boolean retentionAllowed = !properties.isRequireRetentionExpired() || retentionExpired;
+-            check(planId, runNumber, "RETENTION", "Retention policy does not allow operational purge yet unless configured",
++            check(planId, runNumber, "RETENTION", "Retention policy allows the configured purge stage",
+                     retentionAllowed,
+                     archive.retentionUntil() == null
+                             ? "No retention date found."
+@@ -228,17 +300,20 @@
+             check(planId, runNumber, "ORIGINAL_PORT", "Original runtime port is free",
+                     portAvailable,
+                     instance.getRuntimePort() == null ? "No runtime port configured." : "Port " + instance.getRuntimePort());
+-            check(planId, runNumber, "NO_ACTIVE_OPERATIONS", "No active backup or restore blocks the dry run",
++            check(planId, runNumber, "NO_ACTIVE_OPERATIONS", "No active backup or restore blocks the plan",
+                     !repository.hasActiveBackupOrRestore(instance.getId(), instance.getCode()),
+                     "Active backup, clone restore, and in-place restore states are checked in Matrix26 metadata.");
++            check(planId, runNumber, "NO_ACTIVE_ARCHIVE_RESTORE", "No active archive clone restore is running",
++                    !repository.hasActiveArchiveCloneRestore(archive.id()),
++                    "Existing completed clones are preserved; only active clone restore jobs block execution.");
+             check(planId, runNumber, "SCHEDULES_DISABLED", "Backup schedules are disabled",
+                     !repository.hasEnabledSchedules(instance.getId()),
+                     "Total schedules registered: " + repository.totalSchedules(instance.getId()));
+ 
+             int cloneCount = repository.associatedCloneCount(archive.id());
+-            check(planId, runNumber, "ARCHIVE_CLONES", "Archive restore clones require review before real purge",
++            check(planId, runNumber, "ARCHIVE_CLONES", "Archive restore clones are preserved",
+                     true,
+-                    cloneCount == 0 ? "No clone restore links were found." : cloneCount + " clone restore link(s) are associated with this archive.");
++                    cloneCount == 0 ? "No clone restore links were found." : cloneCount + " clone restore link(s) are associated with this archive and will not be purged.");
+ 
+             classifyDatabase(planId, runNumber, instance, dispositions);
+             classifyDirectory(planId, runNumber, "RUNTIME_DIRECTORY", instance.getRuntimeProfile(),
+@@ -264,6 +339,107 @@
+         }
+     }
+ 
++    private void assertExecutionSafety(Matrix26PurgePlan plan, boolean preparing) {
++        if (!allowlisted(plan.instanceCode()) || protectedCode(plan.instanceCode())) {
++            throw new Matrix26PurgeException("The selected instance is not allowed for operational purge.");
++        }
++        if (plan.blockers() > 0 || !plan.eligibleForFuturePurge()) {
++            throw new Matrix26PurgeException("The purge plan still has blockers. Refresh the dry run and resolve blockers first.");
++        }
++        Matrix26ArchiveRecord archive = archiveRepository.findById(plan.archiveRecordId())
++                .orElseThrow(() -> new Matrix26PurgeException("The archive record no longer exists."));
++        PlatformBusinessClient instance = clientRepository.findById(plan.instanceId())
++                .orElseThrow(() -> new Matrix26PurgeException("The archived instance registry entry is missing."));
++        if (!"READY".equalsIgnoreCase(archive.archiveStatus())) {
++            throw new Matrix26PurgeException("The final archive must remain READY before purge execution.");
++        }
++        if (!"DECOMMISSIONED".equalsIgnoreCase(instance.getStatus())
++                && !"PURGING".equalsIgnoreCase(instance.getStatus())
++                && !"MANUAL_REVIEW_REQUIRED".equalsIgnoreCase(instance.getStatus())) {
++            throw new Matrix26PurgeException("The original instance must be DECOMMISSIONED before purge execution. Current status: " + instance.getStatus());
++        }
++        if (instance.getRuntimePort() != null && !isPortAvailable(instance.getRuntimePort())) {
++            throw new Matrix26PurgeException("The original runtime port is still busy: " + instance.getRuntimePort());
++        }
++        if (repository.hasEnabledSchedules(instance.getId())) {
++            throw new Matrix26PurgeException("Enabled backup schedules still exist for the archived instance.");
++        }
++        if (repository.hasActiveBackupOrRestore(instance.getId(), instance.getCode())) {
++            throw new Matrix26PurgeException("An active backup or restore still references the archived instance.");
++        }
++        if (repository.hasActiveArchiveCloneRestore(archive.id())) {
++            throw new Matrix26PurgeException("An archive clone restore is still running. Wait until it completes before purging the original resources.");
++        }
++        Matrix26BackupEncryption encryption = finalBackupMetadata(plan);
++        if (!finalBackupOk(encryption)) {
++            throw new Matrix26PurgeException("The final backup is not encrypted, FINAL, protected and VERIFIED anymore.");
++        }
++        if (preparing && plan.status() != Matrix26PurgeStatus.DRY_RUN_READY) {
++            throw new Matrix26PurgeException("The plan must be DRY_RUN_READY before preparation.");
++        }
++    }
++
++    private void executeItem(Matrix26PurgePlan plan, Matrix26PurgeItem item) {
++        switch (item.resourceType()) {
++            case "DATABASE" -> purgeDatabase(plan, item);
++            case "RUNTIME_DIRECTORY" -> purgeDirectory(item, Path.of(properties.getRuntimeDirectory()), "runtime");
++            case "RUNTIME_DATA_DIRECTORY" -> purgeDirectory(item, Path.of(properties.getDataDirectory()), "runtime-data");
++            default -> repository.updateItemExecutionStatus(item.id(), "SKIPPED_KEEP",
++                    "This WOULD_DELETE item type has no operational purge handler and was preserved.");
++        }
++    }
++
++    private void purgeDatabase(Matrix26PurgePlan plan, Matrix26PurgeItem item) {
++        String database = nullToBlank(plan.databaseName());
++        if (database.isBlank()) {
++            repository.updateItemExecutionStatus(item.id(), "NOT_FOUND", "No database name exists in the plan.");
++            return;
++        }
++        if (!database.equals(item.resourceName())) {
++            throw new Matrix26PurgeException("Database item does not match the frozen plan.");
++        }
++        if (!repository.schemaExists(database)) {
++            repository.updateItemExecutionStatus(item.id(), "NOT_FOUND", "The database schema was already absent.");
++            return;
++        }
++        repository.dropSchema(database);
++        if (repository.schemaExists(database)) {
++            throw new Matrix26PurgeException("The database still exists after DROP DATABASE.");
++        }
++        repository.updateItemExecutionStatus(item.id(), "DELETED", "Archived database schema dropped after explicit confirmation.");
++    }
++
++    private void purgeDirectory(Matrix26PurgeItem item, Path root, String label) {
++        Path rootPath = root.toAbsolutePath().normalize();
++        Path target = Path.of(nullToBlank(item.resourcePath())).toAbsolutePath().normalize();
++        if (!isSafeChild(rootPath, target)) {
++            throw new Matrix26PurgeException("Unsafe " + label + " path refused: " + target);
++        }
++        if (!Files.exists(target)) {
++            repository.updateItemExecutionStatus(item.id(), "NOT_FOUND", "The " + label + " directory was already absent.");
++            return;
++        }
++        deleteDirectory(target);
++        if (Files.exists(target)) {
++            throw new Matrix26PurgeException("The " + label + " directory still exists after deletion: " + target);
++        }
++        repository.updateItemExecutionStatus(item.id(), "DELETED", "Archived " + label + " directory deleted after explicit confirmation.");
++    }
++
++    private void deleteDirectory(Path directory) {
++        try (Stream<Path> stream = Files.walk(directory)) {
++            for (Path path : stream.sorted(Comparator.reverseOrder()).toList()) {
++                Files.deleteIfExists(path);
++            }
++        } catch (IOException ex) {
++            throw new Matrix26PurgeException("Could not delete directory " + directory + ": " + ex.getMessage());
++        }
++    }
++
++    private boolean isSafeChild(Path root, Path target) {
++        return target.startsWith(root) && !target.equals(root);
++    }
++
+     private void classifyDatabase(long planId, int runNumber, PlatformBusinessClient instance, List<Matrix26PurgeDisposition> dispositions) {
+         String database = nullToBlank(instance.getDatabaseName());
+         if (database.isBlank()) {
+@@ -278,7 +454,7 @@
+         }
+         item(planId, runNumber, "DATABASE", database, database, Matrix26PurgeDisposition.WOULD_DELETE,
+                 repository.databaseSizeBytes(database), repository.tableCount(database),
+-                "Future operational purge would drop only this archived laboratory schema after separate confirmations. Phase 3H.1 does not execute a schema removal command.", dispositions);
++                "Operational purge will drop only this archived laboratory schema after separate confirmations.", dispositions);
+     }
+ 
+     private void classifyDirectory(long planId, int runNumber, String type, String name, Path path, List<Matrix26PurgeDisposition> dispositions) {
+@@ -291,7 +467,7 @@
+         DirectorySnapshot snapshot = snapshot(normalized);
+         item(planId, runNumber, type, nullToBlank(name), normalized.toString(), Matrix26PurgeDisposition.WOULD_DELETE,
+                 snapshot.sizeBytes(), snapshot.fileCount(),
+-                "Future operational purge would remove this archived laboratory directory. Phase 3H.1 only inventories it.", dispositions);
++                "Operational purge will remove this archived laboratory directory after separate confirmations.", dispositions);
+     }
+ 
+     private void classifyBackupRoot(
+@@ -311,7 +487,7 @@
+         DirectorySnapshot snapshot = snapshot(root);
+         item(planId, runNumber, "BACKUP_ROOT", instance.getCode(), root.toString(), Matrix26PurgeDisposition.WOULD_KEEP,
+                 snapshot.sizeBytes(), snapshot.fileCount(),
+-                "Backups stay preserved during Phase 3H.1. A future phase must protect the FINAL archive before considering non-final backups.", dispositions);
++                "Backups stay preserved during operational purge. FINAL archives remain protected.", dispositions);
+         item(planId, runNumber, "FINAL_BACKUP", archive.finalBackupPublicId(), archive.finalBackupSha256(),
+                 finalBackupOk ? Matrix26PurgeDisposition.PROTECTED : Matrix26PurgeDisposition.BLOCKED,
+                 null, null,
+@@ -329,16 +505,16 @@
+             List<Matrix26PurgeDisposition> dispositions
+     ) {
+         item(planId, runNumber, "INSTANCE_REGISTRY", instance.getCode(), "platform_business_client", Matrix26PurgeDisposition.WOULD_KEEP,
+-                null, null, "The historical instance row remains as audit evidence in this dry run.", dispositions);
++                null, null, "The historical instance row remains as audit evidence and is marked PURGED after execution.", dispositions);
+         item(planId, runNumber, "DECOMMISSION_RECORDS", archive.decommissionPublicId(), "matrix26_decommission_*", Matrix26PurgeDisposition.WOULD_KEEP,
+                 null, null, "Decommission records stay available for governance and future audit.", dispositions);
+         item(planId, runNumber, "ARCHIVE_RECORDS", archive.publicId(), "matrix26_archive_*", Matrix26PurgeDisposition.WOULD_KEEP,
+                 null, cloneCount, "Archive records and restore links stay available; clone restores are not confused with the original instance.", dispositions);
+         item(planId, runNumber, "SCHEDULES", instance.getCode(), "matrix26_backup_schedule", Matrix26PurgeDisposition.WOULD_KEEP,
+-                null, repository.totalSchedules(instance.getId()), "Disabled schedule metadata stays preserved in this dry run.", dispositions);
++                null, repository.totalSchedules(instance.getId()), "Disabled schedule metadata stays preserved.", dispositions);
+         if (cloneCount > 0) {
+             item(planId, runNumber, "ARCHIVE_CLONE_LINKS", archive.publicId(), "matrix26_archive_restore_link", Matrix26PurgeDisposition.REQUIRES_REVIEW,
+-                    null, cloneCount, "Associated clone restore links exist. A real purge must confirm whether clones are still needed.", dispositions);
++                    null, cloneCount, "Associated clone restore links exist and will be preserved.", dispositions);
+         }
+     }
+ 
+@@ -414,6 +590,22 @@
+         return new DirectorySnapshot(bytes, files);
+     }
+ 
++    private Matrix26BackupEncryption finalBackupMetadata(Matrix26PurgePlan plan) {
++        return plan.finalBackupJobId() == null ? null : backupSecurityService.metadata(plan.finalBackupJobId());
++    }
++
++    private boolean finalBackupOk(Matrix26BackupEncryption encryption) {
++        return encryption != null
++                && encryption.encrypted()
++                && encryption.retentionClass() == Matrix26BackupRetentionClass.FINAL
++                && encryption.protectedFlag()
++                && encryption.verificationStatus() == Matrix26BackupVerificationState.VERIFIED;
++    }
++
++    private int currentRun(Matrix26PurgePlan plan) {
++        return plan.runNumber() == null ? 1 : plan.runNumber();
++    }
++
+     private boolean isPortAvailable(int port) {
+         try (ServerSocket socket = new ServerSocket()) {
+             socket.setReuseAddress(false);
+@@ -430,6 +622,13 @@
+         }
+     }
+ 
++    private void validateExecutionEnabled() {
++        validateEnabled();
++        if (!properties.isExecutionEnabled()) {
++            throw new Matrix26PurgeException("Operational purge execution is disabled in Matrix26 configuration.");
++        }
++    }
++
+     private boolean allowlisted(String code) {
+         if (code == null) {
+             return false;
+diff -ruN matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeStatus.java matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeStatus.java
+--- matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeStatus.java	2026-06-28 23:04:40.298003671 +0000
++++ matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeStatus.java	2026-06-28 22:58:56.612680066 +0000
+@@ -4,6 +4,11 @@
+     DRAFT,
+     DRY_RUN_RUNNING,
+     DRY_RUN_READY,
++    READY_TO_PURGE,
++    PURGING,
++    PARTIALLY_PURGED,
++    PURGED,
+     BLOCKED,
+-    FAILED
++    FAILED,
++    MANUAL_REVIEW_REQUIRED
+ }
+diff -ruN matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/resources/templates/control_center/purge/detail.html matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/resources/templates/control_center/purge/detail.html
+--- matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/src/main/resources/templates/control_center/purge/detail.html	2026-06-28 23:04:40.435365877 +0000
++++ matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/src/main/resources/templates/control_center/purge/detail.html	2026-06-28 23:02:20.792817711 +0000
+@@ -1,11 +1,11 @@
+ <!DOCTYPE html>
+ <html lang="en" xmlns:th="http://www.thymeleaf.org">
+-<head th:replace="~{control_center/fragments/head :: head('Purge dry run detail')}"></head>
++<head th:replace="~{control_center/fragments/head :: head('Purge plan detail')}"></head>
+ <body class="matrix26-body">
+ <div class="matrix26-shell">
+     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+     <div class="matrix26-content">
+-        <header th:replace="~{control_center/fragments/topbar :: topbar('Purge dry run detail', 'Read-only classification evidence for a decommissioned instance.')} "></header>
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Purge plan detail', 'Dry run evidence and controlled execution for a decommissioned laboratory.')} "></header>
+         <main class="matrix26-main">
+             <div th:if="${purgeSuccess}" class="alert alert-success" th:text="${purgeSuccess}"></div>
+             <div th:if="${purgeError}" class="alert alert-danger" th:text="${purgeError}"></div>
+@@ -15,33 +15,78 @@
+                     <h1 class="h4 mb-1" th:text="${plan.publicId()}">PUR</h1>
+                     <p class="text-muted mb-0" th:text="|${plan.instanceName()} · ${plan.instanceCode()}|">Instance</p>
+                 </div>
+-                <div class="d-flex gap-2">
+-                    <span class="badge fs-6" th:classappend="${plan.status().name() == 'DRY_RUN_READY' ? ' text-bg-success' : (plan.status().name() == 'BLOCKED' ? ' text-bg-warning' : ' text-bg-secondary')}" th:text="${plan.status()}">status</span>
++                <div class="d-flex gap-2 flex-wrap">
++                    <span class="badge fs-6"
++                          th:classappend="${plan.status().name() == 'PURGED' ? ' text-bg-success' : (plan.status().name() == 'READY_TO_PURGE' ? ' text-bg-danger' : (plan.status().name() == 'DRY_RUN_READY' ? ' text-bg-success' : (plan.status().name() == 'BLOCKED' || plan.status().name() == 'PARTIALLY_PURGED' ? ' text-bg-warning' : ' text-bg-secondary')))}"
++                          th:text="${plan.status()}">status</span>
+                     <a class="btn btn-outline-secondary" th:href="@{/control-center/purge}"><i class="bi bi-arrow-left me-1"></i>Purge Manager</a>
+                     <a class="btn btn-outline-primary" th:href="@{/control-center/purge/{id}/report(id=${plan.id()})}"><i class="bi bi-download me-1"></i>Report</a>
+-                    <form method="post" th:action="@{/control-center/purge/{id}/refresh(id=${plan.id()})}">
++                    <form method="post" th:if="${plan.status().name() == 'DRY_RUN_READY' || plan.status().name() == 'BLOCKED' || plan.status().name() == 'FAILED'}" th:action="@{/control-center/purge/{id}/refresh(id=${plan.id()})}">
+                         <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Refresh dry run</button>
+                     </form>
+                 </div>
+             </div>
+ 
+-            <div class="matrix26-alert-safe mb-4">
++            <div class="matrix26-alert-safe mb-4" th:if="${plan.status().name() != 'READY_TO_PURGE' && plan.status().name() != 'PURGING'}">
+                 <i class="bi bi-shield-lock"></i>
+                 <div>
+-                    <strong>Deleted resources: 0</strong>
+-                    <p>This detail page is evidence only. A future purge phase will require a separate signed plan and separate confirmations before any real removal exists.</p>
++                    <strong th:text="${plan.status().name() == 'PURGED' ? 'Operational purge completed' : 'Controlled purge workflow'}">Controlled purge workflow</strong>
++                    <p th:text="${plan.status().name() == 'PURGED' ? 'Original runtime, runtime-data and database were removed. Final archive, protected backups, audit metadata and clone restores were preserved.' : 'The dry run is safe. Real deletion requires two extra confirmations and only applies to the original decommissioned laboratory.'}">Message</p>
++                </div>
++            </div>
++
++            <div class="matrix26-alert-warning mb-4" th:if="${plan.status().name() == 'READY_TO_PURGE' || plan.status().name() == 'PURGING'}">
++                <i class="bi bi-exclamation-triangle"></i>
++                <div>
++                    <strong>Operational purge is armed</strong>
++                    <p>This stage can delete the original database, runtime directory and runtime-data directory. Final archive, protected backups, audit metadata and clone restores are preserved.</p>
+                 </div>
+             </div>
+ 
+             <section class="row g-3 mb-4">
+                 <div class="col-md-2"><div class="matrix26-stat-card"><span>Blockers</span><strong th:text="${plan.blockers()}">0</strong></div></div>
+-                <div class="col-md-2"><div class="matrix26-stat-card"><span>Would delete later</span><strong th:text="${plan.wouldDelete()}">0</strong></div></div>
++                <div class="col-md-2"><div class="matrix26-stat-card"><span>Delete candidates</span><strong th:text="${plan.wouldDelete()}">0</strong></div></div>
+                 <div class="col-md-2"><div class="matrix26-stat-card"><span>Would keep</span><strong th:text="${plan.wouldKeep()}">0</strong></div></div>
+                 <div class="col-md-2"><div class="matrix26-stat-card"><span>Protected</span><strong th:text="${plan.protectedResources()}">0</strong></div></div>
+                 <div class="col-md-2"><div class="matrix26-stat-card"><span>Review</span><strong th:text="${plan.reviewResources()}">0</strong></div></div>
+                 <div class="col-md-2"><div class="matrix26-stat-card"><span>Not found</span><strong th:text="${plan.missingResources()}">0</strong></div></div>
+             </section>
+ 
++            <section class="matrix26-panel mb-4" th:if="${plan.status().name() == 'DRY_RUN_READY'}">
++                <div class="matrix26-panel-header"><div><h2>Prepare operational purge</h2><p>This freezes the dry run. It does not delete anything yet.</p></div></div>
++                <form method="post" th:action="@{/control-center/purge/{id}/prepare-execution(id=${plan.id()})}" class="row g-3">
++                    <div class="col-12">
++                        <label class="form-label">Exact confirmation</label>
++                        <input class="form-control" name="confirmation" required th:placeholder="|PREPARE PURGE EXECUTION ${plan.instanceCode()}|">
++                        <div class="form-text">Type exactly: <code th:text="|PREPARE PURGE EXECUTION ${plan.instanceCode()}|">PREPARE</code></div>
++                    </div>
++                    <div class="col-12 d-flex justify-content-end"><button class="btn btn-danger" type="submit"><i class="bi bi-shield-exclamation me-1"></i>Prepare purge execution</button></div>
++                </form>
++            </section>
++
++            <section class="matrix26-panel mb-4 border border-danger" th:if="${plan.status().name() == 'READY_TO_PURGE'}">
++                <div class="matrix26-panel-header"><div><h2>Execute operational purge</h2><p>This step removes only the original archived laboratory resources.</p></div></div>
++                <form method="post" th:action="@{/control-center/purge/{id}/execute(id=${plan.id()})}" class="row g-3">
++                    <div class="col-md-6">
++                        <label class="form-label">Purge confirmation</label>
++                        <input class="form-control" name="purgeConfirmation" required th:placeholder="|PURGE INSTANCE ${plan.instanceCode()}|">
++                        <div class="form-text">Type exactly: <code th:text="|PURGE INSTANCE ${plan.instanceCode()}|">PURGE</code></div>
++                    </div>
++                    <div class="col-md-6">
++                        <label class="form-label">Database confirmation</label>
++                        <input class="form-control" name="databaseConfirmation" required th:placeholder="|DROP ARCHIVED DATABASE ${plan.databaseName()}|">
++                        <div class="form-text">Type exactly: <code th:text="|DROP ARCHIVED DATABASE ${plan.databaseName()}|">DROP</code></div>
++                    </div>
++                    <div class="col-12">
++                        <div class="matrix26-alert-warning">
++                            <i class="bi bi-exclamation-triangle"></i>
++                            <div><strong>Final destructive confirmation</strong><p>Matrix26 will delete the original database, runtime directory and runtime-data directory only. Backups, final archive, audit records and archive clone links remain preserved.</p></div>
++                        </div>
++                    </div>
++                    <div class="col-12 d-flex justify-content-end"><button class="btn btn-danger" type="submit"><i class="bi bi-trash3 me-1"></i>Execute operational purge</button></div>
++                </form>
++            </section>
++
+             <section class="row g-3 mb-4">
+                 <div class="col-xl-6">
+                     <div class="matrix26-panel h-100">
+@@ -52,14 +97,14 @@
+                             <dt class="col-sm-4">Runtime</dt><dd class="col-sm-8"><code th:text="${plan.runtimeProfile()}">runtime</code><span th:text="| · port ${plan.runtimePort()}|">port</span></dd>
+                             <dt class="col-sm-4">Final backup</dt><dd class="col-sm-8"><code th:text="${plan.finalBackupPublicId()}">BKP</code></dd>
+                             <dt class="col-sm-4">Retention</dt><dd class="col-sm-8" th:text="|${plan.retentionStatus()} · ${plan.retentionUntil() != null ? #temporals.format(plan.retentionUntil(), 'yyyy-MM-dd HH:mm:ss') : 'No date'}|">retention</dd>
+-                            <dt class="col-sm-4">Eligible later</dt><dd class="col-sm-8"><span class="badge" th:classappend="${plan.eligibleForFuturePurge() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${plan.eligibleForFuturePurge() ? 'YES' : 'NO'}">NO</span></dd>
++                            <dt class="col-sm-4">Eligible</dt><dd class="col-sm-8"><span class="badge" th:classappend="${plan.eligibleForFuturePurge() ? ' text-bg-success' : ' text-bg-warning'}" th:text="${plan.eligibleForFuturePurge() ? 'YES' : 'NO'}">NO</span></dd>
+                             <dt class="col-sm-4">Last error</dt><dd class="col-sm-8 text-danger" th:text="${plan.lastError() != null ? plan.lastError() : '—'}">—</dd>
+                         </dl>
+                     </div>
+                 </div>
+                 <div class="col-xl-6">
+                     <div class="matrix26-panel h-100">
+-                        <div class="matrix26-panel-header"><div><h2>Safety checks</h2><p>Blockers prevent any future operational purge.</p></div></div>
++                        <div class="matrix26-panel-header"><div><h2>Safety checks</h2><p>Blockers prevent operational purge.</p></div></div>
+                         <div class="table-responsive">
+                             <table class="table align-middle mb-0 matrix26-table">
+                                 <thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
+@@ -78,18 +123,20 @@
+             </section>
+ 
+             <section class="matrix26-panel mb-4">
+-                <div class="matrix26-panel-header"><div><h2>Resource classification</h2><p>Items are classified only. They are not removed.</p></div></div>
++                <div class="matrix26-panel-header"><div><h2>Resource classification and execution</h2><p>Only WOULD_DELETE items are eligible for real removal.</p></div></div>
+                 <div class="table-responsive">
+                     <table class="table align-middle mb-0 matrix26-table">
+-                        <thead><tr><th>Disposition</th><th>Resource</th><th>Path / reference</th><th>Size</th><th>Files</th><th>Detail</th></tr></thead>
++                        <thead><tr><th>Disposition</th><th>Resource</th><th>Path / reference</th><th>Size</th><th>Files</th><th>Execution</th><th>Execution detail</th><th>Detail</th></tr></thead>
+                         <tbody>
+-                        <tr th:if="${#lists.isEmpty(items)}"><td colspan="6" class="text-center text-muted py-4">No items recorded.</td></tr>
++                        <tr th:if="${#lists.isEmpty(items)}"><td colspan="8" class="text-center text-muted py-4">No items recorded.</td></tr>
+                         <tr th:each="item : ${items}">
+                             <td><span class="badge" th:classappend="${item.disposition().name() == 'WOULD_DELETE' ? ' text-bg-warning' : (item.disposition().name() == 'PROTECTED' ? ' text-bg-success' : (item.disposition().name() == 'BLOCKED' ? ' text-bg-danger' : ' text-bg-secondary'))}" th:text="${item.disposition()}">status</span></td>
+                             <td><strong th:text="${item.resourceType()}">type</strong><small class="d-block text-muted" th:text="${item.resourceName()}">name</small></td>
+                             <td><code th:text="${item.resourcePath()}">path</code></td>
+                             <td th:text="${item.sizeLabel()}">size</td>
+                             <td th:text="${item.fileCount() != null ? item.fileCount() : '—'}">files</td>
++                            <td><span class="badge" th:classappend="${item.executionStatusLabel() == 'DELETED' ? ' text-bg-danger' : (item.executionStatusLabel() == 'FAILED' ? ' text-bg-warning' : (item.executionStatusLabel() == 'PENDING' ? ' text-bg-primary' : ' text-bg-secondary'))}" th:text="${item.executionStatusLabel()}">—</span><small class="d-block text-muted" th:if="${item.executedAt() != null}" th:text="${#temporals.format(item.executedAt(), 'yyyy-MM-dd HH:mm:ss')}">time</small></td>
++                            <td th:text="${item.executionDetail() != null ? item.executionDetail() : '—'}">exec</td>
+                             <td th:text="${item.detail()}">detail</td>
+                         </tr>
+                         </tbody>
+@@ -98,7 +145,7 @@
+             </section>
+ 
+             <section class="matrix26-panel">
+-                <div class="matrix26-panel-header"><div><h2>Audit timeline</h2><p>Dry run events.</p></div></div>
++                <div class="matrix26-panel-header"><div><h2>Audit timeline</h2><p>Dry run and execution events.</p></div></div>
+                 <div class="table-responsive">
+                     <table class="table align-middle mb-0 matrix26-table">
+                         <thead><tr><th>Time</th><th>Event</th><th>Status</th><th>Actor</th><th>Detail</th></tr></thead>
+@@ -107,7 +154,7 @@
+                         <tr th:each="event : ${events}">
+                             <td th:text="${#temporals.format(event.createdAt(), 'yyyy-MM-dd HH:mm:ss')}">time</td>
+                             <td th:text="${event.eventType()}">event</td>
+-                            <td><span class="badge" th:classappend="${event.status() == 'COMPLETED' || event.status() == 'DRY_RUN_READY' ? ' text-bg-success' : (event.status() == 'FAILED' ? ' text-bg-danger' : ' text-bg-secondary')}" th:text="${event.status()}">status</span></td>
++                            <td><span class="badge" th:classappend="${event.status() == 'COMPLETED' || event.status() == 'DRY_RUN_READY' || event.status() == 'READY_TO_PURGE' || event.status() == 'PURGED' ? ' text-bg-success' : (event.status() == 'FAILED' || event.status() == 'PARTIALLY_PURGED' ? ' text-bg-danger' : ' text-bg-secondary')}" th:text="${event.status()}">status</span></td>
+                             <td th:text="${event.actor()}">actor</td>
+                             <td th:text="${event.detail()}">detail</td>
+                         </tr>
+diff -ruN matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/scripts/check-matrix26-purge-phase3h2.sh matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/scripts/check-matrix26-purge-phase3h2.sh
+--- matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/scripts/check-matrix26-purge-phase3h2.sh	1970-01-01 00:00:00.000000000 +0000
++++ matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/scripts/check-matrix26-purge-phase3h2.sh	2026-06-28 23:03:33.848253074 +0000
+@@ -0,0 +1,72 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++assert_file() {
++  local file="$1"
++  if [ ! -f "$file" ]; then
++    echo "Missing required file: $file" >&2
++    exit 1
++  fi
++}
++
++assert_contains() {
++  local file="$1"
++  local pattern="$2"
++  local label="$3"
++  if ! grep -qE "$pattern" "$file"; then
++    echo "Check failed: $label" >&2
++    echo "File: $file" >&2
++    exit 1
++  fi
++}
++
++PURGE_SRC="src/main/java/com/ecoamazonas/eco_agua/platform/control/purge"
++PURGE_TPL="src/main/resources/templates/control_center/purge"
++
++assert_file "$PURGE_SRC/Matrix26PurgeController.java"
++assert_file "$PURGE_SRC/Matrix26PurgeService.java"
++assert_file "$PURGE_SRC/Matrix26PurgeRepository.java"
++assert_file "$PURGE_SRC/Matrix26PurgeInitializer.java"
++assert_file "$PURGE_TPL/detail.html"
++assert_file scripts/configure-matrix26-purge-phase3h2.sh
++
++assert_contains "$PURGE_SRC/Matrix26PurgeStatus.java" 'READY_TO_PURGE' 'Ready-to-purge state exists'
++assert_contains "$PURGE_SRC/Matrix26PurgeStatus.java" 'PARTIALLY_PURGED' 'Partial purge state exists'
++assert_contains "$PURGE_SRC/Matrix26PurgeStatus.java" 'PURGED' 'Purged state exists'
++assert_contains "$PURGE_SRC/Matrix26PurgeController.java" 'prepare-execution' 'Prepare execution route exists'
++assert_contains "$PURGE_SRC/Matrix26PurgeController.java" '/execute' 'Execute route exists'
++assert_contains "$PURGE_SRC/Matrix26PurgeService.java" 'PREPARE PURGE EXECUTION' 'First operational confirmation is required'
++assert_contains "$PURGE_SRC/Matrix26PurgeService.java" 'PURGE INSTANCE' 'Purge instance confirmation is required'
++assert_contains "$PURGE_SRC/Matrix26PurgeService.java" 'DROP ARCHIVED DATABASE' 'Database confirmation is required'
++assert_contains "$PURGE_SRC/Matrix26PurgeService.java" 'dropSchema' 'Database drop is centralized'
++assert_contains "$PURGE_SRC/Matrix26PurgeService.java" 'deleteDirectory' 'Directory deletion is centralized'
++assert_contains "$PURGE_SRC/Matrix26PurgeService.java" 'isSafeChild' 'Directory deletion is root-bound'
++assert_contains "$PURGE_SRC/Matrix26PurgeService.java" 'Final archive, backups, archive records, decommission records, purge records, and clone restores were preserved' 'Preservation guarantee is logged'
++assert_contains "$PURGE_SRC/Matrix26PurgeRepository.java" 'DROP DATABASE' 'Database drop exists only in repository'
++assert_contains "$PURGE_SRC/Matrix26PurgeRepository.java" 'markInstancePurged' 'Instance is marked PURGED after execution'
++assert_contains "$PURGE_SRC/Matrix26PurgeInitializer.java" 'execution_status' 'Execution status columns are initialized'
++assert_contains "$PURGE_TPL/detail.html" 'READY_TO_PURGE' 'Template shows armed purge state'
++assert_contains "$PURGE_TPL/detail.html" 'Execute operational purge' 'Template exposes execution form'
++assert_contains scripts/configure-matrix26-purge-phase3h2.sh 'matrix26-archived-restore-test' 'Archive clone is protected in configuration'
++
++if grep -RniE 'DROP DATABASE|DROP SCHEMA|Files\.delete|deleteRecursively|deleteIfExists|removeDirectory' \
++  src/main/java/com/ecoamazonas/eco_agua/platform/control \
++  | grep -v 'src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeRepository.java' \
++  | grep -v 'src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeService.java' \
++  | grep -v 'Matrix26Backup' \
++  | grep -v 'Matrix26FullBackupAssembler' \
++  | grep -v 'Matrix26RuntimeControlService' \
++  | grep -v 'Matrix26BrandingService' \
++  | grep -v 'Matrix26ProvisioningAppearanceService' \
++  | grep -v 'Matrix26Restore' \
++  | grep -v 'Matrix26InPlaceRestore'; then
++  echo "Unexpected destructive operation outside known controlled services." >&2
++  exit 1
++fi
++
++echo "Operational purge states and routes: OK"
++echo "Triple confirmation flow: OK"
++echo "Final archive and clone preservation gates: OK"
++echo "Database drop and directory deletion are centralized and guarded: OK"
++echo "Execution evidence columns and UI: OK"
++echo "Matrix26 Purge Manager Phase 3H.2 static checks passed."
+diff -ruN matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/scripts/configure-matrix26-purge-phase3h2.sh matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/scripts/configure-matrix26-purge-phase3h2.sh
+--- matrix26_3h2_orig/matrix26-purge-phase3h2-context-20260628-175230/scripts/configure-matrix26-purge-phase3h2.sh	1970-01-01 00:00:00.000000000 +0000
++++ matrix26_3h2_work/matrix26-purge-phase3h2-context-20260628-175230/scripts/configure-matrix26-purge-phase3h2.sh	2026-06-28 23:02:53.344915565 +0000
+@@ -0,0 +1,37 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++CONFIG_FILE="runtime-clients/matrix26_control/application.properties"
++MAINTENANCE_DIR="runtime-data/matrix26-control/maintenance"
++BACKUP_FILE="$MAINTENANCE_DIR/application.properties.phase3h2.bak"
++
++if [ ! -f "$CONFIG_FILE" ]; then
++  echo "Matrix26 Control Center runtime configuration was not found: $CONFIG_FILE" >&2
++  exit 1
++fi
++
++mkdir -p "$MAINTENANCE_DIR"
++cp "$CONFIG_FILE" "$BACKUP_FILE"
++
++set_property() {
++  local key="$1"
++  local value="$2"
++  if grep -qE "^[[:space:]]*${key//./\\.}=" "$CONFIG_FILE"; then
++    sed -i -E "s|^[[:space:]]*${key//./\\.}=.*|${key}=${value}|" "$CONFIG_FILE"
++  else
++    printf '\n%s=%s\n' "$key" "$value" >> "$CONFIG_FILE"
++  fi
++}
++
++set_property "matrix26.control-center.purge.enabled" "true"
++set_property "matrix26.control-center.purge.execution-enabled" "true"
++set_property "matrix26.control-center.purge.allowed-instance-codes" "matrix26-appearance-lab"
++set_property "matrix26.control-center.purge.protected-instance-codes" "eco-agua,productos-selva-belen,restaurante-buen-sabor,matrix26-control-center,matrix26-archived-restore-test"
++set_property "matrix26.control-center.purge.minimum-reason-length" "10"
++set_property "matrix26.control-center.purge.require-retention-expired" "false"
++set_property "matrix26.control-center.purge.runtime-directory" "runtime-clients"
++set_property "matrix26.control-center.purge.data-directory" "runtime-data"
++set_property "matrix26.control-center.purge.backup-root-directory" "C:/Users/PC/Matrix26/backups"
++
++echo "Matrix26 Purge Manager Phase 3H.2 configuration updated."
++echo "Backup saved at: $BACKUP_FILE"

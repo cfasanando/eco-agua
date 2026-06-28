@@ -19,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -78,7 +79,7 @@ public class Matrix26PurgeService {
 
     public Matrix26PurgePlan plan(long id) {
         return repository.findPlan(id)
-                .orElseThrow(() -> new Matrix26PurgeException("The purge dry run plan does not exist."));
+                .orElseThrow(() -> new Matrix26PurgeException("The purge plan does not exist."));
     }
 
     public List<Matrix26PurgeItem> items(long planId) {
@@ -148,19 +149,92 @@ public class Matrix26PurgeService {
     public Matrix26PurgePlan refresh(long planId, String actor) {
         validateEnabled();
         Matrix26PurgePlan plan = plan(planId);
+        if (plan.status() == Matrix26PurgeStatus.PURGING || plan.status() == Matrix26PurgeStatus.PURGED) {
+            throw new Matrix26PurgeException("This purge plan is already executing or completed and cannot be refreshed.");
+        }
         repository.addEvent(planId, "PURGE_DRY_RUN_REFRESH_REQUESTED", "COMPLETED", safeActor(actor),
                 "Dry run refresh requested. Previous evidence remains stored; current run will be shown on the detail page.");
         return evaluate(planId, safeActor(actor));
     }
 
+    public Matrix26PurgePlan prepareExecution(long planId, String confirmation, String actor) {
+        validateExecutionEnabled();
+        Matrix26PurgePlan plan = plan(planId);
+        if (plan.status() != Matrix26PurgeStatus.DRY_RUN_READY) {
+            throw new Matrix26PurgeException("Only a DRY_RUN_READY plan can be prepared for operational purge.");
+        }
+        String expected = "PREPARE PURGE EXECUTION " + plan.instanceCode();
+        if (!expected.equals(confirmation == null ? "" : confirmation.trim())) {
+            throw new Matrix26PurgeException("Type exactly: " + expected);
+        }
+        assertExecutionSafety(plan, true);
+        repository.prepareExecutionItems(plan.id(), currentRun(plan));
+        repository.updatePlanStatus(plan.id(), Matrix26PurgeStatus.READY_TO_PURGE, null);
+        repository.addEvent(plan.id(), "PURGE_EXECUTION_PREPARED", Matrix26PurgeStatus.READY_TO_PURGE.name(), safeActor(actor),
+                "The dry run was frozen for controlled operational purge. No resource was deleted yet.");
+        return plan(plan.id());
+    }
+
+    public Matrix26PurgePlan execute(long planId, String purgeConfirmation, String databaseConfirmation, String actor) {
+        validateExecutionEnabled();
+        Matrix26PurgePlan plan = plan(planId);
+        if (plan.status() != Matrix26PurgeStatus.READY_TO_PURGE && plan.status() != Matrix26PurgeStatus.PARTIALLY_PURGED) {
+            throw new Matrix26PurgeException("Only a READY_TO_PURGE plan can execute operational purge.");
+        }
+        String expectedPurge = "PURGE INSTANCE " + plan.instanceCode();
+        if (!expectedPurge.equals(purgeConfirmation == null ? "" : purgeConfirmation.trim())) {
+            throw new Matrix26PurgeException("Type exactly: " + expectedPurge);
+        }
+        String expectedDatabase = "DROP ARCHIVED DATABASE " + plan.databaseName();
+        if (!expectedDatabase.equals(databaseConfirmation == null ? "" : databaseConfirmation.trim())) {
+            throw new Matrix26PurgeException("Type exactly: " + expectedDatabase);
+        }
+
+        assertExecutionSafety(plan, false);
+        repository.updatePlanStatus(plan.id(), Matrix26PurgeStatus.PURGING, null);
+        repository.markInstancePurging(plan.instanceId(), safeActor(actor));
+        repository.addEvent(plan.id(), "PURGE_EXECUTION_STARTED", Matrix26PurgeStatus.PURGING.name(), safeActor(actor),
+                "Operational purge started after explicit confirmations. Final archive and audit records will be preserved.");
+
+        List<String> failures = new ArrayList<>();
+        for (Matrix26PurgeItem item : repository.items(plan.id())) {
+            if (item.disposition() != Matrix26PurgeDisposition.WOULD_DELETE) {
+                continue;
+            }
+            try {
+                executeItem(plan, item);
+            } catch (RuntimeException ex) {
+                failures.add(item.resourceType() + ": " + ex.getMessage());
+                repository.updateItemExecutionStatus(item.id(), "FAILED", ex.getMessage());
+                repository.addEvent(plan.id(), "PURGE_ITEM_FAILED", "FAILED", safeActor(actor),
+                        item.resourceType() + " failed: " + ex.getMessage());
+            }
+        }
+
+        if (failures.isEmpty()) {
+            repository.markInstancePurged(plan.instanceId(), safeActor(actor));
+            repository.updatePlanStatus(plan.id(), Matrix26PurgeStatus.PURGED, null);
+            repository.addEvent(plan.id(), "PURGE_EXECUTION_COMPLETED", Matrix26PurgeStatus.PURGED.name(), safeActor(actor),
+                    "Operational purge completed. Deleted items: " + repository.deletedItemCount(plan.id())
+                            + ". Final archive, backups, archive records, decommission records, purge records, and clone restores were preserved.");
+        } else {
+            String error = String.join(" | ", failures);
+            repository.markInstanceManualReview(plan.instanceId(), error);
+            repository.updatePlanStatus(plan.id(), Matrix26PurgeStatus.PARTIALLY_PURGED, error);
+            repository.addEvent(plan.id(), "PURGE_EXECUTION_PARTIAL", Matrix26PurgeStatus.PARTIALLY_PURGED.name(), safeActor(actor),
+                    "Operational purge stopped with " + failures.size() + " failure(s): " + error);
+        }
+        return plan(plan.id());
+    }
+
     public String report(long planId) {
         Matrix26PurgePlan plan = plan(planId);
         StringBuilder builder = new StringBuilder();
-        builder.append("Matrix26 Purge Manager - Dry Run Report\n");
+        builder.append("Matrix26 Purge Manager - Operational Report\n");
         builder.append("Plan: ").append(plan.publicId()).append('\n');
         builder.append("Instance: ").append(plan.instanceName()).append(" (").append(plan.instanceCode()).append(")\n");
         builder.append("Status: ").append(plan.status()).append('\n');
-        builder.append("Eligible for future purge: ").append(plan.eligibleForFuturePurge()).append('\n');
+        builder.append("Eligible for purge: ").append(plan.eligibleForFuturePurge()).append('\n');
         builder.append("Reason: ").append(plan.reason()).append("\n\n");
         builder.append("Checks\n");
         for (Matrix26PurgeCheck check : checks(planId)) {
@@ -172,10 +246,12 @@ public class Matrix26PurgeService {
             builder.append("- [").append(item.disposition()).append("] ")
                     .append(item.resourceType()).append(" | ").append(item.resourceName())
                     .append(" | ").append(nullToBlank(item.resourcePath()))
-                    .append(" | ").append(nullToBlank(item.detail()))
+                    .append(" | execution=").append(item.executionStatusLabel())
+                    .append(" | ").append(nullToBlank(item.executionDetail()))
                     .append('\n');
         }
-        builder.append("\nDeleted resources in Phase 3H.1: 0\n");
+        builder.append("\nDeleted resources in Phase 3H.2: ").append(repository.deletedItemCount(planId)).append('\n');
+        builder.append("Preserved: final archive, protected backups, decommission records, archive records, purge records, and archive clone links.\n");
         return builder.toString();
     }
 
@@ -191,34 +267,30 @@ public class Matrix26PurgeService {
                     .orElseThrow(() -> new Matrix26PurgeException("The archived instance registry entry is missing."));
 
             check(planId, runNumber, "FEATURE_ENABLED", "Purge Manager dry run enabled",
-                    properties.isEnabled(), "Only non-destructive classification is available in Phase 3H.1.");
-            check(planId, runNumber, "ALLOWLIST", "Instance is allowlisted for dry run",
+                    properties.isEnabled(), "Non-destructive classification is always completed before operational purge.");
+            check(planId, runNumber, "ALLOWLIST", "Instance is allowlisted for purge planning",
                     allowlisted(instance.getCode()), "Allowed instance codes: " + properties.getAllowedInstanceCodes());
             check(planId, runNumber, "PROTECTED_INSTANCE", "Instance is not protected",
                     !instance.isProtectedInstance() && !protectedCode(instance.getCode()),
-                    "Protected runtime clients 8081, 8082, 8084 and Matrix26 8091 are blocked.");
+                    "Protected runtime clients 8081, 8082, 8084, Matrix26 8091 and archive clones are blocked.");
             check(planId, runNumber, "DECOMMISSIONED", "Original instance is decommissioned",
-                    "DECOMMISSIONED".equalsIgnoreCase(instance.getStatus()),
+                    "DECOMMISSIONED".equalsIgnoreCase(instance.getStatus())
+                            || "PURGED".equalsIgnoreCase(instance.getStatus())
+                            || "PURGING".equalsIgnoreCase(instance.getStatus()),
                     "Current instance status: " + instance.getStatus());
             check(planId, runNumber, "ARCHIVE_READY", "Final archive is ready",
                     "READY".equalsIgnoreCase(archive.archiveStatus()),
                     "Current archive status: " + archive.archiveStatus());
 
-            Matrix26BackupEncryption encryption = plan.finalBackupJobId() == null
-                    ? null
-                    : backupSecurityService.metadata(plan.finalBackupJobId());
-            boolean finalBackupOk = encryption != null
-                    && encryption.encrypted()
-                    && encryption.retentionClass() == Matrix26BackupRetentionClass.FINAL
-                    && encryption.protectedFlag()
-                    && encryption.verificationStatus() == Matrix26BackupVerificationState.VERIFIED;
+            Matrix26BackupEncryption encryption = finalBackupMetadata(plan);
+            boolean finalBackupOk = finalBackupOk(encryption);
             check(planId, runNumber, "FINAL_BACKUP", "Final backup is encrypted, FINAL, protected, and VERIFIED",
                     finalBackupOk,
                     encryption == null ? "No encrypted backup metadata found." : "Package SHA-256: " + nullToBlank(encryption.packageSha256()));
 
             boolean retentionExpired = archive.retentionUntil() != null && !archive.retentionUntil().isAfter(LocalDateTime.now());
             boolean retentionAllowed = !properties.isRequireRetentionExpired() || retentionExpired;
-            check(planId, runNumber, "RETENTION", "Retention policy does not allow operational purge yet unless configured",
+            check(planId, runNumber, "RETENTION", "Retention policy allows the configured purge stage",
                     retentionAllowed,
                     archive.retentionUntil() == null
                             ? "No retention date found."
@@ -228,17 +300,20 @@ public class Matrix26PurgeService {
             check(planId, runNumber, "ORIGINAL_PORT", "Original runtime port is free",
                     portAvailable,
                     instance.getRuntimePort() == null ? "No runtime port configured." : "Port " + instance.getRuntimePort());
-            check(planId, runNumber, "NO_ACTIVE_OPERATIONS", "No active backup or restore blocks the dry run",
+            check(planId, runNumber, "NO_ACTIVE_OPERATIONS", "No active backup or restore blocks the plan",
                     !repository.hasActiveBackupOrRestore(instance.getId(), instance.getCode()),
                     "Active backup, clone restore, and in-place restore states are checked in Matrix26 metadata.");
+            check(planId, runNumber, "NO_ACTIVE_ARCHIVE_RESTORE", "No active archive clone restore is running",
+                    !repository.hasActiveArchiveCloneRestore(archive.id()),
+                    "Existing completed clones are preserved; only active clone restore jobs block execution.");
             check(planId, runNumber, "SCHEDULES_DISABLED", "Backup schedules are disabled",
                     !repository.hasEnabledSchedules(instance.getId()),
                     "Total schedules registered: " + repository.totalSchedules(instance.getId()));
 
             int cloneCount = repository.associatedCloneCount(archive.id());
-            check(planId, runNumber, "ARCHIVE_CLONES", "Archive restore clones require review before real purge",
+            check(planId, runNumber, "ARCHIVE_CLONES", "Archive restore clones are preserved",
                     true,
-                    cloneCount == 0 ? "No clone restore links were found." : cloneCount + " clone restore link(s) are associated with this archive.");
+                    cloneCount == 0 ? "No clone restore links were found." : cloneCount + " clone restore link(s) are associated with this archive and will not be purged.");
 
             classifyDatabase(planId, runNumber, instance, dispositions);
             classifyDirectory(planId, runNumber, "RUNTIME_DIRECTORY", instance.getRuntimeProfile(),
@@ -264,6 +339,107 @@ public class Matrix26PurgeService {
         }
     }
 
+    private void assertExecutionSafety(Matrix26PurgePlan plan, boolean preparing) {
+        if (!allowlisted(plan.instanceCode()) || protectedCode(plan.instanceCode())) {
+            throw new Matrix26PurgeException("The selected instance is not allowed for operational purge.");
+        }
+        if (plan.blockers() > 0 || !plan.eligibleForFuturePurge()) {
+            throw new Matrix26PurgeException("The purge plan still has blockers. Refresh the dry run and resolve blockers first.");
+        }
+        Matrix26ArchiveRecord archive = archiveRepository.findById(plan.archiveRecordId())
+                .orElseThrow(() -> new Matrix26PurgeException("The archive record no longer exists."));
+        PlatformBusinessClient instance = clientRepository.findById(plan.instanceId())
+                .orElseThrow(() -> new Matrix26PurgeException("The archived instance registry entry is missing."));
+        if (!"READY".equalsIgnoreCase(archive.archiveStatus())) {
+            throw new Matrix26PurgeException("The final archive must remain READY before purge execution.");
+        }
+        if (!"DECOMMISSIONED".equalsIgnoreCase(instance.getStatus())
+                && !"PURGING".equalsIgnoreCase(instance.getStatus())
+                && !"MANUAL_REVIEW_REQUIRED".equalsIgnoreCase(instance.getStatus())) {
+            throw new Matrix26PurgeException("The original instance must be DECOMMISSIONED before purge execution. Current status: " + instance.getStatus());
+        }
+        if (instance.getRuntimePort() != null && !isPortAvailable(instance.getRuntimePort())) {
+            throw new Matrix26PurgeException("The original runtime port is still busy: " + instance.getRuntimePort());
+        }
+        if (repository.hasEnabledSchedules(instance.getId())) {
+            throw new Matrix26PurgeException("Enabled backup schedules still exist for the archived instance.");
+        }
+        if (repository.hasActiveBackupOrRestore(instance.getId(), instance.getCode())) {
+            throw new Matrix26PurgeException("An active backup or restore still references the archived instance.");
+        }
+        if (repository.hasActiveArchiveCloneRestore(archive.id())) {
+            throw new Matrix26PurgeException("An archive clone restore is still running. Wait until it completes before purging the original resources.");
+        }
+        Matrix26BackupEncryption encryption = finalBackupMetadata(plan);
+        if (!finalBackupOk(encryption)) {
+            throw new Matrix26PurgeException("The final backup is not encrypted, FINAL, protected and VERIFIED anymore.");
+        }
+        if (preparing && plan.status() != Matrix26PurgeStatus.DRY_RUN_READY) {
+            throw new Matrix26PurgeException("The plan must be DRY_RUN_READY before preparation.");
+        }
+    }
+
+    private void executeItem(Matrix26PurgePlan plan, Matrix26PurgeItem item) {
+        switch (item.resourceType()) {
+            case "DATABASE" -> purgeDatabase(plan, item);
+            case "RUNTIME_DIRECTORY" -> purgeDirectory(item, Path.of(properties.getRuntimeDirectory()), "runtime");
+            case "RUNTIME_DATA_DIRECTORY" -> purgeDirectory(item, Path.of(properties.getDataDirectory()), "runtime-data");
+            default -> repository.updateItemExecutionStatus(item.id(), "SKIPPED_KEEP",
+                    "This WOULD_DELETE item type has no operational purge handler and was preserved.");
+        }
+    }
+
+    private void purgeDatabase(Matrix26PurgePlan plan, Matrix26PurgeItem item) {
+        String database = nullToBlank(plan.databaseName());
+        if (database.isBlank()) {
+            repository.updateItemExecutionStatus(item.id(), "NOT_FOUND", "No database name exists in the plan.");
+            return;
+        }
+        if (!database.equals(item.resourceName())) {
+            throw new Matrix26PurgeException("Database item does not match the frozen plan.");
+        }
+        if (!repository.schemaExists(database)) {
+            repository.updateItemExecutionStatus(item.id(), "NOT_FOUND", "The database schema was already absent.");
+            return;
+        }
+        repository.dropSchema(database);
+        if (repository.schemaExists(database)) {
+            throw new Matrix26PurgeException("The database still exists after DROP DATABASE.");
+        }
+        repository.updateItemExecutionStatus(item.id(), "DELETED", "Archived database schema dropped after explicit confirmation.");
+    }
+
+    private void purgeDirectory(Matrix26PurgeItem item, Path root, String label) {
+        Path rootPath = root.toAbsolutePath().normalize();
+        Path target = Path.of(nullToBlank(item.resourcePath())).toAbsolutePath().normalize();
+        if (!isSafeChild(rootPath, target)) {
+            throw new Matrix26PurgeException("Unsafe " + label + " path refused: " + target);
+        }
+        if (!Files.exists(target)) {
+            repository.updateItemExecutionStatus(item.id(), "NOT_FOUND", "The " + label + " directory was already absent.");
+            return;
+        }
+        deleteDirectory(target);
+        if (Files.exists(target)) {
+            throw new Matrix26PurgeException("The " + label + " directory still exists after deletion: " + target);
+        }
+        repository.updateItemExecutionStatus(item.id(), "DELETED", "Archived " + label + " directory deleted after explicit confirmation.");
+    }
+
+    private void deleteDirectory(Path directory) {
+        try (Stream<Path> stream = Files.walk(directory)) {
+            for (Path path : stream.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        } catch (IOException ex) {
+            throw new Matrix26PurgeException("Could not delete directory " + directory + ": " + ex.getMessage());
+        }
+    }
+
+    private boolean isSafeChild(Path root, Path target) {
+        return target.startsWith(root) && !target.equals(root);
+    }
+
     private void classifyDatabase(long planId, int runNumber, PlatformBusinessClient instance, List<Matrix26PurgeDisposition> dispositions) {
         String database = nullToBlank(instance.getDatabaseName());
         if (database.isBlank()) {
@@ -278,7 +454,7 @@ public class Matrix26PurgeService {
         }
         item(planId, runNumber, "DATABASE", database, database, Matrix26PurgeDisposition.WOULD_DELETE,
                 repository.databaseSizeBytes(database), repository.tableCount(database),
-                "Future operational purge would drop only this archived laboratory schema after separate confirmations. Phase 3H.1 does not execute a schema removal command.", dispositions);
+                "Operational purge will drop only this archived laboratory schema after separate confirmations.", dispositions);
     }
 
     private void classifyDirectory(long planId, int runNumber, String type, String name, Path path, List<Matrix26PurgeDisposition> dispositions) {
@@ -291,7 +467,7 @@ public class Matrix26PurgeService {
         DirectorySnapshot snapshot = snapshot(normalized);
         item(planId, runNumber, type, nullToBlank(name), normalized.toString(), Matrix26PurgeDisposition.WOULD_DELETE,
                 snapshot.sizeBytes(), snapshot.fileCount(),
-                "Future operational purge would remove this archived laboratory directory. Phase 3H.1 only inventories it.", dispositions);
+                "Operational purge will remove this archived laboratory directory after separate confirmations.", dispositions);
     }
 
     private void classifyBackupRoot(
@@ -311,7 +487,7 @@ public class Matrix26PurgeService {
         DirectorySnapshot snapshot = snapshot(root);
         item(planId, runNumber, "BACKUP_ROOT", instance.getCode(), root.toString(), Matrix26PurgeDisposition.WOULD_KEEP,
                 snapshot.sizeBytes(), snapshot.fileCount(),
-                "Backups stay preserved during Phase 3H.1. A future phase must protect the FINAL archive before considering non-final backups.", dispositions);
+                "Backups stay preserved during operational purge. FINAL archives remain protected.", dispositions);
         item(planId, runNumber, "FINAL_BACKUP", archive.finalBackupPublicId(), archive.finalBackupSha256(),
                 finalBackupOk ? Matrix26PurgeDisposition.PROTECTED : Matrix26PurgeDisposition.BLOCKED,
                 null, null,
@@ -329,16 +505,16 @@ public class Matrix26PurgeService {
             List<Matrix26PurgeDisposition> dispositions
     ) {
         item(planId, runNumber, "INSTANCE_REGISTRY", instance.getCode(), "platform_business_client", Matrix26PurgeDisposition.WOULD_KEEP,
-                null, null, "The historical instance row remains as audit evidence in this dry run.", dispositions);
+                null, null, "The historical instance row remains as audit evidence and is marked PURGED after execution.", dispositions);
         item(planId, runNumber, "DECOMMISSION_RECORDS", archive.decommissionPublicId(), "matrix26_decommission_*", Matrix26PurgeDisposition.WOULD_KEEP,
                 null, null, "Decommission records stay available for governance and future audit.", dispositions);
         item(planId, runNumber, "ARCHIVE_RECORDS", archive.publicId(), "matrix26_archive_*", Matrix26PurgeDisposition.WOULD_KEEP,
                 null, cloneCount, "Archive records and restore links stay available; clone restores are not confused with the original instance.", dispositions);
         item(planId, runNumber, "SCHEDULES", instance.getCode(), "matrix26_backup_schedule", Matrix26PurgeDisposition.WOULD_KEEP,
-                null, repository.totalSchedules(instance.getId()), "Disabled schedule metadata stays preserved in this dry run.", dispositions);
+                null, repository.totalSchedules(instance.getId()), "Disabled schedule metadata stays preserved.", dispositions);
         if (cloneCount > 0) {
             item(planId, runNumber, "ARCHIVE_CLONE_LINKS", archive.publicId(), "matrix26_archive_restore_link", Matrix26PurgeDisposition.REQUIRES_REVIEW,
-                    null, cloneCount, "Associated clone restore links exist. A real purge must confirm whether clones are still needed.", dispositions);
+                    null, cloneCount, "Associated clone restore links exist and will be preserved.", dispositions);
         }
     }
 
@@ -414,6 +590,22 @@ public class Matrix26PurgeService {
         return new DirectorySnapshot(bytes, files);
     }
 
+    private Matrix26BackupEncryption finalBackupMetadata(Matrix26PurgePlan plan) {
+        return plan.finalBackupJobId() == null ? null : backupSecurityService.metadata(plan.finalBackupJobId());
+    }
+
+    private boolean finalBackupOk(Matrix26BackupEncryption encryption) {
+        return encryption != null
+                && encryption.encrypted()
+                && encryption.retentionClass() == Matrix26BackupRetentionClass.FINAL
+                && encryption.protectedFlag()
+                && encryption.verificationStatus() == Matrix26BackupVerificationState.VERIFIED;
+    }
+
+    private int currentRun(Matrix26PurgePlan plan) {
+        return plan.runNumber() == null ? 1 : plan.runNumber();
+    }
+
     private boolean isPortAvailable(int port) {
         try (ServerSocket socket = new ServerSocket()) {
             socket.setReuseAddress(false);
@@ -427,6 +619,13 @@ public class Matrix26PurgeService {
     private void validateEnabled() {
         if (!properties.isEnabled()) {
             throw new Matrix26PurgeException("Purge Manager is disabled in Matrix26 configuration.");
+        }
+    }
+
+    private void validateExecutionEnabled() {
+        validateEnabled();
+        if (!properties.isExecutionEnabled()) {
+            throw new Matrix26PurgeException("Operational purge execution is disabled in Matrix26 configuration.");
         }
     }
 

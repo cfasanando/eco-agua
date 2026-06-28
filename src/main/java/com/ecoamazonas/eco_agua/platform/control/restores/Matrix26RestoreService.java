@@ -139,6 +139,58 @@ public class Matrix26RestoreService {
     public Matrix26RestoreProperties properties() { return properties; }
 
     public Matrix26RestoreJob restoreClone(long backupJobId, boolean startAfterRestore, String confirmation, String actor) {
+        return restoreCloneToTarget(
+                backupJobId,
+                properties.getTargetInstanceCode(),
+                properties.getTargetInstanceName(),
+                properties.getTargetDatabaseName(),
+                properties.getTargetRuntimeProfile(),
+                properties.getTargetRuntimePort(),
+                properties.getTargetPublicUrl(),
+                startAfterRestore,
+                confirmation,
+                actor
+        );
+    }
+
+    public Matrix26RestoreJob restoreArchivedClone(
+            long backupJobId,
+            String targetInstanceCode,
+            String targetInstanceName,
+            String targetDatabaseName,
+            String targetRuntimeProfile,
+            int targetRuntimePort,
+            String targetPublicUrl,
+            boolean startAfterRestore,
+            String confirmation,
+            String actor
+    ) {
+        return restoreCloneToTarget(
+                backupJobId,
+                targetInstanceCode,
+                targetInstanceName,
+                targetDatabaseName,
+                targetRuntimeProfile,
+                targetRuntimePort,
+                targetPublicUrl,
+                startAfterRestore,
+                confirmation,
+                actor
+        );
+    }
+
+    private Matrix26RestoreJob restoreCloneToTarget(
+            long backupJobId,
+            String targetInstanceCode,
+            String targetInstanceName,
+            String targetDatabaseName,
+            String targetRuntimeProfile,
+            int targetRuntimePort,
+            String targetPublicUrl,
+            boolean startAfterRestore,
+            String confirmation,
+            String actor
+    ) {
         if (!properties.isEnabled()) {
             throw new Matrix26RestoreException("Restore Manager is disabled.");
         }
@@ -152,21 +204,38 @@ public class Matrix26RestoreService {
         if (!candidate.eligible()) {
             throw new Matrix26RestoreException(candidate.reason());
         }
-        String expectedConfirmation = "RESTORE " + properties.getTargetInstanceCode();
+        String expectedConfirmation = "RESTORE " + safeIdentifier(targetInstanceCode);
         if (!expectedConfirmation.equals(confirmation == null ? "" : confirmation.trim())) {
             throw new Matrix26RestoreException("Type exactly: " + expectedConfirmation);
         }
-        validateTargetAvailable();
 
         Matrix26BackupJob backup = candidate.backup();
-        String publicId = "RST-" + LocalDateTime.now().format(ID_TIME) + "-" + Long.toHexString(System.nanoTime()).toUpperCase(Locale.ROOT);
         Matrix26RestoreJob draft = new Matrix26RestoreJob(
-                null, publicId, backup.id(), backup.publicId(), backup.instanceId(), backup.instanceCode(),
-                backup.instanceName(), backup.databaseName(), null, properties.getTargetInstanceCode(),
-                properties.getTargetInstanceName(), properties.getTargetDatabaseName(), properties.getTargetRuntimeProfile(),
-                properties.getTargetRuntimePort(), properties.getTargetPublicUrl(), Matrix26RestoreStatus.DRAFT,
-                startAfterRestore, safeActor(actor), LocalDateTime.now(), null, null, null, null
+                null,
+                "RST-" + LocalDateTime.now().format(ID_TIME) + "-" + Long.toHexString(System.nanoTime()).toUpperCase(Locale.ROOT),
+                backup.id(),
+                backup.publicId(),
+                backup.instanceId(),
+                backup.instanceCode(),
+                backup.instanceName(),
+                backup.databaseName(),
+                null,
+                safeIdentifier(targetInstanceCode),
+                limit(targetInstanceName == null || targetInstanceName.isBlank() ? targetInstanceCode : targetInstanceName.trim(), 180),
+                safeIdentifier(targetDatabaseName),
+                safeIdentifier(targetRuntimeProfile),
+                targetRuntimePort,
+                targetPublicUrl == null || targetPublicUrl.isBlank() ? "http://localhost:" + targetRuntimePort : targetPublicUrl.trim(),
+                Matrix26RestoreStatus.DRAFT,
+                startAfterRestore,
+                safeActor(actor),
+                LocalDateTime.now(),
+                null,
+                null,
+                null,
+                null
         );
+        validateTargetAvailable(draft);
         long jobId = restoreRepository.insertJob(draft);
         createSteps(jobId);
         execute(jobId, candidate, actor);
@@ -499,7 +568,7 @@ public class Matrix26RestoreService {
 
             runStep(jobId, "VALIDATE_BACKUP", Matrix26RestoreStatus.VALIDATING,
                     "Validating encrypted backup and isolated destination.", () -> {
-                        validateTargetAvailable();
+                        validateTargetAvailable(job);
                         restoreRepository.insertVerification(jobId, "TARGET_ISOLATION", "Target isolation", "PASSED",
                                 "Database, port, runtime profile, instance code, and directories are available.");
                     });
@@ -609,11 +678,11 @@ public class Matrix26RestoreService {
         restoreRepository.completeStep(jobId, code, detail.replace("Validating", "Validated"));
     }
 
-    private void validateTargetAvailable() {
-        String code = safeIdentifier(properties.getTargetInstanceCode());
-        String database = safeIdentifier(properties.getTargetDatabaseName());
-        String runtime = safeIdentifier(properties.getTargetRuntimeProfile());
-        int port = properties.getTargetRuntimePort();
+    private void validateTargetAvailable(Matrix26RestoreJob job) {
+        String code = safeIdentifier(job.targetInstanceCode());
+        String database = safeIdentifier(job.targetDatabaseName());
+        String runtime = safeIdentifier(job.targetRuntimeProfile());
+        int port = job.targetRuntimePort();
         if (clientRepository.existsByCodeIgnoreCase(code)) throw new Matrix26RestoreException("Target instance code already exists: " + code);
         if (clientRepository.existsByDatabaseNameIgnoreCase(database)) throw new Matrix26RestoreException("Target database is already registered: " + database);
         if (clientRepository.existsByRuntimeProfileIgnoreCase(runtime)) throw new Matrix26RestoreException("Target runtime profile already exists: " + runtime);

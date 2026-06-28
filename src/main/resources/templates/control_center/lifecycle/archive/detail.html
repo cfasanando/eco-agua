@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Archive detail')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Archive detail', 'Final archive evidence and clone recovery controls.')}"></header>
+        <main class="matrix26-main">
+            <div th:if="${archiveSuccess}" class="alert alert-success" th:text="${archiveSuccess}"></div>
+            <div th:if="${archiveError}" class="alert alert-danger" th:text="${archiveError}"></div>
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <div>
+                    <h1 class="h4 mb-1" th:text="${record.publicId()}">ARC</h1>
+                    <p class="text-muted mb-0" th:text="|${record.instanceName()} · ${record.instanceCode()}|">Instance</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <span class="badge fs-6" th:classappend="${record.archiveStatus() == 'READY' ? ' text-bg-success' : ' text-bg-warning'}" th:text="${record.archiveStatus()}">READY</span>
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/archive}"><i class="bi bi-arrow-left me-1"></i>Archive Manager</a>
+                </div>
+            </div>
+
+            <section class="row g-3 mb-4">
+                <div class="col-xl-7">
+                    <div class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><h2>Final archive evidence</h2><p>Historical state and protected backup metadata.</p></div></div>
+                        <dl class="row mb-0 matrix26-definition-list">
+                            <dt class="col-sm-4">Instance status</dt><dd class="col-sm-8"><span class="badge text-bg-dark" th:text="${record.instanceStatus()}">DECOMMISSIONED</span></dd>
+                            <dt class="col-sm-4">Decommission job</dt><dd class="col-sm-8"><code th:text="${record.decommissionPublicId()}">DCM</code></dd>
+                            <dt class="col-sm-4">Final backup</dt><dd class="col-sm-8"><code th:text="${record.finalBackupPublicId()}">BKP</code></dd>
+                            <dt class="col-sm-4">Package SHA-256</dt><dd class="col-sm-8"><code th:text="${record.finalBackupSha256() != null ? record.finalBackupSha256() : 'Not available'}">sha</code></dd>
+                            <dt class="col-sm-4">Key ID</dt><dd class="col-sm-8"><code th:text="${record.finalBackupKeyId() != null ? record.finalBackupKeyId() : 'Not available'}">key</code></dd>
+                            <dt class="col-sm-4">Retention</dt><dd class="col-sm-8" th:text="|${record.retentionStatus()} · ${record.retentionUntil() != null ? #temporals.format(record.retentionUntil(), 'yyyy-MM-dd HH:mm:ss') : 'No date'}|">retention</dd>
+                            <dt class="col-sm-4">Inventory</dt><dd class="col-sm-8" th:text="${record.inventorySummary()}">summary</dd>
+                            <dt class="col-sm-4">Last error</dt><dd class="col-sm-8 text-danger" th:text="${record.lastError() != null ? record.lastError() : '—'}">—</dd>
+                        </dl>
+                    </div>
+                </div>
+                <div class="col-xl-5">
+                    <div class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><h2>Restore as clone</h2><p>The original remains decommissioned. A new isolated runtime is created.</p></div></div>
+                        <div class="matrix26-alert-warning mb-3">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <div><strong>Target must be empty</strong><p th:text="|Matrix26 will create ${cloneCode}, database ${cloneDatabase}, runtime ${cloneRuntime}, and port ${clonePort}.|">Target</p></div>
+                        </div>
+                        <form method="post" th:action="@{/control-center/lifecycle/archive/{id}/verify(id=${record.id()})}" class="mb-3">
+                            <button class="btn btn-outline-primary" type="submit"><i class="bi bi-shield-check me-1"></i>Verify final archive again</button>
+                        </form>
+                        <form method="post" th:action="@{/control-center/lifecycle/archive/{id}/restore-as-clone(id=${record.id()})}">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="startAfterRestore" name="startAfterRestore" value="true" checked>
+                                <label class="form-check-label" for="startAfterRestore">Start clone after restore</label>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="confirmation">Exact confirmation</label>
+                                <input class="form-control font-monospace" id="confirmation" name="confirmation" th:placeholder="${restoreConfirmation}" required>
+                                <div class="form-text">Type: <code th:text="${restoreConfirmation}">RESTORE ARCHIVE matrix26-archived-restore-test</code></div>
+                            </div>
+                            <button class="btn btn-primary" type="submit" th:disabled="${!record.restorableAsClone()}"><i class="bi bi-arrow-repeat me-1"></i>Restore archive as clone</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header"><div><h2>Archive restore history</h2><p>Clone restores created from this final archive.</p></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Restore</th><th>Target</th><th>Status</th><th>Requested</th></tr></thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(restoreLinks)}"><td colspan="4" class="text-center text-muted py-4">No clone restore has been created from this archive.</td></tr>
+                        <tr th:each="link : ${restoreLinks}">
+                            <td><a th:href="@{/control-center/restores/{id}(id=${link.restoreJobId()})}" th:text="${link.restorePublicId()}">RST</a></td>
+                            <td><code th:text="${link.targetInstanceCode()}">target</code><small class="d-block text-muted" th:text="|${link.targetDatabaseName()} · ${link.targetRuntimeProfile()} · ${link.targetRuntimePort()}|">details</small></td>
+                            <td><span class="badge text-bg-success" th:text="${link.status()}">COMPLETED</span></td>
+                            <td th:text="${#temporals.format(link.requestedAt(), 'yyyy-MM-dd HH:mm:ss')}">time</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><h2>Audit timeline</h2><p>Archive verification and clone recovery events.</p></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Time</th><th>Event</th><th>Status</th><th>Actor</th><th>Detail</th></tr></thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(events)}"><td colspan="5" class="text-center text-muted py-4">No archive events recorded.</td></tr>
+                        <tr th:each="event : ${events}">
+                            <td th:text="${#temporals.format(event.createdAt(), 'yyyy-MM-dd HH:mm:ss')}">time</td>
+                            <td th:text="${event.eventType()}">event</td>
+                            <td><span class="badge" th:classappend="${event.status() == 'COMPLETED' ? ' text-bg-success' : (event.status() == 'FAILED' ? ' text-bg-danger' : ' text-bg-secondary')}" th:text="${event.status()}">status</span></td>
+                            <td th:text="${event.actor()}">actor</td>
+                            <td th:text="${event.detail()}">detail</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

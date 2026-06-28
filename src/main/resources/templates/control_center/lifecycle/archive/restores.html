@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Archive clone restores')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Archive clone restores', 'Restored clones created from protected final archives.')}"></header>
+        <main class="matrix26-main">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <div><h1 class="h4 mb-1">Archive clone restores</h1><p class="text-muted mb-0">These restore jobs never reactivate the original decommissioned instance.</p></div>
+                <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/archive}"><i class="bi bi-arrow-left me-1"></i>Archive Manager</a>
+            </div>
+            <section class="matrix26-panel">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Restore</th><th>Archive</th><th>Target</th><th>Status</th><th>Requested</th></tr></thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(restoreLinks)}"><td colspan="5" class="text-center text-muted py-4">No archive clone restores yet.</td></tr>
+                        <tr th:each="link : ${restoreLinks}">
+                            <td><a th:href="@{/control-center/restores/{id}(id=${link.restoreJobId()})}" th:text="${link.restorePublicId()}">RST</a></td>
+                            <td><a th:href="@{/control-center/lifecycle/archive/{id}(id=${link.archiveRecordId()})}" th:text="|Archive #${link.archiveRecordId()}|">Archive</a></td>
+                            <td><code th:text="${link.targetInstanceCode()}">target</code><small class="d-block text-muted" th:text="|${link.targetDatabaseName()} · ${link.targetRuntimeProfile()} · ${link.targetRuntimePort()}|">details</small></td>
+                            <td><span class="badge text-bg-success" th:text="${link.status()}">COMPLETED</span></td>
+                            <td th:text="${#temporals.format(link.requestedAt(), 'yyyy-MM-dd HH:mm:ss')}">time</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

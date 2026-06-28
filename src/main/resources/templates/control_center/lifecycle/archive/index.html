@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Final archive inventory')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Final archive inventory', 'Historical evidence and isolated clone recovery for decommissioned Matrix26 laboratories.')}"></header>
+        <main class="matrix26-main">
+            <div th:if="${archiveSuccess}" class="alert alert-success" th:text="${archiveSuccess}"></div>
+            <div th:if="${archiveError}" class="alert alert-danger" th:text="${archiveError}"></div>
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <div>
+                    <h1 class="h4 mb-1">Archive Manager</h1>
+                    <p class="text-muted mb-0">Final archives stay protected; recovery is allowed only as a new isolated clone.</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission/decommissioned}"><i class="bi bi-clock-history me-1"></i>Decommissioned</a>
+                    <a class="btn btn-outline-primary" th:href="@{/control-center/lifecycle/archive/restores}"><i class="bi bi-arrow-repeat me-1"></i>Archive restores</a>
+                    <form method="post" th:action="@{/control-center/lifecycle/archive/refresh}">
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Refresh inventory</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="matrix26-alert-safe mb-4">
+                <i class="bi bi-shield-lock"></i>
+                <div>
+                    <strong>No reactivation, no purge</strong>
+                    <p>Phase 3G.3 never reactivates the original decommissioned instance and never deletes database, runtime, runtime-data, modules, appearance, or final backups. It only validates the final archive and can restore it as a separate clone on port <strong th:text="${clonePort}">8096</strong>.</p>
+                </div>
+            </div>
+
+            <section class="row g-3 mb-4">
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Archives</span><strong th:text="${summary.totalArchives()}">0</strong></div></div>
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Ready</span><strong th:text="${summary.readyArchives()}">0</strong></div></div>
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Reverified</span><strong th:text="${summary.verifiedArchives()}">0</strong></div></div>
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Clone restores</span><strong th:text="${summary.cloneRestores()}">0</strong></div></div>
+            </section>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header">
+                    <div><h2>Protected final archives</h2><p>Each record comes from a completed decommission job and a protected FINAL backup.</p></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>Instance</th><th>Final backup</th><th>Archive</th><th>Retention</th><th>Inventory</th><th>Actions</th></tr></thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(records)}"><td colspan="6" class="text-center text-muted py-4">No decommissioned final archive has been registered yet.</td></tr>
+                        <tr th:each="record : ${records}">
+                            <td><strong th:text="${record.instanceName()}">Instance</strong><small class="d-block text-muted" th:text="${record.instanceCode()}">code</small><span class="badge text-bg-dark" th:text="${record.instanceStatus()}">DECOMMISSIONED</span></td>
+                            <td><code th:text="${record.finalBackupPublicId()}">BKP</code><small class="d-block text-muted" th:text="${record.finalBackupSha256() != null ? record.finalBackupSha256() : 'No SHA-256'}">sha</small></td>
+                            <td><span class="badge" th:classappend="${record.archiveStatus() == 'READY' ? ' text-bg-success' : ' text-bg-warning'}" th:text="${record.archiveStatus()}">READY</span><small class="d-block text-muted" th:text="${record.lastVerifiedAt() != null ? #temporals.format(record.lastVerifiedAt(), 'yyyy-MM-dd HH:mm:ss') : 'Not reverified in archive manager'}">verified</small></td>
+                            <td><span class="badge" th:classappend="${record.retentionStatus() == 'RETENTION_ACTIVE' ? ' text-bg-info' : ' text-bg-secondary'}" th:text="${record.retentionStatus()}">RETENTION</span><small class="d-block text-muted" th:text="${record.retentionUntil() != null ? #temporals.format(record.retentionUntil(), 'yyyy-MM-dd HH:mm:ss') : 'No retention date'}">until</small></td>
+                            <td><span th:text="|Runtime files: ${record.runtimeFileCount()}|">Runtime files</span><small class="d-block text-muted" th:text="|Data files: ${record.dataFileCount()}|">Data files</small></td>
+                            <td><a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/lifecycle/archive/{id}(id=${record.id()})}"><i class="bi bi-eye me-1"></i>Open</a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

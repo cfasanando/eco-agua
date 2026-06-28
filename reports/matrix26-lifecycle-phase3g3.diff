@@ -1,0 +1,1370 @@
+diff -ruN m26_3g3_orig/scripts/check-matrix26-lifecycle-phase3g3.sh m26_3g3_repo/scripts/check-matrix26-lifecycle-phase3g3.sh
+--- m26_3g3_orig/scripts/check-matrix26-lifecycle-phase3g3.sh	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/scripts/check-matrix26-lifecycle-phase3g3.sh	2026-06-28 01:12:41.440634536 +0000
+@@ -0,0 +1,77 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++ARCHIVE_DIR="$PROJECT_ROOT/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive"
++DECOMMISSION_REPO="$PROJECT_ROOT/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/decommission/Matrix26DecommissionRepository.java"
++RESTORE_SERVICE="$PROJECT_ROOT/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreService.java"
++TEMPLATE_DIR="$PROJECT_ROOT/src/main/resources/templates/control_center/lifecycle/archive"
++SIDEBAR="$PROJECT_ROOT/src/main/resources/templates/control_center/fragments/sidebar.html"
++CONFIG_SCRIPT="$PROJECT_ROOT/scripts/configure-matrix26-lifecycle-phase3g3.sh"
++
++required_java=(
++  Matrix26ArchiveController.java
++  Matrix26ArchiveEvent.java
++  Matrix26ArchiveException.java
++  Matrix26ArchiveInitializer.java
++  Matrix26ArchiveProperties.java
++  Matrix26ArchiveRecord.java
++  Matrix26ArchiveRepository.java
++  Matrix26ArchiveRestoreLink.java
++  Matrix26ArchiveService.java
++  Matrix26ArchiveSummary.java
++)
++for file in "${required_java[@]}"; do
++  test -f "$ARCHIVE_DIR/$file"
++done
++echo "Persistent archive records, events, and clone restore links: OK"
++
++grep -q 'matrix26_archive_record' "$ARCHIVE_DIR/Matrix26ArchiveInitializer.java"
++grep -q 'matrix26_archive_event' "$ARCHIVE_DIR/Matrix26ArchiveInitializer.java"
++grep -q 'matrix26_archive_restore_link' "$ARCHIVE_DIR/Matrix26ArchiveInitializer.java"
++echo "Archive metadata tables: OK"
++
++grep -q 'DECOMMISSIONED' "$ARCHIVE_DIR/Matrix26ArchiveService.java"
++grep -q 'protectedFlag' "$ARCHIVE_DIR/Matrix26ArchiveService.java"
++grep -q 'verifyEncryptedBackup' "$ARCHIVE_DIR/Matrix26ArchiveService.java"
++grep -q 'RESTORE ARCHIVE ' "$ARCHIVE_DIR/Matrix26ArchiveService.java"
++echo "Final archive verification and original decommission protection: OK"
++
++grep -q 'restoreArchivedClone' "$RESTORE_SERVICE"
++grep -q 'validateTargetAvailable(job)' "$RESTORE_SERVICE"
++grep -q 'matrix26-archived-restore-test' "$ARCHIVE_DIR/Matrix26ArchiveProperties.java"
++grep -q '8096' "$ARCHIVE_DIR/Matrix26ArchiveProperties.java"
++echo "Archived final backup clone restore target: OK"
++
++if grep -RniE 'DROP[[:space:]]+(DATABASE|SCHEMA)|Files\.delete|deleteIfExists|deleteRecursively|removeDirectory|DELETE[[:space:]]+FROM[[:space:]]+platform_business_client|purge' "$ARCHIVE_DIR"; then
++  echo "Unexpected destructive operation detected in Phase 3G.3 archive code." >&2
++  exit 1
++fi
++echo "Archive Manager remains non-destructive: OK"
++
++if grep -q 'WHERE instance_id = ?[[:space:]]*$' "$DECOMMISSION_REPO" && grep -q 'INSERT IGNORE INTO matrix26_decommission_schedule_state' "$DECOMMISSION_REPO"; then
++  true
++fi
++if grep -nA8 'snapshotSchedules' "$DECOMMISSION_REPO" | grep -c 'WHERE instance_id = ?' | grep -qv '^1$'; then
++  echo "Unexpected duplicate WHERE clause in decommission schedule snapshot." >&2
++  exit 1
++fi
++echo "Decommission schedule snapshot SQL remains valid: OK"
++
++for file in index.html detail.html restores.html; do
++  test -f "$TEMPLATE_DIR/$file"
++done
++grep -q '/control-center/lifecycle/archive' "$SIDEBAR"
++grep -q 'matrix26_archive' "$SIDEBAR"
++echo "Archive templates and navigation: OK"
++
++grep -q 'application.properties.phase3g3.bak' "$CONFIG_SCRIPT"
++grep -q 'matrix26.control-center.lifecycle.archive.enabled=true' "$CONFIG_SCRIPT"
++grep -q 'clone-runtime-port=8096' "$CONFIG_SCRIPT"
++if grep -Ei 'MATRIX26_BACKUP_MASTER_KEY[[:space:]]*=|spring\.datasource\.password[[:space:]]*=' "$CONFIG_SCRIPT"; then
++  echo "Configuration script must not write secrets." >&2
++  exit 1
++fi
++echo "Configuration preserves credentials and enables only archive clone settings: OK"
++
++echo "Matrix26 Lifecycle Manager Phase 3G.3 static checks passed."
+diff -ruN m26_3g3_orig/scripts/configure-matrix26-lifecycle-phase3g3.sh m26_3g3_repo/scripts/configure-matrix26-lifecycle-phase3g3.sh
+--- m26_3g3_orig/scripts/configure-matrix26-lifecycle-phase3g3.sh	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/scripts/configure-matrix26-lifecycle-phase3g3.sh	2026-06-28 01:12:22.371090265 +0000
+@@ -0,0 +1,40 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++CONFIG_FILE="$PROJECT_ROOT/runtime-clients/matrix26_control/application.properties"
++MAINTENANCE_DIR="$PROJECT_ROOT/runtime-data/matrix26-control/maintenance"
++BACKUP_FILE="$MAINTENANCE_DIR/application.properties.phase3g3.bak"
++
++if [[ ! -f "$CONFIG_FILE" ]]; then
++  echo "Matrix26 runtime configuration was not found: $CONFIG_FILE" >&2
++  exit 1
++fi
++
++mkdir -p "$MAINTENANCE_DIR"
++cp -f "$CONFIG_FILE" "$BACKUP_FILE"
++
++TEMP_FILE="$(mktemp)"
++grep -vE '^matrix26\.control-center\.lifecycle\.archive\.(enabled|allowed-instance-codes|clone-instance-code|clone-instance-name|clone-database-name|clone-runtime-profile|clone-runtime-port|clone-public-url)=' \
++  "$CONFIG_FILE" > "$TEMP_FILE" || true
++
++cat >> "$TEMP_FILE" <<'PROPERTIES'
++
++# Matrix26 Lifecycle Manager Phase 3G.3
++matrix26.control-center.lifecycle.archive.enabled=true
++matrix26.control-center.lifecycle.archive.allowed-instance-codes=matrix26-appearance-lab
++matrix26.control-center.lifecycle.archive.clone-instance-code=matrix26-archived-restore-test
++matrix26.control-center.lifecycle.archive.clone-instance-name=Matrix26 Archived Restore Test
++matrix26.control-center.lifecycle.archive.clone-database-name=matrix26_archived_restore_test
++matrix26.control-center.lifecycle.archive.clone-runtime-profile=matrix26_archived_restore_test
++matrix26.control-center.lifecycle.archive.clone-runtime-port=8096
++matrix26.control-center.lifecycle.archive.clone-public-url=http://localhost:8096
++PROPERTIES
++
++mv "$TEMP_FILE" "$CONFIG_FILE"
++
++echo "Lifecycle Manager Phase 3G.3 archive configuration updated:"
++echo "$CONFIG_FILE"
++echo "Previous configuration preserved at:"
++echo "$BACKUP_FILE"
++echo "No password, token, database credential, backup master key, or existing decommission state was changed."
+diff -ruN m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveController.java m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveController.java
+--- m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveController.java	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveController.java	2026-06-28 01:11:47.959704002 +0000
+@@ -0,0 +1,103 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.archive;
++
++import com.ecoamazonas.eco_agua.platform.control.restores.Matrix26RestoreJob;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Controller;
++import org.springframework.ui.Model;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RequestParam;
++import org.springframework.web.servlet.mvc.support.RedirectAttributes;
++
++import java.security.Principal;
++
++@Controller
++@RequestMapping("/control-center/lifecycle/archive")
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26ArchiveController {
++    private final Matrix26ArchiveService service;
++    private final Matrix26ArchiveProperties properties;
++
++    public Matrix26ArchiveController(Matrix26ArchiveService service, Matrix26ArchiveProperties properties) {
++        this.service = service;
++        this.properties = properties;
++    }
++
++    @GetMapping
++    public String index(Model model) {
++        model.addAttribute("activePage", "matrix26_archive");
++        model.addAttribute("summary", service.summary());
++        model.addAttribute("records", service.records());
++        model.addAttribute("cloneCode", properties.getCloneInstanceCode());
++        model.addAttribute("clonePort", properties.getCloneRuntimePort());
++        return "control_center/lifecycle/archive/index";
++    }
++
++    @GetMapping("/{id:\\d+}")
++    public String detail(@PathVariable long id, Model model) {
++        Matrix26ArchiveRecord record = service.record(id);
++        model.addAttribute("activePage", "matrix26_archive");
++        model.addAttribute("record", record);
++        model.addAttribute("events", service.events(id));
++        model.addAttribute("restoreLinks", service.restoreLinks(id));
++        model.addAttribute("cloneCode", properties.getCloneInstanceCode());
++        model.addAttribute("cloneName", properties.getCloneInstanceName());
++        model.addAttribute("cloneDatabase", properties.getCloneDatabaseName());
++        model.addAttribute("cloneRuntime", properties.getCloneRuntimeProfile());
++        model.addAttribute("clonePort", properties.getCloneRuntimePort());
++        model.addAttribute("cloneUrl", properties.getClonePublicUrl());
++        model.addAttribute("restoreConfirmation", "RESTORE ARCHIVE " + properties.getCloneInstanceCode());
++        return "control_center/lifecycle/archive/detail";
++    }
++
++    @GetMapping("/restores")
++    public String restores(Model model) {
++        model.addAttribute("activePage", "matrix26_archive_restores");
++        model.addAttribute("restoreLinks", service.recentRestoreLinks());
++        return "control_center/lifecycle/archive/restores";
++    }
++
++    @PostMapping("/refresh")
++    public String refresh(Principal principal, RedirectAttributes redirectAttributes) {
++        service.refresh(actor(principal));
++        redirectAttributes.addFlashAttribute("archiveSuccess", "Historical archive inventory was refreshed from decommissioned instances.");
++        return "redirect:/control-center/lifecycle/archive";
++    }
++
++    @PostMapping("/{id:\\d+}/verify")
++    public String verify(@PathVariable long id, Principal principal, RedirectAttributes redirectAttributes) {
++        try {
++            service.verify(id, actor(principal));
++            redirectAttributes.addFlashAttribute("archiveSuccess", "The final archive was reverified successfully.");
++        } catch (RuntimeException ex) {
++            redirectAttributes.addFlashAttribute("archiveError", ex.getMessage());
++        }
++        return "redirect:/control-center/lifecycle/archive/" + id;
++    }
++
++    @PostMapping("/{id:\\d+}/restore-as-clone")
++    public String restoreAsClone(
++            @PathVariable long id,
++            @RequestParam(value = "startAfterRestore", defaultValue = "false") boolean startAfterRestore,
++            @RequestParam("confirmation") String confirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            Matrix26RestoreJob restore = service.restoreAsClone(id, startAfterRestore, confirmation, actor(principal));
++            redirectAttributes.addFlashAttribute("archiveSuccess", "Archived instance restored as isolated clone " + restore.targetInstanceCode() + ".");
++            return "redirect:/control-center/restores/" + restore.id();
++        } catch (RuntimeException ex) {
++            redirectAttributes.addFlashAttribute("archiveError", ex.getMessage());
++            return "redirect:/control-center/lifecycle/archive/" + id;
++        }
++    }
++
++    private String actor(Principal principal) {
++        return principal == null || principal.getName() == null || principal.getName().isBlank()
++                ? "matrix26-system"
++                : principal.getName();
++    }
++}
+diff -ruN m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveEvent.java m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveEvent.java
+--- m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveEvent.java	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveEvent.java	2026-06-28 01:08:22.944586344 +0000
+@@ -0,0 +1,13 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.archive;
++
++import java.time.LocalDateTime;
++
++public record Matrix26ArchiveEvent(
++        Long id,
++        Long archiveRecordId,
++        String eventType,
++        String status,
++        String actor,
++        String detail,
++        LocalDateTime createdAt
++) {}
+diff -ruN m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveException.java m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveException.java
+--- m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveException.java	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveException.java	2026-06-28 01:08:22.967372548 +0000
+@@ -0,0 +1,6 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.archive;
++
++public class Matrix26ArchiveException extends RuntimeException {
++    public Matrix26ArchiveException(String message) { super(message); }
++    public Matrix26ArchiveException(String message, Throwable cause) { super(message, cause); }
++}
+diff -ruN m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveInitializer.java m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveInitializer.java
+--- m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveInitializer.java	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveInitializer.java	2026-06-28 01:08:39.392140906 +0000
+@@ -0,0 +1,102 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.archive;
++
++import org.springframework.boot.ApplicationArguments;
++import org.springframework.boot.ApplicationRunner;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.core.Ordered;
++import org.springframework.core.annotation.Order;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.stereotype.Component;
++
++@Component
++@Order(Ordered.HIGHEST_PRECEDENCE + 75)
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26ArchiveInitializer implements ApplicationRunner {
++    private final JdbcTemplate jdbcTemplate;
++
++    public Matrix26ArchiveInitializer(JdbcTemplate jdbcTemplate) {
++        this.jdbcTemplate = jdbcTemplate;
++    }
++
++    @Override
++    public void run(ApplicationArguments args) {
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_archive_record (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    public_id VARCHAR(80) NOT NULL,
++                    decommission_job_id BIGINT NOT NULL,
++                    decommission_public_id VARCHAR(80) NOT NULL,
++                    instance_id BIGINT NOT NULL,
++                    instance_code VARCHAR(80) NOT NULL,
++                    instance_name VARCHAR(180) NOT NULL,
++                    instance_status VARCHAR(50) NOT NULL,
++                    final_backup_job_id BIGINT NOT NULL,
++                    final_backup_public_id VARCHAR(80) NOT NULL,
++                    final_backup_sha256 VARCHAR(64) NULL,
++                    final_backup_key_id VARCHAR(100) NULL,
++                    final_backup_verified_at DATETIME(6) NULL,
++                    retention_until DATETIME(6) NULL,
++                    archive_status VARCHAR(40) NOT NULL,
++                    retention_status VARCHAR(40) NOT NULL,
++                    runtime_file_count INT NOT NULL DEFAULT 0,
++                    data_file_count INT NOT NULL DEFAULT 0,
++                    inventory_summary TEXT NULL,
++                    created_at DATETIME(6) NOT NULL,
++                    updated_at DATETIME(6) NOT NULL,
++                    last_verified_at DATETIME(6) NULL,
++                    last_error TEXT NULL,
++                    PRIMARY KEY (id),
++                    UNIQUE KEY uk_matrix26_archive_public (public_id),
++                    UNIQUE KEY uk_matrix26_archive_decommission (decommission_job_id),
++                    KEY idx_matrix26_archive_instance (instance_id, archive_status),
++                    KEY idx_matrix26_archive_backup (final_backup_job_id),
++                    CONSTRAINT fk_matrix26_archive_decommission
++                        FOREIGN KEY (decommission_job_id) REFERENCES matrix26_decommission_job(id),
++                    CONSTRAINT fk_matrix26_archive_instance
++                        FOREIGN KEY (instance_id) REFERENCES platform_business_client(id)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_archive_event (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    archive_record_id BIGINT NOT NULL,
++                    event_type VARCHAR(100) NOT NULL,
++                    status VARCHAR(30) NOT NULL,
++                    actor VARCHAR(120) NOT NULL,
++                    detail TEXT NULL,
++                    created_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    KEY idx_matrix26_archive_event_record (archive_record_id, created_at),
++                    CONSTRAINT fk_matrix26_archive_event_record
++                        FOREIGN KEY (archive_record_id) REFERENCES matrix26_archive_record(id)
++                        ON DELETE CASCADE
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS matrix26_archive_restore_link (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    archive_record_id BIGINT NOT NULL,
++                    restore_job_id BIGINT NOT NULL,
++                    restore_public_id VARCHAR(80) NOT NULL,
++                    target_instance_code VARCHAR(80) NOT NULL,
++                    target_database_name VARCHAR(120) NOT NULL,
++                    target_runtime_profile VARCHAR(120) NOT NULL,
++                    target_runtime_port INT NOT NULL,
++                    status VARCHAR(40) NOT NULL,
++                    requested_by VARCHAR(120) NOT NULL,
++                    requested_at DATETIME(6) NOT NULL,
++                    completed_at DATETIME(6) NULL,
++                    PRIMARY KEY (id),
++                    KEY idx_matrix26_archive_restore_record (archive_record_id, requested_at),
++                    KEY idx_matrix26_archive_restore_job (restore_job_id),
++                    CONSTRAINT fk_matrix26_archive_restore_record
++                        FOREIGN KEY (archive_record_id) REFERENCES matrix26_archive_record(id)
++                        ON DELETE CASCADE,
++                    CONSTRAINT fk_matrix26_archive_restore_job
++                        FOREIGN KEY (restore_job_id) REFERENCES matrix26_restore_job(id)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++    }
++}
+diff -ruN m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveProperties.java m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveProperties.java
+--- m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveProperties.java	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveProperties.java	2026-06-28 01:08:22.929067488 +0000
+@@ -0,0 +1,37 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.archive;
++
++import org.springframework.boot.context.properties.ConfigurationProperties;
++import org.springframework.stereotype.Component;
++
++import java.util.LinkedHashSet;
++import java.util.Set;
++
++@Component
++@ConfigurationProperties(prefix = "matrix26.control-center.lifecycle.archive")
++public class Matrix26ArchiveProperties {
++    private boolean enabled = true;
++    private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of("matrix26-appearance-lab"));
++    private String cloneInstanceCode = "matrix26-archived-restore-test";
++    private String cloneInstanceName = "Matrix26 Archived Restore Test";
++    private String cloneDatabaseName = "matrix26_archived_restore_test";
++    private String cloneRuntimeProfile = "matrix26_archived_restore_test";
++    private int cloneRuntimePort = 8096;
++    private String clonePublicUrl = "http://localhost:8096";
++
++    public boolean isEnabled() { return enabled; }
++    public void setEnabled(boolean enabled) { this.enabled = enabled; }
++    public Set<String> getAllowedInstanceCodes() { return allowedInstanceCodes; }
++    public void setAllowedInstanceCodes(Set<String> values) { allowedInstanceCodes = values == null ? new LinkedHashSet<>() : new LinkedHashSet<>(values); }
++    public String getCloneInstanceCode() { return cloneInstanceCode; }
++    public void setCloneInstanceCode(String value) { cloneInstanceCode = value; }
++    public String getCloneInstanceName() { return cloneInstanceName; }
++    public void setCloneInstanceName(String value) { cloneInstanceName = value; }
++    public String getCloneDatabaseName() { return cloneDatabaseName; }
++    public void setCloneDatabaseName(String value) { cloneDatabaseName = value; }
++    public String getCloneRuntimeProfile() { return cloneRuntimeProfile; }
++    public void setCloneRuntimeProfile(String value) { cloneRuntimeProfile = value; }
++    public int getCloneRuntimePort() { return cloneRuntimePort; }
++    public void setCloneRuntimePort(int value) { cloneRuntimePort = value; }
++    public String getClonePublicUrl() { return clonePublicUrl; }
++    public void setClonePublicUrl(String value) { clonePublicUrl = value; }
++}
+diff -ruN m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveRecord.java m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveRecord.java
+--- m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveRecord.java	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveRecord.java	2026-06-28 01:08:22.936938616 +0000
+@@ -0,0 +1,35 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.archive;
++
++import java.time.LocalDateTime;
++
++public record Matrix26ArchiveRecord(
++        Long id,
++        String publicId,
++        Long decommissionJobId,
++        String decommissionPublicId,
++        Long instanceId,
++        String instanceCode,
++        String instanceName,
++        String instanceStatus,
++        Long finalBackupJobId,
++        String finalBackupPublicId,
++        String finalBackupSha256,
++        String finalBackupKeyId,
++        LocalDateTime finalBackupVerifiedAt,
++        LocalDateTime retentionUntil,
++        String archiveStatus,
++        String retentionStatus,
++        Integer runtimeFileCount,
++        Integer dataFileCount,
++        String inventorySummary,
++        LocalDateTime createdAt,
++        LocalDateTime updatedAt,
++        LocalDateTime lastVerifiedAt,
++        String lastError
++) {
++    public boolean restorableAsClone() {
++        return "READY".equalsIgnoreCase(archiveStatus)
++                && "DECOMMISSIONED".equalsIgnoreCase(instanceStatus)
++                && finalBackupJobId != null;
++    }
++}
+diff -ruN m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveRepository.java m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveRepository.java
+--- m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveRepository.java	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveRepository.java	2026-06-28 01:09:09.328492725 +0000
+@@ -0,0 +1,226 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.archive;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.jdbc.core.RowMapper;
++import org.springframework.jdbc.support.GeneratedKeyHolder;
++import org.springframework.jdbc.support.KeyHolder;
++import org.springframework.stereotype.Repository;
++
++import java.sql.Statement;
++import java.time.LocalDateTime;
++import java.util.List;
++import java.util.Optional;
++
++@Repository
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26ArchiveRepository {
++    private final JdbcTemplate jdbcTemplate;
++
++    public Matrix26ArchiveRepository(JdbcTemplate jdbcTemplate) {
++        this.jdbcTemplate = jdbcTemplate;
++    }
++
++    public Optional<Matrix26ArchiveRecord> findByDecommissionJob(long decommissionJobId) {
++        return jdbcTemplate.query(
++                "SELECT * FROM matrix26_archive_record WHERE decommission_job_id = ?",
++                recordMapper(), decommissionJobId
++        ).stream().findFirst();
++    }
++
++    public Optional<Matrix26ArchiveRecord> findById(long id) {
++        return jdbcTemplate.query(
++                "SELECT * FROM matrix26_archive_record WHERE id = ?",
++                recordMapper(), id
++        ).stream().findFirst();
++    }
++
++    public List<Matrix26ArchiveRecord> findAll() {
++        return jdbcTemplate.query(
++                "SELECT * FROM matrix26_archive_record ORDER BY updated_at DESC, id DESC LIMIT 200",
++                recordMapper()
++        );
++    }
++
++    public Matrix26ArchiveSummary summary() {
++        return jdbcTemplate.queryForObject("""
++                SELECT
++                    (SELECT COUNT(*) FROM matrix26_archive_record) AS total_archives,
++                    (SELECT COUNT(*) FROM matrix26_archive_record WHERE archive_status = 'READY') AS ready_archives,
++                    (SELECT COUNT(*) FROM matrix26_archive_record WHERE last_verified_at IS NOT NULL) AS verified_archives,
++                    (SELECT COUNT(*) FROM matrix26_archive_restore_link) AS clone_restores
++                """, (rs, rowNum) -> new Matrix26ArchiveSummary(
++                rs.getLong("total_archives"),
++                rs.getLong("ready_archives"),
++                rs.getLong("verified_archives"),
++                rs.getLong("clone_restores")
++        ));
++    }
++
++    public long insertRecord(Matrix26ArchiveRecord record) {
++        KeyHolder keyHolder = new GeneratedKeyHolder();
++        jdbcTemplate.update(connection -> {
++            var statement = connection.prepareStatement("""
++                    INSERT INTO matrix26_archive_record (
++                        public_id, decommission_job_id, decommission_public_id,
++                        instance_id, instance_code, instance_name, instance_status,
++                        final_backup_job_id, final_backup_public_id, final_backup_sha256,
++                        final_backup_key_id, final_backup_verified_at, retention_until,
++                        archive_status, retention_status, runtime_file_count, data_file_count,
++                        inventory_summary, created_at, updated_at, last_verified_at, last_error
++                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
++                    """, Statement.RETURN_GENERATED_KEYS);
++            statement.setString(1, record.publicId());
++            statement.setLong(2, record.decommissionJobId());
++            statement.setString(3, record.decommissionPublicId());
++            statement.setLong(4, record.instanceId());
++            statement.setString(5, record.instanceCode());
++            statement.setString(6, record.instanceName());
++            statement.setString(7, record.instanceStatus());
++            statement.setLong(8, record.finalBackupJobId());
++            statement.setString(9, record.finalBackupPublicId());
++            statement.setString(10, record.finalBackupSha256());
++            statement.setString(11, record.finalBackupKeyId());
++            statement.setObject(12, record.finalBackupVerifiedAt());
++            statement.setObject(13, record.retentionUntil());
++            statement.setString(14, record.archiveStatus());
++            statement.setString(15, record.retentionStatus());
++            statement.setInt(16, value(record.runtimeFileCount()));
++            statement.setInt(17, value(record.dataFileCount()));
++            statement.setString(18, limit(record.inventorySummary(), 8000));
++            statement.setObject(19, record.createdAt());
++            statement.setObject(20, record.updatedAt());
++            statement.setObject(21, record.lastVerifiedAt());
++            statement.setString(22, limit(record.lastError(), 8000));
++            return statement;
++        }, keyHolder);
++        Number key = keyHolder.getKey();
++        if (key == null) {
++            throw new Matrix26ArchiveException("Matrix26 could not persist the archive record.");
++        }
++        return key.longValue();
++    }
++
++    public void updateRecord(Matrix26ArchiveRecord record) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_archive_record
++                SET instance_status = ?, final_backup_sha256 = ?, final_backup_key_id = ?,
++                    final_backup_verified_at = ?, retention_until = ?, archive_status = ?,
++                    retention_status = ?, runtime_file_count = ?, data_file_count = ?,
++                    inventory_summary = ?, updated_at = ?, last_verified_at = ?, last_error = ?
++                WHERE id = ?
++                """,
++                record.instanceStatus(), record.finalBackupSha256(), record.finalBackupKeyId(),
++                record.finalBackupVerifiedAt(), record.retentionUntil(), record.archiveStatus(),
++                record.retentionStatus(), value(record.runtimeFileCount()), value(record.dataFileCount()),
++                limit(record.inventorySummary(), 8000), LocalDateTime.now(), record.lastVerifiedAt(),
++                limit(record.lastError(), 8000), record.id());
++    }
++
++    public void addEvent(long archiveRecordId, String eventType, String status, String actor, String detail) {
++        jdbcTemplate.update("""
++                INSERT INTO matrix26_archive_event (
++                    archive_record_id, event_type, status, actor, detail, created_at
++                ) VALUES (?, ?, ?, ?, ?, ?)
++                """, archiveRecordId, eventType, status, limit(actor, 120), limit(detail, 8000), LocalDateTime.now());
++    }
++
++    public List<Matrix26ArchiveEvent> events(long archiveRecordId) {
++        return jdbcTemplate.query("""
++                SELECT * FROM matrix26_archive_event
++                WHERE archive_record_id = ? ORDER BY created_at, id
++                """, (rs, rowNum) -> new Matrix26ArchiveEvent(
++                rs.getLong("id"),
++                rs.getLong("archive_record_id"),
++                rs.getString("event_type"),
++                rs.getString("status"),
++                rs.getString("actor"),
++                rs.getString("detail"),
++                rs.getObject("created_at", LocalDateTime.class)
++        ), archiveRecordId);
++    }
++
++    public void insertRestoreLink(
++            long archiveRecordId,
++            long restoreJobId,
++            String restorePublicId,
++            String targetInstanceCode,
++            String targetDatabaseName,
++            String targetRuntimeProfile,
++            int targetRuntimePort,
++            String status,
++            String actor
++    ) {
++        jdbcTemplate.update("""
++                INSERT INTO matrix26_archive_restore_link (
++                    archive_record_id, restore_job_id, restore_public_id, target_instance_code,
++                    target_database_name, target_runtime_profile, target_runtime_port,
++                    status, requested_by, requested_at, completed_at
++                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
++                """, archiveRecordId, restoreJobId, restorePublicId, targetInstanceCode,
++                targetDatabaseName, targetRuntimeProfile, targetRuntimePort, status, limit(actor, 120),
++                LocalDateTime.now(), "COMPLETED".equals(status) ? LocalDateTime.now() : null);
++    }
++
++    public List<Matrix26ArchiveRestoreLink> restoreLinks(long archiveRecordId) {
++        return jdbcTemplate.query("""
++                SELECT * FROM matrix26_archive_restore_link
++                WHERE archive_record_id = ? ORDER BY requested_at DESC, id DESC
++                """, restoreLinkMapper(), archiveRecordId);
++    }
++
++    public List<Matrix26ArchiveRestoreLink> recentRestoreLinks() {
++        return jdbcTemplate.query("""
++                SELECT * FROM matrix26_archive_restore_link
++                ORDER BY requested_at DESC, id DESC LIMIT 100
++                """, restoreLinkMapper());
++    }
++
++    private RowMapper<Matrix26ArchiveRecord> recordMapper() {
++        return (rs, rowNum) -> new Matrix26ArchiveRecord(
++                rs.getLong("id"),
++                rs.getString("public_id"),
++                rs.getLong("decommission_job_id"),
++                rs.getString("decommission_public_id"),
++                rs.getLong("instance_id"),
++                rs.getString("instance_code"),
++                rs.getString("instance_name"),
++                rs.getString("instance_status"),
++                rs.getLong("final_backup_job_id"),
++                rs.getString("final_backup_public_id"),
++                rs.getString("final_backup_sha256"),
++                rs.getString("final_backup_key_id"),
++                rs.getObject("final_backup_verified_at", LocalDateTime.class),
++                rs.getObject("retention_until", LocalDateTime.class),
++                rs.getString("archive_status"),
++                rs.getString("retention_status"),
++                rs.getObject("runtime_file_count", Integer.class),
++                rs.getObject("data_file_count", Integer.class),
++                rs.getString("inventory_summary"),
++                rs.getObject("created_at", LocalDateTime.class),
++                rs.getObject("updated_at", LocalDateTime.class),
++                rs.getObject("last_verified_at", LocalDateTime.class),
++                rs.getString("last_error")
++        );
++    }
++
++    private RowMapper<Matrix26ArchiveRestoreLink> restoreLinkMapper() {
++        return (rs, rowNum) -> new Matrix26ArchiveRestoreLink(
++                rs.getLong("id"),
++                rs.getLong("archive_record_id"),
++                rs.getLong("restore_job_id"),
++                rs.getString("restore_public_id"),
++                rs.getString("target_instance_code"),
++                rs.getString("target_database_name"),
++                rs.getString("target_runtime_profile"),
++                rs.getInt("target_runtime_port"),
++                rs.getString("status"),
++                rs.getString("requested_by"),
++                rs.getObject("requested_at", LocalDateTime.class),
++                rs.getObject("completed_at", LocalDateTime.class)
++        );
++    }
++
++    private int value(Integer value) { return value == null ? 0 : value; }
++    private String limit(String value, int max) { return value == null || value.length() <= max ? value : value.substring(0, max); }
++}
+diff -ruN m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveRestoreLink.java m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveRestoreLink.java
+--- m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveRestoreLink.java	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveRestoreLink.java	2026-06-28 01:08:22.951932609 +0000
+@@ -0,0 +1,18 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.archive;
++
++import java.time.LocalDateTime;
++
++public record Matrix26ArchiveRestoreLink(
++        Long id,
++        Long archiveRecordId,
++        Long restoreJobId,
++        String restorePublicId,
++        String targetInstanceCode,
++        String targetDatabaseName,
++        String targetRuntimeProfile,
++        Integer targetRuntimePort,
++        String status,
++        String requestedBy,
++        LocalDateTime requestedAt,
++        LocalDateTime completedAt
++) {}
+diff -ruN m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveService.java m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveService.java
+--- m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveService.java	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveService.java	2026-06-28 01:11:47.960137783 +0000
+@@ -0,0 +1,282 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.archive;
++
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClient;
++import com.ecoamazonas.eco_agua.platform.PlatformBusinessClientRepository;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupEncryption;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupJob;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupRepository;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupSecurityService;
++import com.ecoamazonas.eco_agua.platform.control.backups.Matrix26BackupVerificationState;
++import com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission.Matrix26DecommissionJob;
++import com.ecoamazonas.eco_agua.platform.control.lifecycle.decommission.Matrix26DecommissionRepository;
++import com.ecoamazonas.eco_agua.platform.control.restores.Matrix26RestoreJob;
++import com.ecoamazonas.eco_agua.platform.control.restores.Matrix26RestoreService;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Service;
++
++import java.io.IOException;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.time.LocalDateTime;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++import java.util.UUID;
++import java.util.stream.Stream;
++
++@Service
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26ArchiveService {
++    private final Matrix26ArchiveRepository repository;
++    private final Matrix26ArchiveProperties properties;
++    private final Matrix26DecommissionRepository decommissionRepository;
++    private final PlatformBusinessClientRepository clientRepository;
++    private final Matrix26BackupRepository backupRepository;
++    private final Matrix26BackupSecurityService backupSecurityService;
++    private final Matrix26RestoreService restoreService;
++
++    public Matrix26ArchiveService(
++            Matrix26ArchiveRepository repository,
++            Matrix26ArchiveProperties properties,
++            Matrix26DecommissionRepository decommissionRepository,
++            PlatformBusinessClientRepository clientRepository,
++            Matrix26BackupRepository backupRepository,
++            Matrix26BackupSecurityService backupSecurityService,
++            Matrix26RestoreService restoreService
++    ) {
++        this.repository = repository;
++        this.properties = properties;
++        this.decommissionRepository = decommissionRepository;
++        this.clientRepository = clientRepository;
++        this.backupRepository = backupRepository;
++        this.backupSecurityService = backupSecurityService;
++        this.restoreService = restoreService;
++    }
++
++    public Matrix26ArchiveSummary summary() {
++        syncFromDecommissioned("matrix26-system");
++        return repository.summary();
++    }
++
++    public List<Matrix26ArchiveRecord> records() {
++        syncFromDecommissioned("matrix26-system");
++        return repository.findAll();
++    }
++
++    public Matrix26ArchiveRecord record(long id) {
++        return repository.findById(id)
++                .orElseThrow(() -> new Matrix26ArchiveException("The archive record does not exist."));
++    }
++
++    public List<Matrix26ArchiveEvent> events(long id) {
++        return repository.events(id);
++    }
++
++    public List<Matrix26ArchiveRestoreLink> restoreLinks(long id) {
++        return repository.restoreLinks(id);
++    }
++
++    public List<Matrix26ArchiveRestoreLink> recentRestoreLinks() {
++        return repository.recentRestoreLinks();
++    }
++
++    public List<Matrix26ArchiveRecord> refresh(String actor) {
++        syncFromDecommissioned(safeActor(actor));
++        return repository.findAll();
++    }
++
++    public Matrix26ArchiveRecord verify(long archiveRecordId, String actor) {
++        Matrix26ArchiveRecord record = record(archiveRecordId);
++        validateEnabled(record.instanceCode());
++        Matrix26BackupEncryption verification = backupSecurityService.verifyEncryptedBackup(
++                record.finalBackupJobId(), safeActor(actor)
++        );
++        if (verification == null
++                || verification.verificationStatus() != Matrix26BackupVerificationState.VERIFIED
++                || !verification.protectedFlag()) {
++            Matrix26ArchiveRecord failed = withVerification(record, "BLOCKED", "FINAL_BACKUP_NOT_VERIFIED",
++                    "The final archive could not be reverified as encrypted, protected, and VERIFIED.");
++            repository.updateRecord(failed);
++            repository.addEvent(record.id(), "FINAL_ARCHIVE_VERIFY", "FAILED", safeActor(actor), failed.lastError());
++            throw new Matrix26ArchiveException(failed.lastError());
++        }
++        Matrix26ArchiveRecord verified = withVerification(record, "READY", retentionStatus(record.retentionUntil()), null);
++        repository.updateRecord(verified);
++        repository.addEvent(record.id(), "FINAL_ARCHIVE_VERIFY", "COMPLETED", safeActor(actor),
++                "Final archive " + record.finalBackupPublicId() + " remains encrypted, deletion-protected, and VERIFIED.");
++        return record(record.id());
++    }
++
++    public Matrix26RestoreJob restoreAsClone(long archiveRecordId, boolean startAfterRestore, String confirmation, String actor) {
++        Matrix26ArchiveRecord record = verify(archiveRecordId, actor);
++        validateRestorable(record);
++        String expected = "RESTORE ARCHIVE " + properties.getCloneInstanceCode();
++        if (!expected.equals(confirmation == null ? "" : confirmation.trim())) {
++            throw new Matrix26ArchiveException("Type exactly: " + expected);
++        }
++        Matrix26RestoreJob restore = restoreService.restoreArchivedClone(
++                record.finalBackupJobId(),
++                properties.getCloneInstanceCode(),
++                properties.getCloneInstanceName(),
++                properties.getCloneDatabaseName(),
++                properties.getCloneRuntimeProfile(),
++                properties.getCloneRuntimePort(),
++                properties.getClonePublicUrl(),
++                startAfterRestore,
++                "RESTORE " + properties.getCloneInstanceCode(),
++                safeActor(actor)
++        );
++        repository.insertRestoreLink(
++                record.id(),
++                restore.id(),
++                restore.publicId(),
++                restore.targetInstanceCode(),
++                restore.targetDatabaseName(),
++                restore.targetRuntimeProfile(),
++                restore.targetRuntimePort(),
++                restore.completed() ? "COMPLETED" : restore.status().name(),
++                safeActor(actor)
++        );
++        repository.addEvent(record.id(), "ARCHIVE_RESTORED_AS_CLONE", "COMPLETED", safeActor(actor),
++                "Final archive restored as isolated clone " + restore.targetInstanceCode()
++                        + " on port " + restore.targetRuntimePort() + ". The original remains DECOMMISSIONED.");
++        return restore;
++    }
++
++    private void syncFromDecommissioned(String actor) {
++        if (!properties.isEnabled()) {
++            return;
++        }
++        for (Matrix26DecommissionJob job : decommissionRepository.findDecommissionedJobs()) {
++            if (job.finalBackupJobId() == null || !allowlisted(job.instanceCode())) {
++                continue;
++            }
++            repository.findByDecommissionJob(job.id()).ifPresentOrElse(
++                    existing -> repository.updateRecord(buildRecord(existing.id(), existing.publicId(), job)),
++                    () -> {
++                        Matrix26ArchiveRecord record = buildRecord(null, publicId(), job);
++                        long id = repository.insertRecord(record);
++                        repository.addEvent(id, "ARCHIVE_RECORD_CREATED", "COMPLETED", actor,
++                                "Historical archive registered for decommission job " + job.publicId() + ".");
++                    }
++            );
++        }
++    }
++
++    private Matrix26ArchiveRecord buildRecord(Long id, String publicId, Matrix26DecommissionJob job) {
++        PlatformBusinessClient instance = clientRepository.findById(job.instanceId())
++                .orElseThrow(() -> new Matrix26ArchiveException("The archived instance registry entry is missing."));
++        Matrix26BackupJob backup = backupRepository.findById(job.finalBackupJobId())
++                .orElseThrow(() -> new Matrix26ArchiveException("The final backup metadata is missing."));
++        Matrix26BackupEncryption encryption = backupSecurityService.metadata(backup.id());
++        boolean ready = "DECOMMISSIONED".equalsIgnoreCase(instance.getStatus())
++                && encryption != null
++                && encryption.encrypted()
++                && encryption.protectedFlag()
++                && encryption.verificationStatus() == Matrix26BackupVerificationState.VERIFIED;
++        int runtimeFiles = countFiles(Path.of("runtime-clients").resolve(nullToBlank(instance.getRuntimeProfile())));
++        int dataFiles = countFiles(Path.of("runtime-data").resolve(nullToBlank(instance.getCode())));
++        String summary = "Runtime profile: " + nullToBlank(instance.getRuntimeProfile())
++                + " | Database: " + nullToBlank(instance.getDatabaseName())
++                + " | Port: " + nullToBlank(instance.getRuntimePort())
++                + " | Runtime files: " + runtimeFiles
++                + " | Data files: " + dataFiles
++                + " | Backup: " + backup.publicId();
++        LocalDateTime now = LocalDateTime.now();
++        return new Matrix26ArchiveRecord(
++                id,
++                publicId,
++                job.id(),
++                job.publicId(),
++                instance.getId(),
++                instance.getCode(),
++                instance.getBusinessName(),
++                instance.getStatus(),
++                backup.id(),
++                backup.publicId(),
++                encryption == null ? job.finalBackupSha256() : encryption.packageSha256(),
++                encryption == null ? job.finalBackupKeyId() : encryption.keyId(),
++                encryption == null ? job.finalBackupVerifiedAt() : encryption.verifiedAt(),
++                job.retentionUntil(),
++                ready ? "READY" : "BLOCKED",
++                retentionStatus(job.retentionUntil()),
++                runtimeFiles,
++                dataFiles,
++                summary,
++                id == null ? now : null,
++                now,
++                ready ? now : null,
++                ready ? null : "The final archive must be DECOMMISSIONED, encrypted, deletion-protected, and VERIFIED."
++        );
++    }
++
++    private Matrix26ArchiveRecord withVerification(Matrix26ArchiveRecord record, String status, String retentionStatus, String error) {
++        return new Matrix26ArchiveRecord(
++                record.id(), record.publicId(), record.decommissionJobId(), record.decommissionPublicId(),
++                record.instanceId(), record.instanceCode(), record.instanceName(), record.instanceStatus(),
++                record.finalBackupJobId(), record.finalBackupPublicId(), record.finalBackupSha256(),
++                record.finalBackupKeyId(), record.finalBackupVerifiedAt(), record.retentionUntil(), status,
++                retentionStatus, record.runtimeFileCount(), record.dataFileCount(), record.inventorySummary(),
++                record.createdAt(), LocalDateTime.now(), error == null ? LocalDateTime.now() : record.lastVerifiedAt(), error
++        );
++    }
++
++    private void validateRestorable(Matrix26ArchiveRecord record) {
++        validateEnabled(record.instanceCode());
++        if (!record.restorableAsClone()) {
++            throw new Matrix26ArchiveException("Only READY archives for DECOMMISSIONED instances can be restored as isolated clones.");
++        }
++        if (!clientRepository.findById(record.instanceId()).map(client -> "DECOMMISSIONED".equalsIgnoreCase(client.getStatus())).orElse(false)) {
++            throw new Matrix26ArchiveException("The original instance must remain DECOMMISSIONED before archive restoration.");
++        }
++    }
++
++    private void validateEnabled(String instanceCode) {
++        if (!properties.isEnabled()) {
++            throw new Matrix26ArchiveException("Archive Manager is disabled by configuration.");
++        }
++        if (!allowlisted(instanceCode)) {
++            throw new Matrix26ArchiveException("The instance is outside the archive laboratory allowlist.");
++        }
++    }
++
++    private boolean allowlisted(String instanceCode) {
++        String code = instanceCode == null ? "" : instanceCode.toLowerCase(Locale.ROOT);
++        return properties.getAllowedInstanceCodes().stream()
++                .filter(value -> value != null)
++                .map(value -> value.toLowerCase(Locale.ROOT))
++                .anyMatch(code::equals);
++    }
++
++    private int countFiles(Path directory) {
++        if (directory == null || directory.toString().isBlank() || !Files.isDirectory(directory)) {
++            return 0;
++        }
++        try (Stream<Path> stream = Files.walk(directory)) {
++            long count = stream.filter(Files::isRegularFile).count();
++            return count > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) count;
++        } catch (IOException ex) {
++            return 0;
++        }
++    }
++
++    private String retentionStatus(LocalDateTime retentionUntil) {
++        if (retentionUntil == null) {
++            return "UNKNOWN";
++        }
++        return retentionUntil.isAfter(LocalDateTime.now()) ? "RETENTION_ACTIVE" : "RETENTION_EXPIRED";
++    }
++
++    private String publicId() {
++        return "ARC-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT);
++    }
++
++    private String safeActor(String actor) {
++        String value = actor == null || actor.isBlank() ? "matrix26-system" : actor.trim();
++        return value.length() > 120 ? value.substring(0, 120) : value;
++    }
++
++    private String nullToBlank(Object value) {
++        return value == null ? "" : String.valueOf(value);
++    }
++}
+diff -ruN m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveSummary.java m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveSummary.java
+--- m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveSummary.java	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/lifecycle/archive/Matrix26ArchiveSummary.java	2026-06-28 01:08:22.960268280 +0000
+@@ -0,0 +1,8 @@
++package com.ecoamazonas.eco_agua.platform.control.lifecycle.archive;
++
++public record Matrix26ArchiveSummary(
++        long totalArchives,
++        long readyArchives,
++        long verifiedArchives,
++        long cloneRestores
++) {}
+diff -ruN m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreService.java m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreService.java
+--- m26_3g3_orig/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreService.java	2026-06-28 01:13:26.134175189 +0000
++++ m26_3g3_repo/src/main/java/com/ecoamazonas/eco_agua/platform/control/restores/Matrix26RestoreService.java	2026-06-28 01:07:55.517798219 +0000
+@@ -139,6 +139,58 @@
+     public Matrix26RestoreProperties properties() { return properties; }
+ 
+     public Matrix26RestoreJob restoreClone(long backupJobId, boolean startAfterRestore, String confirmation, String actor) {
++        return restoreCloneToTarget(
++                backupJobId,
++                properties.getTargetInstanceCode(),
++                properties.getTargetInstanceName(),
++                properties.getTargetDatabaseName(),
++                properties.getTargetRuntimeProfile(),
++                properties.getTargetRuntimePort(),
++                properties.getTargetPublicUrl(),
++                startAfterRestore,
++                confirmation,
++                actor
++        );
++    }
++
++    public Matrix26RestoreJob restoreArchivedClone(
++            long backupJobId,
++            String targetInstanceCode,
++            String targetInstanceName,
++            String targetDatabaseName,
++            String targetRuntimeProfile,
++            int targetRuntimePort,
++            String targetPublicUrl,
++            boolean startAfterRestore,
++            String confirmation,
++            String actor
++    ) {
++        return restoreCloneToTarget(
++                backupJobId,
++                targetInstanceCode,
++                targetInstanceName,
++                targetDatabaseName,
++                targetRuntimeProfile,
++                targetRuntimePort,
++                targetPublicUrl,
++                startAfterRestore,
++                confirmation,
++                actor
++        );
++    }
++
++    private Matrix26RestoreJob restoreCloneToTarget(
++            long backupJobId,
++            String targetInstanceCode,
++            String targetInstanceName,
++            String targetDatabaseName,
++            String targetRuntimeProfile,
++            int targetRuntimePort,
++            String targetPublicUrl,
++            boolean startAfterRestore,
++            String confirmation,
++            String actor
++    ) {
+         if (!properties.isEnabled()) {
+             throw new Matrix26RestoreException("Restore Manager is disabled.");
+         }
+@@ -152,21 +204,38 @@
+         if (!candidate.eligible()) {
+             throw new Matrix26RestoreException(candidate.reason());
+         }
+-        String expectedConfirmation = "RESTORE " + properties.getTargetInstanceCode();
++        String expectedConfirmation = "RESTORE " + safeIdentifier(targetInstanceCode);
+         if (!expectedConfirmation.equals(confirmation == null ? "" : confirmation.trim())) {
+             throw new Matrix26RestoreException("Type exactly: " + expectedConfirmation);
+         }
+-        validateTargetAvailable();
+ 
+         Matrix26BackupJob backup = candidate.backup();
+-        String publicId = "RST-" + LocalDateTime.now().format(ID_TIME) + "-" + Long.toHexString(System.nanoTime()).toUpperCase(Locale.ROOT);
+         Matrix26RestoreJob draft = new Matrix26RestoreJob(
+-                null, publicId, backup.id(), backup.publicId(), backup.instanceId(), backup.instanceCode(),
+-                backup.instanceName(), backup.databaseName(), null, properties.getTargetInstanceCode(),
+-                properties.getTargetInstanceName(), properties.getTargetDatabaseName(), properties.getTargetRuntimeProfile(),
+-                properties.getTargetRuntimePort(), properties.getTargetPublicUrl(), Matrix26RestoreStatus.DRAFT,
+-                startAfterRestore, safeActor(actor), LocalDateTime.now(), null, null, null, null
++                null,
++                "RST-" + LocalDateTime.now().format(ID_TIME) + "-" + Long.toHexString(System.nanoTime()).toUpperCase(Locale.ROOT),
++                backup.id(),
++                backup.publicId(),
++                backup.instanceId(),
++                backup.instanceCode(),
++                backup.instanceName(),
++                backup.databaseName(),
++                null,
++                safeIdentifier(targetInstanceCode),
++                limit(targetInstanceName == null || targetInstanceName.isBlank() ? targetInstanceCode : targetInstanceName.trim(), 180),
++                safeIdentifier(targetDatabaseName),
++                safeIdentifier(targetRuntimeProfile),
++                targetRuntimePort,
++                targetPublicUrl == null || targetPublicUrl.isBlank() ? "http://localhost:" + targetRuntimePort : targetPublicUrl.trim(),
++                Matrix26RestoreStatus.DRAFT,
++                startAfterRestore,
++                safeActor(actor),
++                LocalDateTime.now(),
++                null,
++                null,
++                null,
++                null
+         );
++        validateTargetAvailable(draft);
+         long jobId = restoreRepository.insertJob(draft);
+         createSteps(jobId);
+         execute(jobId, candidate, actor);
+@@ -499,7 +568,7 @@
+ 
+             runStep(jobId, "VALIDATE_BACKUP", Matrix26RestoreStatus.VALIDATING,
+                     "Validating encrypted backup and isolated destination.", () -> {
+-                        validateTargetAvailable();
++                        validateTargetAvailable(job);
+                         restoreRepository.insertVerification(jobId, "TARGET_ISOLATION", "Target isolation", "PASSED",
+                                 "Database, port, runtime profile, instance code, and directories are available.");
+                     });
+@@ -609,11 +678,11 @@
+         restoreRepository.completeStep(jobId, code, detail.replace("Validating", "Validated"));
+     }
+ 
+-    private void validateTargetAvailable() {
+-        String code = safeIdentifier(properties.getTargetInstanceCode());
+-        String database = safeIdentifier(properties.getTargetDatabaseName());
+-        String runtime = safeIdentifier(properties.getTargetRuntimeProfile());
+-        int port = properties.getTargetRuntimePort();
++    private void validateTargetAvailable(Matrix26RestoreJob job) {
++        String code = safeIdentifier(job.targetInstanceCode());
++        String database = safeIdentifier(job.targetDatabaseName());
++        String runtime = safeIdentifier(job.targetRuntimeProfile());
++        int port = job.targetRuntimePort();
+         if (clientRepository.existsByCodeIgnoreCase(code)) throw new Matrix26RestoreException("Target instance code already exists: " + code);
+         if (clientRepository.existsByDatabaseNameIgnoreCase(database)) throw new Matrix26RestoreException("Target database is already registered: " + database);
+         if (clientRepository.existsByRuntimeProfileIgnoreCase(runtime)) throw new Matrix26RestoreException("Target runtime profile already exists: " + runtime);
+diff -ruN m26_3g3_orig/src/main/resources/templates/control_center/fragments/sidebar.html m26_3g3_repo/src/main/resources/templates/control_center/fragments/sidebar.html
+--- m26_3g3_orig/src/main/resources/templates/control_center/fragments/sidebar.html	2026-06-28 01:13:26.284466995 +0000
++++ m26_3g3_repo/src/main/resources/templates/control_center/fragments/sidebar.html	2026-06-28 01:11:08.644652126 +0000
+@@ -110,6 +110,16 @@
+             <i class="bi bi-clock-history"></i>
+             <span>Decommissioned</span>
+         </a>
++        <a th:href="@{/control-center/lifecycle/archive}"
++           th:classappend="${activePage == 'matrix26_archive'} ? ' active' : ''">
++            <i class="bi bi-safe2"></i>
++            <span>Final archives</span>
++        </a>
++        <a th:href="@{/control-center/lifecycle/archive/restores}"
++           th:classappend="${activePage == 'matrix26_archive_restores'} ? ' active' : ''">
++            <i class="bi bi-arrow-repeat"></i>
++            <span>Archive restores</span>
++        </a>
+     </nav>
+ 
+     <div class="matrix26-sidebar-label">Diseño y experiencia</div>
+diff -ruN m26_3g3_orig/src/main/resources/templates/control_center/lifecycle/archive/detail.html m26_3g3_repo/src/main/resources/templates/control_center/lifecycle/archive/detail.html
+--- m26_3g3_orig/src/main/resources/templates/control_center/lifecycle/archive/detail.html	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/src/main/resources/templates/control_center/lifecycle/archive/detail.html	2026-06-28 01:10:58.262858354 +0000
+@@ -0,0 +1,106 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Archive detail')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Archive detail', 'Final archive evidence and clone recovery controls.')}"></header>
++        <main class="matrix26-main">
++            <div th:if="${archiveSuccess}" class="alert alert-success" th:text="${archiveSuccess}"></div>
++            <div th:if="${archiveError}" class="alert alert-danger" th:text="${archiveError}"></div>
++
++            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
++                <div>
++                    <h1 class="h4 mb-1" th:text="${record.publicId()}">ARC</h1>
++                    <p class="text-muted mb-0" th:text="|${record.instanceName()} · ${record.instanceCode()}|">Instance</p>
++                </div>
++                <div class="d-flex gap-2">
++                    <span class="badge fs-6" th:classappend="${record.archiveStatus() == 'READY' ? ' text-bg-success' : ' text-bg-warning'}" th:text="${record.archiveStatus()}">READY</span>
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/archive}"><i class="bi bi-arrow-left me-1"></i>Archive Manager</a>
++                </div>
++            </div>
++
++            <section class="row g-3 mb-4">
++                <div class="col-xl-7">
++                    <div class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><h2>Final archive evidence</h2><p>Historical state and protected backup metadata.</p></div></div>
++                        <dl class="row mb-0 matrix26-definition-list">
++                            <dt class="col-sm-4">Instance status</dt><dd class="col-sm-8"><span class="badge text-bg-dark" th:text="${record.instanceStatus()}">DECOMMISSIONED</span></dd>
++                            <dt class="col-sm-4">Decommission job</dt><dd class="col-sm-8"><code th:text="${record.decommissionPublicId()}">DCM</code></dd>
++                            <dt class="col-sm-4">Final backup</dt><dd class="col-sm-8"><code th:text="${record.finalBackupPublicId()}">BKP</code></dd>
++                            <dt class="col-sm-4">Package SHA-256</dt><dd class="col-sm-8"><code th:text="${record.finalBackupSha256() != null ? record.finalBackupSha256() : 'Not available'}">sha</code></dd>
++                            <dt class="col-sm-4">Key ID</dt><dd class="col-sm-8"><code th:text="${record.finalBackupKeyId() != null ? record.finalBackupKeyId() : 'Not available'}">key</code></dd>
++                            <dt class="col-sm-4">Retention</dt><dd class="col-sm-8" th:text="|${record.retentionStatus()} · ${record.retentionUntil() != null ? #temporals.format(record.retentionUntil(), 'yyyy-MM-dd HH:mm:ss') : 'No date'}|">retention</dd>
++                            <dt class="col-sm-4">Inventory</dt><dd class="col-sm-8" th:text="${record.inventorySummary()}">summary</dd>
++                            <dt class="col-sm-4">Last error</dt><dd class="col-sm-8 text-danger" th:text="${record.lastError() != null ? record.lastError() : '—'}">—</dd>
++                        </dl>
++                    </div>
++                </div>
++                <div class="col-xl-5">
++                    <div class="matrix26-panel h-100">
++                        <div class="matrix26-panel-header"><div><h2>Restore as clone</h2><p>The original remains decommissioned. A new isolated runtime is created.</p></div></div>
++                        <div class="matrix26-alert-warning mb-3">
++                            <i class="bi bi-exclamation-triangle"></i>
++                            <div><strong>Target must be empty</strong><p th:text="|Matrix26 will create ${cloneCode}, database ${cloneDatabase}, runtime ${cloneRuntime}, and port ${clonePort}.|">Target</p></div>
++                        </div>
++                        <form method="post" th:action="@{/control-center/lifecycle/archive/{id}/verify(id=${record.id()})}" class="mb-3">
++                            <button class="btn btn-outline-primary" type="submit"><i class="bi bi-shield-check me-1"></i>Verify final archive again</button>
++                        </form>
++                        <form method="post" th:action="@{/control-center/lifecycle/archive/{id}/restore-as-clone(id=${record.id()})}">
++                            <div class="form-check form-switch mb-3">
++                                <input class="form-check-input" type="checkbox" id="startAfterRestore" name="startAfterRestore" value="true" checked>
++                                <label class="form-check-label" for="startAfterRestore">Start clone after restore</label>
++                            </div>
++                            <div class="mb-3">
++                                <label class="form-label" for="confirmation">Exact confirmation</label>
++                                <input class="form-control font-monospace" id="confirmation" name="confirmation" th:placeholder="${restoreConfirmation}" required>
++                                <div class="form-text">Type: <code th:text="${restoreConfirmation}">RESTORE ARCHIVE matrix26-archived-restore-test</code></div>
++                            </div>
++                            <button class="btn btn-primary" type="submit" th:disabled="${!record.restorableAsClone()}"><i class="bi bi-arrow-repeat me-1"></i>Restore archive as clone</button>
++                        </form>
++                    </div>
++                </div>
++            </section>
++
++            <section class="matrix26-panel mb-4">
++                <div class="matrix26-panel-header"><div><h2>Archive restore history</h2><p>Clone restores created from this final archive.</p></div></div>
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Restore</th><th>Target</th><th>Status</th><th>Requested</th></tr></thead>
++                        <tbody>
++                        <tr th:if="${#lists.isEmpty(restoreLinks)}"><td colspan="4" class="text-center text-muted py-4">No clone restore has been created from this archive.</td></tr>
++                        <tr th:each="link : ${restoreLinks}">
++                            <td><a th:href="@{/control-center/restores/{id}(id=${link.restoreJobId()})}" th:text="${link.restorePublicId()}">RST</a></td>
++                            <td><code th:text="${link.targetInstanceCode()}">target</code><small class="d-block text-muted" th:text="|${link.targetDatabaseName()} · ${link.targetRuntimeProfile()} · ${link.targetRuntimePort()}|">details</small></td>
++                            <td><span class="badge text-bg-success" th:text="${link.status()}">COMPLETED</span></td>
++                            <td th:text="${#temporals.format(link.requestedAt(), 'yyyy-MM-dd HH:mm:ss')}">time</td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++
++            <section class="matrix26-panel">
++                <div class="matrix26-panel-header"><div><h2>Audit timeline</h2><p>Archive verification and clone recovery events.</p></div></div>
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Time</th><th>Event</th><th>Status</th><th>Actor</th><th>Detail</th></tr></thead>
++                        <tbody>
++                        <tr th:if="${#lists.isEmpty(events)}"><td colspan="5" class="text-center text-muted py-4">No archive events recorded.</td></tr>
++                        <tr th:each="event : ${events}">
++                            <td th:text="${#temporals.format(event.createdAt(), 'yyyy-MM-dd HH:mm:ss')}">time</td>
++                            <td th:text="${event.eventType()}">event</td>
++                            <td><span class="badge" th:classappend="${event.status() == 'COMPLETED' ? ' text-bg-success' : (event.status() == 'FAILED' ? ' text-bg-danger' : ' text-bg-secondary')}" th:text="${event.status()}">status</span></td>
++                            <td th:text="${event.actor()}">actor</td>
++                            <td th:text="${event.detail()}">detail</td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++</body>
++</html>
+diff -ruN m26_3g3_orig/src/main/resources/templates/control_center/lifecycle/archive/index.html m26_3g3_repo/src/main/resources/templates/control_center/lifecycle/archive/index.html
+--- m26_3g3_orig/src/main/resources/templates/control_center/lifecycle/archive/index.html	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/src/main/resources/templates/control_center/lifecycle/archive/index.html	2026-06-28 01:10:58.188375925 +0000
+@@ -0,0 +1,67 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Final archive inventory')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Final archive inventory', 'Historical evidence and isolated clone recovery for decommissioned Matrix26 laboratories.')}"></header>
++        <main class="matrix26-main">
++            <div th:if="${archiveSuccess}" class="alert alert-success" th:text="${archiveSuccess}"></div>
++            <div th:if="${archiveError}" class="alert alert-danger" th:text="${archiveError}"></div>
++
++            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
++                <div>
++                    <h1 class="h4 mb-1">Archive Manager</h1>
++                    <p class="text-muted mb-0">Final archives stay protected; recovery is allowed only as a new isolated clone.</p>
++                </div>
++                <div class="d-flex gap-2">
++                    <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/decommission/decommissioned}"><i class="bi bi-clock-history me-1"></i>Decommissioned</a>
++                    <a class="btn btn-outline-primary" th:href="@{/control-center/lifecycle/archive/restores}"><i class="bi bi-arrow-repeat me-1"></i>Archive restores</a>
++                    <form method="post" th:action="@{/control-center/lifecycle/archive/refresh}">
++                        <button class="btn btn-primary" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Refresh inventory</button>
++                    </form>
++                </div>
++            </div>
++
++            <div class="matrix26-alert-safe mb-4">
++                <i class="bi bi-shield-lock"></i>
++                <div>
++                    <strong>No reactivation, no purge</strong>
++                    <p>Phase 3G.3 never reactivates the original decommissioned instance and never deletes database, runtime, runtime-data, modules, appearance, or final backups. It only validates the final archive and can restore it as a separate clone on port <strong th:text="${clonePort}">8096</strong>.</p>
++                </div>
++            </div>
++
++            <section class="row g-3 mb-4">
++                <div class="col-md-3"><div class="matrix26-stat-card"><span>Archives</span><strong th:text="${summary.totalArchives()}">0</strong></div></div>
++                <div class="col-md-3"><div class="matrix26-stat-card"><span>Ready</span><strong th:text="${summary.readyArchives()}">0</strong></div></div>
++                <div class="col-md-3"><div class="matrix26-stat-card"><span>Reverified</span><strong th:text="${summary.verifiedArchives()}">0</strong></div></div>
++                <div class="col-md-3"><div class="matrix26-stat-card"><span>Clone restores</span><strong th:text="${summary.cloneRestores()}">0</strong></div></div>
++            </section>
++
++            <section class="matrix26-panel">
++                <div class="matrix26-panel-header">
++                    <div><h2>Protected final archives</h2><p>Each record comes from a completed decommission job and a protected FINAL backup.</p></div>
++                </div>
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Instance</th><th>Final backup</th><th>Archive</th><th>Retention</th><th>Inventory</th><th>Actions</th></tr></thead>
++                        <tbody>
++                        <tr th:if="${#lists.isEmpty(records)}"><td colspan="6" class="text-center text-muted py-4">No decommissioned final archive has been registered yet.</td></tr>
++                        <tr th:each="record : ${records}">
++                            <td><strong th:text="${record.instanceName()}">Instance</strong><small class="d-block text-muted" th:text="${record.instanceCode()}">code</small><span class="badge text-bg-dark" th:text="${record.instanceStatus()}">DECOMMISSIONED</span></td>
++                            <td><code th:text="${record.finalBackupPublicId()}">BKP</code><small class="d-block text-muted" th:text="${record.finalBackupSha256() != null ? record.finalBackupSha256() : 'No SHA-256'}">sha</small></td>
++                            <td><span class="badge" th:classappend="${record.archiveStatus() == 'READY' ? ' text-bg-success' : ' text-bg-warning'}" th:text="${record.archiveStatus()}">READY</span><small class="d-block text-muted" th:text="${record.lastVerifiedAt() != null ? #temporals.format(record.lastVerifiedAt(), 'yyyy-MM-dd HH:mm:ss') : 'Not reverified in archive manager'}">verified</small></td>
++                            <td><span class="badge" th:classappend="${record.retentionStatus() == 'RETENTION_ACTIVE' ? ' text-bg-info' : ' text-bg-secondary'}" th:text="${record.retentionStatus()}">RETENTION</span><small class="d-block text-muted" th:text="${record.retentionUntil() != null ? #temporals.format(record.retentionUntil(), 'yyyy-MM-dd HH:mm:ss') : 'No retention date'}">until</small></td>
++                            <td><span th:text="|Runtime files: ${record.runtimeFileCount()}|">Runtime files</span><small class="d-block text-muted" th:text="|Data files: ${record.dataFileCount()}|">Data files</small></td>
++                            <td><a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/lifecycle/archive/{id}(id=${record.id()})}"><i class="bi bi-eye me-1"></i>Open</a></td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++</body>
++</html>
+diff -ruN m26_3g3_orig/src/main/resources/templates/control_center/lifecycle/archive/restores.html m26_3g3_repo/src/main/resources/templates/control_center/lifecycle/archive/restores.html
+--- m26_3g3_orig/src/main/resources/templates/control_center/lifecycle/archive/restores.html	1970-01-01 00:00:00.000000000 +0000
++++ m26_3g3_repo/src/main/resources/templates/control_center/lifecycle/archive/restores.html	2026-06-28 01:10:58.272243183 +0000
+@@ -0,0 +1,35 @@
++<!DOCTYPE html>
++<html lang="en" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="~{control_center/fragments/head :: head('Archive clone restores')}"></head>
++<body class="matrix26-body">
++<div class="matrix26-shell">
++    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
++    <div class="matrix26-content">
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Archive clone restores', 'Restored clones created from protected final archives.')}"></header>
++        <main class="matrix26-main">
++            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
++                <div><h1 class="h4 mb-1">Archive clone restores</h1><p class="text-muted mb-0">These restore jobs never reactivate the original decommissioned instance.</p></div>
++                <a class="btn btn-outline-secondary" th:href="@{/control-center/lifecycle/archive}"><i class="bi bi-arrow-left me-1"></i>Archive Manager</a>
++            </div>
++            <section class="matrix26-panel">
++                <div class="table-responsive">
++                    <table class="table align-middle mb-0 matrix26-table">
++                        <thead><tr><th>Restore</th><th>Archive</th><th>Target</th><th>Status</th><th>Requested</th></tr></thead>
++                        <tbody>
++                        <tr th:if="${#lists.isEmpty(restoreLinks)}"><td colspan="5" class="text-center text-muted py-4">No archive clone restores yet.</td></tr>
++                        <tr th:each="link : ${restoreLinks}">
++                            <td><a th:href="@{/control-center/restores/{id}(id=${link.restoreJobId()})}" th:text="${link.restorePublicId()}">RST</a></td>
++                            <td><a th:href="@{/control-center/lifecycle/archive/{id}(id=${link.archiveRecordId()})}" th:text="|Archive #${link.archiveRecordId()}|">Archive</a></td>
++                            <td><code th:text="${link.targetInstanceCode()}">target</code><small class="d-block text-muted" th:text="|${link.targetDatabaseName()} · ${link.targetRuntimeProfile()} · ${link.targetRuntimePort()}|">details</small></td>
++                            <td><span class="badge text-bg-success" th:text="${link.status()}">COMPLETED</span></td>
++                            <td th:text="${#temporals.format(link.requestedAt(), 'yyyy-MM-dd HH:mm:ss')}">time</td>
++                        </tr>
++                        </tbody>
++                    </table>
++                </div>
++            </section>
++        </main>
++    </div>
++</div>
++</body>
++</html>

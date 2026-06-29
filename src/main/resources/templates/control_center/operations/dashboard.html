@@ -1,70 +1,121 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{control_center/fragments/head :: head('Operations')}"></head>
+<head th:replace="~{control_center/fragments/head :: head('Operations dashboard')}"></head>
 <body class="matrix26-body">
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('Operations Center', 'Stable runtime control, recovery diagnostics, ports, and persistent logs.')}" ></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Operations Dashboard', 'One consolidated operational view for runtimes, backups, restores, lifecycle, purge, and archive safety.')}"></header>
 
         <main class="matrix26-main">
             <div class="matrix26-alert-safe mb-4">
                 <i class="bi bi-shield-check"></i>
                 <div>
-                    <strong>Phase 3D.3: stabilized Runtime Control Center</strong>
-                    <p>Matrix26 now reconciles interrupted operations, detects stale PID files and orphan processes, rotates logs, and keeps force stop isolated behind verified ownership and explicit confirmation. Production instances and the Control Center remain read only.</p>
+                    <strong>Phase 3I.1: read-only operational dashboard</strong>
+                    <p>This page consolidates existing Matrix26 metadata. It does not start runtimes, create backups, run restores, purge resources, or destroy archive files.</p>
                 </div>
             </div>
-
-            <div th:each="warning : ${probeWarnings}" class="alert alert-warning d-flex gap-2 align-items-start">
-                <i class="bi bi-exclamation-triangle-fill mt-1"></i>
-                <span th:text="${warning}">Warning</span>
-            </div>
-
-            <section class="matrix26-operations-summary mb-4">
-                <article>
-                    <span class="matrix26-operation-icon is-primary"><i class="bi bi-hdd-stack"></i></span>
-                    <div><strong th:text="${summary.totalRuntimes()}">0</strong><small>Inventoried runtimes</small></div>
-                </article>
-                <article>
-                    <span class="matrix26-operation-icon is-success"><i class="bi bi-check-circle-fill"></i></span>
-                    <div><strong th:text="${summary.onlineRuntimes()}">0</strong><small>Online</small></div>
-                </article>
-                <article>
-                    <span class="matrix26-operation-icon is-warning"><i class="bi bi-exclamation-triangle-fill"></i></span>
-                    <div><strong th:text="${summary.degradedRuntimes()}">0</strong><small>Needs attention</small></div>
-                </article>
-                <article>
-                    <span class="matrix26-operation-icon is-secondary"><i class="bi bi-stop-circle-fill"></i></span>
-                    <div><strong th:text="${summary.offlineRuntimes()}">0</strong><small>Offline</small></div>
-                </article>
-                <article>
-                    <span class="matrix26-operation-icon is-info"><i class="bi bi-cpu-fill"></i></span>
-                    <div><strong th:text="${summary.detectedProcesses()}">0</strong><small>Detected processes</small></div>
-                </article>
-                <article>
-                    <span class="matrix26-operation-icon is-dark"><i class="bi bi-device-ssd-fill"></i></span>
-                    <div><strong th:text="${summary.totalStorageLabel()}">0 B</strong><small>Runtime + assets</small></div>
-                </article>
-            </section>
 
             <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4">
                 <div class="matrix26-inline-summary">
-                    <span><strong th:text="${summary.listeningPorts()}">0</strong> expected ports listening</span>
-                    <span><strong th:text="${summary.protectedRuntimes()}">0</strong> protected</span>
-                    <span th:if="${summary.inspectedAt() != null}" th:text="|Updated ${#temporals.format(summary.inspectedAt(), 'dd/MM/yyyy HH:mm:ss')}|">Updated</span>
+                    <span th:if="${operationsDashboard.generatedAt() != null}" th:text="|Generated ${#temporals.format(operationsDashboard.generatedAt(), 'dd/MM/yyyy HH:mm:ss')}|">Generated</span>
+                    <span><strong th:text="${operationsDashboard.archiveDestructionExecutionEnabled() ? 'Enabled' : 'Disabled'}">Disabled</strong> archive destruction execution</span>
+                    <span><strong th:text="${operationsDashboard.purgeExecutionEnabled() ? 'Enabled' : 'Disabled'}">Enabled</strong> purge execution</span>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
-                    <a class="btn btn-outline-secondary" th:href="@{/control-center/operations/ports}"><i class="bi bi-ethernet me-1"></i>Ports</a>
-                    <a class="btn btn-outline-secondary" th:href="@{/control-center/operations/logs}"><i class="bi bi-journal-text me-1"></i>Logs</a>
-                    <a class="btn btn-primary" th:href="@{/control-center/operations(refresh=true)}"><i class="bi bi-arrow-clockwise me-1"></i>Refresh inventory</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/operations/runtimes}"><i class="bi bi-cpu me-1"></i>Runtimes</a>
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/backups}"><i class="bi bi-database-check me-1"></i>Backups</a>
+                    <a class="btn btn-primary" th:href="@{/control-center/operations/dashboard(refresh=true)}"><i class="bi bi-arrow-clockwise me-1"></i>Refresh dashboard</a>
                 </div>
             </div>
 
-            <section class="matrix26-panel">
+            <section class="matrix26-operations-dashboard-grid mb-4">
+                <a th:each="metric : ${operationsDashboard.metrics()}"
+                   th:href="${metric.href()}"
+                   class="matrix26-ops-kpi"
+                   th:classappend="${' is-' + metric.tone()}">
+                    <span class="matrix26-ops-kpi-icon"><i class="bi" th:classappend="${' ' + metric.icon()}"></i></span>
+                    <span>
+                        <small th:text="${metric.label()}">Metric</small>
+                        <strong th:text="${metric.value()}">0</strong>
+                        <em th:text="${metric.detail()}">Detail</em>
+                    </span>
+                </a>
+            </section>
+
+            <div class="row g-4">
+                <div class="col-12 col-xl-5">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header">
+                            <div><span>Attention center</span><h2>Current alerts</h2></div>
+                            <small th:text="${operationsDashboard.incomplete() ? 'Partial metadata available' : 'All dashboard sources responded'}">Status</small>
+                        </div>
+                        <div class="matrix26-alert-stack">
+                            <article th:each="alert : ${operationsDashboard.alerts()}" class="matrix26-dashboard-alert">
+                                <span class="badge" th:classappend="${alert.badgeClass()}"><i class="bi" th:classappend="${' ' + alert.icon()}"></i></span>
+                                <div>
+                                    <strong th:text="${alert.title()}">Alert</strong>
+                                    <p th:text="${alert.detail()}">Detail</p>
+                                    <a th:if="${alert.href() != null}" th:href="${alert.href()}" th:text="${alert.actionLabel()}">Open</a>
+                                </div>
+                            </article>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="col-12 col-xl-7">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header">
+                            <div><span>Instance safety</span><h2>Instances requiring attention</h2></div>
+                            <a class="small text-decoration-none" th:href="@{/control-center/instances}">View all instances</a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table align-middle mb-0 matrix26-table">
+                                <thead><tr><th>Instance</th><th>Status</th><th>Runtime</th><th>Database</th><th>Attention</th><th class="text-end">Open</th></tr></thead>
+                                <tbody>
+                                <tr th:each="instance : ${operationsDashboard.instances()}">
+                                    <td><strong th:text="${instance.name()}">Instance</strong><small><code th:text="${instance.code()}">code</code></small></td>
+                                    <td><span class="badge text-bg-light border text-dark" th:text="${instance.status()}">Status</span></td>
+                                    <td><strong th:text="${instance.runtimeStatus()}">Runtime</strong><small th:text="${instance.port() != null ? 'Port ' + instance.port() : 'Port not configured'}">Port</small></td>
+                                    <td><code th:text="${instance.databaseName()}">database</code></td>
+                                    <td><span class="badge" th:classappend="${instance.badgeClass()}" th:text="${instance.attentionLevel()}">Level</span><small th:text="${instance.attentionDetail()}">Detail</small></td>
+                                    <td class="text-end"><a class="btn btn-sm btn-outline-primary" th:href="${instance.href()}" title="Open instance"><i class="bi bi-eye"></i></a></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <section class="matrix26-panel mt-4">
                 <div class="matrix26-panel-header">
-                    <div><span>Current status</span><h2>Monitored runtimes</h2></div>
-                    <a class="small text-decoration-none" th:href="@{/control-center/operations/runtimes}">View full inventory</a>
+                    <div><span>Unified timeline</span><h2>Recent operational activity</h2></div>
+                    <small>Backups, restores, lifecycle, purge, archive destruction, and runtime actions</small>
+                </div>
+                <div th:if="${#lists.isEmpty(operationsDashboard.activities())}" class="text-muted py-4 text-center">No operational activity has been recorded yet.</div>
+                <div th:unless="${#lists.isEmpty(operationsDashboard.activities())}" class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>When</th><th>Area</th><th>Instance</th><th>Operation</th><th>Status</th><th>Detail</th><th class="text-end">Open</th></tr></thead>
+                        <tbody>
+                        <tr th:each="activity : ${operationsDashboard.activities()}">
+                            <td th:text="${activity.occurredAt() != null ? #temporals.format(activity.occurredAt(), 'dd/MM/yyyy HH:mm:ss') : '—'}">Date</td>
+                            <td><span class="badge text-bg-light border text-dark" th:text="${activity.area()}">Area</span></td>
+                            <td><code th:text="${activity.instanceCode()}">instance</code></td>
+                            <td><strong th:text="${activity.title()}">Operation</strong></td>
+                            <td><span class="badge" th:classappend="${activity.badgeClass()}" th:text="${activity.status()}">Status</span></td>
+                            <td class="matrix26-table-message" th:text="${activity.detail()}">Detail</td>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" th:href="${activity.href()}" title="Open record"><i class="bi bi-box-arrow-up-right"></i></a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="matrix26-panel mt-4">
+                <div class="matrix26-panel-header">
+                    <div><span>Runtime snapshot</span><h2>Monitored runtimes</h2></div>
+                    <a class="small text-decoration-none" th:href="@{/control-center/operations/runtimes}">View runtime control</a>
                 </div>
                 <div class="table-responsive">
                     <table class="table align-middle mb-0 matrix26-table matrix26-runtime-table">
@@ -102,30 +153,6 @@
                             <td class="text-end">
                                 <a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/operations/runtimes/{key}(key=${runtime.target().key()})}" title="View technical inventory"><i class="bi bi-eye"></i></a>
                             </td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <section class="matrix26-panel mt-4">
-                <div class="matrix26-panel-header">
-                    <div><span>Audit trail</span><h2>Recent runtime operations</h2></div>
-                    <span class="small text-muted">Up to 100 operations</span>
-                </div>
-                <div th:if="${#lists.isEmpty(recentRuntimeOperations)}" class="text-muted py-4 text-center">No controlled runtime operations have been recorded.</div>
-                <div th:unless="${#lists.isEmpty(recentRuntimeOperations)}" class="table-responsive">
-                    <table class="table align-middle mb-0 matrix26-table">
-                        <thead><tr><th>Requested</th><th>Instance</th><th>Action</th><th>Status</th><th>PID</th><th>User</th><th>Result</th></tr></thead>
-                        <tbody>
-                        <tr th:each="operation : ${recentRuntimeOperations}">
-                            <td th:text="${#temporals.format(operation.requestedAt, 'dd/MM/yyyy HH:mm:ss')}">Date</td>
-                            <td><strong th:text="${operation.instanceCode}">Instance</strong><small th:text="|Port ${operation.runtimePort}|">Port</small></td>
-                            <td><span class="badge text-bg-light border text-dark" th:text="${operation.action.label}">Action</span></td>
-                            <td><span class="badge" th:classappend="${operation.status.badgeClass}" th:text="${operation.status.label}">Status</span></td>
-                            <td><code th:text="${operation.resultingPid != null ? operation.resultingPid : (operation.previousPid != null ? operation.previousPid : '—')}">PID</code></td>
-                            <td th:text="${operation.requestedBy}">User</td>
-                            <td class="matrix26-table-message" th:text="${operation.message}">Result</td>
                         </tr>
                         </tbody>
                     </table>

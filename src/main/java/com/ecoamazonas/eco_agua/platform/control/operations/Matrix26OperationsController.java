@@ -19,22 +19,34 @@ public class Matrix26OperationsController {
 
     private final Matrix26OperationsInventoryService inventoryService;
     private final Matrix26RuntimeControlService runtimeControlService;
+    private final Matrix26OperationsDashboardService dashboardService;
 
     public Matrix26OperationsController(
             Matrix26OperationsInventoryService inventoryService,
-            Matrix26RuntimeControlService runtimeControlService
+            Matrix26RuntimeControlService runtimeControlService,
+            Matrix26OperationsDashboardService dashboardService
     ) {
         this.inventoryService = inventoryService;
         this.runtimeControlService = runtimeControlService;
+        this.dashboardService = dashboardService;
     }
 
     @GetMapping
-    public String dashboard(
+    public String dashboardRoot(
+            @RequestParam(value = "refresh", defaultValue = "false") boolean refresh,
+            Model model
+    ) {
+        return operationsDashboard(refresh, model);
+    }
+
+    @GetMapping("/dashboard")
+    public String operationsDashboard(
             @RequestParam(value = "refresh", defaultValue = "false") boolean refresh,
             Model model
     ) {
         Matrix26OperationsSnapshot snapshot = inventoryService.snapshot(refresh);
-        addSnapshotModel(model, snapshot, "matrix26_operations");
+        addSnapshotModel(model, snapshot, "matrix26_operations_dashboard");
+        model.addAttribute("operationsDashboard", dashboardService.dashboard(snapshot));
         model.addAttribute("recentRuntimeOperations", runtimeControlService.recentOperations());
         return "control_center/operations/dashboard";
     }

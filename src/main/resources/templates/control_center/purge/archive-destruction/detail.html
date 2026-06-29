@@ -5,7 +5,7 @@
 <div class="matrix26-shell">
     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
     <div class="matrix26-content">
-        <header th:replace="~{control_center/fragments/topbar :: topbar('Archive destruction detail', 'Read-only evidence for final archive package governance.')} "></header>
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Archive destruction detail', 'Governed final archive package destruction with explicit safety gates.')} "></header>
         <main class="matrix26-main">
             <div th:if="${purgeSuccess}" class="alert alert-success" th:text="${purgeSuccess}"></div>
             <div th:if="${purgeError}" class="alert alert-danger" th:text="${purgeError}"></div>
@@ -30,9 +30,14 @@
             <div class="matrix26-alert-safe mb-4">
                 <i class="bi bi-shield-lock"></i>
                 <div>
-                    <strong>Phase 3H.3 is read-only</strong>
-                    <p>Even when resources are marked WOULD_DELETE, this screen only means “candidate for a future phase”. It does not remove files or database records.</p>
+                    <strong>Phase 3H.4 uses a separate execution gate</strong>
+                    <p>Planning remains safe by default. Archive package destruction requires execution-enabled=true, approval, two irreversible confirmations and zero safety blockers.</p>
                 </div>
+            </div>
+
+            <div class="alert mb-4" th:classappend="${archiveDestructionExecutionEnabled ? ' alert-danger' : ' alert-warning'}">
+                <strong th:text="${archiveDestructionExecutionEnabled ? 'Archive destruction execution is ENABLED' : 'Archive destruction execution is DISABLED'}">Execution gate</strong>
+                <span th:text="${archiveDestructionExecutionEnabled ? 'Only continue in the controlled 3H.4 test window.' : 'Approval and destruction actions must block until matrix26.control-center.purge.archive-destruction-execution-enabled=true.'}">Gate detail</span>
             </div>
 
             <section class="row g-3 mb-4">
@@ -69,15 +74,55 @@
                 </div>
             </section>
 
+            <section class="matrix26-panel mb-4" th:if="${plan.status().name() == 'READY_FOR_REVIEW' || plan.status().name() == 'APPROVED_FOR_DESTRUCTION' || plan.status().name() == 'PARTIALLY_DESTROYED'}">
+                <div class="matrix26-panel-header">
+                    <div>
+                        <h2>Controlled archive destruction execution</h2>
+                        <p>Use this only after validating the planner, retention, clone links and final backup metadata.</p>
+                    </div>
+                </div>
+                <div class="row g-4">
+                    <div class="col-lg-6" th:if="${plan.status().name() == 'READY_FOR_REVIEW'}">
+                        <form method="post" th:action="@{/control-center/purge/archive-destruction/{id}/approve(id=${plan.id()})}">
+                            <label class="form-label">Approval confirmation</label>
+                            <input class="form-control mb-2" name="approvalConfirmation" required th:placeholder="|APPROVE ARCHIVE DESTRUCTION ${plan.instanceCode()}|">
+                            <div class="form-text mb-3">Type exactly: <code th:text="|APPROVE ARCHIVE DESTRUCTION ${plan.instanceCode()}|">APPROVE</code></div>
+                            <button class="btn btn-outline-danger" type="submit"><i class="bi bi-shield-exclamation me-1"></i>Approve destruction</button>
+                        </form>
+                    </div>
+                    <div class="col-lg-6" th:if="${plan.status().name() == 'APPROVED_FOR_DESTRUCTION' || plan.status().name() == 'PARTIALLY_DESTROYED'}">
+                        <form method="post" th:action="@{/control-center/purge/archive-destruction/{id}/execute(id=${plan.id()})}">
+                            <label class="form-label">Destroy archive confirmation</label>
+                            <input class="form-control mb-2" name="destroyConfirmation" required th:placeholder="|DESTROY ARCHIVE PACKAGE ${plan.instanceCode()}|">
+                            <div class="form-text mb-3">Type exactly: <code th:text="|DESTROY ARCHIVE PACKAGE ${plan.instanceCode()}|">DESTROY</code></div>
+                            <label class="form-label">Irreversible confirmation</label>
+                            <input class="form-control mb-2" name="irreversibleConfirmation" required placeholder="I UNDERSTAND THIS ARCHIVE CANNOT BE RESTORED">
+                            <div class="form-text mb-3">Type exactly: <code>I UNDERSTAND THIS ARCHIVE CANNOT BE RESTORED</code></div>
+                            <button class="btn btn-danger" type="submit"><i class="bi bi-trash3 me-1"></i>Destroy archive package</button>
+                        </form>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="matrix26-alert-safe h-100">
+                            <i class="bi bi-database-lock"></i>
+                            <div>
+                                <strong>Preserved records</strong>
+                                <p>Central archive, backup, purge, decommission and clone link metadata stay in Matrix26 for audit even if the physical archive package is destroyed.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section class="matrix26-panel mb-4">
-                <div class="matrix26-panel-header"><div><h2>Archive package classification</h2><p>WOULD_DELETE is only a future candidate marker in this phase.</p></div></div>
+                <div class="matrix26-panel-header"><div><h2>Archive package classification</h2><p>WOULD_DELETE becomes executable only after approval and explicit final confirmations.</p></div></div>
                 <div class="table-responsive">
                     <table class="table align-middle mb-0 matrix26-table">
-                        <thead><tr><th>Disposition</th><th>Resource</th><th>Path / reference</th><th>Size</th><th>Files</th><th>Detail</th></tr></thead>
+                        <thead><tr><th>Disposition</th><th>Execution</th><th>Resource</th><th>Path / reference</th><th>Size</th><th>Files</th><th>Detail</th></tr></thead>
                         <tbody>
-                        <tr th:if="${#lists.isEmpty(items)}"><td colspan="6" class="text-center text-muted py-4">No items recorded.</td></tr>
+                        <tr th:if="${#lists.isEmpty(items)}"><td colspan="7" class="text-center text-muted py-4">No items recorded.</td></tr>
                         <tr th:each="item : ${items}">
                             <td><span class="badge" th:classappend="${item.disposition().name() == 'WOULD_DELETE' ? ' text-bg-warning' : (item.disposition().name() == 'PROTECTED' ? ' text-bg-success' : (item.disposition().name() == 'BLOCKED' ? ' text-bg-danger' : ' text-bg-secondary'))}" th:text="${item.disposition()}">status</span></td>
+                            <td><span class="badge text-bg-light" th:text="${item.executionStatusLabel()}">—</span><small class="d-block text-muted" th:text="${item.executionDetailLabel()}">—</small></td>
                             <td><strong th:text="${item.resourceType()}">type</strong><small class="d-block text-muted" th:text="${item.resourceName()}">name</small></td>
                             <td><code th:text="${item.resourcePath()}">path</code></td>
                             <td th:text="${item.sizeLabel()}">size</td>
@@ -90,7 +135,7 @@
             </section>
 
             <section class="matrix26-panel">
-                <div class="matrix26-panel-header"><div><h2>Audit timeline</h2><p>Planner events only.</p></div></div>
+                <div class="matrix26-panel-header"><div><h2>Audit timeline</h2><p>Planner and executor events.</p></div></div>
                 <div class="table-responsive">
                     <table class="table align-middle mb-0 matrix26-table">
                         <thead><tr><th>Time</th><th>Event</th><th>Status</th><th>Actor</th><th>Detail</th></tr></thead>

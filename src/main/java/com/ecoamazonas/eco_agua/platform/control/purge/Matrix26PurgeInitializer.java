@@ -180,12 +180,22 @@ public class Matrix26PurgeInitializer implements ApplicationRunner {
                     file_count INT NULL,
                     detail TEXT NULL,
                     created_at DATETIME(6) NOT NULL,
+                    execution_status VARCHAR(40) NULL,
+                    executed_at DATETIME(6) NULL,
+                    execution_detail TEXT NULL,
                     PRIMARY KEY (id),
                     KEY idx_matrix26_archive_destruction_item_plan (destruction_plan_id, run_number, disposition),
+                    KEY idx_matrix26_archive_destruction_item_execution (destruction_plan_id, run_number, execution_status),
                     CONSTRAINT fk_matrix26_archive_destruction_item_plan
                         FOREIGN KEY (destruction_plan_id) REFERENCES matrix26_archive_destruction_plan(id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+
+        addColumnIfMissing("matrix26_archive_destruction_item", "execution_status", "VARCHAR(40) NULL");
+        addColumnIfMissing("matrix26_archive_destruction_item", "executed_at", "DATETIME(6) NULL");
+        addColumnIfMissing("matrix26_archive_destruction_item", "execution_detail", "TEXT NULL");
+        addIndexIfMissing("matrix26_archive_destruction_item", "idx_matrix26_archive_destruction_item_execution",
+                "CREATE INDEX idx_matrix26_archive_destruction_item_execution ON matrix26_archive_destruction_item (destruction_plan_id, run_number, execution_status)");
 
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS matrix26_archive_destruction_check (

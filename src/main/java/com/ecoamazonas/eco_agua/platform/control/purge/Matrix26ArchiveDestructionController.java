@@ -38,6 +38,7 @@ public class Matrix26ArchiveDestructionController {
         model.addAttribute("summary", service.summary());
         model.addAttribute("candidates", service.candidates());
         model.addAttribute("plans", service.recentPlans());
+        model.addAttribute("archiveDestructionExecutionEnabled", properties.isArchiveDestructionExecutionEnabled());
         return "control_center/purge/archive-destruction/index";
     }
 
@@ -57,6 +58,7 @@ public class Matrix26ArchiveDestructionController {
         model.addAttribute("items", service.items(planId));
         model.addAttribute("checks", service.checks(planId));
         model.addAttribute("events", service.events(planId));
+        model.addAttribute("archiveDestructionExecutionEnabled", properties.isArchiveDestructionExecutionEnabled());
         return "control_center/purge/archive-destruction/detail";
     }
 
@@ -83,6 +85,49 @@ public class Matrix26ArchiveDestructionController {
         try {
             service.refresh(planId, actor(principal));
             redirectAttributes.addFlashAttribute("purgeSuccess", "The archive destruction planner was refreshed. Deleted resources: 0.");
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("purgeError", ex.getMessage());
+        }
+        return "redirect:/control-center/purge/archive-destruction/" + planId;
+    }
+
+
+    @PostMapping("/{planId:\\d+}/approve")
+    public String approve(
+            @PathVariable long planId,
+            @RequestParam("approvalConfirmation") String approvalConfirmation,
+            Principal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            service.approveDestruction(planId, approvalConfirmation, actor(principal));
+            redirectAttributes.addFlashAttribute("purgeSuccess", "Archive destruction was approved. No archive package was destroyed yet.");
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("purgeError", ex.getMessage());
+        }
+        return "redirect:/control-center/purge/archive-destruction/" + planId;
+    }
+
+    @PostMapping("/{planId:\\d+}/execute")
+    public String execute(
+            @PathVariable long planId,
+            @RequestParam("destroyConfirmation") String destroyConfirmation,
+            @RequestParam("irreversibleConfirmation") String irreversibleConfirmation,
+            Principal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            Matrix26ArchiveDestructionPlan plan = service.executeDestruction(
+                    planId,
+                    destroyConfirmation,
+                    irreversibleConfirmation,
+                    actor(principal)
+            );
+            if (plan.status() == Matrix26ArchiveDestructionStatus.DESTROYED) {
+                redirectAttributes.addFlashAttribute("purgeSuccess", "Archive package destruction completed. Central audit metadata was preserved.");
+            } else {
+                redirectAttributes.addFlashAttribute("purgeError", "Archive package destruction needs manual review: " + plan.lastError());
+            }
         } catch (RuntimeException ex) {
             redirectAttributes.addFlashAttribute("purgeError", ex.getMessage());
         }

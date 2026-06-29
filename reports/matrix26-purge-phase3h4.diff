@@ -1,0 +1,974 @@
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26ArchiveDestructionController.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26ArchiveDestructionController.java
+@@ -38,6 +38,7 @@
+         model.addAttribute("summary", service.summary());
+         model.addAttribute("candidates", service.candidates());
+         model.addAttribute("plans", service.recentPlans());
++        model.addAttribute("archiveDestructionExecutionEnabled", properties.isArchiveDestructionExecutionEnabled());
+         return "control_center/purge/archive-destruction/index";
+     }
+ 
+@@ -57,6 +58,7 @@
+         model.addAttribute("items", service.items(planId));
+         model.addAttribute("checks", service.checks(planId));
+         model.addAttribute("events", service.events(planId));
++        model.addAttribute("archiveDestructionExecutionEnabled", properties.isArchiveDestructionExecutionEnabled());
+         return "control_center/purge/archive-destruction/detail";
+     }
+ 
+@@ -89,6 +91,49 @@
+         return "redirect:/control-center/purge/archive-destruction/" + planId;
+     }
+ 
++
++    @PostMapping("/{planId:\\d+}/approve")
++    public String approve(
++            @PathVariable long planId,
++            @RequestParam("approvalConfirmation") String approvalConfirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            service.approveDestruction(planId, approvalConfirmation, actor(principal));
++            redirectAttributes.addFlashAttribute("purgeSuccess", "Archive destruction was approved. No archive package was destroyed yet.");
++        } catch (RuntimeException ex) {
++            redirectAttributes.addFlashAttribute("purgeError", ex.getMessage());
++        }
++        return "redirect:/control-center/purge/archive-destruction/" + planId;
++    }
++
++    @PostMapping("/{planId:\\d+}/execute")
++    public String execute(
++            @PathVariable long planId,
++            @RequestParam("destroyConfirmation") String destroyConfirmation,
++            @RequestParam("irreversibleConfirmation") String irreversibleConfirmation,
++            Principal principal,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            Matrix26ArchiveDestructionPlan plan = service.executeDestruction(
++                    planId,
++                    destroyConfirmation,
++                    irreversibleConfirmation,
++                    actor(principal)
++            );
++            if (plan.status() == Matrix26ArchiveDestructionStatus.DESTROYED) {
++                redirectAttributes.addFlashAttribute("purgeSuccess", "Archive package destruction completed. Central audit metadata was preserved.");
++            } else {
++                redirectAttributes.addFlashAttribute("purgeError", "Archive package destruction needs manual review: " + plan.lastError());
++            }
++        } catch (RuntimeException ex) {
++            redirectAttributes.addFlashAttribute("purgeError", ex.getMessage());
++        }
++        return "redirect:/control-center/purge/archive-destruction/" + planId;
++    }
++
+     @GetMapping("/{planId:\\d+}/report")
+     public ResponseEntity<byte[]> report(@PathVariable long planId) {
+         Matrix26ArchiveDestructionPlan plan = service.plan(planId);
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26ArchiveDestructionItem.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26ArchiveDestructionItem.java
+@@ -13,7 +13,10 @@
+         Long sizeBytes,
+         Integer fileCount,
+         String detail,
+-        LocalDateTime createdAt
++        LocalDateTime createdAt,
++        String executionStatus,
++        LocalDateTime executedAt,
++        String executionDetail
+ ) {
+     public String sizeLabel() {
+         if (sizeBytes == null || sizeBytes < 0) {
+@@ -31,4 +34,12 @@
+         }
+         return String.format("%.2f %s", value, units[unit]);
+     }
++
++    public String executionStatusLabel() {
++        return executionStatus == null || executionStatus.isBlank() ? "—" : executionStatus;
++    }
++
++    public String executionDetailLabel() {
++        return executionDetail == null || executionDetail.isBlank() ? "—" : executionDetail;
++    }
+ }
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26ArchiveDestructionRepository.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26ArchiveDestructionRepository.java
+@@ -118,6 +118,66 @@
+         completePlan(planId, Matrix26ArchiveDestructionStatus.FAILED, new Counts(1, 0, 0, 0, 0), error);
+     }
+ 
++    public void updatePlanStatus(long planId, Matrix26ArchiveDestructionStatus status, String error) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_archive_destruction_plan
++                SET status = ?, evaluated_at = ?, last_error = ?
++                WHERE id = ?
++                """, status.name(), LocalDateTime.now(), limit(error, 8000), planId);
++    }
++
++    public void prepareExecutionItems(long planId, int runNumber) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_archive_destruction_item
++                SET execution_status = CASE WHEN disposition = 'WOULD_DELETE' THEN 'PENDING' ELSE 'SKIPPED_PROTECTED' END,
++                    execution_detail = CASE WHEN disposition = 'WOULD_DELETE' THEN 'Awaiting explicit archive destruction execution.' ELSE 'Preserved by archive destruction policy.' END,
++                    executed_at = NULL
++                WHERE destruction_plan_id = ? AND run_number = ?
++                """, planId, runNumber);
++    }
++
++    public void updateItemExecutionStatus(long itemId, String status, String detail) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_archive_destruction_item
++                SET execution_status = ?, execution_detail = ?, executed_at = ?
++                WHERE id = ?
++                """, status, limit(detail, 8000), LocalDateTime.now(), itemId);
++    }
++
++    public int destroyedItemCount(long planId) {
++        Integer count = jdbcTemplate.queryForObject("""
++                SELECT COUNT(*) FROM matrix26_archive_destruction_item
++                WHERE destruction_plan_id = ? AND execution_status = 'DESTROYED'
++                """, Integer.class, planId);
++        return count == null ? 0 : count;
++    }
++
++    public int pendingDestroyItemCount(long planId, int runNumber) {
++        Integer count = jdbcTemplate.queryForObject("""
++                SELECT COUNT(*) FROM matrix26_archive_destruction_item
++                WHERE destruction_plan_id = ? AND run_number = ? AND disposition = 'WOULD_DELETE'
++                """, Integer.class, planId, runNumber);
++        return count == null ? 0 : count;
++    }
++
++    public boolean hasBlockedCurrentChecks(long planId) {
++        return positive("""
++                SELECT COUNT(*)
++                FROM matrix26_archive_destruction_check c
++                JOIN matrix26_archive_destruction_plan p ON p.id = c.destruction_plan_id
++                WHERE c.destruction_plan_id = ? AND c.run_number = p.run_number AND c.status = 'BLOCKED'
++                """, planId);
++    }
++
++    public void markArchivePackageDestroyed(long archiveRecordId, String actor) {
++        jdbcTemplate.update("""
++                UPDATE matrix26_archive_record
++                SET archive_status = 'PACKAGE_DESTROYED', retention_status = 'DESTROYED',
++                    updated_at = ?, last_verified_at = NULL, last_error = ?
++                WHERE id = ?
++                """, LocalDateTime.now(), limit("Final archive package destroyed by " + actor, 8000), archiveRecordId);
++    }
++
+     public void addCheck(long planId, int runNumber, String code, String label, String status, String detail) {
+         jdbcTemplate.update("""
+                 INSERT INTO matrix26_archive_destruction_check (
+@@ -282,7 +342,10 @@
+                 rs.getObject("size_bytes", Long.class),
+                 rs.getObject("file_count", Integer.class),
+                 rs.getString("detail"),
+-                rs.getObject("created_at", LocalDateTime.class)
++                rs.getObject("created_at", LocalDateTime.class),
++                rs.getString("execution_status"),
++                rs.getObject("executed_at", LocalDateTime.class),
++                rs.getString("execution_detail")
+         );
+     }
+ 
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26ArchiveDestructionService.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26ArchiveDestructionService.java
+@@ -32,6 +32,7 @@
+     private final PlatformBusinessClientRepository clientRepository;
+     private final Matrix26BackupRepository backupRepository;
+     private final Matrix26BackupSecurityService backupSecurityService;
++    private final Matrix26HistoricalArchiveExecutor historicalArchiveExecutor;
+ 
+     public Matrix26ArchiveDestructionService(
+             Matrix26ArchiveDestructionRepository repository,
+@@ -39,7 +40,8 @@
+             Matrix26ArchiveRepository archiveRepository,
+             PlatformBusinessClientRepository clientRepository,
+             Matrix26BackupRepository backupRepository,
+-            Matrix26BackupSecurityService backupSecurityService
++            Matrix26BackupSecurityService backupSecurityService,
++            Matrix26HistoricalArchiveExecutor historicalArchiveExecutor
+     ) {
+         this.repository = repository;
+         this.properties = properties;
+@@ -47,6 +49,7 @@
+         this.clientRepository = clientRepository;
+         this.backupRepository = backupRepository;
+         this.backupSecurityService = backupSecurityService;
++        this.historicalArchiveExecutor = historicalArchiveExecutor;
+     }
+ 
+     public Matrix26ArchiveDestructionSummary summary() {
+@@ -146,15 +149,99 @@
+ 
+     public Matrix26ArchiveDestructionPlan refresh(long planId, String actor) {
+         validateEnabled();
++        Matrix26ArchiveDestructionPlan plan = plan(planId);
++        if (plan.status() == Matrix26ArchiveDestructionStatus.DESTROYING
++                || plan.status() == Matrix26ArchiveDestructionStatus.DESTROYED
++                || plan.status() == Matrix26ArchiveDestructionStatus.PARTIALLY_DESTROYED) {
++            throw new Matrix26PurgeException("This archive destruction plan is already executing or completed and cannot be refreshed.");
++        }
+         repository.addEvent(planId, "ARCHIVE_DESTRUCTION_REFRESH_REQUESTED", "COMPLETED", safeActor(actor),
+-                "Read-only archive destruction planner refresh requested. Deleted resources: 0.");
++                "Archive destruction planner refresh requested. No archive package was destroyed.");
+         return evaluate(planId, safeActor(actor));
++    }
++
++    public Matrix26ArchiveDestructionPlan approveDestruction(long planId, String approvalConfirmation, String actor) {
++        validateDestructionExecutionEnabled();
++        Matrix26ArchiveDestructionPlan plan = plan(planId);
++        if (plan.status() != Matrix26ArchiveDestructionStatus.READY_FOR_REVIEW) {
++            throw new Matrix26PurgeException("Only a READY_FOR_REVIEW archive destruction plan can be approved.");
++        }
++        String expected = "APPROVE ARCHIVE DESTRUCTION " + plan.instanceCode();
++        if (!expected.equals(approvalConfirmation == null ? "" : approvalConfirmation.trim())) {
++            throw new Matrix26PurgeException("Type exactly: " + expected);
++        }
++        assertDestructionSafety(plan);
++        repository.prepareExecutionItems(plan.id(), currentRun(plan));
++        repository.updatePlanStatus(plan.id(), Matrix26ArchiveDestructionStatus.APPROVED_FOR_DESTRUCTION, null);
++        repository.addEvent(plan.id(), "ARCHIVE_DESTRUCTION_APPROVED", Matrix26ArchiveDestructionStatus.APPROVED_FOR_DESTRUCTION.name(), safeActor(actor),
++                "Archive destruction was approved after explicit confirmation. No archive package was destroyed yet.");
++        return plan(plan.id());
++    }
++
++    public Matrix26ArchiveDestructionPlan executeDestruction(
++            long planId,
++            String destroyConfirmation,
++            String irreversibleConfirmation,
++            String actor
++    ) {
++        validateDestructionExecutionEnabled();
++        Matrix26ArchiveDestructionPlan plan = plan(planId);
++        if (plan.status() != Matrix26ArchiveDestructionStatus.APPROVED_FOR_DESTRUCTION
++                && plan.status() != Matrix26ArchiveDestructionStatus.PARTIALLY_DESTROYED) {
++            throw new Matrix26PurgeException("Only an APPROVED_FOR_DESTRUCTION plan can destroy an archive package.");
++        }
++        String expectedDestroy = "DESTROY ARCHIVE PACKAGE " + plan.instanceCode();
++        if (!expectedDestroy.equals(destroyConfirmation == null ? "" : destroyConfirmation.trim())) {
++            throw new Matrix26PurgeException("Type exactly: " + expectedDestroy);
++        }
++        String expectedIrreversible = "I UNDERSTAND THIS ARCHIVE CANNOT BE RESTORED";
++        if (!expectedIrreversible.equals(irreversibleConfirmation == null ? "" : irreversibleConfirmation.trim())) {
++            throw new Matrix26PurgeException("Type exactly: " + expectedIrreversible);
++        }
++        assertDestructionSafety(plan);
++        repository.updatePlanStatus(plan.id(), Matrix26ArchiveDestructionStatus.DESTROYING, null);
++        repository.addEvent(plan.id(), "ARCHIVE_DESTRUCTION_STARTED", Matrix26ArchiveDestructionStatus.DESTROYING.name(), safeActor(actor),
++                "Final archive package destruction started after the required confirmations.");
++
++        List<String> failures = new ArrayList<>();
++        for (Matrix26ArchiveDestructionItem item : repository.items(plan.id())) {
++            if (item.disposition() != Matrix26PurgeDisposition.WOULD_DELETE) {
++                continue;
++            }
++            try {
++                Matrix26HistoricalArchiveExecutor.ExecutionResult result = historicalArchiveExecutor.destroy(plan, item);
++                repository.updateItemExecutionStatus(item.id(), result.status(), result.detail());
++                repository.addEvent(plan.id(), "ARCHIVE_DESTRUCTION_ITEM_" + result.status(), result.status(), safeActor(actor),
++                        item.resourceType() + ": " + result.detail());
++            } catch (RuntimeException ex) {
++                failures.add(item.resourceType() + ": " + ex.getMessage());
++                repository.updateItemExecutionStatus(item.id(), "FAILED", ex.getMessage());
++                repository.addEvent(plan.id(), "ARCHIVE_DESTRUCTION_ITEM_FAILED", "FAILED", safeActor(actor),
++                        item.resourceType() + " failed: " + ex.getMessage());
++            }
++        }
++
++        if (failures.isEmpty()) {
++            repository.markArchivePackageDestroyed(plan.archiveRecordId(), safeActor(actor));
++            archiveRepository.addEvent(plan.archiveRecordId(), "ARCHIVE_PACKAGE_DESTROYED", "COMPLETED", safeActor(actor),
++                    "Final archive package was destroyed by Matrix26 Archive Destruction Executor. Central audit metadata was preserved.");
++            repository.updatePlanStatus(plan.id(), Matrix26ArchiveDestructionStatus.DESTROYED, null);
++            repository.addEvent(plan.id(), "ARCHIVE_DESTRUCTION_COMPLETED", Matrix26ArchiveDestructionStatus.DESTROYED.name(), safeActor(actor),
++                    "Archive package destruction completed. Destroyed items: " + repository.destroyedItemCount(plan.id())
++                            + ". Central archive, backup, purge and decommission metadata were preserved.");
++        } else {
++            String error = String.join(" | ", failures);
++            repository.updatePlanStatus(plan.id(), Matrix26ArchiveDestructionStatus.PARTIALLY_DESTROYED, error);
++            repository.addEvent(plan.id(), "ARCHIVE_DESTRUCTION_PARTIAL", Matrix26ArchiveDestructionStatus.PARTIALLY_DESTROYED.name(), safeActor(actor),
++                    "Archive package destruction needs manual review: " + error);
++        }
++        return plan(plan.id());
+     }
+ 
+     public String report(long planId) {
+         Matrix26ArchiveDestructionPlan plan = plan(planId);
+         StringBuilder builder = new StringBuilder();
+-        builder.append("Matrix26 Archive Destruction Planner - Read-only Report\n");
++        builder.append("Matrix26 Archive Destruction Executor - Governance Report\n");
+         builder.append("Plan: ").append(plan.publicId()).append('\n');
+         builder.append("Instance: ").append(plan.instanceName()).append(" (").append(plan.instanceCode()).append(")\n");
+         builder.append("Archive: ").append(plan.archivePublicId()).append('\n');
+@@ -171,11 +258,12 @@
+             builder.append("- [").append(item.disposition()).append("] ")
+                     .append(item.resourceType()).append(" | ").append(nullToBlank(item.resourceName()))
+                     .append(" | ").append(nullToBlank(item.resourcePath()))
+-                    .append(" | ").append(nullToBlank(item.detail()))
++                    .append(" | execution=").append(item.executionStatusLabel())
++                    .append(" | ").append(nullToBlank(item.executionDetail()))
+                     .append('\n');
+         }
+-        builder.append("\nDeleted resources in Phase 3H.3: 0\n");
+-        builder.append("This phase only prepares evidence. Final archive package deletion remains unavailable.\n");
++        builder.append("\nDestroyed resources in Phase 3H.4: ").append(repository.destroyedItemCount(planId)).append('\n');
++        builder.append("Central metadata preservation: archive records, backup metadata, purge records, decommission records and clone links are not deleted by this executor.\n");
+         return builder.toString();
+     }
+ 
+@@ -200,8 +288,9 @@
+ 
+             check(planId, runNumber, "FEATURE_ENABLED", "Archive destruction planner is enabled",
+                     properties.isArchiveDestructionEnabled(), "This phase is read-only and does not remove files.");
+-            check(planId, runNumber, "EXECUTION_DISABLED", "Archive package removal is disabled",
+-                    !properties.isArchiveDestructionExecutionEnabled(), "Phase 3H.3 must not expose operational file removal.");
++            check(planId, runNumber, "EXECUTION_GATE_RECORDED", "Archive package removal requires the separate execution gate",
++                    true, "Execution flag currently enabled: " + properties.isArchiveDestructionExecutionEnabled()
++                            + ". Destruction still requires approval and two irreversible confirmations.");
+             check(planId, runNumber, "ALLOWLIST", "Instance is allowlisted for archive destruction planning",
+                     allowlisted(instance.getCode()), "Allowed instance codes: " + properties.getAllowedInstanceCodes());
+             check(planId, runNumber, "PROTECTED_INSTANCE", "Instance is not protected",
+@@ -237,11 +326,8 @@
+             if (blockers > 0) {
+                 status = Matrix26ArchiveDestructionStatus.BLOCKED;
+                 error = "The archive destruction planner found blockers. Deleted resources: 0.";
+-            } else if (!properties.isArchiveDestructionExecutionEnabled()) {
++            } else {
+                 status = Matrix26ArchiveDestructionStatus.READY_FOR_REVIEW;
+-            } else {
+-                status = Matrix26ArchiveDestructionStatus.DESTRUCTION_NOT_ENABLED;
+-                error = "Operational archive destruction is intentionally unavailable in Phase 3H.3.";
+             }
+             repository.completePlan(planId, status, counts, error);
+             repository.addEvent(planId, "ARCHIVE_DESTRUCTION_ANALYZED", status.name(), actor,
+@@ -423,6 +509,48 @@
+         return total;
+     }
+ 
++
++    private void validateDestructionExecutionEnabled() {
++        validateEnabled();
++        if (!properties.isArchiveDestructionExecutionEnabled()) {
++            throw new Matrix26PurgeException("Archive destruction execution is disabled. Set matrix26.control-center.purge.archive-destruction-execution-enabled=true only for the controlled 3H.4 execution window.");
++        }
++    }
++
++    private void assertDestructionSafety(Matrix26ArchiveDestructionPlan plan) {
++        if (!allowlisted(plan.instanceCode()) || protectedCode(plan.instanceCode())) {
++            throw new Matrix26PurgeException("This instance is not allowed for archive package destruction.");
++        }
++        if (plan.blockers() > 0 || repository.hasBlockedCurrentChecks(plan.id())) {
++            throw new Matrix26PurgeException("The current archive destruction plan still has safety blockers.");
++        }
++        if (repository.pendingDestroyItemCount(plan.id(), currentRun(plan)) <= 0) {
++            throw new Matrix26PurgeException("The current archive destruction plan has no WOULD_DELETE archive package item.");
++        }
++        if (repository.associatedCloneCount(plan.archiveRecordId()) > 0) {
++            throw new Matrix26PurgeException("Clone restore links still reference this archive. Remove or resolve clone dependencies before destruction.");
++        }
++        if (repository.hasActiveBackupOrRestore(plan.instanceId(), plan.instanceCode())
++                || repository.hasActiveArchiveCloneRestore(plan.archiveRecordId())) {
++            throw new Matrix26PurgeException("Active backup or restore operations still reference this archive.");
++        }
++        if (properties.isArchiveDestructionRequireRetentionExpired()
++                && (plan.retentionUntil() == null || plan.retentionUntil().isAfter(LocalDateTime.now()))) {
++            throw new Matrix26PurgeException("Archive retention has not expired yet.");
++        }
++        Matrix26BackupEncryption encryption = finalBackupMetadata(plan.finalBackupJobId());
++        if (!finalBackupOk(encryption)) {
++            throw new Matrix26PurgeException("Final backup metadata is no longer encrypted, FINAL, protected, and VERIFIED.");
++        }
++        if (encryption.packagePath() == null || encryption.packagePath().isBlank()) {
++            throw new Matrix26PurgeException("Final archive package path is missing from encrypted backup metadata.");
++        }
++    }
++
++    private int currentRun(Matrix26ArchiveDestructionPlan plan) {
++        return plan.runNumber() == null ? 1 : plan.runNumber();
++    }
++
+     private Matrix26BackupEncryption finalBackupMetadata(Long jobId) {
+         return jobId == null ? null : backupSecurityService.metadata(jobId);
+     }
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26ArchiveDestructionStatus.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26ArchiveDestructionStatus.java
+@@ -4,6 +4,10 @@
+     DRAFT,
+     ANALYZING,
+     READY_FOR_REVIEW,
++    APPROVED_FOR_DESTRUCTION,
++    DESTROYING,
++    PARTIALLY_DESTROYED,
++    DESTROYED,
+     BLOCKED,
+     DESTRUCTION_NOT_ENABLED,
+     FAILED
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26HistoricalArchiveExecutor.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26HistoricalArchiveExecutor.java
+@@ -0,0 +1,132 @@
++package com.ecoamazonas.eco_agua.platform.control.purge;
++
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.stereotype.Component;
++
++import java.io.IOException;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.ArrayList;
++import java.util.Comparator;
++import java.util.List;
++import java.util.Locale;
++import java.util.Set;
++import java.util.stream.Stream;
++
++@Component
++@ConditionalOnProperty(name = "matrix26.control-center.enabled", havingValue = "true")
++public class Matrix26HistoricalArchiveExecutor {
++    private static final Set<String> ALLOWED_ARCHIVE_FILE_NAMES = Set.of(
++            "package.m26backup",
++            "public-manifest.json",
++            "manifest.json",
++            "checksums.sha256",
++            "backup-report.txt",
++            "database.sql.gz",
++            "instance-files.zip",
++            "runtime-config.properties",
++            "instance.json",
++            "modules.json",
++            "appearance.json",
++            "files-inventory.json",
++            "runtime-log-tail.txt"
++    );
++
++    private final Matrix26PurgeProperties properties;
++
++    public Matrix26HistoricalArchiveExecutor(Matrix26PurgeProperties properties) {
++        this.properties = properties;
++    }
++
++    public ExecutionResult destroy(Matrix26ArchiveDestructionPlan plan, Matrix26ArchiveDestructionItem item) {
++        if (item.resourcePath() == null || item.resourcePath().isBlank()) {
++            throw new Matrix26PurgeException("Archive destruction item has no resource path.");
++        }
++        return switch (item.resourceType()) {
++            case "FINAL_ARCHIVE_PACKAGE" -> destroyFile(plan, item.resourcePath());
++            case "FINAL_BACKUP_DIRECTORY" -> destroyDirectory(plan, item.resourcePath());
++            default -> throw new Matrix26PurgeException("Unsupported archive destruction resource type: " + item.resourceType());
++        };
++    }
++
++    private ExecutionResult destroyFile(Matrix26ArchiveDestructionPlan plan, String rawPath) {
++        Path path = safeArchivePath(plan, rawPath);
++        if (!Files.exists(path)) {
++            return new ExecutionResult("NOT_FOUND", "The archive file was already absent: " + path);
++        }
++        if (!Files.isRegularFile(path)) {
++            throw new Matrix26PurgeException("Archive package path is not a regular file: " + path);
++        }
++        validateAllowedFile(path);
++        try {
++            Files.delete(path);
++            return new ExecutionResult("DESTROYED", "Destroyed archive file: " + path);
++        } catch (IOException ex) {
++            throw new Matrix26PurgeException("Could not destroy archive file " + path + ": " + ex.getMessage());
++        }
++    }
++
++    private ExecutionResult destroyDirectory(Matrix26ArchiveDestructionPlan plan, String rawPath) {
++        Path directory = safeArchivePath(plan, rawPath);
++        if (!Files.exists(directory)) {
++            return new ExecutionResult("NOT_FOUND", "The archive directory was already absent: " + directory);
++        }
++        if (!Files.isDirectory(directory)) {
++            throw new Matrix26PurgeException("Archive directory path is not a directory: " + directory);
++        }
++        List<Path> entries = walk(directory);
++        for (Path entry : entries) {
++            if (Files.isRegularFile(entry)) {
++                validateAllowedFile(entry);
++            }
++        }
++        entries.sort(Comparator.reverseOrder());
++        int removed = 0;
++        for (Path entry : entries) {
++            try {
++                if (Files.exists(entry)) {
++                    Files.delete(entry);
++                    removed++;
++                }
++            } catch (IOException ex) {
++                throw new Matrix26PurgeException("Could not destroy archive directory entry " + entry + ": " + ex.getMessage());
++            }
++        }
++        return new ExecutionResult("DESTROYED", "Destroyed archive directory: " + directory + ". Removed entries: " + removed + ".");
++    }
++
++    private Path safeArchivePath(Matrix26ArchiveDestructionPlan plan, String rawPath) {
++        Path root = Path.of(properties.getBackupRootDirectory()).toAbsolutePath().normalize();
++        Path input = Path.of(rawPath);
++        Path target = input.isAbsolute() ? input.toAbsolutePath().normalize() : root.resolve(input).normalize();
++        if (target.equals(root)) {
++            throw new Matrix26PurgeException("Refusing to destroy the backup root directory.");
++        }
++        if (!target.startsWith(root)) {
++            throw new Matrix26PurgeException("Refusing to destroy a path outside the configured backup root: " + target);
++        }
++        String targetText = target.toString().toLowerCase(Locale.ROOT);
++        String instanceCode = plan.instanceCode() == null ? "" : plan.instanceCode().toLowerCase(Locale.ROOT);
++        if (instanceCode.isBlank() || !targetText.contains(instanceCode)) {
++            throw new Matrix26PurgeException("Refusing to destroy archive path because it does not include the instance code: " + target);
++        }
++        return target;
++    }
++
++    private List<Path> walk(Path directory) {
++        try (Stream<Path> stream = Files.walk(directory)) {
++            return new ArrayList<>(stream.toList());
++        } catch (IOException ex) {
++            throw new Matrix26PurgeException("Could not inspect archive directory before destruction: " + ex.getMessage());
++        }
++    }
++
++    private void validateAllowedFile(Path path) {
++        String fileName = path.getFileName() == null ? "" : path.getFileName().toString();
++        if (!ALLOWED_ARCHIVE_FILE_NAMES.contains(fileName)) {
++            throw new Matrix26PurgeException("Refusing to destroy unexpected archive file: " + path);
++        }
++    }
++
++    public record ExecutionResult(String status, String detail) {}
++}
+--- a/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeInitializer.java
++++ b/src/main/java/com/ecoamazonas/eco_agua/platform/control/purge/Matrix26PurgeInitializer.java
+@@ -180,12 +180,22 @@
+                     file_count INT NULL,
+                     detail TEXT NULL,
+                     created_at DATETIME(6) NOT NULL,
++                    execution_status VARCHAR(40) NULL,
++                    executed_at DATETIME(6) NULL,
++                    execution_detail TEXT NULL,
+                     PRIMARY KEY (id),
+                     KEY idx_matrix26_archive_destruction_item_plan (destruction_plan_id, run_number, disposition),
++                    KEY idx_matrix26_archive_destruction_item_execution (destruction_plan_id, run_number, execution_status),
+                     CONSTRAINT fk_matrix26_archive_destruction_item_plan
+                         FOREIGN KEY (destruction_plan_id) REFERENCES matrix26_archive_destruction_plan(id)
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                 """);
++
++        addColumnIfMissing("matrix26_archive_destruction_item", "execution_status", "VARCHAR(40) NULL");
++        addColumnIfMissing("matrix26_archive_destruction_item", "executed_at", "DATETIME(6) NULL");
++        addColumnIfMissing("matrix26_archive_destruction_item", "execution_detail", "TEXT NULL");
++        addIndexIfMissing("matrix26_archive_destruction_item", "idx_matrix26_archive_destruction_item_execution",
++                "CREATE INDEX idx_matrix26_archive_destruction_item_execution ON matrix26_archive_destruction_item (destruction_plan_id, run_number, execution_status)");
+ 
+         jdbcTemplate.execute("""
+                 CREATE TABLE IF NOT EXISTS matrix26_archive_destruction_check (
+--- a/src/main/resources/templates/control_center/purge/archive-destruction/detail.html
++++ b/src/main/resources/templates/control_center/purge/archive-destruction/detail.html
+@@ -5,7 +5,7 @@
+ <div class="matrix26-shell">
+     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+     <div class="matrix26-content">
+-        <header th:replace="~{control_center/fragments/topbar :: topbar('Archive destruction detail', 'Read-only evidence for final archive package governance.')} "></header>
++        <header th:replace="~{control_center/fragments/topbar :: topbar('Archive destruction detail', 'Governed final archive package destruction with explicit safety gates.')} "></header>
+         <main class="matrix26-main">
+             <div th:if="${purgeSuccess}" class="alert alert-success" th:text="${purgeSuccess}"></div>
+             <div th:if="${purgeError}" class="alert alert-danger" th:text="${purgeError}"></div>
+@@ -30,9 +30,14 @@
+             <div class="matrix26-alert-safe mb-4">
+                 <i class="bi bi-shield-lock"></i>
+                 <div>
+-                    <strong>Phase 3H.3 is read-only</strong>
+-                    <p>Even when resources are marked WOULD_DELETE, this screen only means “candidate for a future phase”. It does not remove files or database records.</p>
++                    <strong>Phase 3H.4 uses a separate execution gate</strong>
++                    <p>Planning remains safe by default. Archive package destruction requires execution-enabled=true, approval, two irreversible confirmations and zero safety blockers.</p>
+                 </div>
++            </div>
++
++            <div class="alert mb-4" th:classappend="${archiveDestructionExecutionEnabled ? ' alert-danger' : ' alert-warning'}">
++                <strong th:text="${archiveDestructionExecutionEnabled ? 'Archive destruction execution is ENABLED' : 'Archive destruction execution is DISABLED'}">Execution gate</strong>
++                <span th:text="${archiveDestructionExecutionEnabled ? 'Only continue in the controlled 3H.4 test window.' : 'Approval and destruction actions must block until matrix26.control-center.purge.archive-destruction-execution-enabled=true.'}">Gate detail</span>
+             </div>
+ 
+             <section class="row g-3 mb-4">
+@@ -69,15 +74,55 @@
+                 </div>
+             </section>
+ 
++            <section class="matrix26-panel mb-4" th:if="${plan.status().name() == 'READY_FOR_REVIEW' || plan.status().name() == 'APPROVED_FOR_DESTRUCTION' || plan.status().name() == 'PARTIALLY_DESTROYED'}">
++                <div class="matrix26-panel-header">
++                    <div>
++                        <h2>Controlled archive destruction execution</h2>
++                        <p>Use this only after validating the planner, retention, clone links and final backup metadata.</p>
++                    </div>
++                </div>
++                <div class="row g-4">
++                    <div class="col-lg-6" th:if="${plan.status().name() == 'READY_FOR_REVIEW'}">
++                        <form method="post" th:action="@{/control-center/purge/archive-destruction/{id}/approve(id=${plan.id()})}">
++                            <label class="form-label">Approval confirmation</label>
++                            <input class="form-control mb-2" name="approvalConfirmation" required th:placeholder="|APPROVE ARCHIVE DESTRUCTION ${plan.instanceCode()}|">
++                            <div class="form-text mb-3">Type exactly: <code th:text="|APPROVE ARCHIVE DESTRUCTION ${plan.instanceCode()}|">APPROVE</code></div>
++                            <button class="btn btn-outline-danger" type="submit"><i class="bi bi-shield-exclamation me-1"></i>Approve destruction</button>
++                        </form>
++                    </div>
++                    <div class="col-lg-6" th:if="${plan.status().name() == 'APPROVED_FOR_DESTRUCTION' || plan.status().name() == 'PARTIALLY_DESTROYED'}">
++                        <form method="post" th:action="@{/control-center/purge/archive-destruction/{id}/execute(id=${plan.id()})}">
++                            <label class="form-label">Destroy archive confirmation</label>
++                            <input class="form-control mb-2" name="destroyConfirmation" required th:placeholder="|DESTROY ARCHIVE PACKAGE ${plan.instanceCode()}|">
++                            <div class="form-text mb-3">Type exactly: <code th:text="|DESTROY ARCHIVE PACKAGE ${plan.instanceCode()}|">DESTROY</code></div>
++                            <label class="form-label">Irreversible confirmation</label>
++                            <input class="form-control mb-2" name="irreversibleConfirmation" required placeholder="I UNDERSTAND THIS ARCHIVE CANNOT BE RESTORED">
++                            <div class="form-text mb-3">Type exactly: <code>I UNDERSTAND THIS ARCHIVE CANNOT BE RESTORED</code></div>
++                            <button class="btn btn-danger" type="submit"><i class="bi bi-trash3 me-1"></i>Destroy archive package</button>
++                        </form>
++                    </div>
++                    <div class="col-lg-6">
++                        <div class="matrix26-alert-safe h-100">
++                            <i class="bi bi-database-lock"></i>
++                            <div>
++                                <strong>Preserved records</strong>
++                                <p>Central archive, backup, purge, decommission and clone link metadata stay in Matrix26 for audit even if the physical archive package is destroyed.</p>
++                            </div>
++                        </div>
++                    </div>
++                </div>
++            </section>
++
+             <section class="matrix26-panel mb-4">
+-                <div class="matrix26-panel-header"><div><h2>Archive package classification</h2><p>WOULD_DELETE is only a future candidate marker in this phase.</p></div></div>
++                <div class="matrix26-panel-header"><div><h2>Archive package classification</h2><p>WOULD_DELETE becomes executable only after approval and explicit final confirmations.</p></div></div>
+                 <div class="table-responsive">
+                     <table class="table align-middle mb-0 matrix26-table">
+-                        <thead><tr><th>Disposition</th><th>Resource</th><th>Path / reference</th><th>Size</th><th>Files</th><th>Detail</th></tr></thead>
++                        <thead><tr><th>Disposition</th><th>Execution</th><th>Resource</th><th>Path / reference</th><th>Size</th><th>Files</th><th>Detail</th></tr></thead>
+                         <tbody>
+-                        <tr th:if="${#lists.isEmpty(items)}"><td colspan="6" class="text-center text-muted py-4">No items recorded.</td></tr>
++                        <tr th:if="${#lists.isEmpty(items)}"><td colspan="7" class="text-center text-muted py-4">No items recorded.</td></tr>
+                         <tr th:each="item : ${items}">
+                             <td><span class="badge" th:classappend="${item.disposition().name() == 'WOULD_DELETE' ? ' text-bg-warning' : (item.disposition().name() == 'PROTECTED' ? ' text-bg-success' : (item.disposition().name() == 'BLOCKED' ? ' text-bg-danger' : ' text-bg-secondary'))}" th:text="${item.disposition()}">status</span></td>
++                            <td><span class="badge text-bg-light" th:text="${item.executionStatusLabel()}">—</span><small class="d-block text-muted" th:text="${item.executionDetailLabel()}">—</small></td>
+                             <td><strong th:text="${item.resourceType()}">type</strong><small class="d-block text-muted" th:text="${item.resourceName()}">name</small></td>
+                             <td><code th:text="${item.resourcePath()}">path</code></td>
+                             <td th:text="${item.sizeLabel()}">size</td>
+@@ -90,7 +135,7 @@
+             </section>
+ 
+             <section class="matrix26-panel">
+-                <div class="matrix26-panel-header"><div><h2>Audit timeline</h2><p>Planner events only.</p></div></div>
++                <div class="matrix26-panel-header"><div><h2>Audit timeline</h2><p>Planner and executor events.</p></div></div>
+                 <div class="table-responsive">
+                     <table class="table align-middle mb-0 matrix26-table">
+                         <thead><tr><th>Time</th><th>Event</th><th>Status</th><th>Actor</th><th>Detail</th></tr></thead>
+--- a/src/main/resources/templates/control_center/purge/archive-destruction/index.html
++++ b/src/main/resources/templates/control_center/purge/archive-destruction/index.html
+@@ -1,6 +1,6 @@
+ <!DOCTYPE html>
+ <html lang="en" xmlns:th="http://www.thymeleaf.org">
+-<head th:replace="~{control_center/fragments/head :: head('Archive destruction planner')}"></head>
++<head th:replace="~{control_center/fragments/head :: head('Archive destruction')}"></head>
+ <body class="matrix26-body">
+ <div class="matrix26-shell">
+     <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+@@ -12,8 +12,8 @@
+ 
+             <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                 <div>
+-                    <h1 class="h4 mb-1">Archive destruction planner</h1>
+-                    <p class="text-muted mb-0">This phase inventories final archive packages, retention, clone links and audit metadata. Deleted resources: <strong>0</strong>.</p>
++                    <h1 class="h4 mb-1">Archive destruction</h1>
++                    <p class="text-muted mb-0">This phase inventories final archive packages, retention, clone links and audit metadata. Destroyed resources stay at <strong>0</strong> until the separate 3H.4 executor is explicitly enabled and confirmed.</p>
+                 </div>
+                 <div class="d-flex gap-2">
+                     <a class="btn btn-outline-secondary" th:href="@{/control-center/purge}"><i class="bi bi-arrow-left me-1"></i>Purge Manager</a>
+--- a/scripts/check-matrix26-purge-phase3h4.sh
++++ b/scripts/check-matrix26-purge-phase3h4.sh
+@@ -0,0 +1,74 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++assert_file() {
++  local file="$1"
++  if [ ! -f "$file" ]; then
++    echo "Missing required file: $file" >&2
++    exit 1
++  fi
++}
++
++assert_contains() {
++  local file="$1"
++  local pattern="$2"
++  local label="$3"
++  if ! grep -qE "$pattern" "$file"; then
++    echo "Check failed: $label" >&2
++    echo "File: $file" >&2
++    exit 1
++  fi
++}
++
++PURGE_SRC="src/main/java/com/ecoamazonas/eco_agua/platform/control/purge"
++ARCHIVE_TPL="src/main/resources/templates/control_center/purge/archive-destruction"
++
++assert_file "$PURGE_SRC/Matrix26ArchiveDestructionController.java"
++assert_file "$PURGE_SRC/Matrix26ArchiveDestructionService.java"
++assert_file "$PURGE_SRC/Matrix26ArchiveDestructionRepository.java"
++assert_file "$PURGE_SRC/Matrix26HistoricalArchiveExecutor.java"
++assert_file "$PURGE_SRC/Matrix26ArchiveDestructionStatus.java"
++assert_file "$ARCHIVE_TPL/detail.html"
++assert_file scripts/configure-matrix26-purge-phase3h4.sh
++
++assert_contains "$PURGE_SRC/Matrix26ArchiveDestructionService.java" 'APPROVE ARCHIVE DESTRUCTION' 'Approval confirmation exists'
++assert_contains "$PURGE_SRC/Matrix26ArchiveDestructionService.java" 'DESTROY ARCHIVE PACKAGE' 'Destroy confirmation exists'
++assert_contains "$PURGE_SRC/Matrix26ArchiveDestructionService.java" 'I UNDERSTAND THIS ARCHIVE CANNOT BE RESTORED' 'Irreversible confirmation exists'
++assert_contains "$PURGE_SRC/Matrix26ArchiveDestructionService.java" 'archive-destruction-execution-enabled=true' 'Execution gate message exists'
++assert_contains "$PURGE_SRC/Matrix26ArchiveDestructionService.java" 'Central archive, backup, purge and decommission metadata were preserved' 'Central metadata preservation is logged'
++assert_contains "$PURGE_SRC/Matrix26ArchiveDestructionService.java" 'NO_CLONE_DEPENDENCY' 'Clone dependency gate remains active'
++assert_contains "$PURGE_SRC/Matrix26ArchiveDestructionService.java" 'RETENTION_EXPIRED' 'Retention gate remains active'
++assert_contains "$PURGE_SRC/Matrix26ArchiveDestructionRepository.java" 'PACKAGE_DESTROYED' 'Archive status is updated after successful package destruction'
++assert_contains "$PURGE_SRC/Matrix26ArchiveDestructionRepository.java" 'execution_status' 'Item execution evidence is stored'
++assert_contains "$PURGE_SRC/Matrix26HistoricalArchiveExecutor.java" 'Files\.delete' 'Physical file deletion is isolated in the executor'
++assert_contains "$PURGE_SRC/Matrix26HistoricalArchiveExecutor.java" 'Refusing to destroy a path outside the configured backup root' 'Backup root safety boundary exists'
++assert_contains "$PURGE_SRC/Matrix26HistoricalArchiveExecutor.java" 'Refusing to destroy unexpected archive file' 'Unexpected files are blocked'
++assert_contains "$PURGE_SRC/Matrix26PurgeInitializer.java" 'idx_matrix26_archive_destruction_item_execution' 'Archive destruction execution index exists'
++assert_contains "$PURGE_SRC/Matrix26PurgeProperties.java" 'archiveDestructionExecutionEnabled = false' 'Archive destruction execution remains disabled by default'
++assert_contains "$ARCHIVE_TPL/detail.html" 'APPROVE ARCHIVE DESTRUCTION' 'UI exposes approval confirmation'
++assert_contains "$ARCHIVE_TPL/detail.html" 'DESTROY ARCHIVE PACKAGE' 'UI exposes destruction confirmation'
++assert_contains "$ARCHIVE_TPL/detail.html" 'I UNDERSTAND THIS ARCHIVE CANNOT BE RESTORED' 'UI exposes irreversible confirmation'
++assert_contains scripts/configure-matrix26-purge-phase3h4.sh 'archive-destruction-execution-enabled" "false' 'Configuration keeps execution disabled by default'
++
++if grep -RniE 'DROP DATABASE|DROP SCHEMA' "$PURGE_SRC/Matrix26ArchiveDestruction"*.java "$PURGE_SRC/Matrix26HistoricalArchiveExecutor.java"; then
++  echo "Archive destruction executor must not drop databases." >&2
++  exit 1
++fi
++
++if grep -RniE 'Files\.delete|deleteRecursively|deleteIfExists|removeDirectory' "$PURGE_SRC/Matrix26ArchiveDestruction"*.java; then
++  echo "Physical file deletion must stay isolated outside Matrix26ArchiveDestruction*.java." >&2
++  exit 1
++fi
++
++if grep -RniE 'Files\.delete|deleteRecursively|deleteIfExists|removeDirectory' "$PURGE_SRC"/*.java | grep -v 'Matrix26HistoricalArchiveExecutor.java' | grep -v 'Matrix26PurgeService.java'; then
++  echo "Unexpected physical deletion outside the approved executors." >&2
++  exit 1
++fi
++
++echo "Archive destruction execution routes: OK"
++echo "Three explicit confirmations: OK"
++echo "Execution disabled by default: OK"
++echo "Retention, clone and final backup gates: OK"
++echo "Physical deletion isolated in Matrix26HistoricalArchiveExecutor: OK"
++echo "Central metadata preservation: OK"
++echo "Matrix26 Purge Manager Phase 3H.4 static checks passed."
+--- a/scripts/configure-matrix26-purge-phase3h4.sh
++++ b/scripts/configure-matrix26-purge-phase3h4.sh
+@@ -0,0 +1,38 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++CONFIG_FILE="runtime-clients/matrix26_control/application.properties"
++MAINTENANCE_DIR="runtime-data/matrix26-control/maintenance"
++BACKUP_FILE="$MAINTENANCE_DIR/application.properties.phase3h4.bak"
++
++if [ ! -f "$CONFIG_FILE" ]; then
++  echo "Matrix26 Control Center runtime configuration was not found: $CONFIG_FILE" >&2
++  exit 1
++fi
++
++mkdir -p "$MAINTENANCE_DIR"
++cp "$CONFIG_FILE" "$BACKUP_FILE"
++
++set_property() {
++  local key="$1"
++  local value="$2"
++  if grep -qE "^[[:space:]]*${key//./\.}=" "$CONFIG_FILE"; then
++    sed -i -E "s|^[[:space:]]*${key//./\.}=.*|${key}=${value}|" "$CONFIG_FILE"
++  else
++    printf '\n%s=%s\n' "$key" "$value" >> "$CONFIG_FILE"
++  fi
++}
++
++set_property "matrix26.control-center.purge.enabled" "true"
++set_property "matrix26.control-center.purge.execution-enabled" "true"
++set_property "matrix26.control-center.purge.archive-destruction-enabled" "true"
++set_property "matrix26.control-center.purge.archive-destruction-execution-enabled" "false"
++set_property "matrix26.control-center.purge.archive-destruction-require-retention-expired" "true"
++set_property "matrix26.control-center.purge.allowed-instance-codes" "matrix26-appearance-lab"
++set_property "matrix26.control-center.purge.protected-instance-codes" "eco-agua,productos-selva-belen,restaurante-buen-sabor,matrix26-control-center,matrix26-archived-restore-test"
++set_property "matrix26.control-center.purge.minimum-reason-length" "10"
++set_property "matrix26.control-center.purge.backup-root-directory" "C:/Users/PC/Matrix26/backups"
++
++echo "Matrix26 Purge Manager Phase 3H.4 archive destruction executor configuration updated."
++echo "Execution remains disabled by default. Enable it manually only during the controlled destruction test."
++echo "Backup saved at: $BACKUP_FILE"
+--- a/docs/project/matrix26-purge-phase3h4-test-guide.md
++++ b/docs/project/matrix26-purge-phase3h4-test-guide.md
+@@ -0,0 +1,167 @@
++# Matrix26 Purge Manager - Phase 3H.4 Test Guide
++
++## Scope
++
++Phase 3H.4 adds the controlled Historical Archive Destruction Executor. It can destroy the physical final archive package and final backup directory only after the 3H.3 planner is `READY_FOR_REVIEW`, the execution gate is enabled, and three explicit confirmations are provided.
++
++Central Matrix26 metadata is preserved:
++
++- `matrix26_archive_record`
++- `matrix26_archive_event`
++- `matrix26_backup_*`
++- `matrix26_purge_*`
++- `matrix26_decommission_*`
++- `matrix26_archive_restore_link`
++
++## Protected instances
++
++Execution remains restricted to:
++
++- `matrix26-appearance-lab`
++
++These remain protected:
++
++- `eco-agua`
++- `productos-selva-belen`
++- `restaurante-buen-sabor`
++- `matrix26-control-center`
++- `matrix26-archived-restore-test`
++
++## Apply configuration
++
++Run:
++
++```bash
++bash scripts/configure-matrix26-purge-phase3h4.sh
++```
++
++Expected default gate:
++
++```properties
++matrix26.control-center.purge.archive-destruction-execution-enabled=false
++```
++
++This is intentional. First verify that approval is blocked while the gate is disabled.
++
++## Static verification
++
++Run:
++
++```bash
++bash scripts/check-matrix26-purge-phase3h4.sh
++```
++
++Expected result:
++
++```text
++Matrix26 Purge Manager Phase 3H.4 static checks passed.
++```
++
++## Functional verification - disabled gate
++
++1. Start Matrix26 Control Center.
++2. Open a `READY_FOR_REVIEW` archive destruction plan:
++
++```text
++http://localhost:8091/control-center/purge/archive-destruction
++```
++
++3. Try to approve with:
++
++```text
++APPROVE ARCHIVE DESTRUCTION matrix26-appearance-lab
++```
++
++Expected result:
++
++```text
++Archive destruction execution is disabled.
++```
++
++No files are removed.
++
++## Functional verification - controlled execution window
++
++Only after the disabled-gate test succeeds, temporarily set:
++
++```properties
++matrix26.control-center.purge.archive-destruction-execution-enabled=true
++```
++
++Restart Matrix26 Control Center and open the same `READY_FOR_REVIEW` plan.
++
++### Step 1: approve
++
++Type exactly:
++
++```text
++APPROVE ARCHIVE DESTRUCTION matrix26-appearance-lab
++```
++
++Expected status:
++
++```text
++APPROVED_FOR_DESTRUCTION
++```
++
++No files are removed yet.
++
++### Step 2: execute
++
++Type exactly:
++
++```text
++DESTROY ARCHIVE PACKAGE matrix26-appearance-lab
++```
++
++and:
++
++```text
++I UNDERSTAND THIS ARCHIVE CANNOT BE RESTORED
++```
++
++Expected status:
++
++```text
++DESTROYED
++```
++
++The final archive record should be marked:
++
++```text
++PACKAGE_DESTROYED
++```
++
++## Safety gates
++
++Execution must be blocked when any condition is true:
++
++- Plan is not `READY_FOR_REVIEW` or `APPROVED_FOR_DESTRUCTION`.
++- Retention has not expired.
++- Clone restore links still reference the archive.
++- Active backup or restore operations exist.
++- Final backup metadata is not encrypted, `FINAL`, protected and `VERIFIED`.
++- Path is outside `matrix26.control-center.purge.backup-root-directory`.
++- Path does not include the instance code.
++- Archive directory contains unexpected file names.
++
++## Must not happen
++
++Phase 3H.4 must not:
++
++- Drop any database.
++- Delete runtime directories.
++- Delete runtime-data directories.
++- Delete Matrix26 central metadata.
++- Delete clone instance `matrix26-archived-restore-test`.
++- Delete protected production clients.
++
++## Restore the safe default
++
++After the test, set execution back to false:
++
++```properties
++matrix26.control-center.purge.archive-destruction-execution-enabled=false
++```
++
++Restart Matrix26 Control Center.

@@ -32,6 +32,7 @@ public class Matrix26ArchiveDestructionService {
     private final PlatformBusinessClientRepository clientRepository;
     private final Matrix26BackupRepository backupRepository;
     private final Matrix26BackupSecurityService backupSecurityService;
+    private final Matrix26HistoricalArchiveExecutor historicalArchiveExecutor;
 
     public Matrix26ArchiveDestructionService(
             Matrix26ArchiveDestructionRepository repository,
@@ -39,7 +40,8 @@ public class Matrix26ArchiveDestructionService {
             Matrix26ArchiveRepository archiveRepository,
             PlatformBusinessClientRepository clientRepository,
             Matrix26BackupRepository backupRepository,
-            Matrix26BackupSecurityService backupSecurityService
+            Matrix26BackupSecurityService backupSecurityService,
+            Matrix26HistoricalArchiveExecutor historicalArchiveExecutor
     ) {
         this.repository = repository;
         this.properties = properties;
@@ -47,6 +49,7 @@ public class Matrix26ArchiveDestructionService {
         this.clientRepository = clientRepository;
         this.backupRepository = backupRepository;
         this.backupSecurityService = backupSecurityService;
+        this.historicalArchiveExecutor = historicalArchiveExecutor;
     }
 
     public Matrix26ArchiveDestructionSummary summary() {
@@ -146,15 +149,99 @@ public class Matrix26ArchiveDestructionService {
 
     public Matrix26ArchiveDestructionPlan refresh(long planId, String actor) {
         validateEnabled();
+        Matrix26ArchiveDestructionPlan plan = plan(planId);
+        if (plan.status() == Matrix26ArchiveDestructionStatus.DESTROYING
+                || plan.status() == Matrix26ArchiveDestructionStatus.DESTROYED
+                || plan.status() == Matrix26ArchiveDestructionStatus.PARTIALLY_DESTROYED) {
+            throw new Matrix26PurgeException("This archive destruction plan is already executing or completed and cannot be refreshed.");
+        }
         repository.addEvent(planId, "ARCHIVE_DESTRUCTION_REFRESH_REQUESTED", "COMPLETED", safeActor(actor),
-                "Read-only archive destruction planner refresh requested. Deleted resources: 0.");
+                "Archive destruction planner refresh requested. No archive package was destroyed.");
         return evaluate(planId, safeActor(actor));
+    }
+
+    public Matrix26ArchiveDestructionPlan approveDestruction(long planId, String approvalConfirmation, String actor) {
+        validateDestructionExecutionEnabled();
+        Matrix26ArchiveDestructionPlan plan = plan(planId);
+        if (plan.status() != Matrix26ArchiveDestructionStatus.READY_FOR_REVIEW) {
+            throw new Matrix26PurgeException("Only a READY_FOR_REVIEW archive destruction plan can be approved.");
+        }
+        String expected = "APPROVE ARCHIVE DESTRUCTION " + plan.instanceCode();
+        if (!expected.equals(approvalConfirmation == null ? "" : approvalConfirmation.trim())) {
+            throw new Matrix26PurgeException("Type exactly: " + expected);
+        }
+        assertDestructionSafety(plan);
+        repository.prepareExecutionItems(plan.id(), currentRun(plan));
+        repository.updatePlanStatus(plan.id(), Matrix26ArchiveDestructionStatus.APPROVED_FOR_DESTRUCTION, null);
+        repository.addEvent(plan.id(), "ARCHIVE_DESTRUCTION_APPROVED", Matrix26ArchiveDestructionStatus.APPROVED_FOR_DESTRUCTION.name(), safeActor(actor),
+                "Archive destruction was approved after explicit confirmation. No archive package was destroyed yet.");
+        return plan(plan.id());
+    }
+
+    public Matrix26ArchiveDestructionPlan executeDestruction(
+            long planId,
+            String destroyConfirmation,
+            String irreversibleConfirmation,
+            String actor
+    ) {
+        validateDestructionExecutionEnabled();
+        Matrix26ArchiveDestructionPlan plan = plan(planId);
+        if (plan.status() != Matrix26ArchiveDestructionStatus.APPROVED_FOR_DESTRUCTION
+                && plan.status() != Matrix26ArchiveDestructionStatus.PARTIALLY_DESTROYED) {
+            throw new Matrix26PurgeException("Only an APPROVED_FOR_DESTRUCTION plan can destroy an archive package.");
+        }
+        String expectedDestroy = "DESTROY ARCHIVE PACKAGE " + plan.instanceCode();
+        if (!expectedDestroy.equals(destroyConfirmation == null ? "" : destroyConfirmation.trim())) {
+            throw new Matrix26PurgeException("Type exactly: " + expectedDestroy);
+        }
+        String expectedIrreversible = "I UNDERSTAND THIS ARCHIVE CANNOT BE RESTORED";
+        if (!expectedIrreversible.equals(irreversibleConfirmation == null ? "" : irreversibleConfirmation.trim())) {
+            throw new Matrix26PurgeException("Type exactly: " + expectedIrreversible);
+        }
+        assertDestructionSafety(plan);
+        repository.updatePlanStatus(plan.id(), Matrix26ArchiveDestructionStatus.DESTROYING, null);
+        repository.addEvent(plan.id(), "ARCHIVE_DESTRUCTION_STARTED", Matrix26ArchiveDestructionStatus.DESTROYING.name(), safeActor(actor),
+                "Final archive package destruction started after the required confirmations.");
+
+        List<String> failures = new ArrayList<>();
+        for (Matrix26ArchiveDestructionItem item : repository.items(plan.id())) {
+            if (item.disposition() != Matrix26PurgeDisposition.WOULD_DELETE) {
+                continue;
+            }
+            try {
+                Matrix26HistoricalArchiveExecutor.ExecutionResult result = historicalArchiveExecutor.destroy(plan, item);
+                repository.updateItemExecutionStatus(item.id(), result.status(), result.detail());
+                repository.addEvent(plan.id(), "ARCHIVE_DESTRUCTION_ITEM_" + result.status(), result.status(), safeActor(actor),
+                        item.resourceType() + ": " + result.detail());
+            } catch (RuntimeException ex) {
+                failures.add(item.resourceType() + ": " + ex.getMessage());
+                repository.updateItemExecutionStatus(item.id(), "FAILED", ex.getMessage());
+                repository.addEvent(plan.id(), "ARCHIVE_DESTRUCTION_ITEM_FAILED", "FAILED", safeActor(actor),
+                        item.resourceType() + " failed: " + ex.getMessage());
+            }
+        }
+
+        if (failures.isEmpty()) {
+            repository.markArchivePackageDestroyed(plan.archiveRecordId(), safeActor(actor));
+            archiveRepository.addEvent(plan.archiveRecordId(), "ARCHIVE_PACKAGE_DESTROYED", "COMPLETED", safeActor(actor),
+                    "Final archive package was destroyed by Matrix26 Archive Destruction Executor. Central audit metadata was preserved.");
+            repository.updatePlanStatus(plan.id(), Matrix26ArchiveDestructionStatus.DESTROYED, null);
+            repository.addEvent(plan.id(), "ARCHIVE_DESTRUCTION_COMPLETED", Matrix26ArchiveDestructionStatus.DESTROYED.name(), safeActor(actor),
+                    "Archive package destruction completed. Destroyed items: " + repository.destroyedItemCount(plan.id())
+                            + ". Central archive, backup, purge and decommission metadata were preserved.");
+        } else {
+            String error = String.join(" | ", failures);
+            repository.updatePlanStatus(plan.id(), Matrix26ArchiveDestructionStatus.PARTIALLY_DESTROYED, error);
+            repository.addEvent(plan.id(), "ARCHIVE_DESTRUCTION_PARTIAL", Matrix26ArchiveDestructionStatus.PARTIALLY_DESTROYED.name(), safeActor(actor),
+                    "Archive package destruction needs manual review: " + error);
+        }
+        return plan(plan.id());
     }
 
     public String report(long planId) {
         Matrix26ArchiveDestructionPlan plan = plan(planId);
         StringBuilder builder = new StringBuilder();
-        builder.append("Matrix26 Archive Destruction Planner - Read-only Report\n");
+        builder.append("Matrix26 Archive Destruction Executor - Governance Report\n");
         builder.append("Plan: ").append(plan.publicId()).append('\n');
         builder.append("Instance: ").append(plan.instanceName()).append(" (").append(plan.instanceCode()).append(")\n");
         builder.append("Archive: ").append(plan.archivePublicId()).append('\n');
@@ -171,11 +258,12 @@ public class Matrix26ArchiveDestructionService {
             builder.append("- [").append(item.disposition()).append("] ")
                     .append(item.resourceType()).append(" | ").append(nullToBlank(item.resourceName()))
                     .append(" | ").append(nullToBlank(item.resourcePath()))
-                    .append(" | ").append(nullToBlank(item.detail()))
+                    .append(" | execution=").append(item.executionStatusLabel())
+                    .append(" | ").append(nullToBlank(item.executionDetail()))
                     .append('\n');
         }
-        builder.append("\nDeleted resources in Phase 3H.3: 0\n");
-        builder.append("This phase only prepares evidence. Final archive package deletion remains unavailable.\n");
+        builder.append("\nDestroyed resources in Phase 3H.4: ").append(repository.destroyedItemCount(planId)).append('\n');
+        builder.append("Central metadata preservation: archive records, backup metadata, purge records, decommission records and clone links are not deleted by this executor.\n");
         return builder.toString();
     }
 
@@ -200,8 +288,9 @@ public class Matrix26ArchiveDestructionService {
 
             check(planId, runNumber, "FEATURE_ENABLED", "Archive destruction planner is enabled",
                     properties.isArchiveDestructionEnabled(), "This phase is read-only and does not remove files.");
-            check(planId, runNumber, "EXECUTION_DISABLED", "Archive package removal is disabled",
-                    !properties.isArchiveDestructionExecutionEnabled(), "Phase 3H.3 must not expose operational file removal.");
+            check(planId, runNumber, "EXECUTION_GATE_RECORDED", "Archive package removal requires the separate execution gate",
+                    true, "Execution flag currently enabled: " + properties.isArchiveDestructionExecutionEnabled()
+                            + ". Destruction still requires approval and two irreversible confirmations.");
             check(planId, runNumber, "ALLOWLIST", "Instance is allowlisted for archive destruction planning",
                     allowlisted(instance.getCode()), "Allowed instance codes: " + properties.getAllowedInstanceCodes());
             check(planId, runNumber, "PROTECTED_INSTANCE", "Instance is not protected",
@@ -237,11 +326,8 @@ public class Matrix26ArchiveDestructionService {
             if (blockers > 0) {
                 status = Matrix26ArchiveDestructionStatus.BLOCKED;
                 error = "The archive destruction planner found blockers. Deleted resources: 0.";
-            } else if (!properties.isArchiveDestructionExecutionEnabled()) {
-                status = Matrix26ArchiveDestructionStatus.READY_FOR_REVIEW;
             } else {
-                status = Matrix26ArchiveDestructionStatus.DESTRUCTION_NOT_ENABLED;
-                error = "Operational archive destruction is intentionally unavailable in Phase 3H.3.";
+                status = Matrix26ArchiveDestructionStatus.READY_FOR_REVIEW;
             }
             repository.completePlan(planId, status, counts, error);
             repository.addEvent(planId, "ARCHIVE_DESTRUCTION_ANALYZED", status.name(), actor,
@@ -421,6 +507,48 @@ public class Matrix26ArchiveDestructionService {
             }
         }
         return total;
+    }
+
+
+    private void validateDestructionExecutionEnabled() {
+        validateEnabled();
+        if (!properties.isArchiveDestructionExecutionEnabled()) {
+            throw new Matrix26PurgeException("Archive destruction execution is disabled. Set matrix26.control-center.purge.archive-destruction-execution-enabled=true only for the controlled 3H.4 execution window.");
+        }
+    }
+
+    private void assertDestructionSafety(Matrix26ArchiveDestructionPlan plan) {
+        if (!allowlisted(plan.instanceCode()) || protectedCode(plan.instanceCode())) {
+            throw new Matrix26PurgeException("This instance is not allowed for archive package destruction.");
+        }
+        if (plan.blockers() > 0 || repository.hasBlockedCurrentChecks(plan.id())) {
+            throw new Matrix26PurgeException("The current archive destruction plan still has safety blockers.");
+        }
+        if (repository.pendingDestroyItemCount(plan.id(), currentRun(plan)) <= 0) {
+            throw new Matrix26PurgeException("The current archive destruction plan has no WOULD_DELETE archive package item.");
+        }
+        if (repository.associatedCloneCount(plan.archiveRecordId()) > 0) {
+            throw new Matrix26PurgeException("Clone restore links still reference this archive. Remove or resolve clone dependencies before destruction.");
+        }
+        if (repository.hasActiveBackupOrRestore(plan.instanceId(), plan.instanceCode())
+                || repository.hasActiveArchiveCloneRestore(plan.archiveRecordId())) {
+            throw new Matrix26PurgeException("Active backup or restore operations still reference this archive.");
+        }
+        if (properties.isArchiveDestructionRequireRetentionExpired()
+                && (plan.retentionUntil() == null || plan.retentionUntil().isAfter(LocalDateTime.now()))) {
+            throw new Matrix26PurgeException("Archive retention has not expired yet.");
+        }
+        Matrix26BackupEncryption encryption = finalBackupMetadata(plan.finalBackupJobId());
+        if (!finalBackupOk(encryption)) {
+            throw new Matrix26PurgeException("Final backup metadata is no longer encrypted, FINAL, protected, and VERIFIED.");
+        }
+        if (encryption.packagePath() == null || encryption.packagePath().isBlank()) {
+            throw new Matrix26PurgeException("Final archive package path is missing from encrypted backup metadata.");
+        }
+    }
+
+    private int currentRun(Matrix26ArchiveDestructionPlan plan) {
+        return plan.runNumber() == null ? 1 : plan.runNumber();
     }
 
     private Matrix26BackupEncryption finalBackupMetadata(Long jobId) {

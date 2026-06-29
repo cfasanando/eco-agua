@@ -118,6 +118,66 @@ public class Matrix26ArchiveDestructionRepository {
         completePlan(planId, Matrix26ArchiveDestructionStatus.FAILED, new Counts(1, 0, 0, 0, 0), error);
     }
 
+    public void updatePlanStatus(long planId, Matrix26ArchiveDestructionStatus status, String error) {
+        jdbcTemplate.update("""
+                UPDATE matrix26_archive_destruction_plan
+                SET status = ?, evaluated_at = ?, last_error = ?
+                WHERE id = ?
+                """, status.name(), LocalDateTime.now(), limit(error, 8000), planId);
+    }
+
+    public void prepareExecutionItems(long planId, int runNumber) {
+        jdbcTemplate.update("""
+                UPDATE matrix26_archive_destruction_item
+                SET execution_status = CASE WHEN disposition = 'WOULD_DELETE' THEN 'PENDING' ELSE 'SKIPPED_PROTECTED' END,
+                    execution_detail = CASE WHEN disposition = 'WOULD_DELETE' THEN 'Awaiting explicit archive destruction execution.' ELSE 'Preserved by archive destruction policy.' END,
+                    executed_at = NULL
+                WHERE destruction_plan_id = ? AND run_number = ?
+                """, planId, runNumber);
+    }
+
+    public void updateItemExecutionStatus(long itemId, String status, String detail) {
+        jdbcTemplate.update("""
+                UPDATE matrix26_archive_destruction_item
+                SET execution_status = ?, execution_detail = ?, executed_at = ?
+                WHERE id = ?
+                """, status, limit(detail, 8000), LocalDateTime.now(), itemId);
+    }
+
+    public int destroyedItemCount(long planId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM matrix26_archive_destruction_item
+                WHERE destruction_plan_id = ? AND execution_status = 'DESTROYED'
+                """, Integer.class, planId);
+        return count == null ? 0 : count;
+    }
+
+    public int pendingDestroyItemCount(long planId, int runNumber) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM matrix26_archive_destruction_item
+                WHERE destruction_plan_id = ? AND run_number = ? AND disposition = 'WOULD_DELETE'
+                """, Integer.class, planId, runNumber);
+        return count == null ? 0 : count;
+    }
+
+    public boolean hasBlockedCurrentChecks(long planId) {
+        return positive("""
+                SELECT COUNT(*)
+                FROM matrix26_archive_destruction_check c
+                JOIN matrix26_archive_destruction_plan p ON p.id = c.destruction_plan_id
+                WHERE c.destruction_plan_id = ? AND c.run_number = p.run_number AND c.status = 'BLOCKED'
+                """, planId);
+    }
+
+    public void markArchivePackageDestroyed(long archiveRecordId, String actor) {
+        jdbcTemplate.update("""
+                UPDATE matrix26_archive_record
+                SET archive_status = 'PACKAGE_DESTROYED', retention_status = 'DESTROYED',
+                    updated_at = ?, last_verified_at = NULL, last_error = ?
+                WHERE id = ?
+                """, LocalDateTime.now(), limit("Final archive package destroyed by " + actor, 8000), archiveRecordId);
+    }
+
     public void addCheck(long planId, int runNumber, String code, String label, String status, String detail) {
         jdbcTemplate.update("""
                 INSERT INTO matrix26_archive_destruction_check (
@@ -282,7 +342,10 @@ public class Matrix26ArchiveDestructionRepository {
                 rs.getObject("size_bytes", Long.class),
                 rs.getObject("file_count", Integer.class),
                 rs.getString("detail"),
-                rs.getObject("created_at", LocalDateTime.class)
+                rs.getObject("created_at", LocalDateTime.class),
+                rs.getString("execution_status"),
+                rs.getObject("executed_at", LocalDateTime.class),
+                rs.getString("execution_detail")
         );
     }
 

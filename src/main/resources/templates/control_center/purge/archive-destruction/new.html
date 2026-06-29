@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Prepare archive destruction planner')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Prepare Archive Destruction Planner', 'Create a read-only review for a final archive package.')}"></header>
+        <main class="matrix26-main">
+            <div th:if="${purgeError}" class="alert alert-danger" th:text="${purgeError}"></div>
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <div>
+                    <h1 class="h4 mb-1">Prepare archive destruction planner</h1>
+                    <p class="text-muted mb-0">This creates evidence only. It will not delete package.m26backup or metadata.</p>
+                </div>
+                <a class="btn btn-outline-secondary" th:href="@{/control-center/purge/archive-destruction}"><i class="bi bi-arrow-left me-1"></i>Archive destruction</a>
+            </div>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><h2>Planner request</h2><p>Use the exact confirmation to avoid accidental archive review.</p></div></div>
+                <form method="post" th:action="@{/control-center/purge/archive-destruction/prepare}" class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label">Final archive</label>
+                        <select class="form-select" name="archiveRecordId" required>
+                            <option value="">Select final archive</option>
+                            <option th:each="candidate : ${candidates}"
+                                    th:value="${candidate.archiveRecordId()}"
+                                    th:text="|${candidate.instanceName()} (${candidate.instanceCode()}) · ${candidate.archivePublicId()} · clones ${candidate.cloneCount()}|">
+                                Archive
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Administrative reason</label>
+                        <textarea class="form-control" name="reason" rows="4" required th:attr="minlength=${minimumReasonLength}" placeholder="Explain why this final archive should be reviewed for future destruction."></textarea>
+                        <div class="form-text">Minimum characters: <span th:text="${minimumReasonLength}">10</span></div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Confirmation</label>
+                        <input class="form-control" name="confirmation" required placeholder="PREPARE ARCHIVE DESTRUCTION matrix26-appearance-lab">
+                        <div class="form-text">Type exactly: <code>PREPARE ARCHIVE DESTRUCTION matrix26-appearance-lab</code></div>
+                    </div>
+                    <div class="col-12">
+                        <div class="matrix26-alert-safe">
+                            <i class="bi bi-shield-lock"></i>
+                            <div><strong>No file removal</strong><p>The planner will only classify package, public metadata, central audit records, retention and clone links. Deleted resources: 0.</p></div>
+                        </div>
+                    </div>
+                    <div class="col-12 d-flex justify-content-end">
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>Create planner</button>
+                    </div>
+                </form>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

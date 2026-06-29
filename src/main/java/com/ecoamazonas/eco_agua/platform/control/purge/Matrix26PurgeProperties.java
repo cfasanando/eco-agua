@@ -11,6 +11,9 @@ import java.util.Set;
 public class Matrix26PurgeProperties {
     private boolean enabled = true;
     private boolean executionEnabled = true;
+    private boolean archiveDestructionEnabled = true;
+    private boolean archiveDestructionExecutionEnabled = false;
+    private boolean archiveDestructionRequireRetentionExpired = true;
     private Set<String> allowedInstanceCodes = new LinkedHashSet<>(Set.of("matrix26-appearance-lab"));
     private Set<String> protectedInstanceCodes = new LinkedHashSet<>(Set.of(
             "eco-agua",
@@ -39,6 +42,30 @@ public class Matrix26PurgeProperties {
 
     public void setExecutionEnabled(boolean executionEnabled) {
         this.executionEnabled = executionEnabled;
+    }
+
+    public boolean isArchiveDestructionEnabled() {
+        return archiveDestructionEnabled;
+    }
+
+    public void setArchiveDestructionEnabled(boolean archiveDestructionEnabled) {
+        this.archiveDestructionEnabled = archiveDestructionEnabled;
+    }
+
+    public boolean isArchiveDestructionExecutionEnabled() {
+        return archiveDestructionExecutionEnabled;
+    }
+
+    public void setArchiveDestructionExecutionEnabled(boolean archiveDestructionExecutionEnabled) {
+        this.archiveDestructionExecutionEnabled = archiveDestructionExecutionEnabled;
+    }
+
+    public boolean isArchiveDestructionRequireRetentionExpired() {
+        return archiveDestructionRequireRetentionExpired;
+    }
+
+    public void setArchiveDestructionRequireRetentionExpired(boolean archiveDestructionRequireRetentionExpired) {
+        this.archiveDestructionRequireRetentionExpired = archiveDestructionRequireRetentionExpired;
     }
 
     public Set<String> getAllowedInstanceCodes() {

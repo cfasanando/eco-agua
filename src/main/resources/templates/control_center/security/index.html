@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Matrix26 Security')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Roles and Permissions', 'Matrix26 platform access matrix for operations, backups, restores, lifecycle, purge and security.')}"></header>
+
+        <main class="matrix26-main">
+            <div class="matrix26-alert-safe mb-4">
+                <i class="bi bi-shield-lock"></i>
+                <div>
+                    <strong>Phase 3I.3: platform security boundary</strong>
+                    <p>This page is read-only in this phase. Roles and permissions are seeded automatically and sensitive POST actions are protected by Spring Security rules.</p>
+                </div>
+            </div>
+
+            <section class="matrix26-operations-dashboard-grid mb-4">
+                <article class="matrix26-ops-kpi is-safe">
+                    <span class="matrix26-ops-kpi-icon"><i class="bi bi-people"></i></span>
+                    <span>
+                        <small>Matrix26 users</small>
+                        <strong th:text="${overview.matrix26UserCount()}">0</strong>
+                        <em>Users with Matrix26 or super admin role</em>
+                    </span>
+                </article>
+                <article class="matrix26-ops-kpi is-info">
+                    <span class="matrix26-ops-kpi-icon"><i class="bi bi-person-check"></i></span>
+                    <span>
+                        <small>Active users</small>
+                        <strong th:text="${overview.activeUserCount()}">0</strong>
+                        <em>Enabled accounts in the control database</em>
+                    </span>
+                </article>
+                <article class="matrix26-ops-kpi is-warning">
+                    <span class="matrix26-ops-kpi-icon"><i class="bi bi-diagram-3"></i></span>
+                    <span>
+                        <small>Platform roles</small>
+                        <strong th:text="${#lists.size(overview.roles())}">0</strong>
+                        <em>Seeded Matrix26 role profiles</em>
+                    </span>
+                </article>
+                <article class="matrix26-ops-kpi is-neutral">
+                    <span class="matrix26-ops-kpi-icon"><i class="bi bi-key"></i></span>
+                    <span>
+                        <small>Permissions</small>
+                        <strong th:text="${#lists.size(overview.permissions())}">0</strong>
+                        <em>Effective platform permissions</em>
+                    </span>
+                </article>
+            </section>
+
+            <div class="row g-4">
+                <div class="col-12 col-xl-6">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header">
+                            <div><span>Role catalog</span><h2>Matrix26 roles</h2></div>
+                            <small>Seeded automatically at startup</small>
+                        </div>
+                        <div class="matrix26-role-list">
+                            <article th:each="role : ${overview.roles()}" class="matrix26-role-card">
+                                <div>
+                                    <strong th:text="${role.title()}">Role</strong>
+                                    <code th:text="${role.code()}">MATRIX26_ROLE</code>
+                                    <p th:text="${role.description()}">Description</p>
+                                </div>
+                                <div class="matrix26-permission-chip-list">
+                                    <span th:each="permission : ${role.permissionCodes()}" class="matrix26-permission-chip" th:text="${permission}">permission</span>
+                                </div>
+                            </article>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="col-12 col-xl-6">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header">
+                            <div><span>Permission catalog</span><h2>Effective permissions</h2></div>
+                            <small>Used by HTTP route guards</small>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table align-middle matrix26-table mb-0">
+                                <thead><tr><th>Permission</th><th>Category</th><th>Description</th></tr></thead>
+                                <tbody>
+                                <tr th:each="permission : ${overview.permissions()}">
+                                    <td><strong th:text="${permission.label()}">Permission</strong><small><code th:text="${permission.code()}">code</code></small></td>
+                                    <td><span class="badge text-bg-light border text-dark" th:text="${permission.category()}">Category</span></td>
+                                    <td class="text-muted" th:text="${permission.description()}">Description</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <section class="matrix26-panel mt-4">
+                <div class="matrix26-panel-header">
+                    <div><span>User matrix</span><h2>Users and effective Matrix26 access</h2></div>
+                    <small>Business roles are shown only as account context; Matrix26 roles protect the control center.</small>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle matrix26-table mb-0">
+                        <thead><tr><th>User</th><th>Status</th><th>Roles</th><th>Effective Matrix26 permissions</th></tr></thead>
+                        <tbody>
+                        <tr th:each="user : ${overview.users()}" th:classappend="${user.matrix26User()} ? '' : ' text-muted'">
+                            <td>
+                                <strong th:text="${user.username()}">username</strong>
+                                <small th:if="${user.matrix26User()}">Matrix26 access</small>
+                                <small th:unless="${user.matrix26User()}">No Matrix26 role</small>
+                            </td>
+                            <td>
+                                <span class="badge" th:classappend="${user.active()} ? ' text-bg-success' : ' text-bg-secondary'" th:text="${user.active()} ? 'ACTIVE' : 'INACTIVE'">ACTIVE</span>
+                            </td>
+                            <td>
+                                <div class="matrix26-permission-chip-list">
+                                    <span th:each="role : ${user.roles()}" class="matrix26-permission-chip" th:text="${role}">role</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div th:if="${#lists.isEmpty(user.effectivePermissions())}" class="text-muted">No Matrix26 permission</div>
+                                <div th:unless="${#lists.isEmpty(user.effectivePermissions())}" class="matrix26-permission-chip-list">
+                                    <span th:each="permission : ${user.effectivePermissions()}" class="matrix26-permission-chip is-strong" th:text="${permission}">permission</span>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="matrix26-panel mt-4">
+                <div class="matrix26-panel-header">
+                    <div><span>Route guards</span><h2>Sensitive action mapping</h2></div>
+                    <small>POST endpoints are blocked unless the user has the required Matrix26 role or permission.</small>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle matrix26-table mb-0">
+                        <thead><tr><th>Area</th><th>Required access</th><th>Examples</th></tr></thead>
+                        <tbody>
+                        <tr><td>Alert Center actions</td><td><code>MATRIX26_OPERATOR</code> or <code>matrix26.alerts.manage</code></td><td>Acknowledge, resolve, ignore, reopen.</td></tr>
+                        <tr><td>Runtime Control</td><td><code>MATRIX26_OPERATOR</code> or <code>matrix26.runtimes.control</code></td><td>Start, stop, restart, adopt, rotate logs.</td></tr>
+                        <tr><td>Backups</td><td><code>MATRIX26_BACKUP_MANAGER</code> or <code>matrix26.backups.manage</code></td><td>Create backups, schedules, verification, retention.</td></tr>
+                        <tr><td>Restores</td><td><code>MATRIX26_RESTORE_MANAGER</code> or <code>matrix26.restores.manage</code></td><td>Clone restore, in-place restore, cleanup.</td></tr>
+                        <tr><td>Lifecycle</td><td><code>MATRIX26_LIFECYCLE_MANAGER</code> or <code>matrix26.lifecycle.manage</code></td><td>Suspend, reactivate, archive, decommission.</td></tr>
+                        <tr><td>Purge and archive destruction</td><td><code>MATRIX26_PURGE_MANAGER</code> or <code>matrix26.purge.manage</code></td><td>Purge execution and historical archive destruction gates.</td></tr>
+                        <tr><td>Security and settings</td><td><code>MATRIX26_ADMIN</code> or specific admin permissions</td><td>Roles, modules and governance settings.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

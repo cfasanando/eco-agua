@@ -404,6 +404,95 @@ public class SecurityConfig {
             "administra_plataforma", "admin_config"
     );
 
+
+    private static final String MATRIX26_VIEWER = "MATRIX26_VIEWER";
+    private static final String MATRIX26_OPERATOR = "MATRIX26_OPERATOR";
+    private static final String MATRIX26_BACKUP_MANAGER = "MATRIX26_BACKUP_MANAGER";
+    private static final String MATRIX26_RESTORE_MANAGER = "MATRIX26_RESTORE_MANAGER";
+    private static final String MATRIX26_LIFECYCLE_MANAGER = "MATRIX26_LIFECYCLE_MANAGER";
+    private static final String MATRIX26_PURGE_MANAGER = "MATRIX26_PURGE_MANAGER";
+    private static final String MATRIX26_ADMIN = "MATRIX26_ADMIN";
+
+    private static final String MATRIX26_VIEW_PERMISSION = "matrix26.view";
+    private static final String MATRIX26_ALERTS_MANAGE = "matrix26.alerts.manage";
+    private static final String MATRIX26_RUNTIMES_CONTROL = "matrix26.runtimes.control";
+    private static final String MATRIX26_BACKUPS_MANAGE = "matrix26.backups.manage";
+    private static final String MATRIX26_RESTORES_MANAGE = "matrix26.restores.manage";
+    private static final String MATRIX26_LIFECYCLE_MANAGE = "matrix26.lifecycle.manage";
+    private static final String MATRIX26_PURGE_MANAGE = "matrix26.purge.manage";
+    private static final String MATRIX26_APPEARANCE_MANAGE = "matrix26.appearance.manage";
+    private static final String MATRIX26_PROVISIONING_MANAGE = "matrix26.provisioning.manage";
+    private static final String MATRIX26_SECURITY_ADMIN = "matrix26.security.admin";
+    private static final String MATRIX26_SETTINGS_ADMIN = "matrix26.settings.admin";
+
+    private static final String[] MATRIX26_VIEW_ACCESS = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            MATRIX26_ADMIN, MATRIX26_VIEWER, MATRIX26_OPERATOR,
+            MATRIX26_BACKUP_MANAGER, MATRIX26_RESTORE_MANAGER, MATRIX26_LIFECYCLE_MANAGER, MATRIX26_PURGE_MANAGER,
+            MATRIX26_VIEW_PERMISSION
+    );
+
+    private static final String[] MATRIX26_ALERT_ACCESS = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            MATRIX26_ADMIN, MATRIX26_OPERATOR, MATRIX26_ALERTS_MANAGE
+    );
+
+    private static final String[] MATRIX26_RUNTIME_ACCESS = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            MATRIX26_ADMIN, MATRIX26_OPERATOR, MATRIX26_RUNTIMES_CONTROL
+    );
+
+    private static final String[] MATRIX26_BACKUP_ACCESS = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            MATRIX26_ADMIN, MATRIX26_BACKUP_MANAGER, MATRIX26_BACKUPS_MANAGE
+    );
+
+    private static final String[] MATRIX26_RESTORE_ACCESS = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            MATRIX26_ADMIN, MATRIX26_RESTORE_MANAGER, MATRIX26_RESTORES_MANAGE
+    );
+
+    private static final String[] MATRIX26_LIFECYCLE_ACCESS = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            MATRIX26_ADMIN, MATRIX26_LIFECYCLE_MANAGER, MATRIX26_LIFECYCLE_MANAGE
+    );
+
+    private static final String[] MATRIX26_PURGE_ACCESS = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            MATRIX26_ADMIN, MATRIX26_PURGE_MANAGER, MATRIX26_PURGE_MANAGE
+    );
+
+    private static final String[] MATRIX26_PROVISIONING_ACCESS = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            MATRIX26_ADMIN, MATRIX26_PROVISIONING_MANAGE
+    );
+
+    private static final String[] MATRIX26_APPEARANCE_ACCESS = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            MATRIX26_ADMIN, MATRIX26_APPEARANCE_MANAGE
+    );
+
+    private static final String[] MATRIX26_SECURITY_ACCESS = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            MATRIX26_ADMIN, MATRIX26_SECURITY_ADMIN
+    );
+
+    private static final String[] MATRIX26_SETTINGS_ACCESS = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            MATRIX26_ADMIN, MATRIX26_SETTINGS_ADMIN
+    );
+
     private final DatabaseUserDetailsService userDetailsService;
     private final SystemModuleAccessFilter systemModuleAccessFilter;
     private final ClientFeatureProperties clientFeatureProperties;
@@ -444,7 +533,18 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/password-reset/request", "/password-reset").permitAll()
                 .requestMatchers(HttpMethod.POST, "/password-reset/request", "/password-reset").permitAll()
 
-                .requestMatchers("/control-center/**").hasAnyAuthority(PLATFORM_ADMIN)
+                .requestMatchers(HttpMethod.POST, "/control-center/operations/alerts/**").hasAnyAuthority(MATRIX26_ALERT_ACCESS)
+                .requestMatchers(HttpMethod.POST, "/control-center/operations/runtimes/**").hasAnyAuthority(MATRIX26_RUNTIME_ACCESS)
+                .requestMatchers(HttpMethod.POST, "/control-center/backups", "/control-center/backups/**").hasAnyAuthority(MATRIX26_BACKUP_ACCESS)
+                .requestMatchers(HttpMethod.POST, "/control-center/restores", "/control-center/restores/**").hasAnyAuthority(MATRIX26_RESTORE_ACCESS)
+                .requestMatchers(HttpMethod.POST, "/control-center/lifecycle/**").hasAnyAuthority(MATRIX26_LIFECYCLE_ACCESS)
+                .requestMatchers(HttpMethod.POST, "/control-center/purge/**").hasAnyAuthority(MATRIX26_PURGE_ACCESS)
+                .requestMatchers(HttpMethod.POST, "/control-center/provisioning", "/control-center/provisioning/**").hasAnyAuthority(MATRIX26_PROVISIONING_ACCESS)
+                .requestMatchers(HttpMethod.POST, "/control-center/appearance", "/control-center/appearance/**", "/control-center/themes", "/control-center/themes/**", "/control-center/layouts", "/control-center/layouts/**").hasAnyAuthority(MATRIX26_APPEARANCE_ACCESS)
+                .requestMatchers("/control-center/security/**").hasAnyAuthority(MATRIX26_SECURITY_ACCESS)
+                .requestMatchers(HttpMethod.POST, "/control-center/settings/**", "/control-center/modules/**").hasAnyAuthority(MATRIX26_SETTINGS_ACCESS)
+                .requestMatchers(HttpMethod.GET, "/control-center/**").hasAnyAuthority(MATRIX26_VIEW_ACCESS)
+                .requestMatchers("/control-center/**").hasAnyAuthority(MATRIX26_SETTINGS_ACCESS)
                 .requestMatchers("/home").hasAnyAuthority(DASHBOARD_VIEW)
                 .requestMatchers("/dashboard/widget-preferences/**").hasAnyAuthority(DASHBOARD_VIEW)
                 .requestMatchers("/dashboard/business", "/dashboard/areas").hasAnyAuthority(REPORTS_VIEW)

@@ -11,6 +11,10 @@
             <div th:if="${successMessage}" class="alert alert-success" th:text="${successMessage}"></div>
             <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}"></div>
 
+            <div class="d-flex justify-content-end mb-3">
+                <a class="btn btn-primary" th:href="@{/control-center/modules/activation}"><i class="bi bi-toggles2 me-1"></i>Open activation center</a>
+            </div>
+
             <div class="matrix26-alert-safe mb-4">
                 <i class="bi bi-grid-3x3-gap"></i>
                 <div>
@@ -49,19 +53,19 @@
                             <a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/instances/{id}(id=${instance.id})}"><i class="bi bi-eye me-1"></i>Detalle</a>
                         </div>
                     </div>
-                    <form th:action="@{/control-center/instances/{id}/modules(id=${instance.id})}" method="post">
+                    <form th:action="@{/control-center/modules/activation/instances/{id}(id=${instance.id})}" method="post">
                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                         <input type="hidden" name="returnTo" value="modules">
                         <div class="matrix26-module-form-groups">
                             <fieldset th:each="entry : ${groupedModules}" class="matrix26-module-form-group">
                                 <legend th:text="${entry.key}">Área</legend>
                                 <label th:each="module : ${entry.value}" class="matrix26-module-option">
-                                    <input type="checkbox" name="selectedModules" th:value="${module.moduleKey}" th:checked="${moduleKeysByInstance.get(instance.id).contains(module.moduleKey)}">
+                                    <input type="checkbox" name="selectedModules" th:value="${module.moduleKey}" th:checked="${moduleKeysByInstance.get(instance.id).contains(module.moduleKey)}" th:disabled="${!matrix26CanManageModules}">
                                     <span><strong th:text="${module.name}">Módulo</strong><small th:text="${module.description}">Descripción</small><code th:text="${module.moduleKey}">key</code></span>
                                 </label>
                             </fieldset>
                         </div>
-                        <div class="text-end mt-3"><button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar declaraciones</button></div>
+                        <div class="text-end mt-3"><button th:if="${matrix26CanManageModules}" type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar declaraciones</button><span th:unless="${matrix26CanManageModules}" class="badge text-bg-secondary">Solo lectura</span></div>
                     </form>
                 </article>
                 <div th:if="${#lists.isEmpty(instances)}" class="matrix26-panel text-center text-muted py-5">No hay instancias registradas.</div>

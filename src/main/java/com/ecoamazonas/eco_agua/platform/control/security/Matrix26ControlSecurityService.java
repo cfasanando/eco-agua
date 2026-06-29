@@ -103,6 +103,11 @@ public class Matrix26ControlSecurityService {
                 SUPER_ADMIN_ROLE, LEGACY_ADMIN_PRINC, LEGACY_ADMIN);
     }
 
+    public boolean canManageModules() {
+        return hasAnyAuthority(Matrix26ControlPermission.MANAGE_MODULES.code(), Matrix26ControlPermission.ADMINISTER_SETTINGS.code(),
+                Matrix26ControlRole.ADMIN.code(), SUPER_ADMIN_ROLE, LEGACY_ADMIN_PRINC, LEGACY_ADMIN);
+    }
+
     public boolean canAdministerSecurity() {
         return hasAnyAuthority(Matrix26ControlPermission.ADMINISTER_SECURITY.code(), Matrix26ControlRole.ADMIN.code(),
                 SUPER_ADMIN_ROLE, LEGACY_ADMIN_PRINC, LEGACY_ADMIN);

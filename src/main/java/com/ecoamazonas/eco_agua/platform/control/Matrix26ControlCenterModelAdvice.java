@@ -49,6 +49,7 @@ public class Matrix26ControlCenterModelAdvice {
         model.addAttribute("matrix26CanManagePurge", securityService == null || securityService.canManagePurge());
         model.addAttribute("matrix26CanManageAppearance", securityService == null || securityService.canManageAppearance());
         model.addAttribute("matrix26CanManageProvisioning", securityService == null || securityService.canManageProvisioning());
+        model.addAttribute("matrix26CanManageModules", securityService == null || securityService.canManageModules());
         model.addAttribute("matrix26CanAdministerSecurity", securityService == null || securityService.canAdministerSecurity());
         model.addAttribute("matrix26CanAdministerSettings", securityService == null || securityService.canAdministerSettings());
     }

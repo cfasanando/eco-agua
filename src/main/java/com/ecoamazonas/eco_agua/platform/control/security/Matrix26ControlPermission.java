@@ -10,6 +10,7 @@ public enum Matrix26ControlPermission {
     MANAGE_PURGE("matrix26.purge.manage", "Manage purge", "Purge", "Prepare purge plans, execute purge and manage archive destruction."),
     MANAGE_APPEARANCE("matrix26.appearance.manage", "Manage appearance", "Appearance", "Edit, publish and rollback themes, layouts and branding."),
     MANAGE_PROVISIONING("matrix26.provisioning.manage", "Manage provisioning", "Provisioning", "Create, validate and execute provisioning jobs."),
+    MANAGE_MODULES("matrix26.modules.manage", "Manage module activation", "Modules", "View and update Matrix26 module activation declarations by instance."),
     ADMINISTER_SECURITY("matrix26.security.admin", "Administer security", "Security", "View and administer Matrix26 roles, permissions and security settings."),
     ADMINISTER_SETTINGS("matrix26.settings.admin", "Administer settings", "Governance", "Manage central settings, modules and governance options.");
 

@@ -422,6 +422,7 @@ public class SecurityConfig {
     private static final String MATRIX26_PURGE_MANAGE = "matrix26.purge.manage";
     private static final String MATRIX26_APPEARANCE_MANAGE = "matrix26.appearance.manage";
     private static final String MATRIX26_PROVISIONING_MANAGE = "matrix26.provisioning.manage";
+    private static final String MATRIX26_MODULES_MANAGE = "matrix26.modules.manage";
     private static final String MATRIX26_SECURITY_ADMIN = "matrix26.security.admin";
     private static final String MATRIX26_SETTINGS_ADMIN = "matrix26.settings.admin";
 
@@ -479,6 +480,12 @@ public class SecurityConfig {
             ROLE_SUPER_ADMIN, ROLE_OWNER,
             LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
             MATRIX26_ADMIN, MATRIX26_APPEARANCE_MANAGE
+    );
+
+    private static final String[] MATRIX26_MODULES_ACCESS = authorities(
+            ROLE_SUPER_ADMIN, ROLE_OWNER,
+            LEGACY_ADMIN_PRINC, LEGACY_ADMIN,
+            MATRIX26_ADMIN, MATRIX26_MODULES_MANAGE, MATRIX26_SETTINGS_ADMIN
     );
 
     private static final String[] MATRIX26_SECURITY_ACCESS = authorities(
@@ -542,7 +549,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/control-center/provisioning", "/control-center/provisioning/**").hasAnyAuthority(MATRIX26_PROVISIONING_ACCESS)
                 .requestMatchers(HttpMethod.POST, "/control-center/appearance", "/control-center/appearance/**", "/control-center/themes", "/control-center/themes/**", "/control-center/layouts", "/control-center/layouts/**").hasAnyAuthority(MATRIX26_APPEARANCE_ACCESS)
                 .requestMatchers("/control-center/security/**").hasAnyAuthority(MATRIX26_SECURITY_ACCESS)
-                .requestMatchers(HttpMethod.POST, "/control-center/settings/**", "/control-center/modules/**").hasAnyAuthority(MATRIX26_SETTINGS_ACCESS)
+                .requestMatchers(HttpMethod.POST, "/control-center/modules", "/control-center/modules/**").hasAnyAuthority(MATRIX26_MODULES_ACCESS)
+                .requestMatchers(HttpMethod.POST, "/control-center/settings/**").hasAnyAuthority(MATRIX26_SETTINGS_ACCESS)
                 .requestMatchers(HttpMethod.GET, "/control-center/**").hasAnyAuthority(MATRIX26_VIEW_ACCESS)
                 .requestMatchers("/control-center/**").hasAnyAuthority(MATRIX26_SETTINGS_ACCESS)
                 .requestMatchers("/home").hasAnyAuthority(DASHBOARD_VIEW)

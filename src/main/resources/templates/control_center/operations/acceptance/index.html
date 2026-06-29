@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Final Acceptance Matrix')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Final Acceptance Matrix', 'Closure checklist for Matrix26 Operations & Lifecycle: dashboard, alerts, roles, backups, restore, purge and archive safety.')}" ></header>
+
+        <main class="matrix26-main">
+            <div class="matrix26-alert-safe mb-4">
+                <i class="bi bi-clipboard2-check"></i>
+                <div>
+                    <strong>Phase 3I.4: final read-only acceptance review</strong>
+                    <p>This page consolidates evidence from Matrix26 modules. It does not start runtimes, create backups, run restores, purge resources, destroy archives or change permissions.</p>
+                </div>
+            </div>
+
+            <div class="matrix26-acceptance-hero mb-4" th:classappend="${' is-' + acceptanceMatrix.overallStatus().getCssSuffix()}">
+                <div>
+                    <span class="badge" th:classappend="${acceptanceMatrix.overallStatus().getBadgeClass()}">
+                        <i class="bi" th:classappend="${' ' + acceptanceMatrix.overallStatus().getIcon()}"></i>
+                        <span th:text="${acceptanceMatrix.overallStatus().getLabel()}">Status</span>
+                    </span>
+                    <h1>Matrix26 Operations &amp; Lifecycle acceptance</h1>
+                    <p>
+                        <span th:text="${acceptanceMatrix.passedItems()}">0</span> passed,
+                        <span th:text="${acceptanceMatrix.warningItems()}">0</span> warnings,
+                        <span th:text="${acceptanceMatrix.failedItems()}">0</span> failed,
+                        <span th:text="${acceptanceMatrix.notTestedItems()}">0</span> not tested.
+                    </p>
+                </div>
+                <div class="text-end">
+                    <small th:if="${acceptanceMatrix.generatedAt() != null}" th:text="|Generated ${#temporals.format(acceptanceMatrix.generatedAt(), 'dd/MM/yyyy HH:mm:ss')}|">Generated</small>
+                    <div class="mt-3 d-flex gap-2 justify-content-end flex-wrap">
+                        <a class="btn btn-outline-secondary" th:href="@{/control-center/operations/dashboard}"><i class="bi bi-command me-1"></i>Dashboard</a>
+                        <a class="btn btn-outline-secondary" th:href="@{/control-center/operations/alerts}"><i class="bi bi-bell me-1"></i>Alerts</a>
+                        <a class="btn btn-primary" th:href="@{/control-center/operations/acceptance(refresh=true)}"><i class="bi bi-arrow-clockwise me-1"></i>Refresh acceptance</a>
+                    </div>
+                </div>
+            </div>
+
+            <section class="matrix26-operations-dashboard-grid mb-4">
+                <article th:each="metric : ${acceptanceMatrix.metrics()}" class="matrix26-ops-kpi" th:classappend="${' is-' + metric.tone()}">
+                    <span class="matrix26-ops-kpi-icon"><i class="bi" th:classappend="${' ' + metric.icon()}"></i></span>
+                    <span>
+                        <small th:text="${metric.label()}">Metric</small>
+                        <strong th:text="${metric.value()}">0</strong>
+                        <em th:text="${metric.detail()}">Detail</em>
+                    </span>
+                </article>
+            </section>
+
+            <section th:if="${!#lists.isEmpty(acceptanceMatrix.notes())}" class="matrix26-alert-warning mb-4">
+                <i class="bi bi-info-circle"></i>
+                <div>
+                    <strong>Partial acceptance notes</strong>
+                    <p th:each="note : ${acceptanceMatrix.notes()}" th:text="${note}">Note</p>
+                </div>
+            </section>
+
+            <div class="row g-4">
+                <div class="col-12 col-xl-8">
+                    <section th:each="group : ${acceptanceMatrix.groups()}" class="matrix26-panel mb-4">
+                        <div class="matrix26-panel-header align-items-start">
+                            <div class="d-flex gap-3 align-items-start">
+                                <span class="matrix26-acceptance-group-icon"><i class="bi" th:classappend="${' ' + group.icon()}"></i></span>
+                                <div>
+                                    <span>Acceptance group</span>
+                                    <h2 th:text="${group.title()}">Group</h2>
+                                    <p class="mb-0 text-muted" th:text="${group.description()}">Description</p>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge" th:classappend="${group.status().getBadgeClass()}">
+                                    <i class="bi" th:classappend="${' ' + group.status().getIcon()}"></i>
+                                    <span th:text="${group.status().getLabel()}">Status</span>
+                                </span>
+                                <small class="d-block mt-2 text-muted" th:text="|${group.passed()} passed / ${group.warnings()} warnings / ${group.failed()} failed|">Counts</small>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table align-middle mb-0 matrix26-table matrix26-acceptance-table">
+                                <thead>
+                                <tr>
+                                    <th>Check</th>
+                                    <th>Status</th>
+                                    <th>Evidence</th>
+                                    <th>Recommended action</th>
+                                    <th class="text-end">Route</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="item : ${group.items()}">
+                                    <td>
+                                        <strong th:text="${item.title()}">Check</strong>
+                                        <small th:text="${item.description()}">Description</small>
+                                        <code th:text="${item.code()}">code</code>
+                                    </td>
+                                    <td>
+                                        <span class="badge" th:classappend="${item.status().getBadgeClass()}">
+                                            <i class="bi" th:classappend="${' ' + item.status().getIcon()}"></i>
+                                            <span th:text="${item.status().getLabel()}">Status</span>
+                                        </span>
+                                    </td>
+                                    <td class="matrix26-table-message" th:text="${item.evidence()}">Evidence</td>
+                                    <td class="matrix26-table-message" th:text="${item.recommendedAction()}">Action</td>
+                                    <td class="text-end">
+                                        <a th:if="${item.route() != null}" class="btn btn-sm btn-outline-primary" th:href="${item.route()}" title="Open evidence"><i class="bi bi-box-arrow-up-right"></i></a>
+                                        <span th:unless="${item.route() != null}" class="text-muted">—</span>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="col-12 col-xl-4">
+                    <section class="matrix26-panel mb-4">
+                        <div class="matrix26-panel-header">
+                            <div><span>Closure summary</span><h2>Final status</h2></div>
+                        </div>
+                        <div class="matrix26-acceptance-summary-list">
+                            <div><span>Total checks</span><strong th:text="${acceptanceMatrix.totalItems()}">0</strong></div>
+                            <div><span>Passed</span><strong th:text="${acceptanceMatrix.passedItems()}">0</strong></div>
+                            <div><span>Warnings</span><strong th:text="${acceptanceMatrix.warningItems()}">0</strong></div>
+                            <div><span>Failed</span><strong th:text="${acceptanceMatrix.failedItems()}">0</strong></div>
+                            <div><span>Not tested</span><strong th:text="${acceptanceMatrix.notTestedItems()}">0</strong></div>
+                        </div>
+                    </section>
+
+                    <section class="matrix26-panel mb-4">
+                        <div class="matrix26-panel-header">
+                            <div><span>Known risks</span><h2>Review before closure</h2></div>
+                        </div>
+                        <div class="matrix26-alert-stack">
+                            <article th:each="risk : ${acceptanceMatrix.risks()}" class="matrix26-dashboard-alert">
+                                <span class="badge" th:classappend="${risk.status().getBadgeClass()}"><i class="bi" th:classappend="${' ' + risk.status().getIcon()}"></i></span>
+                                <div>
+                                    <strong th:text="${risk.title()}">Risk</strong>
+                                    <p th:text="${risk.detail()}">Detail</p>
+                                    <small th:text="${risk.recommendedAction()}">Action</small>
+                                </div>
+                            </article>
+                        </div>
+                    </section>
+
+                    <section class="matrix26-panel">
+                        <div class="matrix26-panel-header">
+                            <div><span>Next evidence</span><h2>Useful links</h2></div>
+                        </div>
+                        <div class="list-group list-group-flush matrix26-acceptance-links">
+                            <a class="list-group-item list-group-item-action" th:href="@{/control-center/operations/dashboard}"><i class="bi bi-command me-2"></i>Operations Dashboard</a>
+                            <a class="list-group-item list-group-item-action" th:href="@{/control-center/operations/alerts}"><i class="bi bi-bell me-2"></i>Alert Center</a>
+                            <a class="list-group-item list-group-item-action" th:href="@{/control-center/security}"><i class="bi bi-person-lock me-2"></i>Roles and Permissions</a>
+                            <a class="list-group-item list-group-item-action" th:href="@{/control-center/purge/archive-destruction}"><i class="bi bi-shield-exclamation me-2"></i>Archive Destruction</a>
+                            <a class="list-group-item list-group-item-action" th:href="@{/control-center/lifecycle/archive}"><i class="bi bi-safe2 me-2"></i>Final Archives</a>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Operation alert detail')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Operation Alert Detail', 'Review, acknowledge, resolve or ignore a Matrix26 operation alert.')} "></header>
+        <main class="matrix26-main">
+            <div th:if="${operationAlertSuccess}" class="alert alert-success" th:text="${operationAlertSuccess}"></div>
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <div>
+                    <h1 class="h4 mb-1" th:text="${alert.title()}">Alert title</h1>
+                    <p class="text-muted mb-0"><code th:text="${alert.sourceKey()}">source-key</code></p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <span class="badge fs-6" th:classappend="${alert.severity().getBadgeClass()}" th:text="${alert.severity().getLabel()}">Severity</span>
+                    <span class="badge fs-6" th:classappend="${alert.status().getBadgeClass()}" th:text="${alert.status().getLabel()}">Status</span>
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/operations/alerts}"><i class="bi bi-arrow-left me-1"></i>Alert Center</a>
+                    <a class="btn btn-outline-primary" th:if="${alert.href() != null}" th:href="${alert.href()}"><i class="bi bi-box-arrow-up-right me-1"></i><span th:text="${alert.actionLabel() != null ? alert.actionLabel() : 'Open source'}">Open source</span></a>
+                </div>
+            </div>
+
+            <section class="row g-4 mb-4">
+                <div class="col-xl-7">
+                    <div class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Alert</span><h2>Operational signal</h2></div></div>
+                        <dl class="row mb-0 matrix26-definition-list">
+                            <dt class="col-sm-3">Source</dt><dd class="col-sm-9"><i class="bi" th:classappend="${' ' + alert.sourceIcon()}"></i> <span th:text="${alert.sourceLabel()}">Source</span></dd>
+                            <dt class="col-sm-3">Instance</dt><dd class="col-sm-9"><code th:text="${alert.instanceCode() != null ? alert.instanceCode() : '—'}">instance</code></dd>
+                            <dt class="col-sm-3">Message</dt><dd class="col-sm-9" th:text="${alert.message()}">Message</dd>
+                            <dt class="col-sm-3">First detected</dt><dd class="col-sm-9" th:text="${alert.firstDetectedAt() != null ? #temporals.format(alert.firstDetectedAt(), 'yyyy-MM-dd HH:mm:ss') : '—'}">date</dd>
+                            <dt class="col-sm-3">Last detected</dt><dd class="col-sm-9" th:text="${alert.lastDetectedAt() != null ? #temporals.format(alert.lastDetectedAt(), 'yyyy-MM-dd HH:mm:ss') : '—'}">date</dd>
+                            <dt class="col-sm-3">Detections</dt><dd class="col-sm-9" th:text="${alert.detections()}">1</dd>
+                            <dt class="col-sm-3">Notes</dt><dd class="col-sm-9" th:text="${alert.resolutionNotes() != null ? alert.resolutionNotes() : '—'}">—</dd>
+                        </dl>
+                    </div>
+                </div>
+                <div class="col-xl-5">
+                    <div class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header"><div><span>Workflow</span><h2>Alert state</h2></div></div>
+                        <form class="mb-3" method="post" th:if="${alert.status().name() == 'OPEN'}" th:action="@{/control-center/operations/alerts/{id}/acknowledge(id=${alert.id()})}">
+                            <label class="form-label">Acknowledge note</label>
+                            <textarea class="form-control mb-2" name="note" rows="2" placeholder="Alert reviewed by operations."></textarea>
+                            <button class="btn btn-outline-primary" type="submit"><i class="bi bi-check2-circle me-1"></i>Acknowledge</button>
+                        </form>
+                        <form class="mb-3" method="post" th:if="${alert.openLike()}" th:action="@{/control-center/operations/alerts/{id}/resolve(id=${alert.id()})}">
+                            <label class="form-label">Resolution note</label>
+                            <textarea class="form-control mb-2" name="note" rows="2" placeholder="Root cause resolved or no longer present."></textarea>
+                            <button class="btn btn-success" type="submit"><i class="bi bi-shield-check me-1"></i>Resolve</button>
+                        </form>
+                        <form class="mb-3" method="post" th:if="${alert.openLike()}" th:action="@{/control-center/operations/alerts/{id}/ignore(id=${alert.id()})}">
+                            <label class="form-label">Ignore note</label>
+                            <textarea class="form-control mb-2" name="note" rows="2" placeholder="Accepted for this laboratory state."></textarea>
+                            <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-eye-slash me-1"></i>Ignore</button>
+                        </form>
+                        <form method="post" th:if="${!alert.openLike()}" th:action="@{/control-center/operations/alerts/{id}/reopen(id=${alert.id()})}">
+                            <label class="form-label">Reopen note</label>
+                            <textarea class="form-control mb-2" name="note" rows="2" placeholder="Alert needs another review."></textarea>
+                            <button class="btn btn-warning" type="submit"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header"><div><span>Audit</span><h2>Alert events</h2></div></div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead><tr><th>When</th><th>Event</th><th>Status</th><th>Actor</th><th>Note</th></tr></thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(events)}"><td colspan="5" class="text-center text-muted py-4">No alert events recorded.</td></tr>
+                        <tr th:each="event : ${events}">
+                            <td th:text="${event.createdAt() != null ? #temporals.format(event.createdAt(), 'yyyy-MM-dd HH:mm:ss') : '—'}">date</td>
+                            <td th:text="${event.eventType()}">event</td>
+                            <td><span class="badge" th:classappend="${event.status().getBadgeClass()}" th:text="${event.status().getLabel()}">status</span></td>
+                            <td th:text="${event.actor()}">actor</td>
+                            <td th:text="${event.note()}">note</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

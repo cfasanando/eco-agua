@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Operation alerts')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Operation Alert Center', 'Persistent alerts generated from Matrix26 runtime, backup, restore, lifecycle and purge health.')} "></header>
+        <main class="matrix26-main">
+            <div th:if="${operationAlertSuccess}" class="alert alert-success" th:text="${operationAlertSuccess}"></div>
+            <div th:if="${view.partialSync()}" class="alert alert-warning" th:text="${view.syncMessage()}"></div>
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                <div>
+                    <h1 class="h4 mb-1">Alert Center</h1>
+                    <p class="text-muted mb-0">Alerts are synchronized from the operations dashboard and kept for administrative follow-up.</p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/operations/dashboard}"><i class="bi bi-command me-1"></i>Dashboard</a>
+                    <a class="btn btn-primary" th:href="@{/control-center/operations/alerts(refresh=true,all=${all},status=${selectedStatus},severity=${selectedSeverity},source=${selectedSource})}"><i class="bi bi-arrow-clockwise me-1"></i>Sync alerts</a>
+                </div>
+            </div>
+
+            <section class="row g-3 mb-4">
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Active</span><strong th:text="${summary.active()}">0</strong></div></div>
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Open</span><strong th:text="${summary.open()}">0</strong></div></div>
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Acknowledged</span><strong th:text="${summary.acknowledged()}">0</strong></div></div>
+                <div class="col-md-3"><div class="matrix26-stat-card"><span>Critical / High</span><strong th:text="${summary.critical() + summary.high()}">0</strong></div></div>
+            </section>
+
+            <section class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header">
+                    <div><span>Filters</span><h2>Alert review</h2></div>
+                    <small th:text="${view.synchronizedAt() != null ? 'Last sync ' + #temporals.format(view.synchronizedAt(), 'yyyy-MM-dd HH:mm:ss') : 'Not synchronized'}">Last sync</small>
+                </div>
+                <form class="row g-3 align-items-end" method="get" th:action="@{/control-center/operations/alerts}">
+                    <div class="col-md-2">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="status">
+                            <option value="">Active statuses</option>
+                            <option th:each="status : ${statuses}" th:value="${status}" th:selected="${selectedStatus == status}" th:text="${status.getLabel()}">Status</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Severity</label>
+                        <select class="form-select" name="severity">
+                            <option value="">Any severity</option>
+                            <option th:each="severity : ${severities}" th:value="${severity}" th:selected="${selectedSeverity == severity}" th:text="${severity.getLabel()}">Severity</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Source</label>
+                        <select class="form-select" name="source">
+                            <option value="">Any source</option>
+                            <option th:each="source : ${sources}" th:value="${source}" th:selected="${selectedSource == source}" th:text="${source.getLabel()}">Source</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Visibility</label>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="allAlerts" name="all" value="true" th:checked="${all}">
+                            <label class="form-check-label" for="allAlerts">Show resolved and ignored alerts</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-md-end">
+                        <button class="btn btn-outline-primary" type="submit"><i class="bi bi-funnel me-1"></i>Apply filters</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header">
+                    <div><span>Persistent alerts</span><h2>Current operational signals</h2></div>
+                    <small th:text="${#lists.size(alerts)} + ' visible alerts'">0 visible alerts</small>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 matrix26-table">
+                        <thead>
+                        <tr><th>Severity</th><th>Status</th><th>Source</th><th>Alert</th><th>Instance</th><th>Last detected</th><th>Count</th><th class="text-end">Action</th></tr>
+                        </thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(alerts)}"><td colspan="8" class="text-center text-muted py-4">No alerts match the current filters.</td></tr>
+                        <tr th:each="alert : ${alerts}">
+                            <td><span class="badge" th:classappend="${alert.severity().getBadgeClass()}"><i class="bi" th:classappend="${' ' + alert.severity().getIconClass()}"></i> <span th:text="${alert.severity().getLabel()}">Severity</span></span></td>
+                            <td><span class="badge" th:classappend="${alert.status().getBadgeClass()}" th:text="${alert.status().getLabel()}">Status</span></td>
+                            <td><i class="bi" th:classappend="${' ' + alert.sourceIcon()}"></i> <span th:text="${alert.sourceLabel()}">Source</span></td>
+                            <td><strong th:text="${alert.title()}">Alert</strong><small th:text="${alert.message()}">Message</small></td>
+                            <td><code th:text="${alert.instanceCode() != null ? alert.instanceCode() : '—'}">instance</code></td>
+                            <td th:text="${alert.lastDetectedAt() != null ? #temporals.format(alert.lastDetectedAt(), 'yyyy-MM-dd HH:mm:ss') : '—'}">date</td>
+                            <td th:text="${alert.detections()}">1</td>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/operations/alerts/{id}(id=${alert.id()})}" title="Open alert"><i class="bi bi-eye"></i></a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+</body>
+</html>

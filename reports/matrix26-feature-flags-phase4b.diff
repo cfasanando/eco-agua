@@ -1,0 +1,1071 @@
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/docs/project/matrix26-feature-flags-phase4b-test-guide.md /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/docs/project/matrix26-feature-flags-phase4b-test-guide.md
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/docs/project/matrix26-feature-flags-phase4b-test-guide.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/docs/project/matrix26-feature-flags-phase4b-test-guide.md	2026-06-29 19:41:58.079731066 +0000
+@@ -0,0 +1,109 @@
++# Matrix26 Feature Flags Phase 4B - Runtime navigation projection
++
++## Scope
++
++Phase 4B connects Matrix26 module activation declarations to the client runtime visibility model.
++
++It is intentionally limited to navigation/sidebar projection and diagnostics. It does not install modules, uninstall modules, restart runtimes, purge data, or add new route hardening rules.
++
++## Main route
++
++Client runtime diagnostic route:
++
++```text
++/admin/system-modules/visibility
++```
++
++Matrix26 activation source remains:
++
++```text
++/control-center/modules/activation
++```
++
++## What changed
++
++- Adds `SystemModuleVisibilityMapper` to translate Matrix26 module declarations such as `sales`, `inventory`, `finance`, `restaurant_cash`, `restaurant_qr`, `restaurant_recipes` and `restaurant_reservations` into runtime module flags.
++- Projects activation into generated runtime properties through `PlatformRuntimeService`.
++- Projects activation into target database `platform_setting` values through `Matrix26TargetDatabaseService` during provisioning/final business settings.
++- Adds granular restaurant visibility attributes in `GlobalModelAttributes`.
++- Applies granular restaurant flags in `fragments/sidebar.html`.
++- Adds a runtime diagnostic page under System Modules.
++
++## Apply
++
++```bash
++cd "$HOME/Projects/eco-agua-workspace/eco-agua"
++
++bash scripts/configure-matrix26-feature-flags-phase4b.sh
++bash scripts/check-matrix26-feature-flags-phase4b.sh
++mvn clean -DskipTests package
++```
++
++## Test checklist
++
++### 1. Matrix26 activation remains available
++
++Open:
++
++```text
++http://localhost:8091/control-center/modules/activation
++```
++
++Confirm that module activation still loads and saves declarations.
++
++### 2. Runtime diagnostic page loads
++
++Open a client runtime, for example restaurant:
++
++```text
++http://localhost:8084/admin/system-modules/visibility
++```
++
++Expected:
++
++- The page shows current database.
++- It shows effective visible/hidden module flags.
++- Restaurant granular flags appear when available.
++
++### 3. Restaurant navigation projection
++
++With restaurant enabled and granular restaurant flags active:
++
++- `restaurant_cash` shows Caja diaria, Cierre de caja and Reportes.
++- `restaurant_qr` shows Pedidos QR, Pedidos externos and Carta pública.
++- `restaurant_recipes` shows Ingredientes y recetas.
++- `restaurant_reservations` shows Reservas and Solicitudes.
++
++### 4. Non-restaurant client navigation
++
++Open Agua Eco or Productos Belén runtime.
++
++Expected:
++
++- Restaurant group is hidden when restaurant flag is disabled.
++- Business modules are shown according to active runtime flags.
++- Public catalog / marketing visibility follows module settings.
++
++### 5. No destructive behavior
++
++Confirm:
++
++- No runtime is restarted by this phase.
++- No module is installed or removed by this phase.
++- No backup, restore, purge or archive-destruction flow is triggered.
++
++## Static check
++
++```bash
++bash scripts/check-matrix26-feature-flags-phase4b.sh
++```
++
++Expected:
++
++```text
++Matrix26 Feature Flags Phase 4B static checks passed.
++```
++
++## Notes
++
++Existing route protection through `SystemModuleAccessFilter` remains unchanged. Phase 4B does not expand route hardening; a later Phase 4C can review route-level enforcement in a focused way.
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-file-list.txt /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-file-list.txt
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-file-list.txt	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-file-list.txt	2026-06-29 19:42:49.128039945 +0000
+@@ -0,0 +1,15 @@
++src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleVisibilityMapper.java
++src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java
++src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java
++src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java
++src/main/java/com/ecoamazonas/eco_agua/platform/PlatformRuntimeService.java
++src/main/java/com/ecoamazonas/eco_agua/platform/control/Matrix26TargetDatabaseService.java
++src/main/resources/templates/fragments/sidebar.html
++src/main/resources/templates/admin/system_modules/visibility.html
++scripts/check-matrix26-feature-flags-phase4b.sh
++scripts/configure-matrix26-feature-flags-phase4b.sh
++docs/project/matrix26-feature-flags-phase4b-test-guide.md
++reports/matrix26-feature-flags-phase4b-report.md
++reports/matrix26-feature-flags-phase4b-static-check.txt
++reports/matrix26-feature-flags-phase4b-file-list.txt
++reports/matrix26-feature-flags-phase4b.diff
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-report.md /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-report.md
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-report.md	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-report.md	2026-06-29 19:41:58.087525988 +0000
+@@ -0,0 +1,30 @@
++# Matrix26 Feature Flags Phase 4B Report
++
++## Summary
++
++Implemented runtime navigation projection for Matrix26 module activation declarations.
++
++## Added
++
++- `SystemModuleVisibilityMapper`
++- `/admin/system-modules/visibility`
++- Runtime visibility diagnostic template
++- 4B configuration script
++- 4B static check script
++- 4B test guide
++
++## Changed
++
++- `SystemModuleService` now knows Matrix26 projection keys such as `sales` and granular restaurant flags.
++- `GlobalModelAttributes` exports granular restaurant attributes to Thymeleaf.
++- `fragments/sidebar.html` hides restaurant sub-navigation using granular flags.
++- `PlatformRuntimeService` uses the shared mapper to generate runtime `ecoagua.features.*` properties.
++- `Matrix26TargetDatabaseService` writes `module.*.enabled` settings for target instances using the shared mapper.
++
++## Safety
++
++No destructive operation was added. Phase 4B does not install modules, delete data, restart runtimes, purge archives, or change backup/restore flows.
++
++## Compile note
++
++The uploaded context included a successful Maven compile before this phase. The sandbox used to prepare this package has no Maven binary, and the Maven wrapper cannot download Maven without internet access, so full compile must be confirmed locally.
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-static-check.txt /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-static-check.txt
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-static-check.txt	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-static-check.txt	2026-06-29 19:42:37.725332028 +0000
+@@ -0,0 +1 @@
++Matrix26 Feature Flags Phase 4B static checks passed.
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b.diff /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b.diff
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b.diff	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b.diff	2026-06-29 19:42:49.156066926 +0000
+@@ -0,0 +1,171 @@
++diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/docs/project/matrix26-feature-flags-phase4b-test-guide.md /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/docs/project/matrix26-feature-flags-phase4b-test-guide.md
++--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/docs/project/matrix26-feature-flags-phase4b-test-guide.md	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/docs/project/matrix26-feature-flags-phase4b-test-guide.md	2026-06-29 19:41:58.079731066 +0000
++@@ -0,0 +1,109 @@
+++# Matrix26 Feature Flags Phase 4B - Runtime navigation projection
+++
+++## Scope
+++
+++Phase 4B connects Matrix26 module activation declarations to the client runtime visibility model.
+++
+++It is intentionally limited to navigation/sidebar projection and diagnostics. It does not install modules, uninstall modules, restart runtimes, purge data, or add new route hardening rules.
+++
+++## Main route
+++
+++Client runtime diagnostic route:
+++
+++```text
+++/admin/system-modules/visibility
+++```
+++
+++Matrix26 activation source remains:
+++
+++```text
+++/control-center/modules/activation
+++```
+++
+++## What changed
+++
+++- Adds `SystemModuleVisibilityMapper` to translate Matrix26 module declarations such as `sales`, `inventory`, `finance`, `restaurant_cash`, `restaurant_qr`, `restaurant_recipes` and `restaurant_reservations` into runtime module flags.
+++- Projects activation into generated runtime properties through `PlatformRuntimeService`.
+++- Projects activation into target database `platform_setting` values through `Matrix26TargetDatabaseService` during provisioning/final business settings.
+++- Adds granular restaurant visibility attributes in `GlobalModelAttributes`.
+++- Applies granular restaurant flags in `fragments/sidebar.html`.
+++- Adds a runtime diagnostic page under System Modules.
+++
+++## Apply
+++
+++```bash
+++cd "$HOME/Projects/eco-agua-workspace/eco-agua"
+++
+++bash scripts/configure-matrix26-feature-flags-phase4b.sh
+++bash scripts/check-matrix26-feature-flags-phase4b.sh
+++mvn clean -DskipTests package
+++```
+++
+++## Test checklist
+++
+++### 1. Matrix26 activation remains available
+++
+++Open:
+++
+++```text
+++http://localhost:8091/control-center/modules/activation
+++```
+++
+++Confirm that module activation still loads and saves declarations.
+++
+++### 2. Runtime diagnostic page loads
+++
+++Open a client runtime, for example restaurant:
+++
+++```text
+++http://localhost:8084/admin/system-modules/visibility
+++```
+++
+++Expected:
+++
+++- The page shows current database.
+++- It shows effective visible/hidden module flags.
+++- Restaurant granular flags appear when available.
+++
+++### 3. Restaurant navigation projection
+++
+++With restaurant enabled and granular restaurant flags active:
+++
+++- `restaurant_cash` shows Caja diaria, Cierre de caja and Reportes.
+++- `restaurant_qr` shows Pedidos QR, Pedidos externos and Carta pública.
+++- `restaurant_recipes` shows Ingredientes y recetas.
+++- `restaurant_reservations` shows Reservas and Solicitudes.
+++
+++### 4. Non-restaurant client navigation
+++
+++Open Agua Eco or Productos Belén runtime.
+++
+++Expected:
+++
+++- Restaurant group is hidden when restaurant flag is disabled.
+++- Business modules are shown according to active runtime flags.
+++- Public catalog / marketing visibility follows module settings.
+++
+++### 5. No destructive behavior
+++
+++Confirm:
+++
+++- No runtime is restarted by this phase.
+++- No module is installed or removed by this phase.
+++- No backup, restore, purge or archive-destruction flow is triggered.
+++
+++## Static check
+++
+++```bash
+++bash scripts/check-matrix26-feature-flags-phase4b.sh
+++```
+++
+++Expected:
+++
+++```text
+++Matrix26 Feature Flags Phase 4B static checks passed.
+++```
+++
+++## Notes
+++
+++Existing route protection through `SystemModuleAccessFilter` remains unchanged. Phase 4B does not expand route hardening; a later Phase 4C can review route-level enforcement in a focused way.
++diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-file-list.txt /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-file-list.txt
++--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-file-list.txt	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-file-list.txt	2026-06-29 19:42:49.128039945 +0000
++@@ -0,0 +1,15 @@
+++src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleVisibilityMapper.java
+++src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java
+++src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java
+++src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java
+++src/main/java/com/ecoamazonas/eco_agua/platform/PlatformRuntimeService.java
+++src/main/java/com/ecoamazonas/eco_agua/platform/control/Matrix26TargetDatabaseService.java
+++src/main/resources/templates/fragments/sidebar.html
+++src/main/resources/templates/admin/system_modules/visibility.html
+++scripts/check-matrix26-feature-flags-phase4b.sh
+++scripts/configure-matrix26-feature-flags-phase4b.sh
+++docs/project/matrix26-feature-flags-phase4b-test-guide.md
+++reports/matrix26-feature-flags-phase4b-report.md
+++reports/matrix26-feature-flags-phase4b-static-check.txt
+++reports/matrix26-feature-flags-phase4b-file-list.txt
+++reports/matrix26-feature-flags-phase4b.diff
++diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-report.md /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-report.md
++--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-report.md	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-report.md	2026-06-29 19:41:58.087525988 +0000
++@@ -0,0 +1,30 @@
+++# Matrix26 Feature Flags Phase 4B Report
+++
+++## Summary
+++
+++Implemented runtime navigation projection for Matrix26 module activation declarations.
+++
+++## Added
+++
+++- `SystemModuleVisibilityMapper`
+++- `/admin/system-modules/visibility`
+++- Runtime visibility diagnostic template
+++- 4B configuration script
+++- 4B static check script
+++- 4B test guide
+++
+++## Changed
+++
+++- `SystemModuleService` now knows Matrix26 projection keys such as `sales` and granular restaurant flags.
+++- `GlobalModelAttributes` exports granular restaurant attributes to Thymeleaf.
+++- `fragments/sidebar.html` hides restaurant sub-navigation using granular flags.
+++- `PlatformRuntimeService` uses the shared mapper to generate runtime `ecoagua.features.*` properties.
+++- `Matrix26TargetDatabaseService` writes `module.*.enabled` settings for target instances using the shared mapper.
+++
+++## Safety
+++
+++No destructive operation was added. Phase 4B does not install modules, delete data, restart runtimes, purge archives, or change backup/restore flows.
+++
+++## Compile note
+++
+++The uploaded context included a successful Maven compile before this phase. The sandbox used to prepare this package has no Maven binary, and the Maven wrapper cannot download Maven without internet access, so full compile must be confirmed locally.
++diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-static-check.txt /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-static-check.txt
++--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-static-check.txt	1970-01-01 00:00:00.000000000 +0000
+++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/reports/matrix26-feature-flags-phase4b-static-check.txt	2026-06-29 19:42:37.725332028 +0000
++@@ -0,0 +1 @@
+++Matrix26 Feature Flags Phase 4B static checks passed.
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/scripts/check-matrix26-feature-flags-phase4b.sh /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/scripts/check-matrix26-feature-flags-phase4b.sh
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/scripts/check-matrix26-feature-flags-phase4b.sh	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/scripts/check-matrix26-feature-flags-phase4b.sh	2026-06-29 19:42:09.875000258 +0000
+@@ -0,0 +1,48 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++cd "$ROOT_DIR"
++
++fail() {
++  echo "[FAIL] $1" >&2
++  exit 1
++}
++
++require_file() {
++  [[ -f "$1" ]] || fail "Missing file: $1"
++}
++
++require_grep() {
++  local pattern="$1"
++  local file="$2"
++  grep -qE "$pattern" "$file" || fail "Pattern not found in $file: $pattern"
++}
++
++require_file "src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleVisibilityMapper.java"
++require_file "src/main/resources/templates/admin/system_modules/visibility.html"
++require_file "docs/project/matrix26-feature-flags-phase4b-test-guide.md"
++
++require_grep "systemModuleFlags" "src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleVisibilityMapper.java"
++require_grep "featureProperties" "src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleVisibilityMapper.java"
++require_grep "restaurant_cash" "src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java"
++require_grep "moduleRestaurantCashEnabled" "src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java"
++require_grep "moduleRestaurantQrEnabled" "src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java"
++require_grep "SystemModuleVisibilityMapper.featureProperties" "src/main/java/com/ecoamazonas/eco_agua/platform/PlatformRuntimeService.java"
++require_grep "SystemModuleVisibilityMapper.systemModuleFlags" "src/main/java/com/ecoamazonas/eco_agua/platform/control/Matrix26TargetDatabaseService.java"
++require_grep "runtimeFeatureProperties" "src/main/java/com/ecoamazonas/eco_agua/platform/control/Matrix26TargetDatabaseService.java"
++require_grep "GetMapping\(\"/visibility\"\)" "src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java"
++require_grep "admin/system_modules/visibility" "src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java"
++require_grep "moduleRestaurantCashEnabled" "src/main/resources/templates/fragments/sidebar.html"
++require_grep "moduleRestaurantQrEnabled" "src/main/resources/templates/fragments/sidebar.html"
++require_grep "system_module_visibility" "src/main/resources/templates/fragments/sidebar.html"
++
++if grep -RniE "DROP DATABASE|DROP TABLE|TRUNCATE|Files\.delete|deleteRecursively|archive-destruction-execution-enabled=true" \
++  src/main/java/com/ecoamazonas/eco_agua/config \
++  src/main/resources/templates/admin/system_modules \
++  >/tmp/matrix26-phase4b-dangerous.txt 2>/dev/null; then
++  cat /tmp/matrix26-phase4b-dangerous.txt >&2
++  fail "Phase 4B must not introduce destructive operations."
++fi
++
++echo "Matrix26 Feature Flags Phase 4B static checks passed."
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/scripts/configure-matrix26-feature-flags-phase4b.sh /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/scripts/configure-matrix26-feature-flags-phase4b.sh
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/scripts/configure-matrix26-feature-flags-phase4b.sh	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/scripts/configure-matrix26-feature-flags-phase4b.sh	2026-06-29 19:41:37.210647511 +0000
+@@ -0,0 +1,16 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++CONTROL_CONFIG="$ROOT_DIR/runtime-clients/matrix26_control/application.properties"
++
++if [[ -f "$CONTROL_CONFIG" ]]; then
++  if grep -q '^matrix26.control-center.enabled=' "$CONTROL_CONFIG"; then
++    sed -i.bak.phase4b -E 's/^matrix26\.control-center\.enabled=.*/matrix26.control-center.enabled=true/' "$CONTROL_CONFIG"
++  else
++    printf '\nmatrix26.control-center.enabled=true\n' >> "$CONTROL_CONFIG"
++  fi
++fi
++
++echo "Matrix26 Feature Flags Phase 4B configuration checked."
++echo "This phase projects module activation to runtime visibility; it does not install modules or change route hardening."
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java	2026-06-29 19:41:14.312421794 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/GlobalModelAttributes.java	2026-06-29 19:40:28.051206731 +0000
+@@ -171,7 +171,8 @@
+         boolean moduleBusinessOverview = flag(moduleFlags, "business_overview");
+         boolean moduleMonthlyFollowup = flag(moduleFlags, "monthly_followup");
+         boolean moduleCommercialDaily = flag(moduleFlags, "commercial_daily");
+-        boolean moduleCrm = flag(moduleFlags, "crm");
++        boolean moduleSales = flag(moduleFlags, "sales");
++        boolean moduleCrm = flag(moduleFlags, "crm") || moduleSales;
+         boolean moduleClients = flag(moduleFlags, "clients");
+         boolean modulePromotions = flag(moduleFlags, "promotions");
+         boolean moduleDelivery = flag(moduleFlags, "delivery");
+@@ -196,6 +197,10 @@
+         boolean moduleBlog = flag(moduleFlags, "blog");
+         boolean moduleAcademy = flag(moduleFlags, "academy");
+         boolean moduleRestaurant = flag(moduleFlags, "restaurant");
++        boolean moduleRestaurantCash = moduleRestaurant && flag(moduleFlags, "restaurant_cash");
++        boolean moduleRestaurantQr = moduleRestaurant && flag(moduleFlags, "restaurant_qr");
++        boolean moduleRestaurantRecipes = moduleRestaurant && flag(moduleFlags, "restaurant_recipes");
++        boolean moduleRestaurantReservations = moduleRestaurant && flag(moduleFlags, "restaurant_reservations");
+         boolean moduleTestimonials = flag(moduleFlags, "testimonials");
+         boolean modulePublicSite = flag(moduleFlags, "public_site");
+         boolean modulePublicCatalog = flag(moduleFlags, "public_catalog");
+@@ -204,8 +209,8 @@
+         boolean moduleRolesPermissions = flag(moduleFlags, "roles_permissions");
+         boolean modulePlatformSettings = flag(moduleFlags, "platform_settings");
+ 
+-        boolean moduleMarketingSection = moduleMarketing || moduleBlog || moduleAcademy || moduleTestimonials;
+-        boolean moduleCommercialSection = moduleCrm && (moduleCommercialDaily || moduleClients || modulePromotions || moduleDelivery || moduleReorder);
++        boolean moduleMarketingSection = moduleMarketing || moduleBlog || moduleAcademy || moduleTestimonials || modulePublicCatalog;
++        boolean moduleCommercialSection = (moduleCrm || moduleSales) && (moduleCommercialDaily || moduleClients || modulePromotions || moduleDelivery || moduleReorder);
+         boolean moduleInventorySection = moduleInventory && (moduleProducts || moduleCategories || moduleWarehouse || moduleSupplies || moduleContainers || moduleProduction);
+         boolean moduleFinanceSection = moduleFinance && (moduleAccounting || moduleCashflow || moduleBreakEven || modulePriceSimulator);
+         boolean moduleSystemSection = moduleHr || moduleUsers || moduleRolesPermissions || modulePlatformSettings;
+@@ -219,6 +224,7 @@
+         model.addAttribute("moduleBusinessOverviewEnabled", moduleBusinessOverview);
+         model.addAttribute("moduleMonthlyFollowupEnabled", moduleMonthlyFollowup);
+         model.addAttribute("moduleCommercialDailyEnabled", moduleCommercialDaily);
++        model.addAttribute("moduleSalesEnabled", moduleSales);
+         model.addAttribute("moduleCrmEnabled", moduleCrm);
+         model.addAttribute("moduleClientsEnabled", moduleClients);
+         model.addAttribute("modulePromotionsEnabled", modulePromotions);
+@@ -244,6 +250,10 @@
+         model.addAttribute("moduleBlogEnabled", moduleBlog);
+         model.addAttribute("moduleAcademyEnabled", moduleAcademy);
+         model.addAttribute("moduleRestaurantEnabled", moduleRestaurant);
++        model.addAttribute("moduleRestaurantCashEnabled", moduleRestaurantCash);
++        model.addAttribute("moduleRestaurantQrEnabled", moduleRestaurantQr);
++        model.addAttribute("moduleRestaurantRecipesEnabled", moduleRestaurantRecipes);
++        model.addAttribute("moduleRestaurantReservationsEnabled", moduleRestaurantReservations);
+         model.addAttribute("moduleTestimonialsEnabled", moduleTestimonials);
+         model.addAttribute("modulePublicSiteEnabled", modulePublicSite);
+         model.addAttribute("modulePublicCatalogEnabled", modulePublicCatalog);
+@@ -268,6 +278,10 @@
+         model.addAttribute("featureBlog", moduleBlog);
+         model.addAttribute("featureAcademy", moduleAcademy);
+         model.addAttribute("featureRestaurant", moduleRestaurant);
++        model.addAttribute("featureRestaurantCash", moduleRestaurantCash);
++        model.addAttribute("featureRestaurantQr", moduleRestaurantQr);
++        model.addAttribute("featureRestaurantRecipes", moduleRestaurantRecipes);
++        model.addAttribute("featureRestaurantReservations", moduleRestaurantReservations);
+         model.addAttribute("featureTestimonials", moduleTestimonials);
+         model.addAttribute("featurePublicCatalog", modulePublicCatalog);
+         model.addAttribute("featureSupplies", moduleSupplies);
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java	2026-06-29 19:41:14.313409251 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleAdminController.java	2026-06-29 19:39:25.551674439 +0000
+@@ -48,6 +48,26 @@
+         return "admin/system_modules";
+     }
+ 
++
++    @GetMapping("/visibility")
++    public String showVisibility(Model model) {
++        var modules = systemModuleService.getModuleDefinitions();
++        long enabledCount = modules.stream().filter(SystemModuleService.ModuleDefinition::enabled).count();
++
++        model.addAttribute("activePage", "system_module_visibility");
++        model.addAttribute("moduleGroups", systemModuleService.getModuleGroups());
++        model.addAttribute("moduleFlags", systemModuleService.getModuleFlags());
++        model.addAttribute("moduleTotalCount", modules.size());
++        model.addAttribute("moduleEnabledCount", enabledCount);
++        model.addAttribute("moduleInstallationDatabase", platformModuleManager.currentDatabaseName());
++        model.addAttribute("moduleVisibilityNotes", java.util.List.of(
++                "This page explains the effective runtime flags used by the sidebar.",
++                "Matrix26 Phase 4B projects central activation into module.*.enabled settings and ecoagua.features.* runtime properties.",
++                "Route hardening is not expanded in this phase; navigation visibility is the main scope."
++        ));
++        return "admin/system_modules/visibility";
++    }
++
+     @GetMapping("/installations")
+     public String showInstallations(Model model) {
+         model.addAttribute("activePage", "system_module_installations");
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java	2026-06-29 19:41:14.313592183 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleService.java	2026-06-29 19:36:52.785161472 +0000
+@@ -129,6 +129,7 @@
+ 
+     private boolean defaultValueFor(String key) {
+         return switch (key) {
++            case "core", "sales" -> true;
+             case "containers" -> clientFeatureProperties.isContainers();
+             case "delivery" -> clientFeatureProperties.isDelivery();
+             case "production" -> clientFeatureProperties.isProduction();
+@@ -136,7 +137,7 @@
+             case "marketing" -> clientFeatureProperties.isMarketing();
+             case "blog" -> clientFeatureProperties.isBlog();
+             case "academy" -> true;
+-            case "restaurant" -> clientFeatureProperties.isRestaurant();
++            case "restaurant", "restaurant_cash", "restaurant_qr", "restaurant_recipes", "restaurant_reservations" -> clientFeatureProperties.isRestaurant();
+             case "testimonials" -> clientFeatureProperties.isTestimonials();
+             case "public_catalog" -> clientFeatureProperties.isPublicCatalog();
+             case "supplies" -> clientFeatureProperties.isSupplies();
+@@ -177,11 +178,13 @@
+     private List<ModuleDefinition> moduleDefinitions() {
+         List<ModuleDefinition> modules = new ArrayList<>();
+ 
++        modules.add(new ModuleDefinition("core", "Principal", "Núcleo empresarial", "Security, settings and base business features.", true, true, false));
+         modules.add(new ModuleDefinition("dashboard", "Principal", "Inicio administrativo", "Private dashboard home.", true, true, false));
+         modules.add(new ModuleDefinition("business_overview", "Principal", "Estado del negocio", "Business overview dashboard.", true, false, false));
+         modules.add(new ModuleDefinition("monthly_followup", "Principal", "Seguimiento del mes", "Monthly follow-up dashboard.", true, false, false));
+         modules.add(new ModuleDefinition("commercial_daily", "Principal", "Panel comercial diario", "Daily commercial dashboard.", true, false, false));
+ 
++        modules.add(new ModuleDefinition("sales", "Comercial y ventas", "Ventas y clientes", "Matrix26 sales declaration projected into CRM, clients, income and commercial views.", true, false, false));
+         modules.add(new ModuleDefinition("crm", "Comercial y ventas", "Comercial / CRM", "CRM and commercial management group.", true, false, false));
+         modules.add(new ModuleDefinition("clients", "Comercial y ventas", "Clientes y cartera", "Client and client portfolio management.", true, false, false));
+         modules.add(new ModuleDefinition("promotions", "Comercial y ventas", "Promociones", "Promotion management.", true, false, false));
+@@ -207,6 +210,10 @@
+         modules.add(new ModuleDefinition("production", "Inventario y operación", "Producción / planta", "Production and plant module.", false, false, false));
+ 
+         modules.add(new ModuleDefinition("restaurant", "Operación restaurante", "Restaurante / carta y comandas", "Carta digital, mesas, comandas y pantalla de cocina.", false, false, false));
++        modules.add(new ModuleDefinition("restaurant_cash", "Operación restaurante", "Caja restaurante", "Caja diaria, cierres, recibos y reportes de restaurante.", false, false, false));
++        modules.add(new ModuleDefinition("restaurant_qr", "Operación restaurante", "Pedidos QR", "Carta QR, solicitudes y pedidos externos.", false, false, false));
++        modules.add(new ModuleDefinition("restaurant_recipes", "Operación restaurante", "Recetas y costos", "Ingredientes, stock, recetas y costos del restaurante.", false, false, false));
++        modules.add(new ModuleDefinition("restaurant_reservations", "Operación restaurante", "Reservas", "Reservas, mesas y solicitudes de salón.", false, false, false));
+ 
+         modules.add(new ModuleDefinition("marketing", "Marketing y portal público", "Marketing / campañas", "Marketing campaign management.", true, false, false));
+         modules.add(new ModuleDefinition("blog", "Marketing y portal público", "Blog / consejos", "Blog and public content management.", true, false, false));
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleVisibilityMapper.java /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleVisibilityMapper.java
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleVisibilityMapper.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/config/SystemModuleVisibilityMapper.java	2026-06-29 19:36:09.999029033 +0000
+@@ -0,0 +1,135 @@
++package com.ecoamazonas.eco_agua.config;
++
++import java.util.Collection;
++import java.util.LinkedHashMap;
++import java.util.LinkedHashSet;
++import java.util.Locale;
++import java.util.Map;
++import java.util.Set;
++
++/**
++ * Maps Matrix26 module declarations to the runtime flags consumed by client sidebars.
++ */
++public final class SystemModuleVisibilityMapper {
++
++    private SystemModuleVisibilityMapper() {
++    }
++
++    public static Map<String, Boolean> systemModuleFlags(Collection<String> moduleKeys, boolean restaurantProfile) {
++        Set<String> keys = normalizeKeys(moduleKeys);
++        boolean restaurant = restaurantProfile || any(keys, "restaurant", "restaurant_cash", "restaurant_qr", "restaurant_recipes", "restaurant_reservations");
++        boolean sales = any(keys, "sales") || restaurant;
++        boolean delivery = any(keys, "delivery") || any(keys, "restaurant_qr");
++        boolean inventory = any(keys, "inventory") || restaurant;
++        boolean finance = any(keys, "finance") || any(keys, "accounting", "cashflow", "fixed_costs", "break_even", "price_simulator") || restaurant;
++        boolean marketing = any(keys, "marketing") || any(keys, "public_catalog", "blog", "testimonials", "academy");
++        boolean hr = any(keys, "hr");
++
++        Map<String, Boolean> flags = new LinkedHashMap<>();
++        flags.put("core", true);
++        flags.put("dashboard", true);
++        flags.put("business_overview", true);
++        flags.put("monthly_followup", sales || finance || inventory || marketing || hr || restaurant);
++        flags.put("commercial_daily", sales);
++
++        flags.put("sales", sales);
++        flags.put("crm", sales);
++        flags.put("clients", sales);
++        flags.put("promotions", any(keys, "promotions") || marketing);
++        flags.put("delivery", delivery);
++        flags.put("reorder", any(keys, "reorder"));
++
++        flags.put("income", sales || finance);
++        flags.put("expenses", finance || inventory || restaurant);
++        flags.put("fixed_costs", any(keys, "fixed_costs") || restaurant);
++        flags.put("suppliers", finance || inventory || restaurant);
++        flags.put("finance", finance);
++        flags.put("accounting", any(keys, "accounting"));
++        flags.put("cashflow", any(keys, "cashflow") || finance);
++        flags.put("break_even", any(keys, "break_even"));
++        flags.put("price_simulator", any(keys, "price_simulator") || restaurant);
++
++        flags.put("inventory", inventory);
++        flags.put("products", inventory || any(keys, "public_catalog") || restaurant);
++        flags.put("categories", inventory || any(keys, "public_catalog") || restaurant);
++        flags.put("warehouse", inventory || any(keys, "warehouse"));
++        flags.put("supplies", any(keys, "supplies", "restaurant_recipes") || restaurant);
++        flags.put("containers", any(keys, "containers"));
++        flags.put("production", any(keys, "production"));
++
++        flags.put("restaurant", restaurant);
++        flags.put("restaurant_cash", restaurant && (any(keys, "restaurant_cash") || !hasGranularRestaurantKey(keys)));
++        flags.put("restaurant_qr", restaurant && (any(keys, "restaurant_qr") || !hasGranularRestaurantKey(keys)));
++        flags.put("restaurant_recipes", restaurant && (any(keys, "restaurant_recipes") || !hasGranularRestaurantKey(keys)));
++        flags.put("restaurant_reservations", restaurant && (any(keys, "restaurant_reservations") || !hasGranularRestaurantKey(keys)));
++
++        flags.put("marketing", marketing);
++        flags.put("blog", any(keys, "blog"));
++        flags.put("academy", any(keys, "academy"));
++        flags.put("testimonials", any(keys, "testimonials"));
++        flags.put("public_site", any(keys, "public_site") || any(keys, "public_catalog", "blog", "academy", "testimonials") || restaurant);
++        flags.put("public_catalog", any(keys, "public_catalog") || restaurant);
++
++        flags.put("hr", hr);
++        flags.put("users", hr);
++        flags.put("roles_permissions", hr);
++        flags.put("platform_settings", true);
++
++        return flags;
++    }
++
++    public static Map<String, Boolean> featureProperties(Collection<String> moduleKeys, boolean restaurantProfile) {
++        Map<String, Boolean> moduleFlags = systemModuleFlags(moduleKeys, restaurantProfile);
++        Map<String, Boolean> flags = new LinkedHashMap<>();
++        flags.put("ecoagua.features.containers", enabled(moduleFlags, "containers"));
++        flags.put("ecoagua.features.delivery", enabled(moduleFlags, "delivery"));
++        flags.put("ecoagua.features.production", enabled(moduleFlags, "production"));
++        flags.put("ecoagua.features.reorder", enabled(moduleFlags, "reorder"));
++        flags.put("ecoagua.features.marketing", enabled(moduleFlags, "marketing"));
++        flags.put("ecoagua.features.blog", enabled(moduleFlags, "blog"));
++        flags.put("ecoagua.features.academy", enabled(moduleFlags, "academy"));
++        flags.put("ecoagua.features.restaurant", enabled(moduleFlags, "restaurant"));
++        flags.put("ecoagua.features.testimonials", enabled(moduleFlags, "testimonials"));
++        flags.put("ecoagua.features.public-catalog", enabled(moduleFlags, "public_catalog"));
++        flags.put("ecoagua.features.supplies", enabled(moduleFlags, "supplies"));
++        flags.put("ecoagua.features.fixed-costs", enabled(moduleFlags, "fixed_costs"));
++        flags.put("ecoagua.features.break-even", enabled(moduleFlags, "break_even"));
++        flags.put("ecoagua.features.price-simulator", enabled(moduleFlags, "price_simulator"));
++        return flags;
++    }
++
++    public static Set<String> normalizeKeys(Collection<String> values) {
++        Set<String> result = new LinkedHashSet<>();
++        if (values == null) {
++            return result;
++        }
++        for (String value : values) {
++            String normalized = normalize(value);
++            if (!normalized.isBlank()) {
++                result.add(normalized);
++            }
++        }
++        return result;
++    }
++
++    public static String normalize(String value) {
++        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT).replace('-', '_');
++    }
++
++    private static boolean enabled(Map<String, Boolean> flags, String key) {
++        return Boolean.TRUE.equals(flags.get(key));
++    }
++
++    private static boolean any(Set<String> keys, String... candidates) {
++        for (String candidate : candidates) {
++            if (keys.contains(normalize(candidate))) {
++                return true;
++            }
++        }
++        return false;
++    }
++
++    private static boolean hasGranularRestaurantKey(Set<String> keys) {
++        return any(keys, "restaurant_cash", "restaurant_qr", "restaurant_recipes", "restaurant_reservations");
++    }
++}
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/platform/PlatformRuntimeService.java /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/platform/PlatformRuntimeService.java
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/platform/PlatformRuntimeService.java	2026-06-29 19:41:14.340543352 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/platform/PlatformRuntimeService.java	2026-06-29 19:42:36.230001738 +0000
+@@ -1,11 +1,11 @@
+ package com.ecoamazonas.eco_agua.platform;
+ 
++import com.ecoamazonas.eco_agua.config.SystemModuleVisibilityMapper;
+ import org.springframework.beans.factory.annotation.Value;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+ import java.time.LocalDateTime;
+-import java.util.LinkedHashMap;
+ import java.util.List;
+ import java.util.Locale;
+ import java.util.Map;
+@@ -223,22 +223,7 @@
+                 .filter(PlatformClientModule::isEnabled)
+                 .map(item -> item.getModule().getModuleKey())
+                 .toList();
+-        boolean restaurant = isRestaurantClient(client) || keys.contains("restaurant") || keys.contains("restaurant_tables") || keys.contains("restaurant_kitchen") || keys.contains("restaurant_menu_qr");
+-        Map<String, Boolean> flags = new LinkedHashMap<>();
+-        flags.put("ecoagua.features.containers", keys.contains("containers"));
+-        flags.put("ecoagua.features.delivery", keys.contains("delivery") || keys.contains("routes") || keys.contains("rutapack"));
+-        flags.put("ecoagua.features.production", keys.contains("production") || keys.contains("recipes") || keys.contains("kitchen"));
+-        flags.put("ecoagua.features.reorder", keys.contains("reorder") || keys.contains("followup"));
+-        flags.put("ecoagua.features.marketing", keys.contains("marketing"));
+-        flags.put("ecoagua.features.blog", keys.contains("blog") || keys.contains("content"));
+-        flags.put("ecoagua.features.testimonials", keys.contains("testimonials"));
+-        flags.put("ecoagua.features.public-catalog", restaurant || keys.contains("public_catalog") || keys.contains("catalog") || keys.contains("ecommerce_filters") || keys.contains("qr_menu"));
+-        flags.put("ecoagua.features.restaurant", restaurant);
+-        flags.put("ecoagua.features.supplies", keys.contains("supplies") || keys.contains("warehouse") || keys.contains("ingredients"));
+-        flags.put("ecoagua.features.fixed-costs", keys.contains("income") || keys.contains("finance") || keys.contains("accounting"));
+-        flags.put("ecoagua.features.break-even", keys.contains("income") || keys.contains("finance") || keys.contains("accounting"));
+-        flags.put("ecoagua.features.price-simulator", restaurant || keys.contains("sales") || keys.contains("products") || keys.contains("public_catalog"));
+-        return flags;
++        return SystemModuleVisibilityMapper.featureProperties(keys, isRestaurantClient(client));
+     }
+ 
+ 
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/platform/control/Matrix26TargetDatabaseService.java /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/platform/control/Matrix26TargetDatabaseService.java
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/platform/control/Matrix26TargetDatabaseService.java	2026-06-29 19:41:14.346210814 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/java/com/ecoamazonas/eco_agua/platform/control/Matrix26TargetDatabaseService.java	2026-06-29 19:40:14.931128804 +0000
+@@ -1,5 +1,6 @@
+ package com.ecoamazonas.eco_agua.platform.control;
+ 
++import com.ecoamazonas.eco_agua.config.SystemModuleVisibilityMapper;
+ import com.ecoamazonas.eco_agua.platform.control.appearance.Matrix26JsonCodec;
+ import org.springframework.beans.factory.annotation.Value;
+ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+@@ -17,6 +18,7 @@
+ import java.util.EnumSet;
+ import java.util.List;
+ import java.util.Locale;
++import java.util.Map;
+ import java.util.Set;
+ import java.util.regex.Matcher;
+ import java.util.regex.Pattern;
+@@ -483,11 +485,19 @@
+         upsertSetting(target, "admin.brand.logo", compactLogo, "string", "admin", "Logo administrativo");
+         upsertSetting(target, "login.title", displayName, "string", "login", "Título de acceso");
+         upsertSetting(target, "login.subtitle", brandingValue(job, "welcomeMessage", "Acceso al sistema de gestión"), "string", "login", "Subtítulo de acceso");
+-        upsertSetting(target, "module.dashboard.enabled", "true", "boolean", "system_modules", "Inicio administrativo");
+-        upsertSetting(target, "module.platform_settings.enabled", "true", "boolean", "system_modules", "Configuración de plataforma");
+-        upsertSetting(target, "module.users.enabled", "true", "boolean", "system_modules", "Usuarios internos");
+-        upsertSetting(target, "module.roles_permissions.enabled", "true", "boolean", "system_modules", "Roles y permisos");
+-        upsertSetting(target, "module.restaurant.enabled", Boolean.toString(selectedModules.contains("restaurant")), "boolean", "system_modules", "Módulo Restaurante");
++        Map<String, Boolean> moduleVisibility = SystemModuleVisibilityMapper.systemModuleFlags(
++                selectedModules,
++                selectedModules.contains("restaurant") || defaultValue(job.getBusinessType(), "").toLowerCase(Locale.ROOT).contains("restaurant")
++                        || defaultValue(job.getBusinessType(), "").toLowerCase(Locale.ROOT).contains("restaurante")
++        );
++        moduleVisibility.forEach((moduleKey, enabled) -> upsertSetting(
++                target,
++                "module." + moduleKey + ".enabled",
++                Boolean.toString(enabled),
++                "boolean",
++                "system_modules",
++                "Matrix26 projected visibility flag for " + moduleKey
++        ));
+         upsertSetting(target, "public.nav.restaurant_label", "Carta", "string", "public_site", "Etiqueta de carta pública");
+     }
+ 
+@@ -519,7 +529,11 @@
+     }
+ 
+     private String runtimeProperties(Matrix26ProvisioningJob job, Set<String> selectedModules) {
+-        boolean restaurant = selectedModules.contains("restaurant");
++        boolean restaurant = Boolean.TRUE.equals(SystemModuleVisibilityMapper.systemModuleFlags(
++                selectedModules,
++                defaultValue(job.getBusinessType(), "").toLowerCase(Locale.ROOT).contains("restaurant")
++                        || defaultValue(job.getBusinessType(), "").toLowerCase(Locale.ROOT).contains("restaurante")
++        ).get("restaurant"));
+         String displayName = brandingValue(job, "displayName", job.getBusinessName());
+         String shortName = brandingValue(job, "shortName", displayName);
+         String tagline = brandingValue(job, "tagline", "Sistema empresarial administrado por Matrix26");
+@@ -556,23 +570,19 @@
+                 + "ecoagua.business.admin-logo=" + escapeProperty(compactLogo) + "\n"
+                 + "ecoagua.business.location=" + escapeProperty(brandingValue(job, "location", defaultValue(job.getCity(), "Iquitos"))) + "\n"
+                 + "ecoagua.business.footer-right=Instancia administrada por Matrix26\n\n"
+-                + "ecoagua.features.containers=false\n"
+-                + "ecoagua.features.delivery=" + restaurant + "\n"
+-                + "ecoagua.features.production=false\n"
+-                + "ecoagua.features.reorder=false\n"
+-                + "ecoagua.features.marketing=false\n"
+-                + "ecoagua.features.blog=false\n"
+-                + "ecoagua.features.academy=false\n"
+-                + "ecoagua.features.restaurant=" + restaurant + "\n"
+-                + "ecoagua.features.testimonials=false\n"
+-                + "ecoagua.features.public-catalog=" + restaurant + "\n"
+-                + "ecoagua.features.supplies=" + restaurant + "\n"
+-                + "ecoagua.features.fixed-costs=false\n"
+-                + "ecoagua.features.break-even=false\n"
+-                + "ecoagua.features.price-simulator=" + restaurant + "\n\n"
++                + runtimeFeatureProperties(selectedModules, restaurant)
++                + "\n"
+                 + "google.maps.api-key=\n";
+     }
+ 
++
++    private String runtimeFeatureProperties(Set<String> selectedModules, boolean restaurantProfile) {
++        StringBuilder out = new StringBuilder();
++        SystemModuleVisibilityMapper.featureProperties(selectedModules, restaurantProfile)
++                .forEach((property, enabled) -> out.append(property).append("=").append(enabled).append("\n"));
++        return out.toString();
++    }
++
+     private String runtimeScript(Matrix26ProvisioningJob job) {
+         return "#!/usr/bin/env bash\n"
+                 + "set -euo pipefail\n\n"
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/resources/templates/admin/system_modules/visibility.html /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/resources/templates/admin/system_modules/visibility.html
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/resources/templates/admin/system_modules/visibility.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/resources/templates/admin/system_modules/visibility.html	2026-06-29 19:39:49.400774905 +0000
+@@ -0,0 +1,129 @@
++<!DOCTYPE html>
++<html lang="es" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="fragments/head_admin :: adminHead('Visibilidad de módulos')"></head>
++
++<body class="bg-light">
++
++<div class="d-flex" id="wrapper">
++    <div th:replace="fragments/sidebar :: sidebar"></div>
++
++    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
++        <div th:replace="fragments/topbar :: topbar"></div>
++
++        <main class="container-fluid mt-4 flex-grow-1">
++            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
++                <div>
++                    <h1 class="h4 mb-1">Visibilidad de módulos</h1>
++                    <p class="text-muted small mb-0">
++                        Diagnóstico de los flags efectivos que usa el sidebar para esta instancia.
++                    </p>
++                </div>
++                <div class="d-flex gap-2 flex-wrap">
++                    <a th:href="@{/admin/system-modules}" class="btn btn-sm btn-outline-primary">
++                        <i class="bi bi-ui-checks-grid"></i>
++                        Módulos
++                    </a>
++                    <a th:href="@{/admin/system-modules/installations}" class="btn btn-sm btn-outline-secondary">
++                        <i class="bi bi-database-gear"></i>
++                        Instalaciones
++                    </a>
++                </div>
++            </div>
++
++            <div class="row g-3 mb-4">
++                <div class="col-12 col-md-4">
++                    <div class="card border-0 shadow-sm h-100">
++                        <div class="card-body">
++                            <div class="text-muted small">Base actual</div>
++                            <div class="h5 mb-0"><code th:text="${moduleInstallationDatabase}">database</code></div>
++                            <div class="small text-muted mt-2">Configuración local de la instancia.</div>
++                        </div>
++                    </div>
++                </div>
++                <div class="col-12 col-md-4">
++                    <div class="card border-0 shadow-sm h-100">
++                        <div class="card-body">
++                            <div class="text-muted small">Módulos visibles</div>
++                            <div class="display-6 fw-bold" th:text="${moduleEnabledCount}">0</div>
++                            <div class="small text-muted">De <span th:text="${moduleTotalCount}">0</span> flags registrados.</div>
++                        </div>
++                    </div>
++                </div>
++                <div class="col-12 col-md-4">
++                    <div class="card border-0 shadow-sm h-100">
++                        <div class="card-body">
++                            <div class="text-muted small">Alcance 4B</div>
++                            <div class="h5 mb-0">Sidebar y navegación</div>
++                            <div class="small text-muted mt-2">Sin nuevas acciones operativas.</div>
++                        </div>
++                    </div>
++                </div>
++            </div>
++
++            <div class="alert alert-info border-0 shadow-sm small" role="alert">
++                <div class="fw-semibold mb-1">Notas de proyección Matrix26</div>
++                <ul class="mb-0">
++                    <li th:each="note : ${moduleVisibilityNotes}" th:text="${note}">Nota</li>
++                </ul>
++            </div>
++
++            <div class="card border-0 shadow-sm mb-4">
++                <div class="card-header bg-white fw-semibold">Flags efectivos por grupo</div>
++                <div class="accordion accordion-flush" id="visibilityAccordion">
++                    <div class="accordion-item" th:each="group, groupStat : ${moduleGroups}">
++                        <h2 class="accordion-header" th:id="${'visibility-heading-' + groupStat.index}">
++                            <button class="accordion-button"
++                                    th:classappend="${groupStat.index > 0 ? ' collapsed' : ''}"
++                                    type="button"
++                                    data-bs-toggle="collapse"
++                                    th:attr="data-bs-target=${'#visibility-collapse-' + groupStat.index},aria-expanded=${groupStat.index == 0 ? 'true' : 'false'},aria-controls=${'visibility-collapse-' + groupStat.index}">
++                                <span class="fw-semibold" th:text="${group.name()}">Grupo</span>
++                                <span class="badge text-bg-light ms-2" th:text="${#lists.size(group.modules()) + ' flags'}">0 flags</span>
++                            </button>
++                        </h2>
++                        <div th:id="${'visibility-collapse-' + groupStat.index}"
++                             class="accordion-collapse collapse"
++                             th:classappend="${groupStat.index == 0 ? ' show' : ''}"
++                             th:attr="aria-labelledby=${'visibility-heading-' + groupStat.index}"
++                             data-bs-parent="#visibilityAccordion">
++                            <div class="accordion-body bg-white p-0">
++                                <div class="table-responsive">
++                                    <table class="table table-sm align-middle mb-0">
++                                        <thead class="table-light">
++                                        <tr>
++                                            <th>Módulo</th>
++                                            <th>Sidebar</th>
++                                            <th>Variable runtime</th>
++                                            <th>Descripción</th>
++                                        </tr>
++                                        </thead>
++                                        <tbody>
++                                        <tr th:each="module : ${group.modules()}">
++                                            <td>
++                                                <div class="fw-semibold" th:text="${module.label()}">Módulo</div>
++                                                <code class="small" th:text="${module.key()}">module_key</code>
++                                            </td>
++                                            <td>
++                                                <span class="badge"
++                                                      th:classappend="${module.enabled()} ? ' text-bg-success' : ' text-bg-secondary'"
++                                                      th:text="${module.enabled()} ? 'Visible' : 'Oculto'">Visible</span>
++                                            </td>
++                                            <td><code class="small" th:text="${module.settingVariable()}">module.key.enabled</code></td>
++                                            <td class="small text-muted" th:text="${module.description()}">Descripción</td>
++                                        </tr>
++                                        </tbody>
++                                    </table>
++                                </div>
++                            </div>
++                        </div>
++                    </div>
++                </div>
++            </div>
++        </main>
++
++        <div th:replace="fragments/scripts_admin :: adminScripts"></div>
++    </div>
++</div>
++
++</body>
++</html>
+diff -ruN /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/resources/templates/fragments/sidebar.html /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/resources/templates/fragments/sidebar.html
+--- /mnt/data/orig4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/resources/templates/fragments/sidebar.html	2026-06-29 19:41:14.541266512 +0000
++++ /mnt/data/work4b/matrix26-feature-flags-phase4b-context-20260629-142833/src/main/resources/templates/fragments/sidebar.html	2026-06-29 19:40:00.986728242 +0000
+@@ -49,7 +49,8 @@
+ 
+       <a
+         sec:authorize="hasAnyAuthority('ROLE_RESTAURANT_CASHIER','restaurante_caja')"
+-        th:href="@{/admin/restaurant/cash}"
++        th:if="${moduleRestaurantCashEnabled}"
++            th:href="@{/admin/restaurant/cash}"
+         class="menu-link"
+         th:classappend="${activePage == 'restaurant_cash' ? ' active' : ''}"
+       >
+@@ -136,6 +137,7 @@
+ 
+           <a
+             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')"
++            th:if="${moduleRestaurantReservationsEnabled}"
+             th:href="@{/admin/restaurant/reservations}"
+             class="menu-link submenu"
+             th:classappend="${activePage == 'restaurant_reservations' ? ' active' : ''}"
+@@ -156,6 +158,7 @@
+ 
+           <a
+             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','administra_restaurante')"
++            th:if="${moduleRestaurantRecipesEnabled}"
+             th:href="@{/admin/restaurant/ingredients}"
+             class="menu-link submenu"
+             th:classappend="${activePage == 'restaurant_ingredients' or activePage == 'restaurant_ingredient_movements' or activePage == 'restaurant_recipe' ? ' active' : ''}"
+@@ -166,6 +169,7 @@
+ 
+           <a
+             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"
++            th:if="${moduleRestaurantReservationsEnabled or moduleRestaurantQrEnabled}"
+             th:href="@{/admin/restaurant/table-requests}"
+             class="menu-link submenu"
+             th:classappend="${activePage == 'restaurant_table_requests' ? ' active' : ''}"
+@@ -176,6 +180,7 @@
+ 
+           <a
+             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')"
++            th:if="${moduleRestaurantQrEnabled}"
+             th:href="@{/admin/restaurant/qr-orders}"
+             class="menu-link submenu"
+             th:classappend="${activePage == 'restaurant_qr_orders' ? ' active' : ''}"
+@@ -186,6 +191,7 @@
+ 
+           <a
+             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"
++            th:if="${moduleRestaurantQrEnabled or moduleDeliveryEnabled}"
+             th:href="@{/admin/restaurant/external-orders}"
+             class="menu-link submenu"
+             th:classappend="${activePage == 'restaurant_external_orders' ? ' active' : ''}"
+@@ -216,6 +222,7 @@
+ 
+           <a
+             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_caja')"
++            th:if="${moduleRestaurantCashEnabled}"
+             th:href="@{/admin/restaurant/cash}"
+             class="menu-link submenu"
+             th:classappend="${activePage == 'restaurant_cash' ? ' active' : ''}"
+@@ -226,6 +233,7 @@
+ 
+           <a
+             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')"
++            th:if="${moduleRestaurantCashEnabled}"
+             th:href="@{/admin/restaurant/cash-sessions}"
+             class="menu-link submenu"
+             th:classappend="${activePage == 'restaurant_cash_sessions' ? ' active' : ''}"
+@@ -236,6 +244,7 @@
+ 
+           <a
+             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')"
++            th:if="${moduleRestaurantCashEnabled}"
+             th:href="@{/admin/restaurant/reports}"
+             class="menu-link submenu"
+             th:classappend="${activePage == 'restaurant_reports' ? ' active' : ''}"
+@@ -256,6 +265,7 @@
+ 
+           <a
+             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"
++            th:if="${moduleRestaurantQrEnabled or modulePublicCatalogEnabled}"
+             th:href="@{/restaurant/menu}"
+             target="_blank"
+             class="menu-link submenu"
+@@ -273,7 +283,8 @@
+       <div
+         class="menu-group"
+         th:with="isModuleAdministrationActive=${activePage == 'system_modules'
+-          or activePage == 'system_module_installations'}"
++          or activePage == 'system_module_installations'
++          or activePage == 'system_module_visibility'}"
+       >
+         <input
+           type="checkbox"
+@@ -306,6 +317,15 @@
+             <span class="icon"><i class="bi bi-database-gear"></i></span>
+             <span>Instalaciones de módulos</span>
+           </a>
++
++          <a
++            th:href="@{/admin/system-modules/visibility}"
++            class="menu-link submenu"
++            th:classappend="${activePage == 'system_module_visibility' ? ' active' : ''}"
++          >
++            <span class="icon"><i class="bi bi-eye"></i></span>
++            <span>Visibilidad runtime</span>
++          </a>
+         </div>
+       </div>
+     </th:block>

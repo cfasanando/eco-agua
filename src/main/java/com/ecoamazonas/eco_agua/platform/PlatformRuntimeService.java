@@ -1,11 +1,11 @@
 package com.ecoamazonas.eco_agua.platform;
 
+import com.ecoamazonas.eco_agua.config.SystemModuleVisibilityMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -223,22 +223,7 @@ public class PlatformRuntimeService {
                 .filter(PlatformClientModule::isEnabled)
                 .map(item -> item.getModule().getModuleKey())
                 .toList();
-        boolean restaurant = isRestaurantClient(client) || keys.contains("restaurant") || keys.contains("restaurant_tables") || keys.contains("restaurant_kitchen") || keys.contains("restaurant_menu_qr");
-        Map<String, Boolean> flags = new LinkedHashMap<>();
-        flags.put("ecoagua.features.containers", keys.contains("containers"));
-        flags.put("ecoagua.features.delivery", keys.contains("delivery") || keys.contains("routes") || keys.contains("rutapack"));
-        flags.put("ecoagua.features.production", keys.contains("production") || keys.contains("recipes") || keys.contains("kitchen"));
-        flags.put("ecoagua.features.reorder", keys.contains("reorder") || keys.contains("followup"));
-        flags.put("ecoagua.features.marketing", keys.contains("marketing"));
-        flags.put("ecoagua.features.blog", keys.contains("blog") || keys.contains("content"));
-        flags.put("ecoagua.features.testimonials", keys.contains("testimonials"));
-        flags.put("ecoagua.features.public-catalog", restaurant || keys.contains("public_catalog") || keys.contains("catalog") || keys.contains("ecommerce_filters") || keys.contains("qr_menu"));
-        flags.put("ecoagua.features.restaurant", restaurant);
-        flags.put("ecoagua.features.supplies", keys.contains("supplies") || keys.contains("warehouse") || keys.contains("ingredients"));
-        flags.put("ecoagua.features.fixed-costs", keys.contains("income") || keys.contains("finance") || keys.contains("accounting"));
-        flags.put("ecoagua.features.break-even", keys.contains("income") || keys.contains("finance") || keys.contains("accounting"));
-        flags.put("ecoagua.features.price-simulator", restaurant || keys.contains("sales") || keys.contains("products") || keys.contains("public_catalog"));
-        return flags;
+        return SystemModuleVisibilityMapper.featureProperties(keys, isRestaurantClient(client));
     }
 
 

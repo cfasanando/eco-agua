@@ -171,7 +171,8 @@ public class GlobalModelAttributes {
         boolean moduleBusinessOverview = flag(moduleFlags, "business_overview");
         boolean moduleMonthlyFollowup = flag(moduleFlags, "monthly_followup");
         boolean moduleCommercialDaily = flag(moduleFlags, "commercial_daily");
-        boolean moduleCrm = flag(moduleFlags, "crm");
+        boolean moduleSales = flag(moduleFlags, "sales");
+        boolean moduleCrm = flag(moduleFlags, "crm") || moduleSales;
         boolean moduleClients = flag(moduleFlags, "clients");
         boolean modulePromotions = flag(moduleFlags, "promotions");
         boolean moduleDelivery = flag(moduleFlags, "delivery");
@@ -196,6 +197,10 @@ public class GlobalModelAttributes {
         boolean moduleBlog = flag(moduleFlags, "blog");
         boolean moduleAcademy = flag(moduleFlags, "academy");
         boolean moduleRestaurant = flag(moduleFlags, "restaurant");
+        boolean moduleRestaurantCash = moduleRestaurant && flag(moduleFlags, "restaurant_cash");
+        boolean moduleRestaurantQr = moduleRestaurant && flag(moduleFlags, "restaurant_qr");
+        boolean moduleRestaurantRecipes = moduleRestaurant && flag(moduleFlags, "restaurant_recipes");
+        boolean moduleRestaurantReservations = moduleRestaurant && flag(moduleFlags, "restaurant_reservations");
         boolean moduleTestimonials = flag(moduleFlags, "testimonials");
         boolean modulePublicSite = flag(moduleFlags, "public_site");
         boolean modulePublicCatalog = flag(moduleFlags, "public_catalog");
@@ -204,8 +209,8 @@ public class GlobalModelAttributes {
         boolean moduleRolesPermissions = flag(moduleFlags, "roles_permissions");
         boolean modulePlatformSettings = flag(moduleFlags, "platform_settings");
 
-        boolean moduleMarketingSection = moduleMarketing || moduleBlog || moduleAcademy || moduleTestimonials;
-        boolean moduleCommercialSection = moduleCrm && (moduleCommercialDaily || moduleClients || modulePromotions || moduleDelivery || moduleReorder);
+        boolean moduleMarketingSection = moduleMarketing || moduleBlog || moduleAcademy || moduleTestimonials || modulePublicCatalog;
+        boolean moduleCommercialSection = (moduleCrm || moduleSales) && (moduleCommercialDaily || moduleClients || modulePromotions || moduleDelivery || moduleReorder);
         boolean moduleInventorySection = moduleInventory && (moduleProducts || moduleCategories || moduleWarehouse || moduleSupplies || moduleContainers || moduleProduction);
         boolean moduleFinanceSection = moduleFinance && (moduleAccounting || moduleCashflow || moduleBreakEven || modulePriceSimulator);
         boolean moduleSystemSection = moduleHr || moduleUsers || moduleRolesPermissions || modulePlatformSettings;
@@ -219,6 +224,7 @@ public class GlobalModelAttributes {
         model.addAttribute("moduleBusinessOverviewEnabled", moduleBusinessOverview);
         model.addAttribute("moduleMonthlyFollowupEnabled", moduleMonthlyFollowup);
         model.addAttribute("moduleCommercialDailyEnabled", moduleCommercialDaily);
+        model.addAttribute("moduleSalesEnabled", moduleSales);
         model.addAttribute("moduleCrmEnabled", moduleCrm);
         model.addAttribute("moduleClientsEnabled", moduleClients);
         model.addAttribute("modulePromotionsEnabled", modulePromotions);
@@ -244,6 +250,10 @@ public class GlobalModelAttributes {
         model.addAttribute("moduleBlogEnabled", moduleBlog);
         model.addAttribute("moduleAcademyEnabled", moduleAcademy);
         model.addAttribute("moduleRestaurantEnabled", moduleRestaurant);
+        model.addAttribute("moduleRestaurantCashEnabled", moduleRestaurantCash);
+        model.addAttribute("moduleRestaurantQrEnabled", moduleRestaurantQr);
+        model.addAttribute("moduleRestaurantRecipesEnabled", moduleRestaurantRecipes);
+        model.addAttribute("moduleRestaurantReservationsEnabled", moduleRestaurantReservations);
         model.addAttribute("moduleTestimonialsEnabled", moduleTestimonials);
         model.addAttribute("modulePublicSiteEnabled", modulePublicSite);
         model.addAttribute("modulePublicCatalogEnabled", modulePublicCatalog);
@@ -268,6 +278,10 @@ public class GlobalModelAttributes {
         model.addAttribute("featureBlog", moduleBlog);
         model.addAttribute("featureAcademy", moduleAcademy);
         model.addAttribute("featureRestaurant", moduleRestaurant);
+        model.addAttribute("featureRestaurantCash", moduleRestaurantCash);
+        model.addAttribute("featureRestaurantQr", moduleRestaurantQr);
+        model.addAttribute("featureRestaurantRecipes", moduleRestaurantRecipes);
+        model.addAttribute("featureRestaurantReservations", moduleRestaurantReservations);
         model.addAttribute("featureTestimonials", moduleTestimonials);
         model.addAttribute("featurePublicCatalog", modulePublicCatalog);
         model.addAttribute("featureSupplies", moduleSupplies);

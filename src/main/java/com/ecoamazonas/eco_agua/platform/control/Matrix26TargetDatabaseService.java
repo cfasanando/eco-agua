@@ -1,5 +1,6 @@
 package com.ecoamazonas.eco_agua.platform.control;
 
+import com.ecoamazonas.eco_agua.config.SystemModuleVisibilityMapper;
 import com.ecoamazonas.eco_agua.platform.control.appearance.Matrix26JsonCodec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -483,11 +485,19 @@ public class Matrix26TargetDatabaseService {
         upsertSetting(target, "admin.brand.logo", compactLogo, "string", "admin", "Logo administrativo");
         upsertSetting(target, "login.title", displayName, "string", "login", "Título de acceso");
         upsertSetting(target, "login.subtitle", brandingValue(job, "welcomeMessage", "Acceso al sistema de gestión"), "string", "login", "Subtítulo de acceso");
-        upsertSetting(target, "module.dashboard.enabled", "true", "boolean", "system_modules", "Inicio administrativo");
-        upsertSetting(target, "module.platform_settings.enabled", "true", "boolean", "system_modules", "Configuración de plataforma");
-        upsertSetting(target, "module.users.enabled", "true", "boolean", "system_modules", "Usuarios internos");
-        upsertSetting(target, "module.roles_permissions.enabled", "true", "boolean", "system_modules", "Roles y permisos");
-        upsertSetting(target, "module.restaurant.enabled", Boolean.toString(selectedModules.contains("restaurant")), "boolean", "system_modules", "Módulo Restaurante");
+        Map<String, Boolean> moduleVisibility = SystemModuleVisibilityMapper.systemModuleFlags(
+                selectedModules,
+                selectedModules.contains("restaurant") || defaultValue(job.getBusinessType(), "").toLowerCase(Locale.ROOT).contains("restaurant")
+                        || defaultValue(job.getBusinessType(), "").toLowerCase(Locale.ROOT).contains("restaurante")
+        );
+        moduleVisibility.forEach((moduleKey, enabled) -> upsertSetting(
+                target,
+                "module." + moduleKey + ".enabled",
+                Boolean.toString(enabled),
+                "boolean",
+                "system_modules",
+                "Matrix26 projected visibility flag for " + moduleKey
+        ));
         upsertSetting(target, "public.nav.restaurant_label", "Carta", "string", "public_site", "Etiqueta de carta pública");
     }
 
@@ -519,7 +529,11 @@ public class Matrix26TargetDatabaseService {
     }
 
     private String runtimeProperties(Matrix26ProvisioningJob job, Set<String> selectedModules) {
-        boolean restaurant = selectedModules.contains("restaurant");
+        boolean restaurant = Boolean.TRUE.equals(SystemModuleVisibilityMapper.systemModuleFlags(
+                selectedModules,
+                defaultValue(job.getBusinessType(), "").toLowerCase(Locale.ROOT).contains("restaurant")
+                        || defaultValue(job.getBusinessType(), "").toLowerCase(Locale.ROOT).contains("restaurante")
+        ).get("restaurant"));
         String displayName = brandingValue(job, "displayName", job.getBusinessName());
         String shortName = brandingValue(job, "shortName", displayName);
         String tagline = brandingValue(job, "tagline", "Sistema empresarial administrado por Matrix26");
@@ -556,21 +570,17 @@ public class Matrix26TargetDatabaseService {
                 + "ecoagua.business.admin-logo=" + escapeProperty(compactLogo) + "\n"
                 + "ecoagua.business.location=" + escapeProperty(brandingValue(job, "location", defaultValue(job.getCity(), "Iquitos"))) + "\n"
                 + "ecoagua.business.footer-right=Instancia administrada por Matrix26\n\n"
-                + "ecoagua.features.containers=false\n"
-                + "ecoagua.features.delivery=" + restaurant + "\n"
-                + "ecoagua.features.production=false\n"
-                + "ecoagua.features.reorder=false\n"
-                + "ecoagua.features.marketing=false\n"
-                + "ecoagua.features.blog=false\n"
-                + "ecoagua.features.academy=false\n"
-                + "ecoagua.features.restaurant=" + restaurant + "\n"
-                + "ecoagua.features.testimonials=false\n"
-                + "ecoagua.features.public-catalog=" + restaurant + "\n"
-                + "ecoagua.features.supplies=" + restaurant + "\n"
-                + "ecoagua.features.fixed-costs=false\n"
-                + "ecoagua.features.break-even=false\n"
-                + "ecoagua.features.price-simulator=" + restaurant + "\n\n"
+                + runtimeFeatureProperties(selectedModules, restaurant)
+                + "\n"
                 + "google.maps.api-key=\n";
+    }
+
+
+    private String runtimeFeatureProperties(Set<String> selectedModules, boolean restaurantProfile) {
+        StringBuilder out = new StringBuilder();
+        SystemModuleVisibilityMapper.featureProperties(selectedModules, restaurantProfile)
+                .forEach((property, enabled) -> out.append(property).append("=").append(enabled).append("\n"));
+        return out.toString();
     }
 
     private String runtimeScript(Matrix26ProvisioningJob job) {

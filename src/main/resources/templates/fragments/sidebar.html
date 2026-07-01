@@ -49,7 +49,8 @@
 
       <a
         sec:authorize="hasAnyAuthority('ROLE_RESTAURANT_CASHIER','restaurante_caja')"
-        th:href="@{/admin/restaurant/cash}"
+        th:if="${moduleRestaurantCashEnabled}"
+            th:href="@{/admin/restaurant/cash}"
         class="menu-link"
         th:classappend="${activePage == 'restaurant_cash' ? ' active' : ''}"
       >
@@ -136,6 +137,7 @@
 
           <a
             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')"
+            th:if="${moduleRestaurantReservationsEnabled}"
             th:href="@{/admin/restaurant/reservations}"
             class="menu-link submenu"
             th:classappend="${activePage == 'restaurant_reservations' ? ' active' : ''}"
@@ -156,6 +158,7 @@
 
           <a
             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','administra_restaurante')"
+            th:if="${moduleRestaurantRecipesEnabled}"
             th:href="@{/admin/restaurant/ingredients}"
             class="menu-link submenu"
             th:classappend="${activePage == 'restaurant_ingredients' or activePage == 'restaurant_ingredient_movements' or activePage == 'restaurant_recipe' ? ' active' : ''}"
@@ -166,6 +169,7 @@
 
           <a
             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"
+            th:if="${moduleRestaurantReservationsEnabled or moduleRestaurantQrEnabled}"
             th:href="@{/admin/restaurant/table-requests}"
             class="menu-link submenu"
             th:classappend="${activePage == 'restaurant_table_requests' ? ' active' : ''}"
@@ -176,6 +180,7 @@
 
           <a
             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ver_restaurante','administra_restaurante','restaurante_mozo')"
+            th:if="${moduleRestaurantQrEnabled}"
             th:href="@{/admin/restaurant/qr-orders}"
             class="menu-link submenu"
             th:classappend="${activePage == 'restaurant_qr_orders' ? ' active' : ''}"
@@ -186,6 +191,7 @@
 
           <a
             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"
+            th:if="${moduleRestaurantQrEnabled or moduleDeliveryEnabled}"
             th:href="@{/admin/restaurant/external-orders}"
             class="menu-link submenu"
             th:classappend="${activePage == 'restaurant_external_orders' ? ' active' : ''}"
@@ -216,6 +222,7 @@
 
           <a
             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_caja')"
+            th:if="${moduleRestaurantCashEnabled}"
             th:href="@{/admin/restaurant/cash}"
             class="menu-link submenu"
             th:classappend="${activePage == 'restaurant_cash' ? ' active' : ''}"
@@ -226,6 +233,7 @@
 
           <a
             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')"
+            th:if="${moduleRestaurantCashEnabled}"
             th:href="@{/admin/restaurant/cash-sessions}"
             class="menu-link submenu"
             th:classappend="${activePage == 'restaurant_cash_sessions' ? ' active' : ''}"
@@ -236,6 +244,7 @@
 
           <a
             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','ADMIN_CONT','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_FINANCE','ROLE_RESTAURANT_CASHIER','administra_restaurante','restaurante_caja')"
+            th:if="${moduleRestaurantCashEnabled}"
             th:href="@{/admin/restaurant/reports}"
             class="menu-link submenu"
             th:classappend="${activePage == 'restaurant_reports' ? ' active' : ''}"
@@ -256,6 +265,7 @@
 
           <a
             sec:authorize="hasAnyAuthority('ADMIN_PRINC','ADMIN','SUPERVISOR','ROLE_OWNER','ROLE_MANAGEMENT','ROLE_RESTAURANT_WAITER','ROLE_RESTAURANT_KITCHEN','ROLE_RESTAURANT_CASHIER','ver_restaurante','administra_restaurante','restaurante_mozo','restaurante_cocina','restaurante_caja')"
+            th:if="${moduleRestaurantQrEnabled or modulePublicCatalogEnabled}"
             th:href="@{/restaurant/menu}"
             target="_blank"
             class="menu-link submenu"
@@ -273,7 +283,8 @@
       <div
         class="menu-group"
         th:with="isModuleAdministrationActive=${activePage == 'system_modules'
-          or activePage == 'system_module_installations'}"
+          or activePage == 'system_module_installations'
+          or activePage == 'system_module_visibility'}"
       >
         <input
           type="checkbox"
@@ -305,6 +316,15 @@
           >
             <span class="icon"><i class="bi bi-database-gear"></i></span>
             <span>Instalaciones de módulos</span>
+          </a>
+
+          <a
+            th:href="@{/admin/system-modules/visibility}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'system_module_visibility' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-eye"></i></span>
+            <span>Visibilidad runtime</span>
           </a>
         </div>
       </div>

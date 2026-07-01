@@ -48,6 +48,26 @@ public class SystemModuleAdminController {
         return "admin/system_modules";
     }
 
+
+    @GetMapping("/visibility")
+    public String showVisibility(Model model) {
+        var modules = systemModuleService.getModuleDefinitions();
+        long enabledCount = modules.stream().filter(SystemModuleService.ModuleDefinition::enabled).count();
+
+        model.addAttribute("activePage", "system_module_visibility");
+        model.addAttribute("moduleGroups", systemModuleService.getModuleGroups());
+        model.addAttribute("moduleFlags", systemModuleService.getModuleFlags());
+        model.addAttribute("moduleTotalCount", modules.size());
+        model.addAttribute("moduleEnabledCount", enabledCount);
+        model.addAttribute("moduleInstallationDatabase", platformModuleManager.currentDatabaseName());
+        model.addAttribute("moduleVisibilityNotes", java.util.List.of(
+                "This page explains the effective runtime flags used by the sidebar.",
+                "Matrix26 Phase 4B projects central activation into module.*.enabled settings and ecoagua.features.* runtime properties.",
+                "Route hardening is not expanded in this phase; navigation visibility is the main scope."
+        ));
+        return "admin/system_modules/visibility";
+    }
+
     @GetMapping("/installations")
     public String showInstallations(Model model) {
         model.addAttribute("activePage", "system_module_installations");

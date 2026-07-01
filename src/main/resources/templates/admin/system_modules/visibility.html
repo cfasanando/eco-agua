@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('Visibilidad de módulos')"></head>
+
+<body class="bg-light">
+
+<div class="d-flex" id="wrapper">
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+
+    <div id="page-content-wrapper" class="flex-grow-1 d-flex flex-column min-vh-100">
+        <div th:replace="fragments/topbar :: topbar"></div>
+
+        <main class="container-fluid mt-4 flex-grow-1">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                <div>
+                    <h1 class="h4 mb-1">Visibilidad de módulos</h1>
+                    <p class="text-muted small mb-0">
+                        Diagnóstico de los flags efectivos que usa el sidebar para esta instancia.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a th:href="@{/admin/system-modules}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-ui-checks-grid"></i>
+                        Módulos
+                    </a>
+                    <a th:href="@{/admin/system-modules/installations}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-database-gear"></i>
+                        Instalaciones
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Base actual</div>
+                            <div class="h5 mb-0"><code th:text="${moduleInstallationDatabase}">database</code></div>
+                            <div class="small text-muted mt-2">Configuración local de la instancia.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Módulos visibles</div>
+                            <div class="display-6 fw-bold" th:text="${moduleEnabledCount}">0</div>
+                            <div class="small text-muted">De <span th:text="${moduleTotalCount}">0</span> flags registrados.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Alcance 4B</div>
+                            <div class="h5 mb-0">Sidebar y navegación</div>
+                            <div class="small text-muted mt-2">Sin nuevas acciones operativas.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-info border-0 shadow-sm small" role="alert">
+                <div class="fw-semibold mb-1">Notas de proyección Matrix26</div>
+                <ul class="mb-0">
+                    <li th:each="note : ${moduleVisibilityNotes}" th:text="${note}">Nota</li>
+                </ul>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white fw-semibold">Flags efectivos por grupo</div>
+                <div class="accordion accordion-flush" id="visibilityAccordion">
+                    <div class="accordion-item" th:each="group, groupStat : ${moduleGroups}">
+                        <h2 class="accordion-header" th:id="${'visibility-heading-' + groupStat.index}">
+                            <button class="accordion-button"
+                                    th:classappend="${groupStat.index > 0 ? ' collapsed' : ''}"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    th:attr="data-bs-target=${'#visibility-collapse-' + groupStat.index},aria-expanded=${groupStat.index == 0 ? 'true' : 'false'},aria-controls=${'visibility-collapse-' + groupStat.index}">
+                                <span class="fw-semibold" th:text="${group.name()}">Grupo</span>
+                                <span class="badge text-bg-light ms-2" th:text="${#lists.size(group.modules()) + ' flags'}">0 flags</span>
+                            </button>
+                        </h2>
+                        <div th:id="${'visibility-collapse-' + groupStat.index}"
+                             class="accordion-collapse collapse"
+                             th:classappend="${groupStat.index == 0 ? ' show' : ''}"
+                             th:attr="aria-labelledby=${'visibility-heading-' + groupStat.index}"
+                             data-bs-parent="#visibilityAccordion">
+                            <div class="accordion-body bg-white p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead class="table-light">
+                                        <tr>
+                                            <th>Módulo</th>
+                                            <th>Sidebar</th>
+                                            <th>Variable runtime</th>
+                                            <th>Descripción</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr th:each="module : ${group.modules()}">
+                                            <td>
+                                                <div class="fw-semibold" th:text="${module.label()}">Módulo</div>
+                                                <code class="small" th:text="${module.key()}">module_key</code>
+                                            </td>
+                                            <td>
+                                                <span class="badge"
+                                                      th:classappend="${module.enabled()} ? ' text-bg-success' : ' text-bg-secondary'"
+                                                      th:text="${module.enabled()} ? 'Visible' : 'Oculto'">Visible</span>
+                                            </td>
+                                            <td><code class="small" th:text="${module.settingVariable()}">module.key.enabled</code></td>
+                                            <td class="small text-muted" th:text="${module.description()}">Descripción</td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div th:replace="fragments/scripts_admin :: adminScripts"></div>
+    </div>
+</div>
+
+</body>
+</html>

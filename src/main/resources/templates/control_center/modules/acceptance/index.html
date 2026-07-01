@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Feature Flags Acceptance')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Feature Flags Acceptance', 'Final checklist for Matrix26 module activation, sidebar visibility and route protection.')}" ></header>
+
+        <main class="matrix26-main">
+            <section class="matrix26-alert-safe mb-4">
+                <i class="bi bi-clipboard2-check"></i>
+                <div>
+                    <strong>Phase 4D: read-only final acceptance</strong>
+                    <p>This page only reviews Matrix26 feature flag evidence. It does not save activation changes, install modules, restart runtimes, execute SQL, purge data or alter customer databases.</p>
+                </div>
+            </section>
+
+            <section class="matrix26-operations-dashboard-grid mb-4">
+                <article th:each="metric : ${acceptance.metrics()}" class="matrix26-ops-kpi" th:classappend="${' is-' + metric.tone()}">
+                    <span class="matrix26-ops-kpi-icon"><i th:class="${'bi ' + metric.icon()}"></i></span>
+                    <span>
+                        <small th:text="${metric.label()}">Metric</small>
+                        <strong th:text="${metric.value()}">0</strong>
+                        <em th:text="${metric.detail()}">Detail</em>
+                    </span>
+                </article>
+            </section>
+
+            <div class="matrix26-panel mb-4">
+                <div class="matrix26-panel-header align-items-start">
+                    <div>
+                        <span>Overall status</span>
+                        <h2>Feature Flags acceptance</h2>
+                        <p class="text-muted mb-0" th:text="|Generated at ${#temporals.format(acceptance.generatedAt(), 'yyyy-MM-dd HH:mm')}|">Generated</p>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge fs-6" th:classappend="${' ' + acceptance.overallStatus().getBadgeClass()}">
+                            <i th:class="${'bi ' + acceptance.overallStatus().getIcon() + ' me-1'}"></i>
+                            <span th:text="${acceptance.overallStatus().getLabel()}">Status</span>
+                        </span>
+                        <div class="small text-muted mt-2">
+                            <span th:text="|${acceptance.passedItems()} passed|">0 passed</span>
+                            · <span th:text="|${acceptance.warningItems()} warning|">0 warning</span>
+                            · <span th:text="|${acceptance.failedItems()} failed|">0 failed</span>
+                            · <span th:text="|${acceptance.totalItems()} total|">0 total</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-sm btn-outline-primary" th:href="@{/control-center/modules/activation}"><i class="bi bi-toggles2 me-1"></i>Module Activation</a>
+                    <a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/modules}"><i class="bi bi-grid-3x3-gap me-1"></i>Module Catalog</a>
+                    <a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/modules/acceptance(refresh=true)}"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>
+                </div>
+            </div>
+
+            <section th:if="${!#lists.isEmpty(acceptance.notes())}" class="matrix26-alert-warning mb-4">
+                <i class="bi bi-info-circle"></i>
+                <div>
+                    <strong>Partial evidence notes</strong>
+                    <p th:each="note : ${acceptance.notes()}" th:text="${note}">Note</p>
+                </div>
+            </section>
+
+            <div class="row g-4 mb-4">
+                <div th:each="group : ${acceptance.groups()}" class="col-12 col-xl-6">
+                    <section class="matrix26-panel h-100">
+                        <div class="matrix26-panel-header align-items-start">
+                            <div class="d-flex gap-3 align-items-start">
+                                <span class="matrix26-acceptance-icon"><i th:class="${'bi ' + group.icon()}"></i></span>
+                                <div>
+                                    <span th:text="${group.description()}">Description</span>
+                                    <h2 th:text="${group.title()}">Group</h2>
+                                </div>
+                            </div>
+                            <span class="badge" th:classappend="${' ' + group.status().getBadgeClass()}" th:text="${group.status().getLabel()}">Status</span>
+                        </div>
+
+                        <div class="matrix26-acceptance-list">
+                            <article th:each="item : ${group.items()}" class="matrix26-acceptance-item">
+                                <div class="d-flex justify-content-between gap-3 align-items-start">
+                                    <div>
+                                        <h3>
+                                            <i th:class="${'bi ' + item.status().getIcon() + ' me-1'}"></i>
+                                            <span th:text="${item.title()}">Item</span>
+                                        </h3>
+                                        <p th:text="${item.description()}">Description</p>
+                                    </div>
+                                    <span class="badge" th:classappend="${' ' + item.status().getBadgeClass()}" th:text="${item.status().getLabel()}">Status</span>
+                                </div>
+                                <div class="matrix26-acceptance-evidence">
+                                    <strong>Evidence:</strong>
+                                    <span th:text="${item.evidence()}">Evidence</span>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2 mt-2 align-items-center">
+                                    <a th:if="${item.hasRoute()}" class="btn btn-sm btn-outline-secondary" th:href="${item.route()}"><i class="bi bi-box-arrow-up-right me-1"></i>Open evidence</a>
+                                    <code th:text="${item.code()}">code</code>
+                                </div>
+                                <div th:if="${item.actionable()}" class="small text-muted mt-2">
+                                    <i class="bi bi-arrow-right-circle me-1"></i>
+                                    <span th:text="${item.recommendedAction()}">Action</span>
+                                </div>
+                            </article>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <div class="matrix26-section-heading">
+                <div><span>Risk review</span><h2>Remaining feature-flag risks</h2></div>
+            </div>
+            <section class="row g-4 mb-4">
+                <div th:each="risk : ${acceptance.risks()}" class="col-12 col-lg-6 col-xxl-3">
+                    <article class="matrix26-panel h-100">
+                        <div class="d-flex justify-content-between gap-3 align-items-start">
+                            <h2 class="h5 mb-2" th:text="${risk.title()}">Risk</h2>
+                            <span class="badge" th:classappend="${' ' + risk.status().getBadgeClass()}" th:text="${risk.status().getLabel()}">Status</span>
+                        </div>
+                        <p class="text-muted" th:text="${risk.detail()}">Detail</p>
+                        <div class="small">
+                            <strong>Action:</strong>
+                            <span th:text="${risk.recommendedAction()}">Action</span>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="matrix26-alert-safe">
+                <i class="bi bi-check2-circle"></i>
+                <div>
+                    <strong>Ready to move to the next module development after 4D</strong>
+                    <p>When this page shows no failed items, Feature Flags can be considered closed: 4A configured declarations, 4B projected navigation flags, 4C blocked inactive direct URLs, and 4D records the final acceptance checklist.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

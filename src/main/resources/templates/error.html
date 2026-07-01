@@ -8,34 +8,79 @@
 </head>
 <body class="bg-light">
 <div class="container py-4">
-    <h1 class="h4 text-danger mb-3">Se produjo un error en el servidor</h1>
+    <div th:if="${systemModuleAccessDenied}" class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+            <div class="badge text-bg-warning mb-3">Módulo inactivo</div>
+            <h1 class="h4 text-danger mb-2">Esta sección no está activa para esta instancia</h1>
+            <p class="text-muted mb-4">
+                Matrix26 bloqueó el acceso directo porque el módulo requerido está desactivado.
+            </p>
 
-    <div class="mb-3">
-        <strong>Estado:</strong>
-        <span th:text="${status}">500</span> -
-        <span th:text="${error}">Internal Server Error</span>
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-4">
+                    <div class="border rounded bg-light p-3 h-100">
+                        <div class="small text-muted">Ruta solicitada</div>
+                        <code th:text="${systemModuleAccessDeniedRequestPath}">/ruta</code>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="border rounded bg-light p-3 h-100">
+                        <div class="small text-muted">Módulo requerido</div>
+                        <div class="fw-semibold" th:text="${systemModuleAccessDeniedModuleLabel}">Módulo</div>
+                        <code th:text="${systemModuleAccessDeniedModuleKey}">module_key</code>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="border rounded bg-light p-3 h-100">
+                        <div class="small text-muted">Regla aplicada</div>
+                        <code th:text="${systemModuleAccessDeniedRoutePrefix}">/prefijo</code>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-info small mb-4">
+                Activa el módulo desde Matrix26 Control Center y reinicia/regenera el runtime si corresponde,
+                o revisa el diagnóstico en <strong>/admin/system-modules/visibility</strong>.
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="javascript:history.back()" class="btn btn-secondary btn-sm">Volver</a>
+                <a th:href="@{/home}" class="btn btn-outline-primary btn-sm">Ir al inicio</a>
+                <a th:href="@{/admin/system-modules/visibility}" class="btn btn-outline-dark btn-sm">Ver diagnóstico</a>
+            </div>
+        </div>
     </div>
 
-    <div class="mb-3">
-        <strong>Mensaje:</strong>
-        <pre class="bg-white border rounded p-2 small"
-             th:text="${message}">Mensaje de error</pre>
-    </div>
+    <div th:unless="${systemModuleAccessDenied}">
+        <h1 class="h4 text-danger mb-3">Se produjo un error en la aplicación</h1>
 
-    <div class="mb-3" th:if="${exception}">
-        <strong>Excepción:</strong>
-        <pre class="bg-white border rounded p-2 small"
-             th:text="${exception}">java.lang.Exception...</pre>
-    </div>
+        <div class="mb-3">
+            <strong>Estado:</strong>
+            <span th:text="${status}">500</span> -
+            <span th:text="${error}">Internal Server Error</span>
+        </div>
 
-    <div class="mb-3" th:if="${trace}">
-        <strong>Stacktrace:</strong>
-        <pre class="bg-white border rounded p-2 small"
-             style="max-height: 400px; overflow:auto;"
-             th:text="${trace}">trace...</pre>
-    </div>
+        <div class="mb-3">
+            <strong>Mensaje:</strong>
+            <pre class="bg-white border rounded p-2 small"
+                 th:text="${message}">Mensaje de error</pre>
+        </div>
 
-    <a href="javascript:history.back()" class="btn btn-secondary btn-sm">Volver</a>
+        <div class="mb-3" th:if="${exception}">
+            <strong>Excepción:</strong>
+            <pre class="bg-white border rounded p-2 small"
+                 th:text="${exception}">java.lang.Exception...</pre>
+        </div>
+
+        <div class="mb-3" th:if="${trace}">
+            <strong>Stacktrace:</strong>
+            <pre class="bg-white border rounded p-2 small"
+                 style="max-height: 400px; overflow:auto;"
+                 th:text="${trace}">trace...</pre>
+        </div>
+
+        <a href="javascript:history.back()" class="btn btn-secondary btn-sm">Volver</a>
+    </div>
 </div>
 </body>
 </html>

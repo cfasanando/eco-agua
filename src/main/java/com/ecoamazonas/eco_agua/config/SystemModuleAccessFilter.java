@@ -9,69 +9,27 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
 
+/**
+ * Blocks direct URL access when the owning runtime module is disabled.
+ *
+ * Sidebar visibility is useful, but direct URLs must also respect the active module map.
+ */
 @Component
 public class SystemModuleAccessFilter extends OncePerRequestFilter {
 
-    private static final List<ModuleRoute> MODULE_ROUTES = List.of(
-            ModuleRoute.prefix("/portal", "public_site"),
-            ModuleRoute.prefix("/catalogo", "public_catalog"),
-            ModuleRoute.prefix("/order/whatsapp", "public_catalog"),
-            ModuleRoute.prefix("/blog", "blog"),
-            ModuleRoute.prefix("/academy", "academy"),
-            ModuleRoute.prefix("/admin/academy", "academy"),
-            ModuleRoute.prefix("/restaurant", "restaurant"),
-            ModuleRoute.prefix("/admin/restaurant", "restaurant"),
-            ModuleRoute.prefix("/admin/blog", "blog"),
-            ModuleRoute.prefix("/marketing/admin/promotions", "promotions"),
-            ModuleRoute.prefix("/marketing/admin/campaigns", "marketing"),
-            ModuleRoute.prefix("/marketing/admin/strategy", "marketing"),
-            ModuleRoute.prefix("/marketing/admin/ideas", "marketing"),
-            ModuleRoute.prefix("/marketing/admin/publication-plan", "marketing"),
-            ModuleRoute.prefix("/marketing/admin/actions-report", "marketing"),
-            ModuleRoute.prefix("/marketing/admin/image-library", "marketing"),
-            ModuleRoute.prefix("/marketing/admin/testimonials", "testimonials"),
-            ModuleRoute.prefix("/admin/promotions", "promotions"),
-            ModuleRoute.prefix("/admin/clients", "clients"),
-            ModuleRoute.prefix("/admin/client-profiles", "clients"),
-            ModuleRoute.prefix("/delivery", "delivery"),
-            ModuleRoute.prefix("/admin/delivery-zones", "delivery"),
-            ModuleRoute.prefix("/reorder-agenda", "reorder"),
-            ModuleRoute.prefix("/orders", "income"),
-            ModuleRoute.prefix("/income", "income"),
-            ModuleRoute.prefix("/expenses/fixed-costs", "fixed_costs"),
-            ModuleRoute.prefix("/expenses", "expenses"),
-            ModuleRoute.prefix("/admin/suppliers", "suppliers"),
-            ModuleRoute.prefix("/admin/products", "products"),
-            ModuleRoute.prefix("/admin/categories", "categories"),
-            ModuleRoute.prefix("/warehouse/purchase-history", "warehouse"),
-            ModuleRoute.prefix("/warehouse/reorder-suggestions", "warehouse"),
-            ModuleRoute.prefix("/warehouse/products-stock", "warehouse"),
-            ModuleRoute.prefix("/warehouse/supplies-stock", "supplies"),
-            ModuleRoute.prefix("/admin/supplies", "supplies"),
-            ModuleRoute.prefix("/containers", "containers"),
-            ModuleRoute.prefix("/production", "production"),
-            ModuleRoute.prefix("/accounting", "accounting"),
-            ModuleRoute.prefix("/cashflow/break-even", "break_even"),
-            ModuleRoute.prefix("/cashflow", "cashflow"),
-            ModuleRoute.prefix("/admin/price-simulator", "price_simulator"),
-            ModuleRoute.prefix("/dashboard/business", "dashboard"),
-            ModuleRoute.prefix("/dashboard/areas", "dashboard"),
-            ModuleRoute.prefix("/dashboard/business-overview", "business_overview"),
-            ModuleRoute.prefix("/dashboard/monthly-followup", "monthly_followup"),
-            ModuleRoute.prefix("/dashboard/commercial-daily", "commercial_daily"),
-            ModuleRoute.prefix("/admin/platform", "platform_settings")
-    );
+    public static final String REQUEST_ATTRIBUTE_DENIED = "systemModuleAccessDenied";
+    public static final String REQUEST_ATTRIBUTE_MODULE_KEY = "systemModuleAccessDeniedModuleKey";
+    public static final String REQUEST_ATTRIBUTE_MODULE_LABEL = "systemModuleAccessDeniedModuleLabel";
+    public static final String REQUEST_ATTRIBUTE_ROUTE_PREFIX = "systemModuleAccessDeniedRoutePrefix";
+    public static final String REQUEST_ATTRIBUTE_REQUEST_PATH = "systemModuleAccessDeniedRequestPath";
 
-    private final SystemModuleService systemModuleService;
+    private final SystemModuleRouteAccessService routeAccessService;
     private final Matrix26ControlCenterProperties controlCenterProperties;
 
-    public SystemModuleAccessFilter(
-            SystemModuleService systemModuleService,
-            Matrix26ControlCenterProperties controlCenterProperties
-    ) {
-        this.systemModuleService = systemModuleService;
+    public SystemModuleAccessFilter(SystemModuleRouteAccessService routeAccessService,
+                                    Matrix26ControlCenterProperties controlCenterProperties) {
+        this.routeAccessService = routeAccessService;
         this.controlCenterProperties = controlCenterProperties;
     }
 
@@ -84,48 +42,24 @@ public class SystemModuleAccessFilter extends OncePerRequestFilter {
             return;
         }
 
-        String path = normalizedPath(request);
-        ModuleRoute matchedRoute = findRoute(path);
-
-        if (matchedRoute != null && !systemModuleService.isEnabled(matchedRoute.moduleKey())) {
-            response.sendError(HttpServletResponse.SC_NOT_FOUND, "Module is disabled.");
+        SystemModuleRouteAccessDecision decision = routeAccessService.decide(request);
+        if (decision.protectedRoute() && !decision.allowed()) {
+            markDeniedRequest(request, decision);
+            response.sendError(
+                    HttpServletResponse.SC_FORBIDDEN,
+                    "Module is disabled: " + decision.moduleKey()
+            );
             return;
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private ModuleRoute findRoute(String path) {
-        for (ModuleRoute route : MODULE_ROUTES) {
-            if (route.matches(path)) {
-                return route;
-            }
-        }
-        return null;
-    }
-
-    private String normalizedPath(HttpServletRequest request) {
-        String contextPath = request.getContextPath();
-        String uri = request.getRequestURI();
-
-        if (contextPath != null && !contextPath.isBlank() && uri.startsWith(contextPath)) {
-            uri = uri.substring(contextPath.length());
-        }
-
-        if (uri == null || uri.isBlank()) {
-            return "/";
-        }
-
-        return uri.startsWith("/") ? uri : "/" + uri;
-    }
-
-    private record ModuleRoute(String pathPrefix, String moduleKey) {
-        static ModuleRoute prefix(String pathPrefix, String moduleKey) {
-            return new ModuleRoute(pathPrefix, moduleKey);
-        }
-
-        boolean matches(String requestPath) {
-            return requestPath.equals(pathPrefix) || requestPath.startsWith(pathPrefix + "/");
-        }
+    private void markDeniedRequest(HttpServletRequest request, SystemModuleRouteAccessDecision decision) {
+        request.setAttribute(REQUEST_ATTRIBUTE_DENIED, true);
+        request.setAttribute(REQUEST_ATTRIBUTE_MODULE_KEY, decision.moduleKey());
+        request.setAttribute(REQUEST_ATTRIBUTE_MODULE_LABEL, decision.label());
+        request.setAttribute(REQUEST_ATTRIBUTE_ROUTE_PREFIX, decision.rule().pathPrefix());
+        request.setAttribute(REQUEST_ATTRIBUTE_REQUEST_PATH, decision.requestPath());
     }
 }

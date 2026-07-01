@@ -18,11 +18,14 @@ import java.util.Map;
 public class SystemModuleAdminController {
 
     private final SystemModuleService systemModuleService;
+    private final SystemModuleRouteAccessService routeAccessService;
     private final PlatformModuleManager platformModuleManager;
 
     public SystemModuleAdminController(SystemModuleService systemModuleService,
+                                       SystemModuleRouteAccessService routeAccessService,
                                        PlatformModuleManager platformModuleManager) {
         this.systemModuleService = systemModuleService;
+        this.routeAccessService = routeAccessService;
         this.platformModuleManager = platformModuleManager;
     }
 
@@ -61,10 +64,15 @@ public class SystemModuleAdminController {
         model.addAttribute("moduleEnabledCount", enabledCount);
         model.addAttribute("moduleInstallationDatabase", platformModuleManager.currentDatabaseName());
         model.addAttribute("moduleVisibilityNotes", java.util.List.of(
-                "This page explains the effective runtime flags used by the sidebar.",
+                "This page explains the effective runtime flags used by the sidebar and route guard.",
                 "Matrix26 Phase 4B projects central activation into module.*.enabled settings and ecoagua.features.* runtime properties.",
-                "Route hardening is not expanded in this phase; navigation visibility is the main scope."
+                "Matrix26 Phase 4C blocks direct URLs with HTTP 403 when the owning module is inactive."
         ));
+        model.addAttribute("routeDiagnostics", routeAccessService.diagnostics());
+        model.addAttribute("routeRuleCount", routeAccessService.rules().size());
+        model.addAttribute("blockedRouteRuleCount", routeAccessService.diagnostics().stream()
+                .filter(diagnostic -> !diagnostic.moduleEnabled())
+                .count());
         return "admin/system_modules/visibility";
     }
 

@@ -8,18 +8,40 @@
         <span id="currentTime">00:00:00</span>
     </div>
 
-    <div class="topbar-user">
-        <span th:text="${#authentication.name}">Usuario</span>
-        <div class="topbar-avatar"
-             th:text="${#authentication.name != null ? #authentication.name.substring(0,1).toUpperCase() : 'U'}">
-            U
-        </div>
+    <div class="topbar-user dropdown">
+        <button class="topbar-user-button" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <span class="topbar-user-name" th:text="${#authentication.name}">Usuario</span>
+            <span class="topbar-avatar"
+                 th:text="${#authentication.name != null ? #authentication.name.substring(0,1).toUpperCase() : 'U'}">
+                U
+            </span>
+            <i class="bi bi-chevron-down small text-muted"></i>
+        </button>
 
-        <form th:action="@{/logout}" method="post" class="d-inline">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-            <button type="submit" class="btn btn-sm btn-outline-secondary">
-                Cerrar sesión
-            </button>
-        </form>
+        <div class="dropdown-menu dropdown-menu-end shadow border-0 topbar-personal-menu">
+            <div class="px-3 py-2 border-bottom">
+                <div class="small text-muted">Sesión actual</div>
+                <div class="fw-semibold" th:text="${#authentication.name}">Usuario</div>
+            </div>
+            <span class="dropdown-item disabled">
+                <i class="bi bi-person-circle me-2"></i> Mi perfil
+            </span>
+            <a class="dropdown-item" th:if="${modulePersonalFinanceEnabled}" th:href="@{/gasto-claro/dashboard}">
+                <i class="bi bi-wallet2 me-2"></i> GastoClaro
+            </a>
+            <a class="dropdown-item" th:if="${modulePersonalFinanceEnabled}" th:href="@{/gasto-claro/monthly-plan}">
+                <i class="bi bi-calendar2-week me-2"></i> Plan mensual
+            </a>
+            <a class="dropdown-item" th:if="${modulePersonalFinanceEnabled}" th:href="@{/gasto-claro/debts}">
+                <i class="bi bi-credit-card me-2"></i> Mis deudas
+            </a>
+            <div class="dropdown-divider"></div>
+            <form th:action="@{/logout}" method="post" class="m-0">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <button type="submit" class="dropdown-item text-danger">
+                    <i class="bi bi-box-arrow-right me-2"></i> Cerrar sesión
+                </button>
+            </form>
+        </div>
     </div>
 </header>

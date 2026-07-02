@@ -2,6 +2,9 @@ package com.ecoamazonas.eco_agua.personalfinance;
 
 public enum PersonalFinanceDebtStatus {
     ACTIVE("Activa"),
+    OVERDUE("Atrasada"),
+    STOPPED_PAYMENT("Dejé de pagar"),
+    NEGOTIATION("En negociación"),
     PAID("Pagada"),
     SUSPENDED("Suspendida"),
     CANCELLED("Cancelada");

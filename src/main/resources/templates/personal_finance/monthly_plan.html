@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('GastoClaro - Plan mensual')"></head>
+<body>
+<div class="app-layout" th:with="activePage='gasto_claro_monthly_plan'">
+  <aside th:replace="fragments/sidebar :: sidebar"></aside>
+  <div class="main-content">
+    <header th:replace="fragments/topbar :: topbar"></header>
+    <main class="content-wrapper gasto-claro-page">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+          <h1 class="h4 mb-1">Plan mensual GastoClaro</h1>
+          <p class="text-muted mb-0">Vista operativa tipo Excel: ingresos, costo de vida básico, deudas, pagado, pendiente y déficit.</p>
+        </div>
+        <form th:action="@{/gasto-claro/monthly-plan}" method="get" class="d-flex gap-2 align-items-end">
+          <div>
+            <label class="form-label small mb-1">Año</label>
+            <input type="number" class="form-control form-control-sm" name="year" th:value="${selectedYear}" style="max-width: 95px;">
+          </div>
+          <div>
+            <label class="form-label small mb-1">Mes</label>
+            <input type="number" class="form-control form-control-sm" min="1" max="12" name="month" th:value="${selectedMonth}" style="max-width: 85px;">
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary">Ver mes</button>
+        </form>
+      </div>
+
+      <div th:replace="personal_finance/_nav :: nav('monthly_plan')"></div>
+
+      <div th:if="${message}" class="alert border-0 shadow-sm" th:classappend="${messageType == 'success'} ? ' alert-success' : ' alert-info'" th:text="${message}">Mensaje</div>
+
+      <section class="gasto-month-hero mb-4">
+        <div>
+          <div class="text-uppercase small fw-bold opacity-75">Mes seleccionado</div>
+          <div class="h3 mb-0"><span th:text="${selectedMonth}">7</span>/<span th:text="${selectedYear}">2026</span></div>
+          <div class="small opacity-75 mt-1">Tu objetivo: saber qué cubrir primero con el dinero disponible.</div>
+        </div>
+        <div class="gasto-hero-number" th:classappend="${plan.projectedBalance().signum() < 0} ? ' text-danger' : ' text-success'">
+          <span class="small d-block">Saldo proyectado</span>
+          S/ <span th:text="${#numbers.formatDecimal(plan.projectedBalance(),1,'POINT',2,'POINT')}">0.00</span>
+        </div>
+      </section>
+
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-2">
+          <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+            <div class="text-muted small">Ingresos</div>
+            <div class="h5 mb-0">S/ <span th:text="${#numbers.formatDecimal(plan.expectedIncome(),1,'POINT',2,'POINT')}">0.00</span></div>
+          </div></div>
+        </div>
+        <div class="col-6 col-xl-2">
+          <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+            <div class="text-muted small">Costo básico</div>
+            <div class="h5 mb-0">S/ <span th:text="${#numbers.formatDecimal(plan.basicLivingTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+          </div></div>
+        </div>
+        <div class="col-6 col-xl-2">
+          <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+            <div class="text-muted small">Deudas</div>
+            <div class="h5 mb-0">S/ <span th:text="${#numbers.formatDecimal(plan.debtTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+          </div></div>
+        </div>
+        <div class="col-6 col-xl-2">
+          <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+            <div class="text-muted small">Pagado</div>
+            <div class="h5 mb-0 text-primary">S/ <span th:text="${#numbers.formatDecimal(plan.paidTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+          </div></div>
+        </div>
+        <div class="col-6 col-xl-2">
+          <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+            <div class="text-muted small">Pendiente</div>
+            <div class="h5 mb-0 text-danger">S/ <span th:text="${#numbers.formatDecimal(plan.pendingTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+          </div></div>
+        </div>
+        <div class="col-6 col-xl-2">
+          <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+            <div class="text-muted small">Después de básico</div>
+            <div class="h5 mb-0" th:classappend="${plan.cashAfterBasicLiving().signum() < 0} ? ' text-danger' : ' text-success'">
+              S/ <span th:text="${#numbers.formatDecimal(plan.cashAfterBasicLiving(),1,'POINT',2,'POINT')}">0.00</span>
+            </div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="alert border-0 shadow-sm mb-4" th:classappend="${plan.hasDeficit()} ? ' alert-danger' : ' alert-success'">
+        <div class="fw-semibold" th:if="${plan.hasDeficit()}">Este mes está en rojo.</div>
+        <div class="fw-semibold" th:unless="${plan.hasDeficit()}">Este mes tiene saldo positivo proyectado.</div>
+        <div class="small">
+          Ingresos menos obligaciones: S/
+          <span th:text="${#numbers.formatDecimal(plan.projectedBalance(),1,'POINT',2,'POINT')}">0.00</span>.
+          Primero cubre costo de vida básico y luego deudas con interés alto, atraso o presión personal.
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-xl-8">
+          <div class="gasto-excel-card mb-3">
+            <div class="gasto-excel-title">Ingresos</div>
+            <div class="table-responsive">
+              <table class="table table-sm gasto-excel-table align-middle mb-0">
+                <thead><tr><th>Fuente</th><th>Estado</th><th>Fecha</th><th class="text-end">Monto</th><th>Observación</th></tr></thead>
+                <tbody>
+                <tr th:each="income : ${plan.incomes()}">
+                  <td><strong th:text="${income.title}">Ingreso</strong><br><small class="text-muted" th:text="${income.incomeSource != null ? income.incomeSource.name : 'Manual'}">Fuente</small></td>
+                  <td><span class="badge bg-light text-dark" th:text="${income.status.label}">Planeado</span></td>
+                  <td th:text="${income.expectedDate}">2026-07-01</td>
+                  <td class="text-end"><span th:text="${income.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(income.amount,1,'POINT',2,'POINT')}">0.00</span></td>
+                  <td class="small text-muted" th:text="${income.notes}">-</td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(plan.incomes())}"><td colspan="5" class="text-center text-muted py-3">Registra tus ingresos programados del mes.</td></tr>
+                <tr class="gasto-total-row"><td colspan="3">TOTAL INGRESOS</td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(plan.expectedIncome(),1,'POINT',2,'POINT')}">0.00</span></td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="gasto-excel-card mb-3">
+            <div class="gasto-excel-title">Costo de vida básico</div>
+            <div class="table-responsive">
+              <table class="table table-sm gasto-excel-table align-middle mb-0">
+                <thead><tr><th>Concepto</th><th>Prioridad</th><th>Fecha</th><th>Estado</th><th class="text-end">Monto</th><th class="text-end">Pagado</th><th class="text-end">Pendiente</th><th>Observación</th><th></th></tr></thead>
+                <tbody th:replace="personal_finance/monthly_plan :: itemRows(${plan.basicLivingItems()}, ${selectedYear}, ${selectedMonth})"></tbody>
+                <tbody>
+                <tr th:if="${#lists.isEmpty(plan.basicLivingItems())}"><td colspan="9" class="text-center text-muted py-3">Aún no tienes costo de vida o compromisos básicos para este mes.</td></tr>
+                <tr class="gasto-total-row"><td colspan="4">TOTAL COSTO DE VIDA</td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(plan.basicLivingTotal(),1,'POINT',2,'POINT')}">0.00</span></td><td></td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(plan.basicLivingTotal(),1,'POINT',2,'POINT')}">0.00</span></td><td colspan="2"></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="gasto-excel-card mb-3">
+            <div class="gasto-excel-title">Deudas x pagar</div>
+            <div class="table-responsive">
+              <table class="table table-sm gasto-excel-table align-middle mb-0">
+                <thead><tr><th>Proveedor / Deuda</th><th>Prioridad</th><th>Fecha</th><th>Estado</th><th class="text-end">Monto</th><th class="text-end">Pagado</th><th class="text-end">Pendiente</th><th>Observación</th><th></th></tr></thead>
+                <tbody th:replace="personal_finance/monthly_plan :: itemRows(${plan.debtItems()}, ${selectedYear}, ${selectedMonth})"></tbody>
+                <tbody>
+                <tr th:if="${#lists.isEmpty(plan.debtItems())}"><td colspan="9" class="text-center text-muted py-3">Aún no tienes deudas exigibles o compromisos de deuda para este mes.</td></tr>
+                <tr class="gasto-total-row"><td colspan="4">TOTAL DEUDAS</td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(plan.debtTotal(),1,'POINT',2,'POINT')}">0.00</span></td><td></td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(plan.debtTotal(),1,'POINT',2,'POINT')}">0.00</span></td><td colspan="2"></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="gasto-excel-card" th:if="${!#lists.isEmpty(plan.otherItems())}">
+            <div class="gasto-excel-title">Otros compromisos</div>
+            <div class="table-responsive">
+              <table class="table table-sm gasto-excel-table align-middle mb-0">
+                <thead><tr><th>Concepto</th><th>Prioridad</th><th>Fecha</th><th>Estado</th><th class="text-end">Monto</th><th class="text-end">Pagado</th><th class="text-end">Pendiente</th><th>Observación</th><th></th></tr></thead>
+                <tbody th:replace="personal_finance/monthly_plan :: itemRows(${plan.otherItems()}, ${selectedYear}, ${selectedMonth})"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-xl-4">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white"><strong th:text="${obligationForm.id == null ? 'Agregar compromiso manual' : 'Editar compromiso'}">Agregar compromiso</strong></div>
+            <div class="card-body">
+              <form th:action="@{/gasto-claro/monthly-plan/obligations}" method="post" th:object="${obligationForm}" class="row g-2">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <input type="hidden" th:field="*{id}"/>
+                <input type="hidden" name="year" th:value="${selectedYear}"/>
+                <input type="hidden" name="month" th:value="${selectedMonth}"/>
+                <div class="col-12">
+                  <label class="form-label small">Título</label>
+                  <input type="text" class="form-control form-control-sm" th:field="*{title}" placeholder="Ej. UTP ciclo, préstamo Nicolas, comida mínima" required>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Grupo</label>
+                  <select class="form-select form-select-sm" th:field="*{group}">
+                    <option th:each="group : ${obligationGroups}" th:value="${group}" th:text="${group.label}">Grupo</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Origen</label>
+                  <select class="form-select form-select-sm" th:field="*{sourceType}">
+                    <option th:each="source : ${obligationSources}" th:value="${source}" th:text="${source.label}">Origen</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Monto</label>
+                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" th:field="*{amountDue}" required>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Pagado ahora</label>
+                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" th:field="*{amountPaid}">
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Moneda</label>
+                  <select class="form-select form-select-sm" th:field="*{currency}">
+                    <option th:each="currency : ${currencies}" th:value="${currency}" th:text="${currency}">PEN</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Vence</label>
+                  <input type="date" class="form-control form-control-sm" th:field="*{dueDate}">
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Estado</label>
+                  <select class="form-select form-select-sm" th:field="*{status}">
+                    <option th:each="status : ${obligationStatuses}" th:value="${status}" th:text="${status.label}">Pendiente</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Prioridad</label>
+                  <select class="form-select form-select-sm" th:field="*{priority}">
+                    <option th:each="priority : ${priorities}" th:value="${priority}" th:text="${priority.label}">Media</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label small">Observación</label>
+                  <textarea class="form-control form-control-sm" rows="2" th:field="*{notes}" placeholder="Notas para decidir o recordar condiciones"></textarea>
+                </div>
+                <div class="col-12 d-grid gap-2">
+                  <button type="submit" class="btn btn-sm btn-primary">Guardar en el plan</button>
+                  <a th:if="${obligationForm.id != null}" th:href="@{/gasto-claro/monthly-plan(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-secondary">Cancelar edición</a>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white"><strong>Lectura rápida</strong></div>
+            <div class="card-body small">
+              <p class="mb-2"><strong>Costo de vida primero:</strong> alquiler, servicios, salud, transporte y compromisos que te mantienen operativo.</p>
+              <p class="mb-2"><strong>Luego deudas críticas:</strong> interés alto, atrasos, presión personal o riesgo alto.</p>
+              <p class="mb-0"><strong>5C:</strong> agregará priorización automática tipo “tengo S/ X, qué cubro primero”.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<tbody th:fragment="itemRows(items, selectedYear, selectedMonth)" xmlns:th="http://www.thymeleaf.org">
+<tr th:each="item : ${items}" th:classappend="${item.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceObligationStatus).OVERDUE} ? ' table-danger' : (${item.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceObligationStatus).PAID} ? ' table-success' : '')">
+  <td>
+    <strong th:text="${item.title()}">Concepto</strong>
+    <br><small class="text-muted" th:text="${item.sourceLabel()}">Origen</small>
+    <span th:if="${item.generated()}" class="badge bg-light text-dark ms-1">auto</span>
+  </td>
+  <td><span class="badge" th:classappend="${item.priority().name() == 'CRITICAL'} ? ' bg-danger' : (${item.priority().name() == 'HIGH'} ? ' bg-warning text-dark' : ' bg-secondary')" th:text="${item.priority().label}">Media</span></td>
+  <td th:text="${item.dueDate() != null ? item.dueDate() : '-'}">-</td>
+  <td><span class="badge bg-light text-dark" th:text="${item.status().label}">Pendiente</span></td>
+  <td class="text-end"><span th:text="${item.currency()}">PEN</span> <span th:text="${#numbers.formatDecimal(item.amountDue(),1,'POINT',2,'POINT')}">0.00</span></td>
+  <td class="text-end"><span th:text="${item.currency()}">PEN</span> <span th:text="${#numbers.formatDecimal(item.amountPaid(),1,'POINT',2,'POINT')}">0.00</span></td>
+  <td class="text-end fw-semibold"><span th:text="${item.currency()}">PEN</span> <span th:text="${#numbers.formatDecimal(item.pendingAmount(),1,'POINT',2,'POINT')}">0.00</span></td>
+  <td class="small text-muted" th:text="${item.notes()}">-</td>
+  <td class="text-end">
+    <a th:if="${!item.generated()}" class="btn btn-sm btn-outline-secondary" th:href="@{/gasto-claro/monthly-plan(year=${selectedYear},month=${selectedMonth},editId=${item.id()})}"><i class="bi bi-pencil"></i></a>
+    <form th:if="${!item.generated()}" th:action="@{/gasto-claro/monthly-plan/obligations/{id}/delete(id=${item.id()})}" method="post" class="d-inline">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+      <input type="hidden" name="year" th:value="${selectedYear}"/>
+      <input type="hidden" name="month" th:value="${selectedMonth}"/>
+      <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Eliminar compromiso manual?')"><i class="bi bi-trash"></i></button>
+    </form>
+  </td>
+</tr>
+</tbody>
+
+<div th:replace="fragments/scripts_admin :: scripts"></div>
+</body>
+</html>

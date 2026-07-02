@@ -26,6 +26,7 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         createTables();
+        upgradeDebtTable();
         ensureModuleSetting();
         LOGGER.info("GastoClaro Personal base schema is ready.");
     }
@@ -101,6 +102,8 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     debt_type VARCHAR(40) NOT NULL DEFAULT 'CREDIT_CARD',
                     name VARCHAR(160) NOT NULL,
                     creditor_name VARCHAR(160) NULL,
+                    holder_type VARCHAR(40) NOT NULL DEFAULT 'OWN_NAME',
+                    contact_name VARCHAR(160) NULL,
                     currency VARCHAR(8) NOT NULL DEFAULT 'PEN',
                     original_amount DECIMAL(14,2) NULL DEFAULT 0.00,
                     current_balance DECIMAL(14,2) NOT NULL DEFAULT 0.00,
@@ -109,6 +112,7 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     interest_rate_monthly DECIMAL(8,4) NULL DEFAULT 0.0000,
                     due_day INT NULL,
                     status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
+                    priority VARCHAR(30) NOT NULL DEFAULT 'MEDIUM',
                     has_fixed_payment BIT NOT NULL DEFAULT 1,
                     notes VARCHAR(1000) NULL,
                     created_at DATETIME(6) NOT NULL,
@@ -116,9 +120,68 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     PRIMARY KEY (id),
                     KEY idx_pf_debt_user_status (user_id, status),
                     KEY idx_pf_debt_user_due (user_id, due_day),
+                    KEY idx_pf_debt_user_priority (user_id, priority),
                     CONSTRAINT fk_pf_debt_user FOREIGN KEY (user_id) REFERENCES `user` (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS personal_finance_payment_obligation (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    user_id INT NOT NULL,
+                    source_type VARCHAR(40) NOT NULL DEFAULT 'MANUAL',
+                    source_id BIGINT NULL,
+                    obligation_group VARCHAR(40) NOT NULL DEFAULT 'OTHER',
+                    title VARCHAR(180) NOT NULL,
+                    amount_due DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    amount_paid DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    currency VARCHAR(8) NOT NULL DEFAULT 'PEN',
+                    due_date DATE NULL,
+                    status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+                    priority VARCHAR(30) NOT NULL DEFAULT 'MEDIUM',
+                    notes VARCHAR(1000) NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    updated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_pf_obligation_user_due (user_id, due_date),
+                    KEY idx_pf_obligation_user_status (user_id, status),
+                    KEY idx_pf_obligation_user_group (user_id, obligation_group),
+                    CONSTRAINT fk_pf_obligation_user FOREIGN KEY (user_id) REFERENCES `user` (id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+    }
+
+    private void upgradeDebtTable() {
+        addColumnIfMissing("personal_finance_debt", "holder_type", "ALTER TABLE personal_finance_debt ADD COLUMN holder_type VARCHAR(40) NOT NULL DEFAULT 'OWN_NAME' AFTER creditor_name");
+        addColumnIfMissing("personal_finance_debt", "contact_name", "ALTER TABLE personal_finance_debt ADD COLUMN contact_name VARCHAR(160) NULL AFTER holder_type");
+        addColumnIfMissing("personal_finance_debt", "priority", "ALTER TABLE personal_finance_debt ADD COLUMN priority VARCHAR(30) NOT NULL DEFAULT 'MEDIUM' AFTER status");
+        addIndexIfMissing("personal_finance_debt", "idx_pf_debt_user_priority", "CREATE INDEX idx_pf_debt_user_priority ON personal_finance_debt (user_id, priority)");
+    }
+
+    private void addColumnIfMissing(String tableName, String columnName, String sql) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND column_name = ?
+                """, Integer.class, tableName, columnName);
+        if (count == null || count == 0) {
+            jdbcTemplate.execute(sql);
+        }
+    }
+
+    private void addIndexIfMissing(String tableName, String indexName, String sql) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND index_name = ?
+                """, Integer.class, tableName, indexName);
+        if (count == null || count == 0) {
+            jdbcTemplate.execute(sql);
+        }
     }
 
     private void ensureModuleSetting() {

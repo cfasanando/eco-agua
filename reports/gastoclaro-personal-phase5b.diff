@@ -1,0 +1,1031 @@
+diff -ru /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceController.java /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceController.java
+--- /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceController.java	2026-07-02 09:19:04.000000000 +0000
++++ /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceController.java	2026-07-02 14:36:06.779047694 +0000
+@@ -1,6 +1,5 @@
+ package com.ecoamazonas.eco_agua.personalfinance;
+ 
+-import org.springframework.format.annotation.DateTimeFormat;
+ import org.springframework.stereotype.Controller;
+ import org.springframework.ui.Model;
+ import org.springframework.web.bind.annotation.GetMapping;
+@@ -40,6 +39,62 @@
+         return "personal_finance/dashboard";
+     }
+ 
++
++    @GetMapping("/monthly-plan")
++    public String monthlyPlan(
++            @RequestParam(name = "year", required = false) Integer year,
++            @RequestParam(name = "month", required = false) Integer month,
++            @RequestParam(name = "editId", required = false) Long editId,
++            Model model
++    ) {
++        YearMonth selectedMonth = selectedMonth(year, month);
++        PersonalFinancePaymentObligation form = editId == null
++                ? new PersonalFinancePaymentObligation()
++                : service.paymentObligation(editId);
++        if (form.getDueDate() == null) {
++            form.setDueDate(selectedMonth.atDay(Math.min(LocalDate.now().getDayOfMonth(), selectedMonth.lengthOfMonth())));
++        }
++        model.addAttribute("activePage", "gasto_claro_monthly_plan");
++        model.addAttribute("selectedYear", selectedMonth.getYear());
++        model.addAttribute("selectedMonth", selectedMonth.getMonthValue());
++        model.addAttribute("plan", service.monthlyPlan(selectedMonth));
++        model.addAttribute("obligationForm", form);
++        model.addAttribute("obligationGroups", PersonalFinanceObligationGroup.values());
++        model.addAttribute("obligationStatuses", PersonalFinanceObligationStatus.values());
++        model.addAttribute("obligationSources", PersonalFinanceObligationSourceType.values());
++        model.addAttribute("priorities", PersonalFinancePriority.values());
++        model.addAttribute("currencies", PersonalFinanceCurrency.values());
++        return "personal_finance/monthly_plan";
++    }
++
++    @PostMapping("/monthly-plan/obligations")
++    public String saveMonthlyPlanObligation(
++            @ModelAttribute("obligationForm") PersonalFinancePaymentObligation obligation,
++            @RequestParam(name = "year", required = false) Integer year,
++            @RequestParam(name = "month", required = false) Integer month,
++            RedirectAttributes redirectAttributes
++    ) {
++        service.savePaymentObligation(obligation);
++        redirectAttributes.addFlashAttribute("message", "Compromiso mensual guardado correctamente.");
++        redirectAttributes.addFlashAttribute("messageType", "success");
++        YearMonth selectedMonth = selectedMonth(year, month);
++        return "redirect:/gasto-claro/monthly-plan?year=" + selectedMonth.getYear() + "&month=" + selectedMonth.getMonthValue();
++    }
++
++    @PostMapping("/monthly-plan/obligations/{id}/delete")
++    public String deleteMonthlyPlanObligation(
++            @PathVariable("id") Long id,
++            @RequestParam(name = "year", required = false) Integer year,
++            @RequestParam(name = "month", required = false) Integer month,
++            RedirectAttributes redirectAttributes
++    ) {
++        service.deletePaymentObligation(id);
++        redirectAttributes.addFlashAttribute("message", "Compromiso mensual eliminado.");
++        redirectAttributes.addFlashAttribute("messageType", "success");
++        YearMonth selectedMonth = selectedMonth(year, month);
++        return "redirect:/gasto-claro/monthly-plan?year=" + selectedMonth.getYear() + "&month=" + selectedMonth.getMonthValue();
++    }
++
+     @GetMapping("/debts")
+     public String debts(@RequestParam(name = "editId", required = false) Long editId, Model model) {
+         model.addAttribute("activePage", "gasto_claro_debts");
+@@ -47,6 +102,8 @@
+         model.addAttribute("debtForm", editId == null ? new PersonalFinanceDebt() : service.debt(editId));
+         model.addAttribute("debtTypes", PersonalFinanceDebtType.values());
+         model.addAttribute("debtStatuses", PersonalFinanceDebtStatus.values());
++        model.addAttribute("debtHolderTypes", PersonalFinanceDebtHolderType.values());
++        model.addAttribute("priorities", PersonalFinancePriority.values());
+         model.addAttribute("currencies", PersonalFinanceCurrency.values());
+         return "personal_finance/debts";
+     }
+diff -ru /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebt.java /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebt.java
+--- /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebt.java	2026-07-02 09:19:04.000000000 +0000
++++ /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebt.java	2026-07-02 14:29:26.335759433 +0000
+@@ -9,7 +9,8 @@
+ @Entity
+ @Table(name = "personal_finance_debt", indexes = {
+         @Index(name = "idx_pf_debt_user_status", columnList = "user_id,status"),
+-        @Index(name = "idx_pf_debt_user_due", columnList = "user_id,due_day")
++        @Index(name = "idx_pf_debt_user_due", columnList = "user_id,due_day"),
++        @Index(name = "idx_pf_debt_user_priority", columnList = "user_id,priority")
+ })
+ public class PersonalFinanceDebt {
+ 
+@@ -32,6 +33,13 @@
+     private String creditorName;
+ 
+     @Enumerated(EnumType.STRING)
++    @Column(name = "holder_type", nullable = false, length = 40)
++    private PersonalFinanceDebtHolderType holderType = PersonalFinanceDebtHolderType.OWN_NAME;
++
++    @Column(name = "contact_name", length = 160)
++    private String contactName;
++
++    @Enumerated(EnumType.STRING)
+     @Column(name = "currency", nullable = false, length = 8)
+     private PersonalFinanceCurrency currency = PersonalFinanceCurrency.PEN;
+ 
+@@ -57,6 +65,10 @@
+     @Column(name = "status", nullable = false, length = 30)
+     private PersonalFinanceDebtStatus status = PersonalFinanceDebtStatus.ACTIVE;
+ 
++    @Enumerated(EnumType.STRING)
++    @Column(name = "priority", nullable = false, length = 30)
++    private PersonalFinancePriority priority = PersonalFinancePriority.MEDIUM;
++
+     @Column(name = "has_fixed_payment", nullable = false)
+     private boolean fixedPayment = true;
+ 
+@@ -93,12 +105,25 @@
+         return monthlyDueAmount != null ? monthlyDueAmount : BigDecimal.ZERO;
+     }
+ 
++    public boolean isHighInterest() {
++        return interestRateMonthly != null && interestRateMonthly.compareTo(new BigDecimal("10.0000")) >= 0;
++    }
++
++    public boolean isPaymentStopped() {
++        return status == PersonalFinanceDebtStatus.STOPPED_PAYMENT || status == PersonalFinanceDebtStatus.OVERDUE;
++    }
++
+     private void normalizeAmounts() {
+         if (originalAmount == null) originalAmount = BigDecimal.ZERO;
+         if (currentBalance == null) currentBalance = BigDecimal.ZERO;
+         if (monthlyDueAmount == null) monthlyDueAmount = BigDecimal.ZERO;
+         if (minimumPayment == null) minimumPayment = BigDecimal.ZERO;
+         if (interestRateMonthly == null) interestRateMonthly = BigDecimal.ZERO;
++        if (holderType == null) holderType = PersonalFinanceDebtHolderType.OWN_NAME;
++        if (priority == null) priority = PersonalFinancePriority.MEDIUM;
++        if (status == null) status = PersonalFinanceDebtStatus.ACTIVE;
++        if (debtType == null) debtType = PersonalFinanceDebtType.CREDIT_CARD;
++        if (currency == null) currency = PersonalFinanceCurrency.PEN;
+     }
+ 
+     public Long getId() { return id; }
+@@ -111,6 +136,10 @@
+     public void setName(String name) { this.name = name; }
+     public String getCreditorName() { return creditorName; }
+     public void setCreditorName(String creditorName) { this.creditorName = creditorName; }
++    public PersonalFinanceDebtHolderType getHolderType() { return holderType; }
++    public void setHolderType(PersonalFinanceDebtHolderType holderType) { this.holderType = holderType; }
++    public String getContactName() { return contactName; }
++    public void setContactName(String contactName) { this.contactName = contactName; }
+     public PersonalFinanceCurrency getCurrency() { return currency; }
+     public void setCurrency(PersonalFinanceCurrency currency) { this.currency = currency; }
+     public BigDecimal getOriginalAmount() { return originalAmount; }
+@@ -127,6 +156,8 @@
+     public void setDueDay(Integer dueDay) { this.dueDay = dueDay; }
+     public PersonalFinanceDebtStatus getStatus() { return status; }
+     public void setStatus(PersonalFinanceDebtStatus status) { this.status = status; }
++    public PersonalFinancePriority getPriority() { return priority; }
++    public void setPriority(PersonalFinancePriority priority) { this.priority = priority; }
+     public boolean isFixedPayment() { return fixedPayment; }
+     public void setFixedPayment(boolean fixedPayment) { this.fixedPayment = fixedPayment; }
+     public String getNotes() { return notes; }
+Only in /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance: PersonalFinanceDebtHolderType.java
+diff -ru /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebtStatus.java /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebtStatus.java
+--- /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebtStatus.java	2026-07-02 09:19:04.000000000 +0000
++++ /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebtStatus.java	2026-07-02 14:28:56.945069833 +0000
+@@ -2,6 +2,9 @@
+ 
+ public enum PersonalFinanceDebtStatus {
+     ACTIVE("Activa"),
++    OVERDUE("Atrasada"),
++    STOPPED_PAYMENT("Dejé de pagar"),
++    NEGOTIATION("En negociación"),
+     PAID("Pagada"),
+     SUSPENDED("Suspendida"),
+     CANCELLED("Cancelada");
+diff -ru /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebtType.java /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebtType.java
+--- /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebtType.java	2026-07-02 09:19:04.000000000 +0000
++++ /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebtType.java	2026-07-02 14:28:56.937035681 +0000
+@@ -2,10 +2,13 @@
+ 
+ public enum PersonalFinanceDebtType {
+     CREDIT_CARD("Tarjeta de crédito"),
+-    BANK_LOAN("Préstamo bancario"),
+-    THIRD_PARTY_LOAN("Préstamo a terceros"),
++    BANK_LOAN("Préstamo bancario propio"),
++    BANK_THIRD_PARTY("Banco por tercero"),
++    PRIVATE_LENDER("Prestamista"),
++    THIRD_PARTY_LOAN("Deuda a tercero / familiar"),
+     STORE_CREDIT("Crédito en tienda"),
+     RECURRING_COMMITMENT("Compromiso mensual"),
++    STUDY_CYCLE("Estudio por ciclo"),
+     OTHER("Otra deuda");
+ 
+     private final String label;
+diff -ru /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceModuleInitializer.java /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceModuleInitializer.java
+--- /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceModuleInitializer.java	2026-07-02 09:19:04.000000000 +0000
++++ /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceModuleInitializer.java	2026-07-02 14:32:05.255678074 +0000
+@@ -26,6 +26,7 @@
+     @Override
+     public void run(ApplicationArguments args) {
+         createTables();
++        upgradeDebtTable();
+         ensureModuleSetting();
+         LOGGER.info("GastoClaro Personal base schema is ready.");
+     }
+@@ -101,6 +102,8 @@
+                     debt_type VARCHAR(40) NOT NULL DEFAULT 'CREDIT_CARD',
+                     name VARCHAR(160) NOT NULL,
+                     creditor_name VARCHAR(160) NULL,
++                    holder_type VARCHAR(40) NOT NULL DEFAULT 'OWN_NAME',
++                    contact_name VARCHAR(160) NULL,
+                     currency VARCHAR(8) NOT NULL DEFAULT 'PEN',
+                     original_amount DECIMAL(14,2) NULL DEFAULT 0.00,
+                     current_balance DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+@@ -109,6 +112,7 @@
+                     interest_rate_monthly DECIMAL(8,4) NULL DEFAULT 0.0000,
+                     due_day INT NULL,
+                     status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
++                    priority VARCHAR(30) NOT NULL DEFAULT 'MEDIUM',
+                     has_fixed_payment BIT NOT NULL DEFAULT 1,
+                     notes VARCHAR(1000) NULL,
+                     created_at DATETIME(6) NOT NULL,
+@@ -116,9 +120,68 @@
+                     PRIMARY KEY (id),
+                     KEY idx_pf_debt_user_status (user_id, status),
+                     KEY idx_pf_debt_user_due (user_id, due_day),
++                    KEY idx_pf_debt_user_priority (user_id, priority),
+                     CONSTRAINT fk_pf_debt_user FOREIGN KEY (user_id) REFERENCES `user` (id)
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                 """);
++
++        jdbcTemplate.execute("""
++                CREATE TABLE IF NOT EXISTS personal_finance_payment_obligation (
++                    id BIGINT NOT NULL AUTO_INCREMENT,
++                    user_id INT NOT NULL,
++                    source_type VARCHAR(40) NOT NULL DEFAULT 'MANUAL',
++                    source_id BIGINT NULL,
++                    obligation_group VARCHAR(40) NOT NULL DEFAULT 'OTHER',
++                    title VARCHAR(180) NOT NULL,
++                    amount_due DECIMAL(14,2) NOT NULL DEFAULT 0.00,
++                    amount_paid DECIMAL(14,2) NOT NULL DEFAULT 0.00,
++                    currency VARCHAR(8) NOT NULL DEFAULT 'PEN',
++                    due_date DATE NULL,
++                    status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
++                    priority VARCHAR(30) NOT NULL DEFAULT 'MEDIUM',
++                    notes VARCHAR(1000) NULL,
++                    created_at DATETIME(6) NOT NULL,
++                    updated_at DATETIME(6) NOT NULL,
++                    PRIMARY KEY (id),
++                    KEY idx_pf_obligation_user_due (user_id, due_date),
++                    KEY idx_pf_obligation_user_status (user_id, status),
++                    KEY idx_pf_obligation_user_group (user_id, obligation_group),
++                    CONSTRAINT fk_pf_obligation_user FOREIGN KEY (user_id) REFERENCES `user` (id)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
++                """);
++    }
++
++    private void upgradeDebtTable() {
++        addColumnIfMissing("personal_finance_debt", "holder_type", "ALTER TABLE personal_finance_debt ADD COLUMN holder_type VARCHAR(40) NOT NULL DEFAULT 'OWN_NAME' AFTER creditor_name");
++        addColumnIfMissing("personal_finance_debt", "contact_name", "ALTER TABLE personal_finance_debt ADD COLUMN contact_name VARCHAR(160) NULL AFTER holder_type");
++        addColumnIfMissing("personal_finance_debt", "priority", "ALTER TABLE personal_finance_debt ADD COLUMN priority VARCHAR(30) NOT NULL DEFAULT 'MEDIUM' AFTER status");
++        addIndexIfMissing("personal_finance_debt", "idx_pf_debt_user_priority", "CREATE INDEX idx_pf_debt_user_priority ON personal_finance_debt (user_id, priority)");
++    }
++
++    private void addColumnIfMissing(String tableName, String columnName, String sql) {
++        Integer count = jdbcTemplate.queryForObject("""
++                SELECT COUNT(*)
++                FROM information_schema.columns
++                WHERE table_schema = DATABASE()
++                  AND table_name = ?
++                  AND column_name = ?
++                """, Integer.class, tableName, columnName);
++        if (count == null || count == 0) {
++            jdbcTemplate.execute(sql);
++        }
++    }
++
++    private void addIndexIfMissing(String tableName, String indexName, String sql) {
++        Integer count = jdbcTemplate.queryForObject("""
++                SELECT COUNT(*)
++                FROM information_schema.statistics
++                WHERE table_schema = DATABASE()
++                  AND table_name = ?
++                  AND index_name = ?
++                """, Integer.class, tableName, indexName);
++        if (count == null || count == 0) {
++            jdbcTemplate.execute(sql);
++        }
+     }
+ 
+     private void ensureModuleSetting() {
+Only in /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance: PersonalFinanceMonthlyPlan.java
+Only in /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance: PersonalFinanceMonthlyPlanItem.java
+Only in /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance: PersonalFinanceObligationGroup.java
+Only in /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance: PersonalFinanceObligationSourceType.java
+Only in /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance: PersonalFinanceObligationStatus.java
+Only in /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance: PersonalFinancePaymentObligation.java
+Only in /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance: PersonalFinancePaymentObligationRepository.java
+Only in /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance: PersonalFinancePriority.java
+diff -ru /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceService.java /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceService.java
+--- /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceService.java	2026-07-02 09:19:04.000000000 +0000
++++ /mnt/data/gasto5b_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceService.java	2026-07-02 14:35:45.285204586 +0000
+@@ -7,6 +7,8 @@
+ import java.math.BigDecimal;
+ import java.time.LocalDate;
+ import java.time.YearMonth;
++import java.util.ArrayList;
++import java.util.Comparator;
+ import java.util.List;
+ 
+ @Service
+@@ -16,6 +18,7 @@
+     private final PersonalFinanceFixedExpenseRepository fixedExpenseRepository;
+     private final PersonalFinanceIncomeSourceRepository incomeSourceRepository;
+     private final PersonalFinanceIncomeEventRepository incomeEventRepository;
++    private final PersonalFinancePaymentObligationRepository paymentObligationRepository;
+     private final PersonalFinanceCurrentUserService currentUserService;
+ 
+     public PersonalFinanceService(
+@@ -23,61 +26,186 @@
+             PersonalFinanceFixedExpenseRepository fixedExpenseRepository,
+             PersonalFinanceIncomeSourceRepository incomeSourceRepository,
+             PersonalFinanceIncomeEventRepository incomeEventRepository,
++            PersonalFinancePaymentObligationRepository paymentObligationRepository,
+             PersonalFinanceCurrentUserService currentUserService
+     ) {
+         this.debtRepository = debtRepository;
+         this.fixedExpenseRepository = fixedExpenseRepository;
+         this.incomeSourceRepository = incomeSourceRepository;
+         this.incomeEventRepository = incomeEventRepository;
++        this.paymentObligationRepository = paymentObligationRepository;
+         this.currentUserService = currentUserService;
+     }
+ 
+     @Transactional(readOnly = true)
+     public PersonalFinanceDashboard dashboard(YearMonth yearMonth) {
++        PersonalFinanceMonthlyPlan plan = monthlyPlan(yearMonth);
++        return new PersonalFinanceDashboard(
++                plan.expectedIncome(),
++                plan.receivedIncome(),
++                plan.basicLivingTotal(),
++                plan.debtTotal().add(plan.otherTotal()),
++                plan.projectedBalance(),
++                debtsForMonthlyPlan(currentUserService.currentUser()).size(),
++                fixedExpenseRepository.findByUserAndActiveTrueOrderByDueDayAscNameAsc(currentUserService.currentUser()).size(),
++                plan.incomes().size(),
++                yearMonth.getYear(),
++                yearMonth.getMonthValue()
++        );
++    }
++
++    @Transactional(readOnly = true)
++    public PersonalFinanceMonthlyPlan monthlyPlan(YearMonth yearMonth) {
+         UserAccount user = currentUserService.currentUser();
+         LocalDate start = yearMonth.atDay(1);
+         LocalDate end = yearMonth.atEndOfMonth();
+ 
+-        List<PersonalFinanceIncomeEvent> incomeEvents = incomeEventRepository.findByUserAndExpectedDateBetweenOrderByExpectedDateAscIdAsc(user, start, end);
++        List<PersonalFinanceIncomeEvent> incomes = incomeEventRepository.findByUserAndExpectedDateBetweenOrderByExpectedDateAscIdAsc(user, start, end);
+         List<PersonalFinanceFixedExpense> fixedExpenses = fixedExpenseRepository.findByUserAndActiveTrueOrderByDueDayAscNameAsc(user);
+-        List<PersonalFinanceDebt> activeDebts = debtRepository.findByUserAndStatusOrderByDueDayAscNameAsc(user, PersonalFinanceDebtStatus.ACTIVE);
++        List<PersonalFinanceDebt> debts = debtsForMonthlyPlan(user);
++        List<PersonalFinancePaymentObligation> obligations = paymentObligationRepository.findByUserAndDueDateBetweenOrderByDueDateAscPriorityAscIdAsc(user, start, end);
++
++        List<PersonalFinanceMonthlyPlanItem> basicItems = new ArrayList<>();
++        List<PersonalFinanceMonthlyPlanItem> debtItems = new ArrayList<>();
++        List<PersonalFinanceMonthlyPlanItem> otherItems = new ArrayList<>();
++
++        for (PersonalFinanceFixedExpense expense : fixedExpenses) {
++            PersonalFinanceObligationGroup group = expense.getCategory() == PersonalFinanceExpenseCategory.STUDY
++                    ? PersonalFinanceObligationGroup.STUDY
++                    : PersonalFinanceObligationGroup.BASIC_LIVING;
++            PersonalFinancePriority priority = expense.isMandatory() ? PersonalFinancePriority.CRITICAL : PersonalFinancePriority.MEDIUM;
++            basicItems.add(new PersonalFinanceMonthlyPlanItem(
++                    null,
++                    expense.getName(),
++                    expense.getCategory().getLabel(),
++                    PersonalFinanceObligationSourceType.FIXED_EXPENSE,
++                    group,
++                    expense.getCurrency(),
++                    safe(expense.getAmount()),
++                    BigDecimal.ZERO,
++                    safe(expense.getAmount()),
++                    dateFromDueDay(yearMonth, expense.getDueDay()),
++                    PersonalFinanceObligationStatus.PENDING,
++                    priority,
++                    expense.getNotes(),
++                    true
++            ));
++        }
+ 
+-        BigDecimal expectedIncome = incomeEvents.stream()
++        for (PersonalFinanceDebt debt : debts) {
++            debtItems.add(new PersonalFinanceMonthlyPlanItem(
++                    null,
++                    debt.getName(),
++                    debt.getDebtType().getLabel(),
++                    PersonalFinanceObligationSourceType.DEBT,
++                    PersonalFinanceObligationGroup.DEBT_PAYMENT,
++                    debt.getCurrency(),
++                    debt.monthlyPressure(),
++                    BigDecimal.ZERO,
++                    debt.monthlyPressure(),
++                    dateFromDueDay(yearMonth, debt.getDueDay()),
++                    obligationStatusFromDebt(debt),
++                    defaultEnum(debt.getPriority(), PersonalFinancePriority.MEDIUM),
++                    debtPlanNotes(debt),
++                    true
++            ));
++        }
++
++        for (PersonalFinancePaymentObligation obligation : obligations) {
++            PersonalFinanceMonthlyPlanItem item = itemFromObligation(obligation);
++            if (obligation.getGroup() == PersonalFinanceObligationGroup.BASIC_LIVING || obligation.getGroup() == PersonalFinanceObligationGroup.STUDY) {
++                basicItems.add(item);
++            } else if (obligation.getGroup() == PersonalFinanceObligationGroup.DEBT_PAYMENT) {
++                debtItems.add(item);
++            } else {
++                otherItems.add(item);
++            }
++        }
++
++        sortItems(basicItems);
++        sortItems(debtItems);
++        sortItems(otherItems);
++
++        BigDecimal expectedIncome = incomes.stream()
+                 .filter(event -> event.getStatus() != PersonalFinanceIncomeStatus.CANCELLED && event.getStatus() != PersonalFinanceIncomeStatus.MISSED)
+                 .map(PersonalFinanceIncomeEvent::getAmount)
++                .map(this::safe)
+                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+ 
+-        BigDecimal receivedIncome = incomeEvents.stream()
++        BigDecimal receivedIncome = incomes.stream()
+                 .filter(event -> event.getStatus() == PersonalFinanceIncomeStatus.RECEIVED)
+                 .map(PersonalFinanceIncomeEvent::getAmount)
++                .map(this::safe)
+                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+ 
+-        BigDecimal fixedExpenseTotal = fixedExpenses.stream()
+-                .filter(expense -> expense.getFrequency() == PersonalFinanceFrequency.MONTHLY)
+-                .map(PersonalFinanceFixedExpense::getAmount)
+-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+-
+-        BigDecimal debtPressureTotal = activeDebts.stream()
+-                .map(PersonalFinanceDebt::monthlyPressure)
+-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+-
+-        BigDecimal projectedBalance = expectedIncome.subtract(fixedExpenseTotal).subtract(debtPressureTotal);
+-
+-        return new PersonalFinanceDashboard(
++        BigDecimal basicTotal = totalDue(basicItems);
++        BigDecimal debtTotal = totalDue(debtItems);
++        BigDecimal otherTotal = totalDue(otherItems);
++        BigDecimal obligationsTotal = basicTotal.add(debtTotal).add(otherTotal);
++        BigDecimal paidTotal = totalPaid(basicItems).add(totalPaid(debtItems)).add(totalPaid(otherItems));
++        BigDecimal pendingTotal = totalPending(basicItems).add(totalPending(debtItems)).add(totalPending(otherItems));
++        BigDecimal projectedBalance = expectedIncome.subtract(obligationsTotal);
++        BigDecimal cashAfterBasic = expectedIncome.subtract(basicTotal);
++        BigDecimal cashAfterAll = expectedIncome.subtract(obligationsTotal);
++        long overdueCount = debtItems.stream().filter(item -> item.status() == PersonalFinanceObligationStatus.OVERDUE).count()
++                + basicItems.stream().filter(item -> item.status() == PersonalFinanceObligationStatus.OVERDUE).count()
++                + otherItems.stream().filter(item -> item.status() == PersonalFinanceObligationStatus.OVERDUE).count();
++        long highInterestDebtCount = debts.stream().filter(PersonalFinanceDebt::isHighInterest).count();
++
++        return new PersonalFinanceMonthlyPlan(
++                yearMonth,
++                incomes,
++                basicItems,
++                debtItems,
++                otherItems,
+                 expectedIncome,
+                 receivedIncome,
+-                fixedExpenseTotal,
+-                debtPressureTotal,
++                basicTotal,
++                debtTotal,
++                otherTotal,
++                obligationsTotal,
++                paidTotal,
++                pendingTotal,
+                 projectedBalance,
+-                activeDebts.size(),
+-                fixedExpenses.size(),
+-                incomeEvents.size(),
+-                yearMonth.getYear(),
+-                yearMonth.getMonthValue()
++                cashAfterBasic,
++                cashAfterAll,
++                overdueCount,
++                highInterestDebtCount
+         );
+     }
+ 
+     @Transactional(readOnly = true)
++    public PersonalFinancePaymentObligation paymentObligation(Long id) {
++        return paymentObligationRepository.findByIdAndUser(id, currentUserService.currentUser()).orElseThrow();
++    }
++
++    @Transactional
++    public void savePaymentObligation(PersonalFinancePaymentObligation obligation) {
++        UserAccount user = currentUserService.currentUser();
++        PersonalFinancePaymentObligation entity = obligation.getId() == null
++                ? new PersonalFinancePaymentObligation()
++                : paymentObligationRepository.findByIdAndUser(obligation.getId(), user).orElseThrow();
++        entity.setUser(user);
++        entity.setSourceType(defaultEnum(obligation.getSourceType(), PersonalFinanceObligationSourceType.MANUAL));
++        entity.setSourceId(obligation.getSourceId());
++        entity.setGroup(defaultEnum(obligation.getGroup(), PersonalFinanceObligationGroup.OTHER));
++        entity.setTitle(clean(obligation.getTitle()));
++        entity.setAmountDue(defaultAmount(obligation.getAmountDue()));
++        entity.setAmountPaid(defaultAmount(obligation.getAmountPaid()));
++        entity.setCurrency(defaultEnum(obligation.getCurrency(), PersonalFinanceCurrency.PEN));
++        entity.setDueDate(obligation.getDueDate());
++        entity.setStatus(resolveObligationStatus(defaultEnum(obligation.getStatus(), PersonalFinanceObligationStatus.PENDING), entity.getAmountDue(), entity.getAmountPaid()));
++        entity.setPriority(defaultEnum(obligation.getPriority(), PersonalFinancePriority.MEDIUM));
++        entity.setNotes(clean(obligation.getNotes()));
++        paymentObligationRepository.save(entity);
++    }
++
++    @Transactional
++    public void deletePaymentObligation(Long id) {
++        paymentObligationRepository.findByIdAndUser(id, currentUserService.currentUser()).ifPresent(paymentObligationRepository::delete);
++    }
++
++    @Transactional(readOnly = true)
+     public List<PersonalFinanceDebt> debts() {
+         return debtRepository.findByUserOrderByStatusAscDueDayAscNameAsc(currentUserService.currentUser());
+     }
+@@ -91,6 +219,8 @@
+         entity.setUser(user);
+         entity.setName(clean(debt.getName()));
+         entity.setCreditorName(clean(debt.getCreditorName()));
++        entity.setHolderType(defaultEnum(debt.getHolderType(), PersonalFinanceDebtHolderType.OWN_NAME));
++        entity.setContactName(clean(debt.getContactName()));
+         entity.setDebtType(defaultEnum(debt.getDebtType(), PersonalFinanceDebtType.CREDIT_CARD));
+         entity.setCurrency(defaultEnum(debt.getCurrency(), PersonalFinanceCurrency.PEN));
+         entity.setOriginalAmount(defaultAmount(debt.getOriginalAmount()));
+@@ -100,6 +230,7 @@
+         entity.setInterestRateMonthly(defaultAmount(debt.getInterestRateMonthly()));
+         entity.setDueDay(normalizeDueDay(debt.getDueDay()));
+         entity.setStatus(defaultEnum(debt.getStatus(), PersonalFinanceDebtStatus.ACTIVE));
++        entity.setPriority(defaultEnum(debt.getPriority(), PersonalFinancePriority.MEDIUM));
+         entity.setFixedPayment(debt.isFixedPayment());
+         entity.setNotes(clean(debt.getNotes()));
+         debtRepository.save(entity);
+@@ -224,6 +355,108 @@
+         incomeEventRepository.findByIdAndUser(id, currentUserService.currentUser()).ifPresent(incomeEventRepository::delete);
+     }
+ 
++    private List<PersonalFinanceDebt> debtsForMonthlyPlan(UserAccount user) {
++        return debtRepository.findByUserOrderByStatusAscDueDayAscNameAsc(user).stream()
++                .filter(debt -> debt.getStatus() == PersonalFinanceDebtStatus.ACTIVE
++                        || debt.getStatus() == PersonalFinanceDebtStatus.OVERDUE
++                        || debt.getStatus() == PersonalFinanceDebtStatus.STOPPED_PAYMENT
++                        || debt.getStatus() == PersonalFinanceDebtStatus.NEGOTIATION
++                        || debt.getStatus() == PersonalFinanceDebtStatus.SUSPENDED)
++                .toList();
++    }
++
++    private PersonalFinanceMonthlyPlanItem itemFromObligation(PersonalFinancePaymentObligation obligation) {
++        return new PersonalFinanceMonthlyPlanItem(
++                obligation.getId(),
++                obligation.getTitle(),
++                obligation.getSourceType().getLabel(),
++                obligation.getSourceType(),
++                obligation.getGroup(),
++                obligation.getCurrency(),
++                safe(obligation.getAmountDue()),
++                safe(obligation.getAmountPaid()),
++                obligation.pendingAmount(),
++                obligation.getDueDate(),
++                obligation.getStatus(),
++                defaultEnum(obligation.getPriority(), PersonalFinancePriority.MEDIUM),
++                obligation.getNotes(),
++                false
++        );
++    }
++
++    private void sortItems(List<PersonalFinanceMonthlyPlanItem> items) {
++        items.sort(Comparator
++                .comparing(PersonalFinanceMonthlyPlanItem::isPaid)
++                .thenComparing(PersonalFinanceMonthlyPlanItem::dueDate, Comparator.nullsLast(Comparator.naturalOrder()))
++                .thenComparing(PersonalFinanceMonthlyPlanItem::priority)
++                .thenComparing(PersonalFinanceMonthlyPlanItem::title, Comparator.nullsLast(String::compareToIgnoreCase)));
++    }
++
++    private BigDecimal totalDue(List<PersonalFinanceMonthlyPlanItem> items) {
++        return items.stream().map(PersonalFinanceMonthlyPlanItem::amountDue).map(this::safe).reduce(BigDecimal.ZERO, BigDecimal::add);
++    }
++
++    private BigDecimal totalPaid(List<PersonalFinanceMonthlyPlanItem> items) {
++        return items.stream().map(PersonalFinanceMonthlyPlanItem::amountPaid).map(this::safe).reduce(BigDecimal.ZERO, BigDecimal::add);
++    }
++
++    private BigDecimal totalPending(List<PersonalFinanceMonthlyPlanItem> items) {
++        return items.stream().map(PersonalFinanceMonthlyPlanItem::pendingAmount).map(this::safe).reduce(BigDecimal.ZERO, BigDecimal::add);
++    }
++
++    private LocalDate dateFromDueDay(YearMonth yearMonth, Integer dueDay) {
++        if (dueDay == null) {
++            return null;
++        }
++        int safeDay = Math.max(1, Math.min(yearMonth.lengthOfMonth(), dueDay));
++        return yearMonth.atDay(safeDay);
++    }
++
++    private PersonalFinanceObligationStatus obligationStatusFromDebt(PersonalFinanceDebt debt) {
++        if (debt.getStatus() == PersonalFinanceDebtStatus.OVERDUE || debt.getStatus() == PersonalFinanceDebtStatus.STOPPED_PAYMENT) {
++            return PersonalFinanceObligationStatus.OVERDUE;
++        }
++        if (debt.getStatus() == PersonalFinanceDebtStatus.PAID) {
++            return PersonalFinanceObligationStatus.PAID;
++        }
++        if (debt.getStatus() == PersonalFinanceDebtStatus.CANCELLED) {
++            return PersonalFinanceObligationStatus.CANCELLED;
++        }
++        return PersonalFinanceObligationStatus.PENDING;
++    }
++
++    private String debtPlanNotes(PersonalFinanceDebt debt) {
++        List<String> notes = new ArrayList<>();
++        if (debt.getHolderType() != null && debt.getHolderType() != PersonalFinanceDebtHolderType.OWN_NAME) {
++            notes.add(debt.getHolderType().getLabel());
++        }
++        if (debt.getContactName() != null && !debt.getContactName().isBlank()) {
++            notes.add("Contacto: " + debt.getContactName());
++        }
++        if (debt.getInterestRateMonthly() != null && debt.getInterestRateMonthly().compareTo(BigDecimal.ZERO) > 0) {
++            notes.add("Interés mensual: " + debt.getInterestRateMonthly() + "%");
++        }
++        if (debt.getNotes() != null && !debt.getNotes().isBlank()) {
++            notes.add(debt.getNotes());
++        }
++        return String.join(" · ", notes);
++    }
++
++    private PersonalFinanceObligationStatus resolveObligationStatus(PersonalFinanceObligationStatus status, BigDecimal amountDue, BigDecimal amountPaid) {
++        if (status == PersonalFinanceObligationStatus.CANCELLED || status == PersonalFinanceObligationStatus.OVERDUE) {
++            return status;
++        }
++        BigDecimal due = safe(amountDue);
++        BigDecimal paid = safe(amountPaid);
++        if (due.compareTo(BigDecimal.ZERO) > 0 && paid.compareTo(due) >= 0) {
++            return PersonalFinanceObligationStatus.PAID;
++        }
++        if (paid.compareTo(BigDecimal.ZERO) > 0) {
++            return PersonalFinanceObligationStatus.PARTIAL;
++        }
++        return status == PersonalFinanceObligationStatus.PAID ? PersonalFinanceObligationStatus.PENDING : status;
++    }
++
+     private String clean(String value) {
+         return value == null ? null : value.trim();
+     }
+@@ -232,6 +465,10 @@
+         return value == null ? BigDecimal.ZERO : value;
+     }
+ 
++    private BigDecimal safe(BigDecimal value) {
++        return value == null ? BigDecimal.ZERO : value;
++    }
++
+     private Integer normalizeDueDay(Integer dueDay) {
+         if (dueDay == null) {
+             return null;
+diff -ru /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/resources/templates/personal_finance/_nav.html /mnt/data/gasto5b_build/src/main/resources/templates/personal_finance/_nav.html
+--- /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/resources/templates/personal_finance/_nav.html	2026-07-02 09:19:04.000000000 +0000
++++ /mnt/data/gasto5b_build/src/main/resources/templates/personal_finance/_nav.html	2026-07-02 14:32:16.279569922 +0000
+@@ -2,6 +2,9 @@
+   <a th:href="@{/gasto-claro/dashboard}" class="flex-sm-fill text-sm-center nav-link" th:classappend="${active == 'dashboard'} ? ' active' : ''">
+     <i class="bi bi-speedometer2"></i> Dashboard
+   </a>
++  <a th:href="@{/gasto-claro/monthly-plan}" class="flex-sm-fill text-sm-center nav-link" th:classappend="${active == 'monthly_plan'} ? ' active' : ''">
++    <i class="bi bi-calendar2-week"></i> Plan mensual
++  </a>
+   <a th:href="@{/gasto-claro/debts}" class="flex-sm-fill text-sm-center nav-link" th:classappend="${active == 'debts'} ? ' active' : ''">
+     <i class="bi bi-credit-card"></i> Deudas
+   </a>
+diff -ru /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/resources/templates/personal_finance/dashboard.html /mnt/data/gasto5b_build/src/main/resources/templates/personal_finance/dashboard.html
+--- /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/resources/templates/personal_finance/dashboard.html	2026-07-02 09:19:04.000000000 +0000
++++ /mnt/data/gasto5b_build/src/main/resources/templates/personal_finance/dashboard.html	2026-07-02 14:35:06.367605536 +0000
+@@ -27,8 +27,9 @@
+ 
+       <div th:replace="personal_finance/_nav :: nav('dashboard')"></div>
+ 
+-      <div class="alert alert-info border-0 shadow-sm">
+-        <strong>Fase 5A:</strong> esta pantalla ya consolida datos base del usuario logueado. En 5B se convertirá en dashboard mensual completo con vencimientos y presión financiera.
++      <div class="alert alert-info border-0 shadow-sm d-flex flex-wrap justify-content-between align-items-center gap-2">
++        <div><strong>Plan mensual:</strong> usa la vista tipo Excel para decidir qué cubrir primero con el dinero disponible.</div>
++        <a th:href="@{/gasto-claro/monthly-plan(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-primary">Abrir plan mensual</a>
+       </div>
+ 
+       <div class="row g-3 mb-4">
+diff -ru /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/resources/templates/personal_finance/debts.html /mnt/data/gasto5b_build/src/main/resources/templates/personal_finance/debts.html
+--- /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/resources/templates/personal_finance/debts.html	2026-07-02 09:19:04.000000000 +0000
++++ /mnt/data/gasto5b_build/src/main/resources/templates/personal_finance/debts.html	2026-07-02 14:33:45.850122275 +0000
+@@ -47,6 +47,16 @@
+                   </select>
+                 </div>
+                 <div class="col-md-6">
++                  <label class="form-label">Titular</label>
++                  <select class="form-select" th:field="*{holderType}">
++                    <option th:each="holder : ${debtHolderTypes}" th:value="${holder}" th:text="${holder.label}">Titular</option>
++                  </select>
++                </div>
++                <div class="col-md-6">
++                  <label class="form-label">Contacto / intermediario</label>
++                  <input type="text" class="form-control" th:field="*{contactName}" placeholder="Nicolás, familiar, prestamista...">
++                </div>
++                <div class="col-md-6">
+                   <label class="form-label">Saldo actual</label>
+                   <input type="number" step="0.01" class="form-control" th:field="*{currentBalance}">
+                 </div>
+@@ -76,6 +86,12 @@
+                   <label class="form-label">Interés mensual %</label>
+                   <input type="number" step="0.0001" class="form-control" th:field="*{interestRateMonthly}">
+                 </div>
++                <div class="col-md-6">
++                  <label class="form-label">Prioridad</label>
++                  <select class="form-select" th:field="*{priority}">
++                    <option th:each="priority : ${priorities}" th:value="${priority}" th:text="${priority.label}">Media</option>
++                  </select>
++                </div>
+                 <div class="col-md-6 d-flex align-items-end">
+                   <div class="form-check">
+                     <input type="hidden" name="fixedPayment" value="false">
+@@ -102,14 +118,26 @@
+             <div class="card-body p-0">
+               <div class="table-responsive">
+                 <table class="table table-hover align-middle mb-0">
+-                  <thead class="table-light"><tr><th>Deuda</th><th>Vence</th><th>Estado</th><th class="text-end">Saldo</th><th class="text-end">Pago mes</th><th></th></tr></thead>
++                  <thead class="table-light"><tr><th>Deuda</th><th>Contacto</th><th>Vence</th><th>Estado</th><th>Prioridad</th><th class="text-end">Saldo</th><th class="text-end">Pago mes</th><th></th></tr></thead>
+                   <tbody>
+                   <tr th:each="debt : ${debts}">
+-                    <td><div class="fw-semibold" th:text="${debt.name}">Deuda</div><small class="text-muted" th:text="${debt.creditorName}">Banco</small></td>
++                    <td>
++                      <div class="fw-semibold" th:text="${debt.name}">Deuda</div>
++                      <small class="text-muted" th:text="${debt.debtType.label}">Tipo</small>
++                      <small class="text-muted" th:if="${debt.creditorName != null and !#strings.isEmpty(debt.creditorName)}"> · <span th:text="${debt.creditorName}">Banco</span></small>
++                    </td>
++                    <td>
++                      <span th:text="${debt.holderType.label}">A mi nombre</span>
++                      <br><small class="text-muted" th:text="${debt.contactName != null and !#strings.isEmpty(debt.contactName) ? debt.contactName : '-'}">-</small>
++                    </td>
+                     <td th:text="${debt.dueDay != null ? 'Día ' + debt.dueDay : '-'}">Día 5</td>
+                     <td><span class="badge text-bg-light" th:text="${debt.status.label}">Activa</span></td>
++                    <td><span class="badge text-bg-secondary" th:text="${debt.priority.label}">Media</span></td>
+                     <td class="text-end"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.currentBalance,1,'POINT',2,'POINT')}">0.00</span></td>
+-                    <td class="text-end"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.monthlyPressure(),1,'POINT',2,'POINT')}">0.00</span></td>
++                    <td class="text-end">
++                      <span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.monthlyPressure(),1,'POINT',2,'POINT')}">0.00</span>
++                      <br><small class="text-danger" th:if="${debt.interestRateMonthly != null and debt.interestRateMonthly.signum() > 0}"><span th:text="${#numbers.formatDecimal(debt.interestRateMonthly,1,'POINT',2,'POINT')}">0.00</span>% mensual</small>
++                    </td>
+                     <td class="text-end">
+                       <a th:href="@{/gasto-claro/debts(editId=${debt.id})}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="bi bi-pencil"></i></a>
+                       <form th:action="@{/gasto-claro/debts/{id}/delete(id=${debt.id})}" method="post" class="d-inline" onsubmit="return confirm('¿Eliminar esta deuda personal?')">
+@@ -118,7 +146,7 @@
+                       </form>
+                     </td>
+                   </tr>
+-                  <tr th:if="${#lists.isEmpty(debts)}"><td colspan="6" class="text-center text-muted py-4">Aún no hay deudas registradas.</td></tr>
++                  <tr th:if="${#lists.isEmpty(debts)}"><td colspan="8" class="text-center text-muted py-4">Aún no hay deudas registradas.</td></tr>
+                   </tbody>
+                 </table>
+               </div>
+Only in /mnt/data/gasto5b_build/src/main/resources/templates/personal_finance: monthly_plan.html
+--- /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/resources/templates/fragments/topbar.html	2026-07-02 09:19:04.000000000 +0000
++++ /mnt/data/gasto5b_build/src/main/resources/templates/fragments/topbar.html	2026-07-02 14:34:17.789374144 +0000
+@@ -8,18 +8,40 @@
+         <span id="currentTime">00:00:00</span>
+     </div>
+ 
+-    <div class="topbar-user">
+-        <span th:text="${#authentication.name}">Usuario</span>
+-        <div class="topbar-avatar"
+-             th:text="${#authentication.name != null ? #authentication.name.substring(0,1).toUpperCase() : 'U'}">
+-            U
+-        </div>
++    <div class="topbar-user dropdown">
++        <button class="topbar-user-button" type="button" data-bs-toggle="dropdown" aria-expanded="false">
++            <span class="topbar-user-name" th:text="${#authentication.name}">Usuario</span>
++            <span class="topbar-avatar"
++                 th:text="${#authentication.name != null ? #authentication.name.substring(0,1).toUpperCase() : 'U'}">
++                U
++            </span>
++            <i class="bi bi-chevron-down small text-muted"></i>
++        </button>
+ 
+-        <form th:action="@{/logout}" method="post" class="d-inline">
+-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+-            <button type="submit" class="btn btn-sm btn-outline-secondary">
+-                Cerrar sesión
+-            </button>
+-        </form>
++        <div class="dropdown-menu dropdown-menu-end shadow border-0 topbar-personal-menu">
++            <div class="px-3 py-2 border-bottom">
++                <div class="small text-muted">Sesión actual</div>
++                <div class="fw-semibold" th:text="${#authentication.name}">Usuario</div>
++            </div>
++            <span class="dropdown-item disabled">
++                <i class="bi bi-person-circle me-2"></i> Mi perfil
++            </span>
++            <a class="dropdown-item" th:if="${modulePersonalFinanceEnabled}" th:href="@{/gasto-claro/dashboard}">
++                <i class="bi bi-wallet2 me-2"></i> GastoClaro
++            </a>
++            <a class="dropdown-item" th:if="${modulePersonalFinanceEnabled}" th:href="@{/gasto-claro/monthly-plan}">
++                <i class="bi bi-calendar2-week me-2"></i> Plan mensual
++            </a>
++            <a class="dropdown-item" th:if="${modulePersonalFinanceEnabled}" th:href="@{/gasto-claro/debts}">
++                <i class="bi bi-credit-card me-2"></i> Mis deudas
++            </a>
++            <div class="dropdown-divider"></div>
++            <form th:action="@{/logout}" method="post" class="m-0">
++                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
++                <button type="submit" class="dropdown-item text-danger">
++                    <i class="bi bi-box-arrow-right me-2"></i> Cerrar sesión
++                </button>
++            </form>
++        </div>
+     </div>
+ </header>
+--- /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/resources/templates/fragments/sidebar.html	2026-07-02 09:19:04.000000000 +0000
++++ /mnt/data/gasto5b_build/src/main/resources/templates/fragments/sidebar.html	2026-07-02 14:34:50.598708559 +0000
+@@ -389,74 +389,7 @@
+     </th:block>
+ 
+ 
+-    <th:block th:if="${modulePersonalFinanceEnabled}" sec:authorize="isAuthenticated()">
+-      <div class="menu-section-title">Personal</div>
+-      <div
+-        class="menu-group"
+-        th:with="isGastoClaroActive=${activePage == 'gasto_claro_dashboard'
+-          or activePage == 'gasto_claro_debts'
+-          or activePage == 'gasto_claro_fixed_expenses'
+-          or activePage == 'gasto_claro_income_sources'
+-          or activePage == 'gasto_claro_income_events'}"
+-      >
+-        <input
+-          type="checkbox"
+-          id="menu-gasto-claro-toggle"
+-          class="menu-toggle"
+-          th:checked="${isGastoClaroActive}"
+-        >
+-
+-        <label class="menu-link has-children" for="menu-gasto-claro-toggle">
+-          <span class="icon"><i class="bi bi-wallet2"></i></span>
+-          <span>GastoClaro</span>
+-          <span class="caret"><i class="bi bi-chevron-right"></i></span>
+-        </label>
+-
+-        <div class="submenu-container">
+-          <a
+-            th:href="@{/gasto-claro/dashboard}"
+-            class="menu-link submenu"
+-            th:classappend="${activePage == 'gasto_claro_dashboard' ? ' active' : ''}"
+-          >
+-            <span class="icon"><i class="bi bi-speedometer2"></i></span>
+-            <span>Dashboard mensual</span>
+-          </a>
+-          <a
+-            th:href="@{/gasto-claro/debts}"
+-            class="menu-link submenu"
+-            th:classappend="${activePage == 'gasto_claro_debts' ? ' active' : ''}"
+-          >
+-            <span class="icon"><i class="bi bi-credit-card"></i></span>
+-            <span>Deudas</span>
+-          </a>
+-          <a
+-            th:href="@{/gasto-claro/fixed-expenses}"
+-            class="menu-link submenu"
+-            th:classappend="${activePage == 'gasto_claro_fixed_expenses' ? ' active' : ''}"
+-          >
+-            <span class="icon"><i class="bi bi-calendar2-check"></i></span>
+-            <span>Gastos fijos</span>
+-          </a>
+-          <a
+-            th:href="@{/gasto-claro/income-sources}"
+-            class="menu-link submenu"
+-            th:classappend="${activePage == 'gasto_claro_income_sources' ? ' active' : ''}"
+-          >
+-            <span class="icon"><i class="bi bi-wallet"></i></span>
+-            <span>Fuentes de ingreso</span>
+-          </a>
+-          <a
+-            th:href="@{/gasto-claro/income-events}"
+-            class="menu-link submenu"
+-            th:classappend="${activePage == 'gasto_claro_income_events' ? ' active' : ''}"
+-          >
+-            <span class="icon"><i class="bi bi-cash-stack"></i></span>
+-            <span>Ingresos programados</span>
+-          </a>
+-        </div>
+-      </div>
+-    </th:block>
+-
++    <!-- GastoClaro is now available from the personal topbar menu to keep the business sidebar focused. -->
+ 
+     <th:block th:if="${!restaurantRuntime and modulePlatformSettingsEnabled}" sec:authorize="hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_OWNER','ADMIN_PRINC','ADMIN','ver_plataforma','administra_plataforma','admin_config')">
+       <div class="menu-section-title">Plataforma / Super Admin</div>
+--- /mnt/data/gasto5b/gastoclaro-personal-phase5b-context-20260702-092158/src/main/resources/static/css/admin.css	2026-07-02 09:19:04.000000000 +0000
++++ /mnt/data/gasto5b_build/src/main/resources/static/css/admin.css	2026-07-02 14:34:33.118528632 +0000
+@@ -1432,3 +1432,123 @@
+         display: none;
+     }
+ }
++
++/* GastoClaro personal menu and monthly plan */
++.topbar-user-button {
++    border: 0;
++    background: transparent;
++    display: inline-flex;
++    align-items: center;
++    gap: 10px;
++    padding: 4px 6px 4px 10px;
++    border-radius: 999px;
++    color: #1f2937;
++}
++
++.topbar-user-button:hover,
++.topbar-user-button:focus {
++    background: #f3f5f9;
++    outline: none;
++}
++
++.topbar-user-name {
++    max-width: 160px;
++    white-space: nowrap;
++    overflow: hidden;
++    text-overflow: ellipsis;
++}
++
++.topbar-personal-menu {
++    min-width: 235px;
++    border-radius: 14px;
++    overflow: hidden;
++}
++
++.gasto-claro-page .nav-pills .nav-link {
++    border-radius: 999px;
++}
++
++.gasto-month-hero {
++    background: linear-gradient(135deg, #0f172a, #1d4ed8);
++    color: #ffffff;
++    border-radius: 20px;
++    padding: 22px 24px;
++    display: flex;
++    justify-content: space-between;
++    align-items: center;
++    gap: 1rem;
++    box-shadow: 0 16px 35px rgba(15, 23, 42, 0.18);
++}
++
++.gasto-hero-number {
++    background: rgba(255, 255, 255, 0.12);
++    border: 1px solid rgba(255, 255, 255, 0.14);
++    border-radius: 18px;
++    padding: 14px 18px;
++    min-width: 220px;
++    text-align: right;
++    font-size: 1.45rem;
++    font-weight: 800;
++}
++
++.gasto-excel-card {
++    background: #ffffff;
++    border-radius: 16px;
++    border: 1px solid #d7e0eb;
++    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.07);
++    overflow: hidden;
++}
++
++.gasto-excel-title {
++    background: #0f172a;
++    color: #ffffff;
++    font-weight: 800;
++    text-align: center;
++    padding: 8px 12px;
++    letter-spacing: 0.02em;
++}
++
++.gasto-excel-table thead th {
++    background: #3f7fdc;
++    color: #ffffff;
++    font-size: 0.78rem;
++    white-space: nowrap;
++    border-color: #2f68bc;
++}
++
++.gasto-excel-table td,
++.gasto-excel-table th {
++    border-color: #c8d4e2;
++    vertical-align: middle;
++}
++
++.gasto-total-row td {
++    background: #d7e8f8;
++    font-weight: 800;
++    border-top: 2px solid #94a3b8;
++}
++
++@media (max-width: 768px) {
++    .topbar-date {
++        display: none;
++    }
++
++    .topbar {
++        justify-content: flex-end !important;
++        padding: 0 14px;
++    }
++
++    .topbar-user-name {
++        display: none;
++    }
++
++    .gasto-month-hero {
++        align-items: stretch;
++        flex-direction: column;
++    }
++
++    .gasto-hero-number {
++        min-width: 0;
++        text-align: left;
++    }
++}

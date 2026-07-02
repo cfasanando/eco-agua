@@ -1,6 +1,5 @@
 package com.ecoamazonas.eco_agua.personalfinance;
 
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,6 +39,62 @@ public class PersonalFinanceController {
         return "personal_finance/dashboard";
     }
 
+
+    @GetMapping("/monthly-plan")
+    public String monthlyPlan(
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            @RequestParam(name = "editId", required = false) Long editId,
+            Model model
+    ) {
+        YearMonth selectedMonth = selectedMonth(year, month);
+        PersonalFinancePaymentObligation form = editId == null
+                ? new PersonalFinancePaymentObligation()
+                : service.paymentObligation(editId);
+        if (form.getDueDate() == null) {
+            form.setDueDate(selectedMonth.atDay(Math.min(LocalDate.now().getDayOfMonth(), selectedMonth.lengthOfMonth())));
+        }
+        model.addAttribute("activePage", "gasto_claro_monthly_plan");
+        model.addAttribute("selectedYear", selectedMonth.getYear());
+        model.addAttribute("selectedMonth", selectedMonth.getMonthValue());
+        model.addAttribute("plan", service.monthlyPlan(selectedMonth));
+        model.addAttribute("obligationForm", form);
+        model.addAttribute("obligationGroups", PersonalFinanceObligationGroup.values());
+        model.addAttribute("obligationStatuses", PersonalFinanceObligationStatus.values());
+        model.addAttribute("obligationSources", PersonalFinanceObligationSourceType.values());
+        model.addAttribute("priorities", PersonalFinancePriority.values());
+        model.addAttribute("currencies", PersonalFinanceCurrency.values());
+        return "personal_finance/monthly_plan";
+    }
+
+    @PostMapping("/monthly-plan/obligations")
+    public String saveMonthlyPlanObligation(
+            @ModelAttribute("obligationForm") PersonalFinancePaymentObligation obligation,
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            RedirectAttributes redirectAttributes
+    ) {
+        service.savePaymentObligation(obligation);
+        redirectAttributes.addFlashAttribute("message", "Compromiso mensual guardado correctamente.");
+        redirectAttributes.addFlashAttribute("messageType", "success");
+        YearMonth selectedMonth = selectedMonth(year, month);
+        return "redirect:/gasto-claro/monthly-plan?year=" + selectedMonth.getYear() + "&month=" + selectedMonth.getMonthValue();
+    }
+
+    @PostMapping("/monthly-plan/obligations/{id}/delete")
+    public String deleteMonthlyPlanObligation(
+            @PathVariable("id") Long id,
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            RedirectAttributes redirectAttributes
+    ) {
+        service.deletePaymentObligation(id);
+        redirectAttributes.addFlashAttribute("message", "Compromiso mensual eliminado.");
+        redirectAttributes.addFlashAttribute("messageType", "success");
+        YearMonth selectedMonth = selectedMonth(year, month);
+        return "redirect:/gasto-claro/monthly-plan?year=" + selectedMonth.getYear() + "&month=" + selectedMonth.getMonthValue();
+    }
+
     @GetMapping("/debts")
     public String debts(@RequestParam(name = "editId", required = false) Long editId, Model model) {
         model.addAttribute("activePage", "gasto_claro_debts");
@@ -47,6 +102,8 @@ public class PersonalFinanceController {
         model.addAttribute("debtForm", editId == null ? new PersonalFinanceDebt() : service.debt(editId));
         model.addAttribute("debtTypes", PersonalFinanceDebtType.values());
         model.addAttribute("debtStatuses", PersonalFinanceDebtStatus.values());
+        model.addAttribute("debtHolderTypes", PersonalFinanceDebtHolderType.values());
+        model.addAttribute("priorities", PersonalFinancePriority.values());
         model.addAttribute("currencies", PersonalFinanceCurrency.values());
         return "personal_finance/debts";
     }

@@ -9,7 +9,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "personal_finance_debt", indexes = {
         @Index(name = "idx_pf_debt_user_status", columnList = "user_id,status"),
-        @Index(name = "idx_pf_debt_user_due", columnList = "user_id,due_day")
+        @Index(name = "idx_pf_debt_user_due", columnList = "user_id,due_day"),
+        @Index(name = "idx_pf_debt_user_priority", columnList = "user_id,priority")
 })
 public class PersonalFinanceDebt {
 
@@ -30,6 +31,13 @@ public class PersonalFinanceDebt {
 
     @Column(name = "creditor_name", length = 160)
     private String creditorName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "holder_type", nullable = false, length = 40)
+    private PersonalFinanceDebtHolderType holderType = PersonalFinanceDebtHolderType.OWN_NAME;
+
+    @Column(name = "contact_name", length = 160)
+    private String contactName;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "currency", nullable = false, length = 8)
@@ -56,6 +64,10 @@ public class PersonalFinanceDebt {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private PersonalFinanceDebtStatus status = PersonalFinanceDebtStatus.ACTIVE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "priority", nullable = false, length = 30)
+    private PersonalFinancePriority priority = PersonalFinancePriority.MEDIUM;
 
     @Column(name = "has_fixed_payment", nullable = false)
     private boolean fixedPayment = true;
@@ -93,12 +105,25 @@ public class PersonalFinanceDebt {
         return monthlyDueAmount != null ? monthlyDueAmount : BigDecimal.ZERO;
     }
 
+    public boolean isHighInterest() {
+        return interestRateMonthly != null && interestRateMonthly.compareTo(new BigDecimal("10.0000")) >= 0;
+    }
+
+    public boolean isPaymentStopped() {
+        return status == PersonalFinanceDebtStatus.STOPPED_PAYMENT || status == PersonalFinanceDebtStatus.OVERDUE;
+    }
+
     private void normalizeAmounts() {
         if (originalAmount == null) originalAmount = BigDecimal.ZERO;
         if (currentBalance == null) currentBalance = BigDecimal.ZERO;
         if (monthlyDueAmount == null) monthlyDueAmount = BigDecimal.ZERO;
         if (minimumPayment == null) minimumPayment = BigDecimal.ZERO;
         if (interestRateMonthly == null) interestRateMonthly = BigDecimal.ZERO;
+        if (holderType == null) holderType = PersonalFinanceDebtHolderType.OWN_NAME;
+        if (priority == null) priority = PersonalFinancePriority.MEDIUM;
+        if (status == null) status = PersonalFinanceDebtStatus.ACTIVE;
+        if (debtType == null) debtType = PersonalFinanceDebtType.CREDIT_CARD;
+        if (currency == null) currency = PersonalFinanceCurrency.PEN;
     }
 
     public Long getId() { return id; }
@@ -111,6 +136,10 @@ public class PersonalFinanceDebt {
     public void setName(String name) { this.name = name; }
     public String getCreditorName() { return creditorName; }
     public void setCreditorName(String creditorName) { this.creditorName = creditorName; }
+    public PersonalFinanceDebtHolderType getHolderType() { return holderType; }
+    public void setHolderType(PersonalFinanceDebtHolderType holderType) { this.holderType = holderType; }
+    public String getContactName() { return contactName; }
+    public void setContactName(String contactName) { this.contactName = contactName; }
     public PersonalFinanceCurrency getCurrency() { return currency; }
     public void setCurrency(PersonalFinanceCurrency currency) { this.currency = currency; }
     public BigDecimal getOriginalAmount() { return originalAmount; }
@@ -127,6 +156,8 @@ public class PersonalFinanceDebt {
     public void setDueDay(Integer dueDay) { this.dueDay = dueDay; }
     public PersonalFinanceDebtStatus getStatus() { return status; }
     public void setStatus(PersonalFinanceDebtStatus status) { this.status = status; }
+    public PersonalFinancePriority getPriority() { return priority; }
+    public void setPriority(PersonalFinancePriority priority) { this.priority = priority; }
     public boolean isFixedPayment() { return fixedPayment; }
     public void setFixedPayment(boolean fixedPayment) { this.fixedPayment = fixedPayment; }
     public String getNotes() { return notes; }

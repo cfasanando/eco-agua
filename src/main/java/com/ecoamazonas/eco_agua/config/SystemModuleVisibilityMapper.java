@@ -24,6 +24,7 @@ public final class SystemModuleVisibilityMapper {
         boolean finance = any(keys, "finance") || any(keys, "accounting", "cashflow", "fixed_costs", "break_even", "price_simulator") || restaurant;
         boolean marketing = any(keys, "marketing") || any(keys, "public_catalog", "blog", "testimonials", "academy");
         boolean hr = any(keys, "hr");
+        boolean personalFinance = any(keys, "personal_finance", "gasto_claro");
 
         Map<String, Boolean> flags = new LinkedHashMap<>();
         flags.put("core", true);
@@ -74,6 +75,7 @@ public final class SystemModuleVisibilityMapper {
         flags.put("users", hr);
         flags.put("roles_permissions", hr);
         flags.put("platform_settings", true);
+        flags.put("personal_finance", personalFinance);
 
         return flags;
     }
@@ -95,6 +97,7 @@ public final class SystemModuleVisibilityMapper {
         flags.put("ecoagua.features.fixed-costs", enabled(moduleFlags, "fixed_costs"));
         flags.put("ecoagua.features.break-even", enabled(moduleFlags, "break_even"));
         flags.put("ecoagua.features.price-simulator", enabled(moduleFlags, "price_simulator"));
+        flags.put("ecoagua.features.personal-finance", enabled(moduleFlags, "personal_finance"));
         return flags;
     }
 

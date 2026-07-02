@@ -388,6 +388,76 @@
       </a>
     </th:block>
 
+
+    <th:block th:if="${modulePersonalFinanceEnabled}" sec:authorize="isAuthenticated()">
+      <div class="menu-section-title">Personal</div>
+      <div
+        class="menu-group"
+        th:with="isGastoClaroActive=${activePage == 'gasto_claro_dashboard'
+          or activePage == 'gasto_claro_debts'
+          or activePage == 'gasto_claro_fixed_expenses'
+          or activePage == 'gasto_claro_income_sources'
+          or activePage == 'gasto_claro_income_events'}"
+      >
+        <input
+          type="checkbox"
+          id="menu-gasto-claro-toggle"
+          class="menu-toggle"
+          th:checked="${isGastoClaroActive}"
+        >
+
+        <label class="menu-link has-children" for="menu-gasto-claro-toggle">
+          <span class="icon"><i class="bi bi-wallet2"></i></span>
+          <span>GastoClaro</span>
+          <span class="caret"><i class="bi bi-chevron-right"></i></span>
+        </label>
+
+        <div class="submenu-container">
+          <a
+            th:href="@{/gasto-claro/dashboard}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'gasto_claro_dashboard' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-speedometer2"></i></span>
+            <span>Dashboard mensual</span>
+          </a>
+          <a
+            th:href="@{/gasto-claro/debts}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'gasto_claro_debts' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-credit-card"></i></span>
+            <span>Deudas</span>
+          </a>
+          <a
+            th:href="@{/gasto-claro/fixed-expenses}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'gasto_claro_fixed_expenses' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-calendar2-check"></i></span>
+            <span>Gastos fijos</span>
+          </a>
+          <a
+            th:href="@{/gasto-claro/income-sources}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'gasto_claro_income_sources' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-wallet"></i></span>
+            <span>Fuentes de ingreso</span>
+          </a>
+          <a
+            th:href="@{/gasto-claro/income-events}"
+            class="menu-link submenu"
+            th:classappend="${activePage == 'gasto_claro_income_events' ? ' active' : ''}"
+          >
+            <span class="icon"><i class="bi bi-cash-stack"></i></span>
+            <span>Ingresos programados</span>
+          </a>
+        </div>
+      </div>
+    </th:block>
+
+
     <th:block th:if="${!restaurantRuntime and modulePlatformSettingsEnabled}" sec:authorize="hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_OWNER','ADMIN_PRINC','ADMIN','ver_plataforma','administra_plataforma','admin_config')">
       <div class="menu-section-title">Plataforma / Super Admin</div>
 

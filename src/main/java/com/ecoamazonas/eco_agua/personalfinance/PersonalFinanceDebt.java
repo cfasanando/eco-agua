@@ -1,0 +1,138 @@
+package com.ecoamazonas.eco_agua.personalfinance;
+
+import com.ecoamazonas.eco_agua.user.UserAccount;
+import jakarta.persistence.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "personal_finance_debt", indexes = {
+        @Index(name = "idx_pf_debt_user_status", columnList = "user_id,status"),
+        @Index(name = "idx_pf_debt_user_due", columnList = "user_id,due_day")
+})
+public class PersonalFinanceDebt {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private UserAccount user;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "debt_type", nullable = false, length = 40)
+    private PersonalFinanceDebtType debtType = PersonalFinanceDebtType.CREDIT_CARD;
+
+    @Column(name = "name", nullable = false, length = 160)
+    private String name;
+
+    @Column(name = "creditor_name", length = 160)
+    private String creditorName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "currency", nullable = false, length = 8)
+    private PersonalFinanceCurrency currency = PersonalFinanceCurrency.PEN;
+
+    @Column(name = "original_amount", precision = 14, scale = 2)
+    private BigDecimal originalAmount = BigDecimal.ZERO;
+
+    @Column(name = "current_balance", precision = 14, scale = 2, nullable = false)
+    private BigDecimal currentBalance = BigDecimal.ZERO;
+
+    @Column(name = "monthly_due_amount", precision = 14, scale = 2)
+    private BigDecimal monthlyDueAmount = BigDecimal.ZERO;
+
+    @Column(name = "minimum_payment", precision = 14, scale = 2)
+    private BigDecimal minimumPayment = BigDecimal.ZERO;
+
+    @Column(name = "interest_rate_monthly", precision = 8, scale = 4)
+    private BigDecimal interestRateMonthly = BigDecimal.ZERO;
+
+    @Column(name = "due_day")
+    private Integer dueDay;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 30)
+    private PersonalFinanceDebtStatus status = PersonalFinanceDebtStatus.ACTIVE;
+
+    @Column(name = "has_fixed_payment", nullable = false)
+    private boolean fixedPayment = true;
+
+    @Column(name = "notes", length = 1000)
+    private String notes;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+        normalizeAmounts();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+        normalizeAmounts();
+    }
+
+    public BigDecimal monthlyPressure() {
+        if (fixedPayment && monthlyDueAmount != null && monthlyDueAmount.compareTo(BigDecimal.ZERO) > 0) {
+            return monthlyDueAmount;
+        }
+        if (minimumPayment != null && minimumPayment.compareTo(BigDecimal.ZERO) > 0) {
+            return minimumPayment;
+        }
+        return monthlyDueAmount != null ? monthlyDueAmount : BigDecimal.ZERO;
+    }
+
+    private void normalizeAmounts() {
+        if (originalAmount == null) originalAmount = BigDecimal.ZERO;
+        if (currentBalance == null) currentBalance = BigDecimal.ZERO;
+        if (monthlyDueAmount == null) monthlyDueAmount = BigDecimal.ZERO;
+        if (minimumPayment == null) minimumPayment = BigDecimal.ZERO;
+        if (interestRateMonthly == null) interestRateMonthly = BigDecimal.ZERO;
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public UserAccount getUser() { return user; }
+    public void setUser(UserAccount user) { this.user = user; }
+    public PersonalFinanceDebtType getDebtType() { return debtType; }
+    public void setDebtType(PersonalFinanceDebtType debtType) { this.debtType = debtType; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getCreditorName() { return creditorName; }
+    public void setCreditorName(String creditorName) { this.creditorName = creditorName; }
+    public PersonalFinanceCurrency getCurrency() { return currency; }
+    public void setCurrency(PersonalFinanceCurrency currency) { this.currency = currency; }
+    public BigDecimal getOriginalAmount() { return originalAmount; }
+    public void setOriginalAmount(BigDecimal originalAmount) { this.originalAmount = originalAmount; }
+    public BigDecimal getCurrentBalance() { return currentBalance; }
+    public void setCurrentBalance(BigDecimal currentBalance) { this.currentBalance = currentBalance; }
+    public BigDecimal getMonthlyDueAmount() { return monthlyDueAmount; }
+    public void setMonthlyDueAmount(BigDecimal monthlyDueAmount) { this.monthlyDueAmount = monthlyDueAmount; }
+    public BigDecimal getMinimumPayment() { return minimumPayment; }
+    public void setMinimumPayment(BigDecimal minimumPayment) { this.minimumPayment = minimumPayment; }
+    public BigDecimal getInterestRateMonthly() { return interestRateMonthly; }
+    public void setInterestRateMonthly(BigDecimal interestRateMonthly) { this.interestRateMonthly = interestRateMonthly; }
+    public Integer getDueDay() { return dueDay; }
+    public void setDueDay(Integer dueDay) { this.dueDay = dueDay; }
+    public PersonalFinanceDebtStatus getStatus() { return status; }
+    public void setStatus(PersonalFinanceDebtStatus status) { this.status = status; }
+    public boolean isFixedPayment() { return fixedPayment; }
+    public void setFixedPayment(boolean fixedPayment) { this.fixedPayment = fixedPayment; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+}

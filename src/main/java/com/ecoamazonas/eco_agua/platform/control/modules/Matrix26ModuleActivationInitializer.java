@@ -105,6 +105,7 @@ public class Matrix26ModuleActivationInitializer implements ApplicationRunner {
                 new ModuleSeed("academy", "Academia", "40 Crecimiento", "Course catalog, assessments and certificates.", false, 340),
 
                 new ModuleSeed("hr", "Recursos Humanos", "50 Gestión", "Employees, attendance, payroll and obligations.", true, 400),
+                new ModuleSeed("personal_finance", "GastoClaro personal", "55 Personal", "Private personal cashflow, debts, fixed expenses and planned income per user.", true, 450),
 
                 new ModuleSeed("restaurant", "Restaurante", "60 Vertical restaurante", "Restaurant dashboard, menu, tables and kitchen operations.", false, 500),
                 new ModuleSeed("restaurant_cash", "Caja restaurante", "60 Vertical restaurante", "Restaurant cash sessions, receipts and daily close.", false, 510),

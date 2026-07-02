@@ -293,6 +293,7 @@ public class Matrix26ModuleActivationService {
             case "fixed_costs" -> "ecoagua.features.fixed-costs";
             case "break_even" -> "ecoagua.features.break-even";
             case "price_simulator" -> "ecoagua.features.price-simulator";
+            case "personal_finance" -> "ecoagua.features.personal-finance / module.personal_finance.enabled";
             default -> "Matrix26 declaration only";
         };
     }
@@ -303,6 +304,7 @@ public class Matrix26ModuleActivationService {
             case "containers", "production", "warehouse", "reorder" -> "Water delivery";
             case "public_catalog", "blog", "testimonials" -> "Catalog / commerce";
             case "matrix26_operations", "matrix26_backups", "matrix26_restore", "matrix26_lifecycle", "matrix26_purge", "matrix26_security" -> "Matrix26 Control";
+            case "personal_finance" -> "Personal tools";
             default -> "General";
         };
     }

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('GastoClaro - Dashboard')"></head>
+<body>
+<div class="app-layout" th:with="activePage='gasto_claro_dashboard'">
+  <aside th:replace="fragments/sidebar :: sidebar"></aside>
+  <div class="main-content">
+    <header th:replace="fragments/topbar :: topbar"></header>
+    <main class="content-wrapper">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+          <h1 class="h4 mb-1">GastoClaro personal</h1>
+          <p class="text-muted mb-0">Control privado de flujo mensual, deudas, gastos fijos e ingresos programados.</p>
+        </div>
+        <form th:action="@{/gasto-claro/dashboard}" method="get" class="d-flex gap-2 align-items-end">
+          <div>
+            <label class="form-label small mb-1">Año</label>
+            <input type="number" class="form-control form-control-sm" name="year" th:value="${selectedYear}" style="max-width: 95px;">
+          </div>
+          <div>
+            <label class="form-label small mb-1">Mes</label>
+            <input type="number" class="form-control form-control-sm" min="1" max="12" name="month" th:value="${selectedMonth}" style="max-width: 85px;">
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary">Ver mes</button>
+        </form>
+      </div>
+
+      <div th:replace="personal_finance/_nav :: nav('dashboard')"></div>
+
+      <div class="alert alert-info border-0 shadow-sm">
+        <strong>Fase 5A:</strong> esta pantalla ya consolida datos base del usuario logueado. En 5B se convertirá en dashboard mensual completo con vencimientos y presión financiera.
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="text-muted small">Ingreso esperado</div>
+              <div class="h3 mb-0">S/ <span th:text="${#numbers.formatDecimal(dashboard.expectedIncome(),1,'POINT',2,'POINT')}">0.00</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="text-muted small">Gastos fijos activos</div>
+              <div class="h3 mb-0">S/ <span th:text="${#numbers.formatDecimal(dashboard.fixedExpenseTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="text-muted small">Presión de deudas</div>
+              <div class="h3 mb-0">S/ <span th:text="${#numbers.formatDecimal(dashboard.debtPressureTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="card border-0 shadow-sm h-100" th:classappend="${dashboard.projectedBalance().signum() < 0} ? ' border-danger' : ' border-success'">
+            <div class="card-body">
+              <div class="text-muted small">Saldo proyectado</div>
+              <div class="h3 mb-0" th:classappend="${dashboard.projectedBalance().signum() < 0} ? ' text-danger' : ' text-success'">
+                S/ <span th:text="${#numbers.formatDecimal(dashboard.projectedBalance(),1,'POINT',2,'POINT')}">0.00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <strong>Deudas activas</strong>
+              <a th:href="@{/gasto-claro/debts}" class="btn btn-sm btn-outline-primary">Gestionar</a>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light"><tr><th>Deuda</th><th>Vence</th><th class="text-end">Pago mes</th></tr></thead>
+                  <tbody>
+                  <tr th:each="debt : ${debts}">
+                    <td><div class="fw-semibold" th:text="${debt.name}">Deuda</div><small class="text-muted" th:text="${debt.debtType.label}">Tipo</small></td>
+                    <td th:text="${debt.dueDay != null ? 'Día ' + debt.dueDay : '-'}">Día 1</td>
+                    <td class="text-end"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.monthlyPressure(),1,'POINT',2,'POINT')}">0.00</span></td>
+                  </tr>
+                  <tr th:if="${#lists.isEmpty(debts)}"><td colspan="3" class="text-center text-muted py-4">Aún no registraste deudas.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <strong>Ingresos del mes</strong>
+              <a th:href="@{/gasto-claro/income-events(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-primary">Gestionar</a>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light"><tr><th>Ingreso</th><th>Fecha</th><th class="text-end">Monto</th></tr></thead>
+                  <tbody>
+                  <tr th:each="event : ${incomeEvents}">
+                    <td><div class="fw-semibold" th:text="${event.title}">Ingreso</div><small class="text-muted" th:text="${event.status.label}">Estado</small></td>
+                    <td th:text="${event.expectedDate}">2026-07-01</td>
+                    <td class="text-end"><span th:text="${event.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(event.amount,1,'POINT',2,'POINT')}">0.00</span></td>
+                  </tr>
+                  <tr th:if="${#lists.isEmpty(incomeEvents)}"><td colspan="3" class="text-center text-muted py-4">Aún no registraste ingresos programados para este mes.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div th:replace="fragments/scripts_admin :: scripts"></div>
+</body>
+</html>

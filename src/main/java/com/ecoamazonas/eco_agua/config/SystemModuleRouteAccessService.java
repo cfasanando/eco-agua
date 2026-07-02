@@ -22,6 +22,9 @@ public class SystemModuleRouteAccessService {
             rule("/academy", "academy", "Academia pública", "Portal público", "Academy module is disabled for this instance."),
             rule("/restaurant", "restaurant_qr", "Carta pública restaurante", "Restaurante", "Public restaurant menu requires the restaurant QR module."),
 
+            // Personal tools.
+            rule("/gasto-claro", "personal_finance", "GastoClaro", "Personal", "GastoClaro personal finance module is disabled for this instance."),
+
             // Dashboards.
             rule("/dashboard/business-overview", "business_overview", "Estado del negocio", "Dashboard", "Business overview dashboard is disabled for this instance."),
             rule("/dashboard/monthly-followup", "monthly_followup", "Seguimiento mensual", "Dashboard", "Monthly follow-up dashboard is disabled for this instance."),

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('GastoClaro - Ingresos programados')"></head>
+<body>
+<div class="app-layout" th:with="activePage='gasto_claro_income_events'">
+  <aside th:replace="fragments/sidebar :: sidebar"></aside>
+  <div class="main-content">
+    <header th:replace="fragments/topbar :: topbar"></header>
+    <main class="content-wrapper">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+        <div><h1 class="h4 mb-1">Ingresos programados</h1><p class="text-muted mb-0">Entradas esperadas o recibidas por fecha.</p></div>
+        <form th:action="@{/gasto-claro/income-events}" method="get" class="d-flex gap-2 align-items-end">
+          <div><label class="form-label small mb-1">Año</label><input type="number" class="form-control form-control-sm" name="year" th:value="${selectedYear}" style="max-width: 95px;"></div>
+          <div><label class="form-label small mb-1">Mes</label><input type="number" class="form-control form-control-sm" min="1" max="12" name="month" th:value="${selectedMonth}" style="max-width: 85px;"></div>
+          <button type="submit" class="btn btn-sm btn-primary">Ver</button>
+        </form>
+      </div>
+      <div th:replace="personal_finance/_nav :: nav('income_events')"></div>
+      <div th:if="${message}" class="alert" th:classappend="${messageType == 'success'} ? ' alert-success' : ' alert-danger'" th:text="${message}">Mensaje</div>
+
+      <div class="row g-3">
+        <div class="col-lg-4"><div class="card border-0 shadow-sm"><div class="card-header bg-white fw-semibold" th:text="${eventForm.id == null ? 'Nuevo ingreso' : 'Editar ingreso'}">Nuevo ingreso</div><div class="card-body">
+          <form th:action="@{/gasto-claro/income-events}" th:object="${eventForm}" method="post" class="row g-3">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/><input type="hidden" th:field="*{id}"/>
+            <input type="hidden" name="year" th:value="${selectedYear}"><input type="hidden" name="month" th:value="${selectedMonth}">
+            <div class="col-12"><label class="form-label">Título</label><input class="form-control" th:field="*{title}" placeholder="Sueldo julio" required></div>
+            <div class="col-12"><label class="form-label">Fuente</label><select class="form-select" name="sourceId"><option value="">Sin fuente</option><option th:each="source : ${sources}" th:value="${source.id}" th:selected="${eventForm.incomeSource != null and eventForm.incomeSource.id == source.id}" th:text="${source.name}">Fuente</option></select></div>
+            <div class="col-md-6"><label class="form-label">Monto</label><input type="number" step="0.01" class="form-control" th:field="*{amount}"></div>
+            <div class="col-md-6"><label class="form-label">Moneda</label><select class="form-select" th:field="*{currency}"><option th:each="currency : ${currencies}" th:value="${currency}" th:text="${currency}">PEN</option></select></div>
+            <div class="col-md-6"><label class="form-label">Fecha esperada</label><input type="date" class="form-control" th:field="*{expectedDate}"></div>
+            <div class="col-md-6"><label class="form-label">Fecha recibida</label><input type="date" class="form-control" th:field="*{receivedDate}"></div>
+            <div class="col-12"><label class="form-label">Estado</label><select class="form-select" th:field="*{status}"><option th:each="status : ${incomeStatuses}" th:value="${status}" th:text="${status.label}">Estado</option></select></div>
+            <div class="col-12"><label class="form-label">Notas</label><textarea class="form-control" rows="2" th:field="*{notes}"></textarea></div>
+            <div class="col-12 d-grid gap-2"><button class="btn btn-primary" type="submit"><i class="bi bi-save"></i> Guardar</button><a th:if="${eventForm.id != null}" th:href="@{/gasto-claro/income-events(year=${selectedYear},month=${selectedMonth})}" class="btn btn-outline-secondary">Cancelar edición</a></div>
+          </form>
+        </div></div></div>
+        <div class="col-lg-8"><div class="card border-0 shadow-sm"><div class="card-header bg-white fw-semibold">Ingresos del mes</div><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+          <thead class="table-light"><tr><th>Ingreso</th><th>Fecha</th><th>Estado</th><th class="text-end">Monto</th><th></th></tr></thead><tbody>
+          <tr th:each="event : ${events}">
+            <td><div class="fw-semibold" th:text="${event.title}">Ingreso</div><small class="text-muted" th:text="${event.incomeSource != null ? event.incomeSource.name : 'Sin fuente'}">Fuente</small></td>
+            <td th:text="${event.expectedDate}">Fecha</td>
+            <td><span class="badge" th:classappend="${event.status.name() == 'RECEIVED'} ? ' text-bg-success' : (${event.status.name() == 'MISSED' or event.status.name() == 'CANCELLED'} ? ' text-bg-secondary' : ' text-bg-warning')" th:text="${event.status.label}">Estado</span></td>
+            <td class="text-end"><span th:text="${event.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(event.amount,1,'POINT',2,'POINT')}">0.00</span></td>
+            <td class="text-end"><a th:href="@{/gasto-claro/income-events(year=${selectedYear},month=${selectedMonth},editId=${event.id})}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a> <form th:action="@{/gasto-claro/income-events/{id}/delete(id=${event.id})}" method="post" class="d-inline" onsubmit="return confirm('¿Eliminar este ingreso?')"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/><input type="hidden" name="year" th:value="${selectedYear}"><input type="hidden" name="month" th:value="${selectedMonth}"><button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash"></i></button></form></td>
+          </tr>
+          <tr th:if="${#lists.isEmpty(events)}"><td colspan="5" class="text-center text-muted py-4">Aún no hay ingresos programados para este mes.</td></tr>
+        </tbody></table></div></div></div></div>
+      </div>
+    </main>
+  </div>
+</div>
+<div th:replace="fragments/scripts_admin :: scripts"></div>
+</body>
+</html>

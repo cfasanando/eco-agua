@@ -208,12 +208,14 @@ public class GlobalModelAttributes {
         boolean moduleUsers = flag(moduleFlags, "users");
         boolean moduleRolesPermissions = flag(moduleFlags, "roles_permissions");
         boolean modulePlatformSettings = flag(moduleFlags, "platform_settings");
+        boolean modulePersonalFinance = flag(moduleFlags, "personal_finance");
 
         boolean moduleMarketingSection = moduleMarketing || moduleBlog || moduleAcademy || moduleTestimonials || modulePublicCatalog;
         boolean moduleCommercialSection = (moduleCrm || moduleSales) && (moduleCommercialDaily || moduleClients || modulePromotions || moduleDelivery || moduleReorder);
         boolean moduleInventorySection = moduleInventory && (moduleProducts || moduleCategories || moduleWarehouse || moduleSupplies || moduleContainers || moduleProduction);
         boolean moduleFinanceSection = moduleFinance && (moduleAccounting || moduleCashflow || moduleBreakEven || modulePriceSimulator);
         boolean moduleSystemSection = moduleHr || moduleUsers || moduleRolesPermissions || modulePlatformSettings;
+        boolean modulePersonalSection = modulePersonalFinance;
         boolean moduleRestaurantSection = moduleRestaurant;
         boolean moduleOperationSection = moduleCommercialSection || moduleRestaurantSection || moduleIncome || moduleExpenses || moduleInventorySection;
 
@@ -261,6 +263,8 @@ public class GlobalModelAttributes {
         model.addAttribute("moduleUsersEnabled", moduleUsers);
         model.addAttribute("moduleRolesPermissionsEnabled", moduleRolesPermissions);
         model.addAttribute("modulePlatformSettingsEnabled", modulePlatformSettings);
+        model.addAttribute("modulePersonalFinanceEnabled", modulePersonalFinance);
+        model.addAttribute("modulePersonalSectionEnabled", modulePersonalSection);
         model.addAttribute("moduleMarketingSectionEnabled", moduleMarketingSection);
         model.addAttribute("moduleCommercialSectionEnabled", moduleCommercialSection);
         model.addAttribute("moduleInventorySectionEnabled", moduleInventorySection);
@@ -288,6 +292,7 @@ public class GlobalModelAttributes {
         model.addAttribute("featureFixedCosts", moduleFixedCosts);
         model.addAttribute("featureBreakEven", moduleBreakEven);
         model.addAttribute("featurePriceSimulator", modulePriceSimulator);
+        model.addAttribute("featurePersonalFinance", modulePersonalFinance);
         model.addAttribute("featureMarketingSection", moduleMarketingSection);
     }
 

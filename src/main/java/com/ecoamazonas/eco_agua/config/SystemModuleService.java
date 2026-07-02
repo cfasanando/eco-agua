@@ -129,7 +129,7 @@ public class SystemModuleService {
 
     private boolean defaultValueFor(String key) {
         return switch (key) {
-            case "core", "sales" -> true;
+            case "core", "sales", "personal_finance" -> true;
             case "containers" -> clientFeatureProperties.isContainers();
             case "delivery" -> clientFeatureProperties.isDelivery();
             case "production" -> clientFeatureProperties.isProduction();
@@ -170,6 +170,7 @@ public class SystemModuleService {
             case "Inventario y operación" -> "Products, categories, warehouse, supplies, containers and production.";
             case "Marketing y portal público" -> "Campaigns, blog, testimonials, public portal and public catalog.";
             case "Operación restaurante" -> "Carta digital, mesas, comandas y cocina para negocios de comida.";
+            case "Personal" -> "Private tools owned by each authenticated user.";
             case "Sistema y RRHH" -> "Internal users, roles, permissions, staff and platform configuration.";
             default -> "Configurable system modules.";
         };
@@ -183,6 +184,8 @@ public class SystemModuleService {
         modules.add(new ModuleDefinition("business_overview", "Principal", "Estado del negocio", "Business overview dashboard.", true, false, false));
         modules.add(new ModuleDefinition("monthly_followup", "Principal", "Seguimiento del mes", "Monthly follow-up dashboard.", true, false, false));
         modules.add(new ModuleDefinition("commercial_daily", "Principal", "Panel comercial diario", "Daily commercial dashboard.", true, false, false));
+
+        modules.add(new ModuleDefinition("personal_finance", "Personal", "GastoClaro", "Personal monthly cashflow, debts, fixed expenses and planned income per user.", true, false, false));
 
         modules.add(new ModuleDefinition("sales", "Comercial y ventas", "Ventas y clientes", "Matrix26 sales declaration projected into CRM, clients, income and commercial views.", true, false, false));
         modules.add(new ModuleDefinition("crm", "Comercial y ventas", "Comercial / CRM", "CRM and commercial management group.", true, false, false));

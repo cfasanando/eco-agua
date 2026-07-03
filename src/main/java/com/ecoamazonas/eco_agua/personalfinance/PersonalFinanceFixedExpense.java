@@ -4,6 +4,7 @@ import com.ecoamazonas.eco_agua.user.UserAccount;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -42,6 +43,15 @@ public class PersonalFinanceFixedExpense {
     @Column(name = "frequency", nullable = false, length = 30)
     private PersonalFinanceFrequency frequency = PersonalFinanceFrequency.MONTHLY;
 
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    @Column(name = "end_date")
+    private LocalDate endDate;
+
+    @Column(name = "auto_generate_monthly", nullable = false)
+    private boolean autoGenerateMonthly = true;
+
     @Column(name = "is_mandatory", nullable = false)
     private boolean mandatory = true;
 
@@ -62,13 +72,21 @@ public class PersonalFinanceFixedExpense {
         LocalDateTime now = LocalDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;
-        if (amount == null) amount = BigDecimal.ZERO;
+        normalize();
     }
 
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
+        normalize();
+    }
+
+    private void normalize() {
         if (amount == null) amount = BigDecimal.ZERO;
+        if (currency == null) currency = PersonalFinanceCurrency.PEN;
+        if (category == null) category = PersonalFinanceExpenseCategory.OTHER;
+        if (frequency == null) frequency = PersonalFinanceFrequency.MONTHLY;
+        if (dueDay != null) dueDay = Math.max(1, Math.min(31, dueDay));
     }
 
     public Long getId() { return id; }
@@ -87,6 +105,12 @@ public class PersonalFinanceFixedExpense {
     public void setDueDay(Integer dueDay) { this.dueDay = dueDay; }
     public PersonalFinanceFrequency getFrequency() { return frequency; }
     public void setFrequency(PersonalFinanceFrequency frequency) { this.frequency = frequency; }
+    public LocalDate getStartDate() { return startDate; }
+    public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
+    public LocalDate getEndDate() { return endDate; }
+    public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+    public boolean isAutoGenerateMonthly() { return autoGenerateMonthly; }
+    public void setAutoGenerateMonthly(boolean autoGenerateMonthly) { this.autoGenerateMonthly = autoGenerateMonthly; }
     public boolean isMandatory() { return mandatory; }
     public void setMandatory(boolean mandatory) { this.mandatory = mandatory; }
     public boolean isActive() { return active; }

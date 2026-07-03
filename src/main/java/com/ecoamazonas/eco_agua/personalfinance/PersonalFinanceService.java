@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -65,62 +66,12 @@ public class PersonalFinanceService {
         LocalDate end = yearMonth.atEndOfMonth();
 
         List<PersonalFinanceIncomeEvent> incomes = incomeEventRepository.findByUserAndExpectedDateBetweenOrderByExpectedDateAscIdAsc(user, start, end);
-        List<PersonalFinanceFixedExpense> fixedExpenses = fixedExpenseRepository.findByUserAndActiveTrueOrderByDueDayAscNameAsc(user);
         List<PersonalFinanceDebt> debts = debtsForMonthlyPlan(user);
         List<PersonalFinancePaymentObligation> obligations = paymentObligationRepository.findByUserAndDueDateBetweenOrderByDueDateAscPriorityAscIdAsc(user, start, end);
 
         List<PersonalFinanceMonthlyPlanItem> basicItems = new ArrayList<>();
         List<PersonalFinanceMonthlyPlanItem> debtItems = new ArrayList<>();
         List<PersonalFinanceMonthlyPlanItem> otherItems = new ArrayList<>();
-
-        for (PersonalFinanceFixedExpense expense : fixedExpenses) {
-            PersonalFinanceObligationGroup group = expense.getCategory() == PersonalFinanceExpenseCategory.STUDY
-                    ? PersonalFinanceObligationGroup.STUDY
-                    : PersonalFinanceObligationGroup.BASIC_LIVING;
-            PersonalFinancePriority priority = expense.isMandatory() ? PersonalFinancePriority.CRITICAL : PersonalFinancePriority.MEDIUM;
-            basicItems.add(new PersonalFinanceMonthlyPlanItem(
-                    null,
-                    expense.getName(),
-                    expense.getCategory().getLabel(),
-                    PersonalFinanceObligationSourceType.FIXED_EXPENSE,
-                    group,
-                    expense.getCurrency(),
-                    safe(expense.getAmount()),
-                    BigDecimal.ZERO,
-                    safe(expense.getAmount()),
-                    dateFromDueDay(yearMonth, expense.getDueDay()),
-                    PersonalFinanceObligationStatus.PENDING,
-                    priority,
-                    expense.getNotes(),
-                    true
-            ));
-        }
-
-        for (PersonalFinanceDebt debt : debts) {
-            if (debt.usesGeneratedSchedule() || debt.getScheduleMode() == PersonalFinanceDebtScheduleMode.TRACKING_ONLY) {
-                continue;
-            }
-            BigDecimal monthlyPressure = debt.monthlyPressure();
-            if (monthlyPressure.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
-            debtItems.add(new PersonalFinanceMonthlyPlanItem(
-                    null,
-                    debt.getName(),
-                    debt.getDebtType().getLabel(),
-                    PersonalFinanceObligationSourceType.DEBT,
-                    PersonalFinanceObligationGroup.DEBT_PAYMENT,
-                    debt.getCurrency(),
-                    monthlyPressure,
-                    BigDecimal.ZERO,
-                    monthlyPressure,
-                    dateFromDueDay(yearMonth, debt.getDueDay()),
-                    obligationStatusFromDebt(debt),
-                    defaultEnum(debt.getPriority(), PersonalFinancePriority.MEDIUM),
-                    debtPlanNotes(debt),
-                    true
-            ));
-        }
 
         for (PersonalFinancePaymentObligation obligation : obligations) {
             PersonalFinanceMonthlyPlanItem item = itemFromObligation(obligation);
@@ -280,6 +231,9 @@ public class PersonalFinanceService {
         entity.setCurrency(defaultEnum(expense.getCurrency(), PersonalFinanceCurrency.PEN));
         entity.setDueDay(normalizeDueDay(expense.getDueDay()));
         entity.setFrequency(defaultEnum(expense.getFrequency(), PersonalFinanceFrequency.MONTHLY));
+        entity.setStartDate(expense.getStartDate());
+        entity.setEndDate(expense.getEndDate());
+        entity.setAutoGenerateMonthly(expense.isAutoGenerateMonthly());
         entity.setMandatory(expense.isMandatory());
         entity.setActive(expense.isActive());
         entity.setNotes(clean(expense.getNotes()));
@@ -317,6 +271,11 @@ public class PersonalFinanceService {
         entity.setType(defaultEnum(source.getType(), PersonalFinanceIncomeType.OTHER));
         entity.setDefaultAmount(defaultAmount(source.getDefaultAmount()));
         entity.setCurrency(defaultEnum(source.getCurrency(), PersonalFinanceCurrency.PEN));
+        entity.setFrequency(defaultEnum(source.getFrequency(), PersonalFinanceFrequency.MONTHLY));
+        entity.setExpectedDay(normalizeDueDay(source.getExpectedDay()));
+        entity.setStartDate(source.getStartDate());
+        entity.setEndDate(source.getEndDate());
+        entity.setAutoGenerateMonthly(source.isAutoGenerateMonthly());
         entity.setActive(source.isActive());
         entity.setNotes(clean(source.getNotes()));
         incomeSourceRepository.save(entity);
@@ -452,8 +411,119 @@ public class PersonalFinanceService {
     }
 
     @Transactional
-    public int generateMonthlyObligations(YearMonth yearMonth) {
+    public PersonalFinanceMonthGenerationResult generateMonthlyPlan(YearMonth yearMonth) {
         UserAccount user = currentUserService.currentUser();
+        int incomeEventsCreated = generateIncomeEventsForMonth(user, yearMonth);
+        int fixedExpenseObligationsCreated = generateFixedExpenseObligationsForMonth(user, yearMonth);
+        int debtScheduleLinesCreated = ensureDebtScheduleLinesForMonth(user, yearMonth);
+        int debtScheduleObligationsCreated = generateDebtScheduleObligationsForMonth(user, yearMonth);
+        int simpleDebtObligationsCreated = generateSimpleDebtObligationsForMonth(user, yearMonth);
+        return new PersonalFinanceMonthGenerationResult(
+                incomeEventsCreated,
+                fixedExpenseObligationsCreated,
+                debtScheduleLinesCreated,
+                debtScheduleObligationsCreated,
+                simpleDebtObligationsCreated
+        );
+    }
+
+    @Transactional
+    public int generateMonthlyObligations(YearMonth yearMonth) {
+        return generateMonthlyPlan(yearMonth).totalCreated();
+    }
+
+    private int generateIncomeEventsForMonth(UserAccount user, YearMonth yearMonth) {
+        LocalDate start = yearMonth.atDay(1);
+        LocalDate end = yearMonth.atEndOfMonth();
+        int created = 0;
+        for (PersonalFinanceIncomeSource source : incomeSourceRepository.findByUserAndActiveTrueOrderByNameAsc(user)) {
+            if (!source.isAutoGenerateMonthly() || !appliesToMonth(yearMonth, source.getStartDate(), source.getEndDate())) {
+                continue;
+            }
+            if (source.getFrequency() != PersonalFinanceFrequency.MONTHLY) {
+                continue;
+            }
+            if (incomeEventRepository.existsByUserAndIncomeSourceAndExpectedDateBetween(user, source, start, end)) {
+                continue;
+            }
+            PersonalFinanceIncomeEvent event = new PersonalFinanceIncomeEvent();
+            event.setUser(user);
+            event.setIncomeSource(source);
+            event.setTitle(source.getName());
+            event.setAmount(defaultAmount(source.getDefaultAmount()));
+            event.setCurrency(defaultEnum(source.getCurrency(), PersonalFinanceCurrency.PEN));
+            event.setExpectedDate(dateFromDueDay(yearMonth, source.getExpectedDay() == null ? yearMonth.lengthOfMonth() : source.getExpectedDay()));
+            event.setStatus(PersonalFinanceIncomeStatus.PLANNED);
+            event.setNotes(generatedIncomeNotes(source));
+            incomeEventRepository.save(event);
+            created++;
+        }
+        return created;
+    }
+
+    private int generateFixedExpenseObligationsForMonth(UserAccount user, YearMonth yearMonth) {
+        LocalDate start = yearMonth.atDay(1);
+        LocalDate end = yearMonth.atEndOfMonth();
+        int created = 0;
+        for (PersonalFinanceFixedExpense expense : fixedExpenseRepository.findByUserAndActiveTrueOrderByDueDayAscNameAsc(user)) {
+            if (!expense.isAutoGenerateMonthly() || expense.getFrequency() != PersonalFinanceFrequency.MONTHLY || !appliesToMonth(yearMonth, expense.getStartDate(), expense.getEndDate())) {
+                continue;
+            }
+            if (paymentObligationRepository.existsByUserAndSourceTypeAndSourceIdAndDueDateBetween(user, PersonalFinanceObligationSourceType.FIXED_EXPENSE, expense.getId(), start, end)) {
+                continue;
+            }
+            PersonalFinancePaymentObligation obligation = new PersonalFinancePaymentObligation();
+            obligation.setUser(user);
+            obligation.setSourceType(PersonalFinanceObligationSourceType.FIXED_EXPENSE);
+            obligation.setSourceId(expense.getId());
+            obligation.setGroup(expense.getCategory() == PersonalFinanceExpenseCategory.STUDY ? PersonalFinanceObligationGroup.STUDY : PersonalFinanceObligationGroup.BASIC_LIVING);
+            obligation.setTitle(expense.getName());
+            obligation.setAmountDue(defaultAmount(expense.getAmount()));
+            obligation.setAmountPaid(BigDecimal.ZERO);
+            obligation.setCurrency(defaultEnum(expense.getCurrency(), PersonalFinanceCurrency.PEN));
+            obligation.setDueDate(dateFromDueDay(yearMonth, expense.getDueDay() == null ? 1 : expense.getDueDay()));
+            obligation.setStatus(obligation.getDueDate() != null && obligation.getDueDate().isBefore(LocalDate.now()) ? PersonalFinanceObligationStatus.OVERDUE : PersonalFinanceObligationStatus.PENDING);
+            obligation.setPriority(expense.isMandatory() ? PersonalFinancePriority.CRITICAL : PersonalFinancePriority.MEDIUM);
+            obligation.setNotes(generatedFixedExpenseNotes(expense));
+            paymentObligationRepository.save(obligation);
+            created++;
+        }
+        return created;
+    }
+
+    private int ensureDebtScheduleLinesForMonth(UserAccount user, YearMonth yearMonth) {
+        int created = 0;
+        for (PersonalFinanceDebt debt : debtsForMonthlyPlan(user)) {
+            PersonalFinanceDebtScheduleMode mode = defaultEnum(debt.getScheduleMode(), inferScheduleMode(debt));
+            if (!debt.isAutoGenerateMonthly() || !debt.usesGeneratedSchedule() || mode == PersonalFinanceDebtScheduleMode.TRACKING_ONLY) {
+                continue;
+            }
+            if (!debtScheduleAppliesToMonth(debt, mode, yearMonth)) {
+                continue;
+            }
+            LocalDate dueDate = debtDueDateForMonth(debt, yearMonth, mode);
+            PersonalFinanceScheduleLineType lineType = lineTypeForMode(mode);
+            if (debtScheduleLineRepository.existsByUserAndDebtAndDueDateAndLineType(user, debt, dueDate, lineType)) {
+                continue;
+            }
+            PersonalFinanceDebtScheduleLine line = new PersonalFinanceDebtScheduleLine();
+            line.setUser(user);
+            line.setDebt(debt);
+            line.setLineNumber(nextScheduleLineNumber(user, debt));
+            line.setLineType(lineType);
+            line.setTitle(scheduleTitle(debt, mode, scheduleLineNumberForMonth(debt, yearMonth)));
+            line.setCurrency(defaultEnum(debt.getCurrency(), PersonalFinanceCurrency.PEN));
+            line.setDueDate(dueDate);
+            line.setStatus(dueDate.isBefore(LocalDate.now()) ? PersonalFinanceObligationStatus.OVERDUE : PersonalFinanceObligationStatus.PENDING);
+            applyScheduleAmounts(line, debt, mode);
+            line.setNotes(scheduleNotes(debt, mode));
+            debtScheduleLineRepository.save(line);
+            created++;
+        }
+        return created;
+    }
+
+    private int generateDebtScheduleObligationsForMonth(UserAccount user, YearMonth yearMonth) {
         LocalDate start = yearMonth.atDay(1);
         LocalDate end = yearMonth.atEndOfMonth();
         List<PersonalFinanceDebtScheduleLine> lines = debtScheduleLineRepository.findByUserAndDueDateBetweenOrderByDueDateAscLineNumberAscIdAsc(user, start, end);
@@ -490,6 +560,44 @@ public class PersonalFinanceService {
         return created;
     }
 
+    private int generateSimpleDebtObligationsForMonth(UserAccount user, YearMonth yearMonth) {
+        LocalDate start = yearMonth.atDay(1);
+        LocalDate end = yearMonth.atEndOfMonth();
+        int created = 0;
+        for (PersonalFinanceDebt debt : debtsForMonthlyPlan(user)) {
+            PersonalFinanceDebtScheduleMode mode = defaultEnum(debt.getScheduleMode(), inferScheduleMode(debt));
+            if (!debt.isAutoGenerateMonthly() || debt.usesGeneratedSchedule() || mode == PersonalFinanceDebtScheduleMode.TRACKING_ONLY) {
+                continue;
+            }
+            BigDecimal monthlyPressure = debt.monthlyPressure();
+            if (monthlyPressure.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            if (!debtScheduleAppliesToMonth(debt, mode, yearMonth)) {
+                continue;
+            }
+            if (paymentObligationRepository.existsByUserAndSourceTypeAndSourceIdAndDueDateBetween(user, PersonalFinanceObligationSourceType.DEBT, debt.getId(), start, end)) {
+                continue;
+            }
+            PersonalFinancePaymentObligation obligation = new PersonalFinancePaymentObligation();
+            obligation.setUser(user);
+            obligation.setSourceType(PersonalFinanceObligationSourceType.DEBT);
+            obligation.setSourceId(debt.getId());
+            obligation.setGroup(PersonalFinanceObligationGroup.DEBT_PAYMENT);
+            obligation.setTitle(debt.getName());
+            obligation.setAmountDue(monthlyPressure);
+            obligation.setAmountPaid(BigDecimal.ZERO);
+            obligation.setCurrency(defaultEnum(debt.getCurrency(), PersonalFinanceCurrency.PEN));
+            obligation.setDueDate(dateFromDueDay(yearMonth, debt.getDueDay() == null ? yearMonth.lengthOfMonth() : debt.getDueDay()));
+            obligation.setStatus(obligation.getDueDate() != null && obligation.getDueDate().isBefore(LocalDate.now()) ? PersonalFinanceObligationStatus.OVERDUE : obligationStatusFromDebt(debt));
+            obligation.setPriority(defaultEnum(debt.getPriority(), PersonalFinancePriority.MEDIUM));
+            obligation.setNotes(generatedSimpleDebtNotes(debt));
+            paymentObligationRepository.save(obligation);
+            created++;
+        }
+        return created;
+    }
+
     private List<PersonalFinanceDebt> debtsForMonthlyPlan(UserAccount user) {
         return debtRepository.findByUserOrderByStatusAscDueDayAscNameAsc(user).stream()
                 .filter(debt -> debt.getStatus() == PersonalFinanceDebtStatus.ACTIVE
@@ -515,7 +623,9 @@ public class PersonalFinanceService {
                 obligation.getStatus(),
                 defaultEnum(obligation.getPriority(), PersonalFinancePriority.MEDIUM),
                 obligation.getNotes(),
-                false
+                obligation.getSourceType() != PersonalFinanceObligationSourceType.MANUAL
+                        && obligation.getSourceType() != PersonalFinanceObligationSourceType.STUDY_CYCLE
+                        && obligation.getSourceType() != PersonalFinanceObligationSourceType.LIFE_COST
         );
     }
 
@@ -700,6 +810,85 @@ public class PersonalFinanceService {
         }
         if (line.getNotes() != null && !line.getNotes().isBlank()) {
             notes.add(line.getNotes());
+        }
+        return String.join(" · ", notes);
+    }
+
+    private boolean appliesToMonth(YearMonth yearMonth, LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && YearMonth.from(startDate).isAfter(yearMonth)) {
+            return false;
+        }
+        return endDate == null || !YearMonth.from(endDate).isBefore(yearMonth);
+    }
+
+    private boolean debtScheduleAppliesToMonth(PersonalFinanceDebt debt, PersonalFinanceDebtScheduleMode mode, YearMonth yearMonth) {
+        if (!appliesToMonth(yearMonth, debt.getScheduleStartDate(), debt.getScheduleEndDate())) {
+            return false;
+        }
+        if (mode == PersonalFinanceDebtScheduleMode.ONE_TIME && debt.getScheduleStartDate() != null) {
+            return YearMonth.from(debt.getScheduleStartDate()).equals(yearMonth);
+        }
+        if (debt.getScheduleStartDate() != null && debt.getInstallmentCount() != null && debt.getInstallmentCount() > 0) {
+            long monthIndex = ChronoUnit.MONTHS.between(YearMonth.from(debt.getScheduleStartDate()), yearMonth);
+            return monthIndex >= 0 && monthIndex < debt.getInstallmentCount();
+        }
+        return true;
+    }
+
+    private LocalDate debtDueDateForMonth(PersonalFinanceDebt debt, YearMonth yearMonth, PersonalFinanceDebtScheduleMode mode) {
+        if (mode == PersonalFinanceDebtScheduleMode.ONE_TIME && debt.getScheduleStartDate() != null) {
+            return debt.getScheduleStartDate();
+        }
+        Integer dueDay = debt.getDueDay();
+        if (dueDay == null && debt.getScheduleStartDate() != null) {
+            dueDay = debt.getScheduleStartDate().getDayOfMonth();
+        }
+        return dateFromDueDay(yearMonth, dueDay == null ? yearMonth.lengthOfMonth() : dueDay);
+    }
+
+    private int scheduleLineNumberForMonth(PersonalFinanceDebt debt, YearMonth yearMonth) {
+        if (debt.getScheduleStartDate() == null) {
+            return 1;
+        }
+        long index = ChronoUnit.MONTHS.between(YearMonth.from(debt.getScheduleStartDate()), yearMonth);
+        return (int) Math.max(1, index + 1);
+    }
+
+    private int nextScheduleLineNumber(UserAccount user, PersonalFinanceDebt debt) {
+        long count = debtScheduleLineRepository.countByUserAndDebt(user, debt);
+        return (int) Math.min(Integer.MAX_VALUE, count + 1);
+    }
+
+    private String generatedIncomeNotes(PersonalFinanceIncomeSource source) {
+        List<String> notes = new ArrayList<>();
+        notes.add("Generado desde fuente recurrente");
+        notes.add(source.getFrequency().getLabel());
+        if (source.getNotes() != null && !source.getNotes().isBlank()) {
+            notes.add(source.getNotes());
+        }
+        return String.join(" · ", notes);
+    }
+
+    private String generatedFixedExpenseNotes(PersonalFinanceFixedExpense expense) {
+        List<String> notes = new ArrayList<>();
+        notes.add("Generado desde gasto fijo recurrente");
+        notes.add(expense.getCategory().getLabel());
+        notes.add(expense.getFrequency().getLabel());
+        if (!expense.isMandatory()) {
+            notes.add("No obligatorio");
+        }
+        if (expense.getNotes() != null && !expense.getNotes().isBlank()) {
+            notes.add(expense.getNotes());
+        }
+        return String.join(" · ", notes);
+    }
+
+    private String generatedSimpleDebtNotes(PersonalFinanceDebt debt) {
+        List<String> notes = new ArrayList<>();
+        notes.add("Generado desde deuda mensual simple");
+        String debtNotes = debtPlanNotes(debt);
+        if (debtNotes != null && !debtNotes.isBlank()) {
+            notes.add(debtNotes);
         }
         return String.join(" · ", notes);
     }

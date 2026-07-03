@@ -12,4 +12,6 @@ public interface PersonalFinancePaymentObligationRepository extends JpaRepositor
     List<PersonalFinancePaymentObligation> findByUserOrderByDueDateAscPriorityAscIdAsc(UserAccount user);
     Optional<PersonalFinancePaymentObligation> findByIdAndUser(Long id, UserAccount user);
     Optional<PersonalFinancePaymentObligation> findByScheduleLineIdAndUser(Long scheduleLineId, UserAccount user);
+    boolean existsByUserAndSourceTypeAndSourceIdAndDueDateBetween(UserAccount user, PersonalFinanceObligationSourceType sourceType, Long sourceId, LocalDate start, LocalDate end);
+    boolean existsByUserAndSourceTypeAndSourceIdAndDueDate(UserAccount user, PersonalFinanceObligationSourceType sourceType, Long sourceId, LocalDate dueDate);
 }

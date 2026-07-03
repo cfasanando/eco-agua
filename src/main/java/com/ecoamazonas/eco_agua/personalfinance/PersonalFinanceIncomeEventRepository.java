@@ -10,5 +10,6 @@ import java.util.Optional;
 public interface PersonalFinanceIncomeEventRepository extends JpaRepository<PersonalFinanceIncomeEvent, Long> {
     List<PersonalFinanceIncomeEvent> findByUserOrderByExpectedDateAscIdAsc(UserAccount user);
     List<PersonalFinanceIncomeEvent> findByUserAndExpectedDateBetweenOrderByExpectedDateAscIdAsc(UserAccount user, LocalDate start, LocalDate end);
+    boolean existsByUserAndIncomeSourceAndExpectedDateBetween(UserAccount user, PersonalFinanceIncomeSource incomeSource, LocalDate start, LocalDate end);
     Optional<PersonalFinanceIncomeEvent> findByIdAndUser(Long id, UserAccount user);
 }

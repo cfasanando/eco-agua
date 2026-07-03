@@ -4,6 +4,7 @@ import com.ecoamazonas.eco_agua.user.UserAccount;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -34,6 +35,22 @@ public class PersonalFinanceIncomeSource {
     @Column(name = "currency", nullable = false, length = 8)
     private PersonalFinanceCurrency currency = PersonalFinanceCurrency.PEN;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "frequency", nullable = false, length = 30)
+    private PersonalFinanceFrequency frequency = PersonalFinanceFrequency.MONTHLY;
+
+    @Column(name = "expected_day")
+    private Integer expectedDay;
+
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    @Column(name = "end_date")
+    private LocalDate endDate;
+
+    @Column(name = "auto_generate_monthly", nullable = false)
+    private boolean autoGenerateMonthly = true;
+
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
@@ -51,13 +68,20 @@ public class PersonalFinanceIncomeSource {
         LocalDateTime now = LocalDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;
-        if (defaultAmount == null) defaultAmount = BigDecimal.ZERO;
+        normalize();
     }
 
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
+        normalize();
+    }
+
+    private void normalize() {
         if (defaultAmount == null) defaultAmount = BigDecimal.ZERO;
+        if (currency == null) currency = PersonalFinanceCurrency.PEN;
+        if (frequency == null) frequency = PersonalFinanceFrequency.MONTHLY;
+        if (expectedDay != null) expectedDay = Math.max(1, Math.min(31, expectedDay));
     }
 
     public Long getId() { return id; }
@@ -72,6 +96,16 @@ public class PersonalFinanceIncomeSource {
     public void setDefaultAmount(BigDecimal defaultAmount) { this.defaultAmount = defaultAmount; }
     public PersonalFinanceCurrency getCurrency() { return currency; }
     public void setCurrency(PersonalFinanceCurrency currency) { this.currency = currency; }
+    public PersonalFinanceFrequency getFrequency() { return frequency; }
+    public void setFrequency(PersonalFinanceFrequency frequency) { this.frequency = frequency; }
+    public Integer getExpectedDay() { return expectedDay; }
+    public void setExpectedDay(Integer expectedDay) { this.expectedDay = expectedDay; }
+    public LocalDate getStartDate() { return startDate; }
+    public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
+    public LocalDate getEndDate() { return endDate; }
+    public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+    public boolean isAutoGenerateMonthly() { return autoGenerateMonthly; }
+    public void setAutoGenerateMonthly(boolean autoGenerateMonthly) { this.autoGenerateMonthly = autoGenerateMonthly; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
     public String getNotes() { return notes; }

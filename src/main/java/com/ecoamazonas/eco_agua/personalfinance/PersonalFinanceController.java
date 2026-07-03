@@ -102,8 +102,8 @@ public class PersonalFinanceController {
             RedirectAttributes redirectAttributes
     ) {
         YearMonth selectedMonth = selectedMonth(year, month);
-        int created = service.generateMonthlyObligations(selectedMonth);
-        redirectAttributes.addFlashAttribute("message", "Obligaciones generadas desde cronogramas: " + created + ".");
+        PersonalFinanceMonthGenerationResult result = service.generateMonthlyPlan(selectedMonth);
+        redirectAttributes.addFlashAttribute("message", "Mes generado/actualizado. " + result.summary());
         redirectAttributes.addFlashAttribute("messageType", "success");
         return "redirect:/gasto-claro/monthly-plan?year=" + selectedMonth.getYear() + "&month=" + selectedMonth.getMonthValue();
     }
@@ -233,6 +233,7 @@ public class PersonalFinanceController {
         model.addAttribute("sources", service.incomeSources());
         model.addAttribute("sourceForm", editId == null ? new PersonalFinanceIncomeSource() : service.incomeSource(editId));
         model.addAttribute("incomeTypes", PersonalFinanceIncomeType.values());
+        model.addAttribute("frequencies", PersonalFinanceFrequency.values());
         model.addAttribute("currencies", PersonalFinanceCurrency.values());
         return "personal_finance/income_sources";
     }

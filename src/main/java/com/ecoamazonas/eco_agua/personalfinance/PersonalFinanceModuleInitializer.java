@@ -27,6 +27,7 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         createTables();
         upgradeDebtTable();
+        upgradeRecurringTables();
         ensureModuleSetting();
         LOGGER.info("GastoClaro Personal base schema is ready.");
     }
@@ -40,12 +41,18 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     type VARCHAR(40) NOT NULL,
                     default_amount DECIMAL(14,2) NULL DEFAULT 0.00,
                     currency VARCHAR(8) NOT NULL DEFAULT 'PEN',
+                    frequency VARCHAR(30) NOT NULL DEFAULT 'MONTHLY',
+                    expected_day INT NULL,
+                    start_date DATE NULL,
+                    end_date DATE NULL,
+                    auto_generate_monthly BIT NOT NULL DEFAULT 1,
                     is_active BIT NOT NULL DEFAULT 1,
                     notes VARCHAR(1000) NULL,
                     created_at DATETIME(6) NOT NULL,
                     updated_at DATETIME(6) NOT NULL,
                     PRIMARY KEY (id),
                     KEY idx_pf_income_source_user_active (user_id, is_active),
+                    KEY idx_pf_income_source_user_recurrence (user_id, is_active, auto_generate_monthly),
                     CONSTRAINT fk_pf_income_source_user FOREIGN KEY (user_id) REFERENCES `user` (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
@@ -83,6 +90,9 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     currency VARCHAR(8) NOT NULL DEFAULT 'PEN',
                     due_day INT NULL,
                     frequency VARCHAR(30) NOT NULL DEFAULT 'MONTHLY',
+                    start_date DATE NULL,
+                    end_date DATE NULL,
+                    auto_generate_monthly BIT NOT NULL DEFAULT 1,
                     is_mandatory BIT NOT NULL DEFAULT 1,
                     is_active BIT NOT NULL DEFAULT 1,
                     notes VARCHAR(1000) NULL,
@@ -91,6 +101,7 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     PRIMARY KEY (id),
                     KEY idx_pf_fixed_expense_user_active (user_id, is_active),
                     KEY idx_pf_fixed_expense_user_due (user_id, due_day),
+                    KEY idx_pf_fixed_expense_user_recurrence (user_id, is_active, auto_generate_monthly),
                     CONSTRAINT fk_pf_fixed_expense_user FOREIGN KEY (user_id) REFERENCES `user` (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
@@ -154,6 +165,7 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     KEY idx_pf_obligation_user_status (user_id, status),
                     KEY idx_pf_obligation_user_group (user_id, obligation_group),
                     KEY idx_pf_obligation_schedule_line (schedule_line_id),
+                    KEY idx_pf_obligation_source_month (user_id, source_type, source_id, due_date),
                     CONSTRAINT fk_pf_obligation_user FOREIGN KEY (user_id) REFERENCES `user` (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
@@ -186,6 +198,22 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     CONSTRAINT fk_pf_schedule_debt FOREIGN KEY (debt_id) REFERENCES personal_finance_debt (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+    }
+
+    private void upgradeRecurringTables() {
+        addColumnIfMissing("personal_finance_income_source", "frequency", "ALTER TABLE personal_finance_income_source ADD COLUMN frequency VARCHAR(30) NOT NULL DEFAULT 'MONTHLY' AFTER currency");
+        addColumnIfMissing("personal_finance_income_source", "expected_day", "ALTER TABLE personal_finance_income_source ADD COLUMN expected_day INT NULL AFTER frequency");
+        addColumnIfMissing("personal_finance_income_source", "start_date", "ALTER TABLE personal_finance_income_source ADD COLUMN start_date DATE NULL AFTER expected_day");
+        addColumnIfMissing("personal_finance_income_source", "end_date", "ALTER TABLE personal_finance_income_source ADD COLUMN end_date DATE NULL AFTER start_date");
+        addColumnIfMissing("personal_finance_income_source", "auto_generate_monthly", "ALTER TABLE personal_finance_income_source ADD COLUMN auto_generate_monthly BIT NOT NULL DEFAULT 1 AFTER end_date");
+        addIndexIfMissing("personal_finance_income_source", "idx_pf_income_source_user_recurrence", "CREATE INDEX idx_pf_income_source_user_recurrence ON personal_finance_income_source (user_id, is_active, auto_generate_monthly)");
+
+        addColumnIfMissing("personal_finance_fixed_expense", "start_date", "ALTER TABLE personal_finance_fixed_expense ADD COLUMN start_date DATE NULL AFTER frequency");
+        addColumnIfMissing("personal_finance_fixed_expense", "end_date", "ALTER TABLE personal_finance_fixed_expense ADD COLUMN end_date DATE NULL AFTER start_date");
+        addColumnIfMissing("personal_finance_fixed_expense", "auto_generate_monthly", "ALTER TABLE personal_finance_fixed_expense ADD COLUMN auto_generate_monthly BIT NOT NULL DEFAULT 1 AFTER end_date");
+        addIndexIfMissing("personal_finance_fixed_expense", "idx_pf_fixed_expense_user_recurrence", "CREATE INDEX idx_pf_fixed_expense_user_recurrence ON personal_finance_fixed_expense (user_id, is_active, auto_generate_monthly)");
+
+        addIndexIfMissing("personal_finance_payment_obligation", "idx_pf_obligation_source_month", "CREATE INDEX idx_pf_obligation_source_month ON personal_finance_payment_obligation (user_id, source_type, source_id, due_date)");
     }
 
     private void upgradeDebtTable() {

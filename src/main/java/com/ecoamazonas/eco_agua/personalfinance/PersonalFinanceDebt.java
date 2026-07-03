@@ -4,13 +4,15 @@ import com.ecoamazonas.eco_agua.user.UserAccount;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "personal_finance_debt", indexes = {
         @Index(name = "idx_pf_debt_user_status", columnList = "user_id,status"),
         @Index(name = "idx_pf_debt_user_due", columnList = "user_id,due_day"),
-        @Index(name = "idx_pf_debt_user_priority", columnList = "user_id,priority")
+        @Index(name = "idx_pf_debt_user_priority", columnList = "user_id,priority"),
+        @Index(name = "idx_pf_debt_user_schedule_mode", columnList = "user_id,schedule_mode")
 })
 public class PersonalFinanceDebt {
 
@@ -62,6 +64,22 @@ public class PersonalFinanceDebt {
     private Integer dueDay;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "schedule_mode", nullable = false, length = 40)
+    private PersonalFinanceDebtScheduleMode scheduleMode = PersonalFinanceDebtScheduleMode.SIMPLE_MONTHLY;
+
+    @Column(name = "schedule_start_date")
+    private LocalDate scheduleStartDate;
+
+    @Column(name = "schedule_end_date")
+    private LocalDate scheduleEndDate;
+
+    @Column(name = "installment_count")
+    private Integer installmentCount;
+
+    @Column(name = "auto_generate_monthly", nullable = false)
+    private boolean autoGenerateMonthly = true;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private PersonalFinanceDebtStatus status = PersonalFinanceDebtStatus.ACTIVE;
 
@@ -109,6 +127,22 @@ public class PersonalFinanceDebt {
         return interestRateMonthly != null && interestRateMonthly.compareTo(new BigDecimal("10.0000")) >= 0;
     }
 
+    public BigDecimal monthlyInterestAmount() {
+        BigDecimal balance = currentBalance == null ? BigDecimal.ZERO : currentBalance;
+        BigDecimal rate = interestRateMonthly == null ? BigDecimal.ZERO : interestRateMonthly;
+        if (balance.compareTo(BigDecimal.ZERO) <= 0 || rate.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return balance.multiply(rate).divide(new BigDecimal("100"));
+    }
+
+    public boolean usesGeneratedSchedule() {
+        return scheduleMode == PersonalFinanceDebtScheduleMode.BANK_SCHEDULE
+                || scheduleMode == PersonalFinanceDebtScheduleMode.PRIVATE_LENDER_INTEREST
+                || scheduleMode == PersonalFinanceDebtScheduleMode.ONE_TIME
+                || scheduleMode == PersonalFinanceDebtScheduleMode.AUTO_DEDUCTION;
+    }
+
     public boolean isPaymentStopped() {
         return status == PersonalFinanceDebtStatus.STOPPED_PAYMENT || status == PersonalFinanceDebtStatus.OVERDUE;
     }
@@ -121,6 +155,8 @@ public class PersonalFinanceDebt {
         if (interestRateMonthly == null) interestRateMonthly = BigDecimal.ZERO;
         if (holderType == null) holderType = PersonalFinanceDebtHolderType.OWN_NAME;
         if (priority == null) priority = PersonalFinancePriority.MEDIUM;
+        if (scheduleMode == null) scheduleMode = PersonalFinanceDebtScheduleMode.SIMPLE_MONTHLY;
+        if (installmentCount != null && installmentCount < 0) installmentCount = 0;
         if (status == null) status = PersonalFinanceDebtStatus.ACTIVE;
         if (debtType == null) debtType = PersonalFinanceDebtType.CREDIT_CARD;
         if (currency == null) currency = PersonalFinanceCurrency.PEN;
@@ -154,6 +190,16 @@ public class PersonalFinanceDebt {
     public void setInterestRateMonthly(BigDecimal interestRateMonthly) { this.interestRateMonthly = interestRateMonthly; }
     public Integer getDueDay() { return dueDay; }
     public void setDueDay(Integer dueDay) { this.dueDay = dueDay; }
+    public PersonalFinanceDebtScheduleMode getScheduleMode() { return scheduleMode; }
+    public void setScheduleMode(PersonalFinanceDebtScheduleMode scheduleMode) { this.scheduleMode = scheduleMode; }
+    public LocalDate getScheduleStartDate() { return scheduleStartDate; }
+    public void setScheduleStartDate(LocalDate scheduleStartDate) { this.scheduleStartDate = scheduleStartDate; }
+    public LocalDate getScheduleEndDate() { return scheduleEndDate; }
+    public void setScheduleEndDate(LocalDate scheduleEndDate) { this.scheduleEndDate = scheduleEndDate; }
+    public Integer getInstallmentCount() { return installmentCount; }
+    public void setInstallmentCount(Integer installmentCount) { this.installmentCount = installmentCount; }
+    public boolean isAutoGenerateMonthly() { return autoGenerateMonthly; }
+    public void setAutoGenerateMonthly(boolean autoGenerateMonthly) { this.autoGenerateMonthly = autoGenerateMonthly; }
     public PersonalFinanceDebtStatus getStatus() { return status; }
     public void setStatus(PersonalFinanceDebtStatus status) { this.status = status; }
     public PersonalFinancePriority getPriority() { return priority; }

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('GastoClaro - Cronograma de deuda')"></head>
+<body>
+<div class="app-layout" th:with="activePage='gasto_claro_debts'">
+  <aside th:replace="fragments/sidebar :: sidebar"></aside>
+  <div class="main-content">
+    <header th:replace="fragments/topbar :: topbar"></header>
+    <main class="content-wrapper gasto-claro-page">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+        <div>
+          <h1 class="h4 mb-1">Cronograma de deuda</h1>
+          <p class="text-muted mb-0">Cuotas bancarias, intereses mensuales de prestamistas, pagos únicos y descuentos automáticos.</p>
+        </div>
+        <div class="d-flex gap-2">
+          <a th:href="@{/gasto-claro/debts(editId=${debt.id})}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i> Editar deuda</a>
+          <a th:href="@{/gasto-claro/debts}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Deudas</a>
+        </div>
+      </div>
+
+      <div th:replace="personal_finance/_nav :: nav('debts')"></div>
+      <div th:if="${message}" class="alert" th:classappend="${messageType == 'success'} ? ' alert-success' : ' alert-danger'" th:text="${message}">Mensaje</div>
+
+      <section class="gasto-month-hero mb-4">
+        <div>
+          <div class="text-uppercase small fw-bold opacity-75">Deuda seleccionada</div>
+          <div class="h4 mb-1" th:text="${debt.name}">Deuda</div>
+          <div class="small opacity-75">
+            <span th:text="${debt.debtType.label}">Tipo</span>
+            <span th:if="${debt.creditorName != null and !#strings.isEmpty(debt.creditorName)}"> · <span th:text="${debt.creditorName}">Acreedor</span></span>
+            <span th:if="${debt.contactName != null and !#strings.isEmpty(debt.contactName)}"> · Contacto: <span th:text="${debt.contactName}">Contacto</span></span>
+          </div>
+        </div>
+        <div class="gasto-hero-number">
+          <span class="small d-block">Saldo actual</span>
+          <span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.currentBalance,1,'POINT',2,'POINT')}">0.00</span>
+        </div>
+      </section>
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Modo</div><div class="fw-semibold" th:text="${debt.scheduleMode != null ? debt.scheduleMode.label : 'Pago mensual simple'}">Modo</div></div></div></div>
+        <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Pago mensual</div><div class="fw-semibold"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.monthlyPressure(),1,'POINT',2,'POINT')}">0.00</span></div></div></div></div>
+        <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Interés mensual</div><div class="fw-semibold text-danger"><span th:text="${#numbers.formatDecimal(debt.interestRateMonthly,1,'POINT',2,'POINT')}">0.00</span>%</div></div></div></div>
+        <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Líneas</div><div class="fw-semibold" th:text="${#lists.size(scheduleLines)}">0</div></div></div></div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-xl-4">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold">Generar cronograma rápido</div>
+            <div class="card-body">
+              <form th:action="@{/gasto-claro/debts/{id}/schedule/generate(id=${debt.id})}" method="post" class="row g-2">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <div class="col-6">
+                  <label class="form-label">Año inicio</label>
+                  <input type="number" class="form-control" name="year" th:value="${currentYear}">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Mes inicio</label>
+                  <input type="number" min="1" max="12" class="form-control" name="month" th:value="${currentMonth}">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Meses / cuotas a generar</label>
+                  <input type="number" min="1" max="60" class="form-control" name="months" th:value="${debt.installmentCount != null and debt.installmentCount > 0 ? debt.installmentCount : 6}">
+                  <div class="form-text">Para prestamistas genera intereses mensuales. Para bancos genera cuotas.</div>
+                </div>
+                <div class="col-12 d-grid">
+                  <button type="submit" class="btn btn-success"><i class="bi bi-magic"></i> Generar filas</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold" th:text="${lineForm.id == null ? 'Agregar fila manual' : 'Editar fila'}">Agregar fila</div>
+            <div class="card-body">
+              <form th:action="@{/gasto-claro/debts/{id}/schedule-lines(id=${debt.id})}" th:object="${lineForm}" method="post" class="row g-3">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <input type="hidden" th:field="*{id}"/>
+                <div class="col-12">
+                  <label class="form-label">Título</label>
+                  <input type="text" class="form-control" th:field="*{title}" placeholder="Cuota julio / Interés mensual" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Tipo línea</label>
+                  <select class="form-select" th:field="*{lineType}">
+                    <option th:each="type : ${lineTypes}" th:value="${type}" th:text="${type.label}">Tipo</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Vence</label>
+                  <input type="date" class="form-control" th:field="*{dueDate}">
+                </div>
+                <div class="col-md-6"><label class="form-label">Capital</label><input type="number" step="0.01" class="form-control" th:field="*{principalAmount}"></div>
+                <div class="col-md-6"><label class="form-label">Interés</label><input type="number" step="0.01" class="form-control" th:field="*{interestAmount}"></div>
+                <div class="col-md-6"><label class="form-label">Comisión / mora</label><input type="number" step="0.01" class="form-control" th:field="*{feeAmount}"></div>
+                <div class="col-md-6"><label class="form-label">Total</label><input type="number" step="0.01" class="form-control" th:field="*{totalAmount}"></div>
+                <div class="col-md-6">
+                  <label class="form-label">Estado</label>
+                  <select class="form-select" th:field="*{status}">
+                    <option th:each="status : ${obligationStatuses}" th:value="${status}" th:text="${status.label}">Estado</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Moneda</label>
+                  <select class="form-select" th:field="*{currency}">
+                    <option th:each="currency : ${currencies}" th:value="${currency}" th:text="${currency}">PEN</option>
+                  </select>
+                </div>
+                <div class="col-12"><label class="form-label">Notas</label><textarea class="form-control" rows="2" th:field="*{notes}"></textarea></div>
+                <div class="col-12 d-grid gap-2">
+                  <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Guardar fila</button>
+                  <a th:if="${lineForm.id != null}" th:href="@{/gasto-claro/debts/{id}/schedule(id=${debt.id})}" class="btn btn-outline-secondary">Cancelar edición</a>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-xl-8">
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <span class="fw-semibold">Cronograma registrado</span>
+              <span class="badge text-bg-light">Luego genera obligaciones desde el Plan mensual</span>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light"><tr><th>#</th><th>Concepto</th><th>Tipo</th><th>Vence</th><th>Estado</th><th class="text-end">Capital</th><th class="text-end">Interés</th><th class="text-end">Total</th><th>Obligación</th><th></th></tr></thead>
+                  <tbody>
+                  <tr th:each="line : ${scheduleLines}">
+                    <td th:text="${line.lineNumber != null ? line.lineNumber : line.id}">1</td>
+                    <td><strong th:text="${line.title}">Cuota</strong><br><small class="text-muted" th:text="${line.notes}">Notas</small></td>
+                    <td><span class="badge text-bg-light" th:text="${line.lineType.label}">Cuota</span></td>
+                    <td th:text="${line.dueDate}">2026-07-20</td>
+                    <td><span class="badge text-bg-secondary" th:text="${line.status.label}">Pendiente</span></td>
+                    <td class="text-end"><span th:text="${line.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(line.principalAmount,1,'POINT',2,'POINT')}">0.00</span></td>
+                    <td class="text-end"><span th:text="${line.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(line.interestAmount,1,'POINT',2,'POINT')}">0.00</span></td>
+                    <td class="text-end fw-semibold"><span th:text="${line.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(line.calculatedTotal(),1,'POINT',2,'POINT')}">0.00</span></td>
+                    <td><span class="badge" th:classappend="${line.generatedObligationId != null} ? ' text-bg-success' : ' text-bg-warning'" th:text="${line.generatedObligationId != null ? 'Generada' : 'Pendiente'}">Pendiente</span></td>
+                    <td class="text-end">
+                      <a th:href="@{/gasto-claro/debts/{id}/schedule(id=${debt.id}, editLineId=${line.id})}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="bi bi-pencil"></i></a>
+                      <form th:action="@{/gasto-claro/debts/{debtId}/schedule-lines/{lineId}/delete(debtId=${debt.id}, lineId=${line.id})}" method="post" class="d-inline" onsubmit="return confirm('¿Eliminar esta fila del cronograma?')">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
+                      </form>
+                    </td>
+                  </tr>
+                  <tr th:if="${#lists.isEmpty(scheduleLines)}"><td colspan="10" class="text-center text-muted py-4">Aún no hay cronograma. Usa el generador rápido o agrega filas manualmente.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div th:replace="fragments/scripts_admin :: scripts"></div>
+</body>
+</html>

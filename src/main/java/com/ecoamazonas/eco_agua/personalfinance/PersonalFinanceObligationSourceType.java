@@ -4,6 +4,9 @@ public enum PersonalFinanceObligationSourceType {
     FIXED_EXPENSE("Gasto fijo"),
     DEBT("Deuda"),
     MANUAL("Manual"),
+    DEBT_SCHEDULE("Cronograma de deuda"),
+    PRIVATE_LENDER_INTEREST("Interés prestamista"),
+    AUTO_DEDUCTION("Descuento automático"),
     STUDY_CYCLE("Estudio por ciclo"),
     LIFE_COST("Costo de vida");
 

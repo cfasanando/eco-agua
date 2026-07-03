@@ -95,6 +95,19 @@ public class PersonalFinanceController {
         return "redirect:/gasto-claro/monthly-plan?year=" + selectedMonth.getYear() + "&month=" + selectedMonth.getMonthValue();
     }
 
+    @PostMapping("/monthly-plan/generate-obligations")
+    public String generateMonthlyObligations(
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            RedirectAttributes redirectAttributes
+    ) {
+        YearMonth selectedMonth = selectedMonth(year, month);
+        int created = service.generateMonthlyObligations(selectedMonth);
+        redirectAttributes.addFlashAttribute("message", "Obligaciones generadas desde cronogramas: " + created + ".");
+        redirectAttributes.addFlashAttribute("messageType", "success");
+        return "redirect:/gasto-claro/monthly-plan?year=" + selectedMonth.getYear() + "&month=" + selectedMonth.getMonthValue();
+    }
+
     @GetMapping("/debts")
     public String debts(@RequestParam(name = "editId", required = false) Long editId, Model model) {
         model.addAttribute("activePage", "gasto_claro_debts");
@@ -103,6 +116,7 @@ public class PersonalFinanceController {
         model.addAttribute("debtTypes", PersonalFinanceDebtType.values());
         model.addAttribute("debtStatuses", PersonalFinanceDebtStatus.values());
         model.addAttribute("debtHolderTypes", PersonalFinanceDebtHolderType.values());
+        model.addAttribute("scheduleModes", PersonalFinanceDebtScheduleMode.values());
         model.addAttribute("priorities", PersonalFinancePriority.values());
         model.addAttribute("currencies", PersonalFinanceCurrency.values());
         return "personal_finance/debts";
@@ -122,6 +136,68 @@ public class PersonalFinanceController {
         redirectAttributes.addFlashAttribute("message", "Deuda eliminada del módulo personal.");
         redirectAttributes.addFlashAttribute("messageType", "success");
         return "redirect:/gasto-claro/debts";
+    }
+
+    @GetMapping("/debts/{id}/schedule")
+    public String debtSchedule(
+            @PathVariable("id") Long id,
+            @RequestParam(name = "editLineId", required = false) Long editLineId,
+            Model model
+    ) {
+        PersonalFinanceDebt debt = service.debt(id);
+        PersonalFinanceDebtScheduleLine form = editLineId == null ? new PersonalFinanceDebtScheduleLine() : service.debtScheduleLine(editLineId);
+        if (form.getDueDate() == null) {
+            form.setDueDate(LocalDate.now());
+        }
+        model.addAttribute("activePage", "gasto_claro_debts");
+        model.addAttribute("debt", debt);
+        model.addAttribute("scheduleLines", service.debtSchedule(id));
+        model.addAttribute("lineForm", form);
+        model.addAttribute("lineTypes", PersonalFinanceScheduleLineType.values());
+        model.addAttribute("currentYear", YearMonth.now().getYear());
+        model.addAttribute("currentMonth", YearMonth.now().getMonthValue());
+        model.addAttribute("obligationStatuses", PersonalFinanceObligationStatus.values());
+        model.addAttribute("currencies", PersonalFinanceCurrency.values());
+        return "personal_finance/debt_schedule";
+    }
+
+    @PostMapping("/debts/{id}/schedule/generate")
+    public String generateDebtSchedule(
+            @PathVariable("id") Long id,
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            @RequestParam(name = "months", required = false) Integer months,
+            RedirectAttributes redirectAttributes
+    ) {
+        YearMonth selectedMonth = selectedMonth(year, month);
+        int created = service.generateDebtSchedule(id, selectedMonth, months);
+        redirectAttributes.addFlashAttribute("message", "Cronograma generado: " + created + " fila(s) nuevas.");
+        redirectAttributes.addFlashAttribute("messageType", "success");
+        return "redirect:/gasto-claro/debts/" + id + "/schedule";
+    }
+
+    @PostMapping("/debts/{id}/schedule-lines")
+    public String saveDebtScheduleLine(
+            @PathVariable("id") Long id,
+            @ModelAttribute("lineForm") PersonalFinanceDebtScheduleLine line,
+            RedirectAttributes redirectAttributes
+    ) {
+        service.saveDebtScheduleLine(id, line);
+        redirectAttributes.addFlashAttribute("message", "Fila de cronograma guardada correctamente.");
+        redirectAttributes.addFlashAttribute("messageType", "success");
+        return "redirect:/gasto-claro/debts/" + id + "/schedule";
+    }
+
+    @PostMapping("/debts/{debtId}/schedule-lines/{lineId}/delete")
+    public String deleteDebtScheduleLine(
+            @PathVariable("debtId") Long debtId,
+            @PathVariable("lineId") Long lineId,
+            RedirectAttributes redirectAttributes
+    ) {
+        service.deleteDebtScheduleLine(lineId);
+        redirectAttributes.addFlashAttribute("message", "Fila de cronograma eliminada.");
+        redirectAttributes.addFlashAttribute("messageType", "success");
+        return "redirect:/gasto-claro/debts/" + debtId + "/schedule";
     }
 
     @GetMapping("/fixed-expenses")

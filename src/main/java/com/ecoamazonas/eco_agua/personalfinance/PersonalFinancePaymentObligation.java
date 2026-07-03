@@ -11,7 +11,8 @@ import java.time.LocalDateTime;
 @Table(name = "personal_finance_payment_obligation", indexes = {
         @Index(name = "idx_pf_obligation_user_due", columnList = "user_id,due_date"),
         @Index(name = "idx_pf_obligation_user_status", columnList = "user_id,status"),
-        @Index(name = "idx_pf_obligation_user_group", columnList = "user_id,obligation_group")
+        @Index(name = "idx_pf_obligation_user_group", columnList = "user_id,obligation_group"),
+        @Index(name = "idx_pf_obligation_schedule_line", columnList = "schedule_line_id")
 })
 public class PersonalFinancePaymentObligation {
 
@@ -29,6 +30,9 @@ public class PersonalFinancePaymentObligation {
 
     @Column(name = "source_id")
     private Long sourceId;
+
+    @Column(name = "schedule_line_id")
+    private Long scheduleLineId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "obligation_group", nullable = false, length = 40)
@@ -110,6 +114,8 @@ public class PersonalFinancePaymentObligation {
     public void setSourceType(PersonalFinanceObligationSourceType sourceType) { this.sourceType = sourceType; }
     public Long getSourceId() { return sourceId; }
     public void setSourceId(Long sourceId) { this.sourceId = sourceId; }
+    public Long getScheduleLineId() { return scheduleLineId; }
+    public void setScheduleLineId(Long scheduleLineId) { this.scheduleLineId = scheduleLineId; }
     public PersonalFinanceObligationGroup getGroup() { return group; }
     public void setGroup(PersonalFinanceObligationGroup group) { this.group = group; }
     public String getTitle() { return title; }

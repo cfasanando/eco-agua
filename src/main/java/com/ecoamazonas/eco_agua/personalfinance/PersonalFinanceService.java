@@ -68,12 +68,16 @@ public class PersonalFinanceService {
         List<PersonalFinanceIncomeEvent> incomes = incomeEventRepository.findByUserAndExpectedDateBetweenOrderByExpectedDateAscIdAsc(user, start, end);
         List<PersonalFinanceDebt> debts = debtsForMonthlyPlan(user);
         List<PersonalFinancePaymentObligation> obligations = paymentObligationRepository.findByUserAndDueDateBetweenOrderByDueDateAscPriorityAscIdAsc(user, start, end);
+        List<PersonalFinanceDelinquentDebtItem> delinquentDebts = delinquentDebtsForPlan(user);
 
         List<PersonalFinanceMonthlyPlanItem> basicItems = new ArrayList<>();
         List<PersonalFinanceMonthlyPlanItem> debtItems = new ArrayList<>();
         List<PersonalFinanceMonthlyPlanItem> otherItems = new ArrayList<>();
 
         for (PersonalFinancePaymentObligation obligation : obligations) {
+            if (obligation.getStatus() == PersonalFinanceObligationStatus.CANCELLED) {
+                continue;
+            }
             PersonalFinanceMonthlyPlanItem item = itemFromObligation(obligation);
             if (obligation.getGroup() == PersonalFinanceObligationGroup.BASIC_LIVING || obligation.getGroup() == PersonalFinanceObligationGroup.STUDY) {
                 basicItems.add(item);
@@ -113,6 +117,17 @@ public class PersonalFinanceService {
                 + basicItems.stream().filter(item -> item.status() == PersonalFinanceObligationStatus.OVERDUE).count()
                 + otherItems.stream().filter(item -> item.status() == PersonalFinanceObligationStatus.OVERDUE).count();
         long highInterestDebtCount = debts.stream().filter(PersonalFinanceDebt::isHighInterest).count();
+        BigDecimal delinquentDebtPenTotal = delinquentDebts.stream()
+                .filter(item -> item.currency() == PersonalFinanceCurrency.PEN)
+                .map(PersonalFinanceDelinquentDebtItem::currentBalance)
+                .map(this::safe)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal delinquentDebtUsdTotal = delinquentDebts.stream()
+                .filter(item -> item.currency() == PersonalFinanceCurrency.USD)
+                .map(PersonalFinanceDelinquentDebtItem::currentBalance)
+                .map(this::safe)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        long reviewDueCount = delinquentDebts.stream().filter(PersonalFinanceDelinquentDebtItem::reviewDue).count();
 
         return new PersonalFinanceMonthlyPlan(
                 yearMonth,
@@ -120,6 +135,7 @@ public class PersonalFinanceService {
                 basicItems,
                 debtItems,
                 otherItems,
+                delinquentDebts,
                 expectedIncome,
                 receivedIncome,
                 basicTotal,
@@ -131,8 +147,12 @@ public class PersonalFinanceService {
                 projectedBalance,
                 cashAfterBasic,
                 cashAfterAll,
+                delinquentDebtPenTotal,
+                delinquentDebtUsdTotal,
+                delinquentDebts.size(),
                 overdueCount,
-                highInterestDebtCount
+                highInterestDebtCount,
+                reviewDueCount
         );
     }
 
@@ -167,6 +187,36 @@ public class PersonalFinanceService {
         paymentObligationRepository.findByIdAndUser(id, currentUserService.currentUser()).ifPresent(paymentObligationRepository::delete);
     }
 
+    @Transactional
+    public PersonalFinancePaymentObligation createVoluntaryPayment(Long debtId, PersonalFinanceVoluntaryPaymentForm form) {
+        UserAccount user = currentUserService.currentUser();
+        PersonalFinanceDebt debt = debtRepository.findByIdAndUser(debtId, user).orElseThrow();
+        BigDecimal amount = defaultAmount(form.getAmount());
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("El monto del abono debe ser mayor que cero.");
+        }
+        LocalDate dueDate = form.getDueDate() == null ? LocalDate.now() : form.getDueDate();
+        PersonalFinancePaymentObligation obligation = new PersonalFinancePaymentObligation();
+        obligation.setUser(user);
+        obligation.setSourceType(PersonalFinanceObligationSourceType.DEBT_VOLUNTARY_PAYMENT);
+        obligation.setSourceId(debt.getId());
+        obligation.setGroup(PersonalFinanceObligationGroup.DEBT_PAYMENT);
+        obligation.setTitle("Abono voluntario - " + debt.getName());
+        obligation.setAmountDue(amount);
+        obligation.setAmountPaid(BigDecimal.ZERO);
+        obligation.setCurrency(defaultEnum(form.getCurrency(), debt.getCurrency()));
+        obligation.setDueDate(dueDate);
+        obligation.setStatus(dueDate.isBefore(LocalDate.now()) ? PersonalFinanceObligationStatus.OVERDUE : PersonalFinanceObligationStatus.PENDING);
+        obligation.setPriority(defaultEnum(form.getPriority(), debt.getPriority()));
+        List<String> notes = new ArrayList<>();
+        notes.add("Abono voluntario creado desde deuda en seguimiento");
+        if (form.getNotes() != null && !form.getNotes().isBlank()) {
+            notes.add(form.getNotes().trim());
+        }
+        obligation.setNotes(String.join(" · ", notes));
+        return paymentObligationRepository.save(obligation);
+    }
+
     @Transactional(readOnly = true)
     public List<PersonalFinanceDebt> debts() {
         return debtRepository.findByUserOrderByStatusAscDueDayAscNameAsc(currentUserService.currentUser());
@@ -199,8 +249,18 @@ public class PersonalFinanceService {
         entity.setStatus(defaultEnum(debt.getStatus(), PersonalFinanceDebtStatus.ACTIVE));
         entity.setPriority(defaultEnum(debt.getPriority(), PersonalFinancePriority.MEDIUM));
         entity.setFixedPayment(debt.isFixedPayment());
+        entity.setPreviousMonthlyPayment(defaultAmount(debt.getPreviousMonthlyPayment()));
+        entity.setLastPaymentDate(debt.getLastPaymentDate());
+        entity.setDelinquencyStartDate(debt.getDelinquencyStartDate());
+        entity.setCollectionStatus(defaultEnum(debt.getCollectionStatus(), PersonalFinanceCollectionStatus.NONE));
+        entity.setNegotiationStatus(defaultEnum(debt.getNegotiationStatus(), PersonalFinanceNegotiationStatus.NOT_STARTED));
+        entity.setNextReviewDate(debt.getNextReviewDate());
         entity.setNotes(clean(debt.getNotes()));
-        debtRepository.save(entity);
+        normalizeTrackingDebt(entity);
+        PersonalFinanceDebt saved = debtRepository.save(entity);
+        if (saved.isDelinquentTracking()) {
+            cancelGeneratedObligationsForTrackingDebt(user, saved);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -529,6 +589,9 @@ public class PersonalFinanceService {
         List<PersonalFinanceDebtScheduleLine> lines = debtScheduleLineRepository.findByUserAndDueDateBetweenOrderByDueDateAscLineNumberAscIdAsc(user, start, end);
         int created = 0;
         for (PersonalFinanceDebtScheduleLine line : lines) {
+            if (line.getDebt() == null || line.getDebt().isDelinquentTracking() || !line.getDebt().isAutoGenerateMonthly()) {
+                continue;
+            }
             if (line.getStatus() == PersonalFinanceObligationStatus.CANCELLED) {
                 continue;
             }
@@ -598,12 +661,44 @@ public class PersonalFinanceService {
         return created;
     }
 
+    private List<PersonalFinanceDelinquentDebtItem> delinquentDebtsForPlan(UserAccount user) {
+        return debtRepository.findByUserOrderByStatusAscDueDayAscNameAsc(user).stream()
+                .filter(PersonalFinanceDebt::isDelinquentTracking)
+                .map(debt -> new PersonalFinanceDelinquentDebtItem(
+                        debt.getId(),
+                        debt.getName(),
+                        debt.getCreditorName(),
+                        defaultEnum(debt.getCurrency(), PersonalFinanceCurrency.PEN),
+                        safe(debt.getCurrentBalance()),
+                        safe(debt.getPreviousMonthlyPayment()),
+                        defaultEnum(debt.getStatus(), PersonalFinanceDebtStatus.STOPPED_PAYMENT),
+                        defaultEnum(debt.getPriority(), PersonalFinancePriority.MEDIUM),
+                        defaultEnum(debt.getCollectionStatus(), PersonalFinanceCollectionStatus.NONE),
+                        defaultEnum(debt.getNegotiationStatus(), PersonalFinanceNegotiationStatus.NOT_STARTED),
+                        debt.getLastPaymentDate(),
+                        debt.getDelinquencyStartDate(),
+                        debt.overdueDays(),
+                        debt.getNextReviewDate(),
+                        debt.getContactName(),
+                        debt.getNotes()
+                ))
+                .sorted(Comparator
+                        .comparing(PersonalFinanceDelinquentDebtItem::reviewDue).reversed()
+                        .thenComparing(PersonalFinanceDelinquentDebtItem::priority)
+                        .thenComparing(PersonalFinanceDelinquentDebtItem::overdueDays, Comparator.reverseOrder())
+                        .thenComparing(PersonalFinanceDelinquentDebtItem::name, Comparator.nullsLast(String::compareToIgnoreCase)))
+                .toList();
+    }
+
     private List<PersonalFinanceDebt> debtsForMonthlyPlan(UserAccount user) {
         return debtRepository.findByUserOrderByStatusAscDueDayAscNameAsc(user).stream()
                 .filter(debt -> debt.getStatus() == PersonalFinanceDebtStatus.ACTIVE
                         || debt.getStatus() == PersonalFinanceDebtStatus.OVERDUE
                         || debt.getStatus() == PersonalFinanceDebtStatus.STOPPED_PAYMENT
+                        || debt.getStatus() == PersonalFinanceDebtStatus.COLLECTION
+                        || debt.getStatus() == PersonalFinanceDebtStatus.PENDING_NEGOTIATION
                         || debt.getStatus() == PersonalFinanceDebtStatus.NEGOTIATION
+                        || debt.getStatus() == PersonalFinanceDebtStatus.REPROGRAMMED
                         || debt.getStatus() == PersonalFinanceDebtStatus.SUSPENDED)
                 .toList();
     }
@@ -626,6 +721,7 @@ public class PersonalFinanceService {
                 obligation.getSourceType() != PersonalFinanceObligationSourceType.MANUAL
                         && obligation.getSourceType() != PersonalFinanceObligationSourceType.STUDY_CYCLE
                         && obligation.getSourceType() != PersonalFinanceObligationSourceType.LIFE_COST
+                        && obligation.getSourceType() != PersonalFinanceObligationSourceType.DEBT_VOLUNTARY_PAYMENT
         );
     }
 
@@ -700,6 +796,44 @@ public class PersonalFinanceService {
             return PersonalFinanceObligationStatus.PARTIAL;
         }
         return status == PersonalFinanceObligationStatus.PAID ? PersonalFinanceObligationStatus.PENDING : status;
+    }
+
+    private void cancelGeneratedObligationsForTrackingDebt(UserAccount user, PersonalFinanceDebt debt) {
+        List<PersonalFinanceObligationSourceType> generatedSources = List.of(
+                PersonalFinanceObligationSourceType.DEBT,
+                PersonalFinanceObligationSourceType.DEBT_SCHEDULE,
+                PersonalFinanceObligationSourceType.PRIVATE_LENDER_INTEREST,
+                PersonalFinanceObligationSourceType.AUTO_DEDUCTION
+        );
+        for (PersonalFinancePaymentObligation obligation : paymentObligationRepository.findByUserAndSourceIdAndSourceTypeIn(user, debt.getId(), generatedSources)) {
+            if (obligation.getStatus() == PersonalFinanceObligationStatus.PAID
+                    || safe(obligation.getAmountPaid()).compareTo(BigDecimal.ZERO) > 0
+                    || obligation.getStatus() == PersonalFinanceObligationStatus.CANCELLED) {
+                continue;
+            }
+            obligation.setStatus(PersonalFinanceObligationStatus.CANCELLED);
+            String existingNotes = clean(obligation.getNotes());
+            obligation.setNotes(existingNotes == null || existingNotes.isBlank()
+                    ? "Cancelada automáticamente al pasar la deuda a seguimiento de mora"
+                    : existingNotes + " · Cancelada automáticamente al pasar la deuda a seguimiento de mora");
+            paymentObligationRepository.save(obligation);
+        }
+    }
+
+    private void normalizeTrackingDebt(PersonalFinanceDebt debt) {
+        boolean trackingStatus = debt.getStatus() == PersonalFinanceDebtStatus.STOPPED_PAYMENT
+                || debt.getStatus() == PersonalFinanceDebtStatus.COLLECTION
+                || debt.getStatus() == PersonalFinanceDebtStatus.PENDING_NEGOTIATION
+                || debt.getStatus() == PersonalFinanceDebtStatus.NEGOTIATION;
+        if (trackingStatus) {
+            debt.setScheduleMode(PersonalFinanceDebtScheduleMode.TRACKING_ONLY);
+            debt.setAutoGenerateMonthly(false);
+            debt.setFixedPayment(false);
+        }
+        if (debt.getScheduleMode() == PersonalFinanceDebtScheduleMode.TRACKING_ONLY) {
+            debt.setAutoGenerateMonthly(false);
+            debt.setFixedPayment(false);
+        }
     }
 
     private PersonalFinanceDebtScheduleMode inferScheduleMode(PersonalFinanceDebt debt) {

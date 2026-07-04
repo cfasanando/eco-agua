@@ -12,7 +12,9 @@ import java.time.LocalDateTime;
         @Index(name = "idx_pf_debt_user_status", columnList = "user_id,status"),
         @Index(name = "idx_pf_debt_user_due", columnList = "user_id,due_day"),
         @Index(name = "idx_pf_debt_user_priority", columnList = "user_id,priority"),
-        @Index(name = "idx_pf_debt_user_schedule_mode", columnList = "user_id,schedule_mode")
+        @Index(name = "idx_pf_debt_user_schedule_mode", columnList = "user_id,schedule_mode"),
+        @Index(name = "idx_pf_debt_user_delinquency", columnList = "user_id,delinquency_start_date"),
+        @Index(name = "idx_pf_debt_user_review", columnList = "user_id,next_review_date")
 })
 public class PersonalFinanceDebt {
 
@@ -90,6 +92,26 @@ public class PersonalFinanceDebt {
     @Column(name = "has_fixed_payment", nullable = false)
     private boolean fixedPayment = true;
 
+    @Column(name = "previous_monthly_payment", precision = 14, scale = 2)
+    private BigDecimal previousMonthlyPayment = BigDecimal.ZERO;
+
+    @Column(name = "last_payment_date")
+    private LocalDate lastPaymentDate;
+
+    @Column(name = "delinquency_start_date")
+    private LocalDate delinquencyStartDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "collection_status", nullable = false, length = 40)
+    private PersonalFinanceCollectionStatus collectionStatus = PersonalFinanceCollectionStatus.NONE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "negotiation_status", nullable = false, length = 40)
+    private PersonalFinanceNegotiationStatus negotiationStatus = PersonalFinanceNegotiationStatus.NOT_STARTED;
+
+    @Column(name = "next_review_date")
+    private LocalDate nextReviewDate;
+
     @Column(name = "notes", length = 1000)
     private String notes;
 
@@ -144,7 +166,25 @@ public class PersonalFinanceDebt {
     }
 
     public boolean isPaymentStopped() {
-        return status == PersonalFinanceDebtStatus.STOPPED_PAYMENT || status == PersonalFinanceDebtStatus.OVERDUE;
+        return status == PersonalFinanceDebtStatus.STOPPED_PAYMENT
+                || status == PersonalFinanceDebtStatus.COLLECTION
+                || status == PersonalFinanceDebtStatus.PENDING_NEGOTIATION
+                || status == PersonalFinanceDebtStatus.NEGOTIATION;
+    }
+
+    public boolean isDelinquentTracking() {
+        return scheduleMode == PersonalFinanceDebtScheduleMode.TRACKING_ONLY
+                || status == PersonalFinanceDebtStatus.STOPPED_PAYMENT
+                || status == PersonalFinanceDebtStatus.COLLECTION
+                || status == PersonalFinanceDebtStatus.PENDING_NEGOTIATION
+                || status == PersonalFinanceDebtStatus.NEGOTIATION;
+    }
+
+    public long overdueDays() {
+        if (delinquencyStartDate == null) {
+            return 0;
+        }
+        return Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(delinquencyStartDate, LocalDate.now()));
     }
 
     private void normalizeAmounts() {
@@ -153,6 +193,7 @@ public class PersonalFinanceDebt {
         if (monthlyDueAmount == null) monthlyDueAmount = BigDecimal.ZERO;
         if (minimumPayment == null) minimumPayment = BigDecimal.ZERO;
         if (interestRateMonthly == null) interestRateMonthly = BigDecimal.ZERO;
+        if (previousMonthlyPayment == null) previousMonthlyPayment = BigDecimal.ZERO;
         if (holderType == null) holderType = PersonalFinanceDebtHolderType.OWN_NAME;
         if (priority == null) priority = PersonalFinancePriority.MEDIUM;
         if (scheduleMode == null) scheduleMode = PersonalFinanceDebtScheduleMode.SIMPLE_MONTHLY;
@@ -160,6 +201,8 @@ public class PersonalFinanceDebt {
         if (status == null) status = PersonalFinanceDebtStatus.ACTIVE;
         if (debtType == null) debtType = PersonalFinanceDebtType.CREDIT_CARD;
         if (currency == null) currency = PersonalFinanceCurrency.PEN;
+        if (collectionStatus == null) collectionStatus = PersonalFinanceCollectionStatus.NONE;
+        if (negotiationStatus == null) negotiationStatus = PersonalFinanceNegotiationStatus.NOT_STARTED;
     }
 
     public Long getId() { return id; }
@@ -206,6 +249,18 @@ public class PersonalFinanceDebt {
     public void setPriority(PersonalFinancePriority priority) { this.priority = priority; }
     public boolean isFixedPayment() { return fixedPayment; }
     public void setFixedPayment(boolean fixedPayment) { this.fixedPayment = fixedPayment; }
+    public BigDecimal getPreviousMonthlyPayment() { return previousMonthlyPayment; }
+    public void setPreviousMonthlyPayment(BigDecimal previousMonthlyPayment) { this.previousMonthlyPayment = previousMonthlyPayment; }
+    public LocalDate getLastPaymentDate() { return lastPaymentDate; }
+    public void setLastPaymentDate(LocalDate lastPaymentDate) { this.lastPaymentDate = lastPaymentDate; }
+    public LocalDate getDelinquencyStartDate() { return delinquencyStartDate; }
+    public void setDelinquencyStartDate(LocalDate delinquencyStartDate) { this.delinquencyStartDate = delinquencyStartDate; }
+    public PersonalFinanceCollectionStatus getCollectionStatus() { return collectionStatus; }
+    public void setCollectionStatus(PersonalFinanceCollectionStatus collectionStatus) { this.collectionStatus = collectionStatus; }
+    public PersonalFinanceNegotiationStatus getNegotiationStatus() { return negotiationStatus; }
+    public void setNegotiationStatus(PersonalFinanceNegotiationStatus negotiationStatus) { this.negotiationStatus = negotiationStatus; }
+    public LocalDate getNextReviewDate() { return nextReviewDate; }
+    public void setNextReviewDate(LocalDate nextReviewDate) { this.nextReviewDate = nextReviewDate; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
     public LocalDateTime getCreatedAt() { return createdAt; }

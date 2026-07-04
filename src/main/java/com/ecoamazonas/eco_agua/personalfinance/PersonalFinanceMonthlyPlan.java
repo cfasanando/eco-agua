@@ -10,6 +10,7 @@ public record PersonalFinanceMonthlyPlan(
         List<PersonalFinanceMonthlyPlanItem> basicLivingItems,
         List<PersonalFinanceMonthlyPlanItem> debtItems,
         List<PersonalFinanceMonthlyPlanItem> otherItems,
+        List<PersonalFinanceDelinquentDebtItem> delinquentDebts,
         BigDecimal expectedIncome,
         BigDecimal receivedIncome,
         BigDecimal basicLivingTotal,
@@ -21,8 +22,12 @@ public record PersonalFinanceMonthlyPlan(
         BigDecimal projectedBalance,
         BigDecimal cashAfterBasicLiving,
         BigDecimal cashAfterAllObligations,
+        BigDecimal delinquentDebtPenTotal,
+        BigDecimal delinquentDebtUsdTotal,
+        long delinquentDebtCount,
         long overdueCount,
-        long highInterestDebtCount
+        long highInterestDebtCount,
+        long reviewDueCount
 ) {
     public boolean hasDeficit() {
         return projectedBalance.compareTo(BigDecimal.ZERO) < 0;

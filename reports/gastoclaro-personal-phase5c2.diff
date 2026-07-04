@@ -1,0 +1,936 @@
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceCollectionStatus.java /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceCollectionStatus.java
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceCollectionStatus.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceCollectionStatus.java	2026-07-03 18:22:30.663793176 +0000
+@@ -0,0 +1,20 @@
++package com.ecoamazonas.eco_agua.personalfinance;
++
++public enum PersonalFinanceCollectionStatus {
++    NONE("Sin gestión de cobranza"),
++    INTERNAL_COLLECTION("Cobranza interna del acreedor"),
++    EXTERNAL_COLLECTION("Cobranza externa"),
++    LEGAL_COLLECTION("Cobranza legal"),
++    REPORTED_CREDIT_BUREAU("Reportada en central de riesgo"),
++    SETTLEMENT_OFFER("Con oferta de liquidación");
++
++    private final String label;
++
++    PersonalFinanceCollectionStatus(String label) {
++        this.label = label;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++}
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceController.java /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceController.java
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceController.java	2026-07-03 13:15:10.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceController.java	2026-07-03 18:24:09.040595739 +0000
+@@ -117,6 +117,8 @@
+         model.addAttribute("debtStatuses", PersonalFinanceDebtStatus.values());
+         model.addAttribute("debtHolderTypes", PersonalFinanceDebtHolderType.values());
+         model.addAttribute("scheduleModes", PersonalFinanceDebtScheduleMode.values());
++        model.addAttribute("collectionStatuses", PersonalFinanceCollectionStatus.values());
++        model.addAttribute("negotiationStatuses", PersonalFinanceNegotiationStatus.values());
+         model.addAttribute("priorities", PersonalFinancePriority.values());
+         model.addAttribute("currencies", PersonalFinanceCurrency.values());
+         return "personal_finance/debts";
+@@ -138,6 +140,42 @@
+         return "redirect:/gasto-claro/debts";
+     }
+ 
++    @GetMapping("/debts/{id}/voluntary-payment")
++    public String voluntaryPayment(
++            @PathVariable("id") Long id,
++            Model model
++    ) {
++        PersonalFinanceDebt debt = service.debt(id);
++        PersonalFinanceVoluntaryPaymentForm form = new PersonalFinanceVoluntaryPaymentForm();
++        form.setCurrency(debt.getCurrency());
++        form.setPriority(debt.getPriority());
++        model.addAttribute("activePage", "gasto_claro_debts");
++        model.addAttribute("debt", debt);
++        model.addAttribute("paymentForm", form);
++        model.addAttribute("priorities", PersonalFinancePriority.values());
++        model.addAttribute("currencies", PersonalFinanceCurrency.values());
++        return "personal_finance/debt_voluntary_payment";
++    }
++
++    @PostMapping("/debts/{id}/voluntary-payment")
++    public String createVoluntaryPayment(
++            @PathVariable("id") Long id,
++            @ModelAttribute("paymentForm") PersonalFinanceVoluntaryPaymentForm form,
++            RedirectAttributes redirectAttributes
++    ) {
++        try {
++            PersonalFinancePaymentObligation obligation = service.createVoluntaryPayment(id, form);
++            redirectAttributes.addFlashAttribute("message", "Abono voluntario agregado al plan mensual.");
++            redirectAttributes.addFlashAttribute("messageType", "success");
++            YearMonth selectedMonth = YearMonth.from(obligation.getDueDate());
++            return "redirect:/gasto-claro/monthly-plan?year=" + selectedMonth.getYear() + "&month=" + selectedMonth.getMonthValue();
++        } catch (IllegalArgumentException exception) {
++            redirectAttributes.addFlashAttribute("message", exception.getMessage());
++            redirectAttributes.addFlashAttribute("messageType", "info");
++            return "redirect:/gasto-claro/debts/" + id + "/voluntary-payment";
++        }
++    }
++
+     @GetMapping("/debts/{id}/schedule")
+     public String debtSchedule(
+             @PathVariable("id") Long id,
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebt.java /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebt.java
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebt.java	2026-07-03 13:15:10.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebt.java	2026-07-03 18:25:41.519821497 +0000
+@@ -12,7 +12,9 @@
+         @Index(name = "idx_pf_debt_user_status", columnList = "user_id,status"),
+         @Index(name = "idx_pf_debt_user_due", columnList = "user_id,due_day"),
+         @Index(name = "idx_pf_debt_user_priority", columnList = "user_id,priority"),
+-        @Index(name = "idx_pf_debt_user_schedule_mode", columnList = "user_id,schedule_mode")
++        @Index(name = "idx_pf_debt_user_schedule_mode", columnList = "user_id,schedule_mode"),
++        @Index(name = "idx_pf_debt_user_delinquency", columnList = "user_id,delinquency_start_date"),
++        @Index(name = "idx_pf_debt_user_review", columnList = "user_id,next_review_date")
+ })
+ public class PersonalFinanceDebt {
+ 
+@@ -90,6 +92,26 @@
+     @Column(name = "has_fixed_payment", nullable = false)
+     private boolean fixedPayment = true;
+ 
++    @Column(name = "previous_monthly_payment", precision = 14, scale = 2)
++    private BigDecimal previousMonthlyPayment = BigDecimal.ZERO;
++
++    @Column(name = "last_payment_date")
++    private LocalDate lastPaymentDate;
++
++    @Column(name = "delinquency_start_date")
++    private LocalDate delinquencyStartDate;
++
++    @Enumerated(EnumType.STRING)
++    @Column(name = "collection_status", nullable = false, length = 40)
++    private PersonalFinanceCollectionStatus collectionStatus = PersonalFinanceCollectionStatus.NONE;
++
++    @Enumerated(EnumType.STRING)
++    @Column(name = "negotiation_status", nullable = false, length = 40)
++    private PersonalFinanceNegotiationStatus negotiationStatus = PersonalFinanceNegotiationStatus.NOT_STARTED;
++
++    @Column(name = "next_review_date")
++    private LocalDate nextReviewDate;
++
+     @Column(name = "notes", length = 1000)
+     private String notes;
+ 
+@@ -144,7 +166,25 @@
+     }
+ 
+     public boolean isPaymentStopped() {
+-        return status == PersonalFinanceDebtStatus.STOPPED_PAYMENT || status == PersonalFinanceDebtStatus.OVERDUE;
++        return status == PersonalFinanceDebtStatus.STOPPED_PAYMENT
++                || status == PersonalFinanceDebtStatus.COLLECTION
++                || status == PersonalFinanceDebtStatus.PENDING_NEGOTIATION
++                || status == PersonalFinanceDebtStatus.NEGOTIATION;
++    }
++
++    public boolean isDelinquentTracking() {
++        return scheduleMode == PersonalFinanceDebtScheduleMode.TRACKING_ONLY
++                || status == PersonalFinanceDebtStatus.STOPPED_PAYMENT
++                || status == PersonalFinanceDebtStatus.COLLECTION
++                || status == PersonalFinanceDebtStatus.PENDING_NEGOTIATION
++                || status == PersonalFinanceDebtStatus.NEGOTIATION;
++    }
++
++    public long overdueDays() {
++        if (delinquencyStartDate == null) {
++            return 0;
++        }
++        return Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(delinquencyStartDate, LocalDate.now()));
+     }
+ 
+     private void normalizeAmounts() {
+@@ -153,6 +193,7 @@
+         if (monthlyDueAmount == null) monthlyDueAmount = BigDecimal.ZERO;
+         if (minimumPayment == null) minimumPayment = BigDecimal.ZERO;
+         if (interestRateMonthly == null) interestRateMonthly = BigDecimal.ZERO;
++        if (previousMonthlyPayment == null) previousMonthlyPayment = BigDecimal.ZERO;
+         if (holderType == null) holderType = PersonalFinanceDebtHolderType.OWN_NAME;
+         if (priority == null) priority = PersonalFinancePriority.MEDIUM;
+         if (scheduleMode == null) scheduleMode = PersonalFinanceDebtScheduleMode.SIMPLE_MONTHLY;
+@@ -160,6 +201,8 @@
+         if (status == null) status = PersonalFinanceDebtStatus.ACTIVE;
+         if (debtType == null) debtType = PersonalFinanceDebtType.CREDIT_CARD;
+         if (currency == null) currency = PersonalFinanceCurrency.PEN;
++        if (collectionStatus == null) collectionStatus = PersonalFinanceCollectionStatus.NONE;
++        if (negotiationStatus == null) negotiationStatus = PersonalFinanceNegotiationStatus.NOT_STARTED;
+     }
+ 
+     public Long getId() { return id; }
+@@ -206,6 +249,18 @@
+     public void setPriority(PersonalFinancePriority priority) { this.priority = priority; }
+     public boolean isFixedPayment() { return fixedPayment; }
+     public void setFixedPayment(boolean fixedPayment) { this.fixedPayment = fixedPayment; }
++    public BigDecimal getPreviousMonthlyPayment() { return previousMonthlyPayment; }
++    public void setPreviousMonthlyPayment(BigDecimal previousMonthlyPayment) { this.previousMonthlyPayment = previousMonthlyPayment; }
++    public LocalDate getLastPaymentDate() { return lastPaymentDate; }
++    public void setLastPaymentDate(LocalDate lastPaymentDate) { this.lastPaymentDate = lastPaymentDate; }
++    public LocalDate getDelinquencyStartDate() { return delinquencyStartDate; }
++    public void setDelinquencyStartDate(LocalDate delinquencyStartDate) { this.delinquencyStartDate = delinquencyStartDate; }
++    public PersonalFinanceCollectionStatus getCollectionStatus() { return collectionStatus; }
++    public void setCollectionStatus(PersonalFinanceCollectionStatus collectionStatus) { this.collectionStatus = collectionStatus; }
++    public PersonalFinanceNegotiationStatus getNegotiationStatus() { return negotiationStatus; }
++    public void setNegotiationStatus(PersonalFinanceNegotiationStatus negotiationStatus) { this.negotiationStatus = negotiationStatus; }
++    public LocalDate getNextReviewDate() { return nextReviewDate; }
++    public void setNextReviewDate(LocalDate nextReviewDate) { this.nextReviewDate = nextReviewDate; }
+     public String getNotes() { return notes; }
+     public void setNotes(String notes) { this.notes = notes; }
+     public LocalDateTime getCreatedAt() { return createdAt; }
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebtStatus.java /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebtStatus.java
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebtStatus.java	2026-07-03 13:15:10.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDebtStatus.java	2026-07-03 18:22:40.698296228 +0000
+@@ -4,7 +4,10 @@
+     ACTIVE("Activa"),
+     OVERDUE("Atrasada"),
+     STOPPED_PAYMENT("Dejé de pagar"),
++    COLLECTION("En cobranza"),
++    PENDING_NEGOTIATION("Pendiente de negociación"),
+     NEGOTIATION("En negociación"),
++    REPROGRAMMED("Reprogramada"),
+     PAID("Pagada"),
+     SUSPENDED("Suspendida"),
+     CANCELLED("Cancelada");
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDelinquentDebtItem.java /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDelinquentDebtItem.java
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDelinquentDebtItem.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceDelinquentDebtItem.java	2026-07-03 18:22:30.674898639 +0000
+@@ -0,0 +1,27 @@
++package com.ecoamazonas.eco_agua.personalfinance;
++
++import java.math.BigDecimal;
++import java.time.LocalDate;
++
++public record PersonalFinanceDelinquentDebtItem(
++        Long id,
++        String name,
++        String creditorName,
++        PersonalFinanceCurrency currency,
++        BigDecimal currentBalance,
++        BigDecimal previousMonthlyPayment,
++        PersonalFinanceDebtStatus status,
++        PersonalFinancePriority priority,
++        PersonalFinanceCollectionStatus collectionStatus,
++        PersonalFinanceNegotiationStatus negotiationStatus,
++        LocalDate lastPaymentDate,
++        LocalDate delinquencyStartDate,
++        long overdueDays,
++        LocalDate nextReviewDate,
++        String contactName,
++        String notes
++) {
++    public boolean reviewDue() {
++        return nextReviewDate != null && !nextReviewDate.isAfter(LocalDate.now());
++    }
++}
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceModuleInitializer.java /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceModuleInitializer.java
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceModuleInitializer.java	2026-07-03 13:15:10.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceModuleInitializer.java	2026-07-03 18:23:56.816059808 +0000
+@@ -130,6 +130,12 @@
+                     status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
+                     priority VARCHAR(30) NOT NULL DEFAULT 'MEDIUM',
+                     has_fixed_payment BIT NOT NULL DEFAULT 1,
++                    previous_monthly_payment DECIMAL(14,2) NULL DEFAULT 0.00,
++                    last_payment_date DATE NULL,
++                    delinquency_start_date DATE NULL,
++                    collection_status VARCHAR(40) NOT NULL DEFAULT 'NONE',
++                    negotiation_status VARCHAR(40) NOT NULL DEFAULT 'NOT_STARTED',
++                    next_review_date DATE NULL,
+                     notes VARCHAR(1000) NULL,
+                     created_at DATETIME(6) NOT NULL,
+                     updated_at DATETIME(6) NOT NULL,
+@@ -138,6 +144,8 @@
+                     KEY idx_pf_debt_user_due (user_id, due_day),
+                     KEY idx_pf_debt_user_priority (user_id, priority),
+                     KEY idx_pf_debt_user_schedule_mode (user_id, schedule_mode),
++                    KEY idx_pf_debt_user_delinquency (user_id, delinquency_start_date),
++                    KEY idx_pf_debt_user_review (user_id, next_review_date),
+                     CONSTRAINT fk_pf_debt_user FOREIGN KEY (user_id) REFERENCES `user` (id)
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                 """);
+@@ -225,9 +233,17 @@
+         addColumnIfMissing("personal_finance_debt", "schedule_end_date", "ALTER TABLE personal_finance_debt ADD COLUMN schedule_end_date DATE NULL AFTER schedule_start_date");
+         addColumnIfMissing("personal_finance_debt", "installment_count", "ALTER TABLE personal_finance_debt ADD COLUMN installment_count INT NULL AFTER schedule_end_date");
+         addColumnIfMissing("personal_finance_debt", "auto_generate_monthly", "ALTER TABLE personal_finance_debt ADD COLUMN auto_generate_monthly BIT NOT NULL DEFAULT 1 AFTER installment_count");
++        addColumnIfMissing("personal_finance_debt", "previous_monthly_payment", "ALTER TABLE personal_finance_debt ADD COLUMN previous_monthly_payment DECIMAL(14,2) NULL DEFAULT 0.00 AFTER has_fixed_payment");
++        addColumnIfMissing("personal_finance_debt", "last_payment_date", "ALTER TABLE personal_finance_debt ADD COLUMN last_payment_date DATE NULL AFTER previous_monthly_payment");
++        addColumnIfMissing("personal_finance_debt", "delinquency_start_date", "ALTER TABLE personal_finance_debt ADD COLUMN delinquency_start_date DATE NULL AFTER last_payment_date");
++        addColumnIfMissing("personal_finance_debt", "collection_status", "ALTER TABLE personal_finance_debt ADD COLUMN collection_status VARCHAR(40) NOT NULL DEFAULT 'NONE' AFTER delinquency_start_date");
++        addColumnIfMissing("personal_finance_debt", "negotiation_status", "ALTER TABLE personal_finance_debt ADD COLUMN negotiation_status VARCHAR(40) NOT NULL DEFAULT 'NOT_STARTED' AFTER collection_status");
++        addColumnIfMissing("personal_finance_debt", "next_review_date", "ALTER TABLE personal_finance_debt ADD COLUMN next_review_date DATE NULL AFTER negotiation_status");
+         addColumnIfMissing("personal_finance_payment_obligation", "schedule_line_id", "ALTER TABLE personal_finance_payment_obligation ADD COLUMN schedule_line_id BIGINT NULL AFTER source_id");
+         addIndexIfMissing("personal_finance_debt", "idx_pf_debt_user_priority", "CREATE INDEX idx_pf_debt_user_priority ON personal_finance_debt (user_id, priority)");
+         addIndexIfMissing("personal_finance_debt", "idx_pf_debt_user_schedule_mode", "CREATE INDEX idx_pf_debt_user_schedule_mode ON personal_finance_debt (user_id, schedule_mode)");
++        addIndexIfMissing("personal_finance_debt", "idx_pf_debt_user_delinquency", "CREATE INDEX idx_pf_debt_user_delinquency ON personal_finance_debt (user_id, delinquency_start_date)");
++        addIndexIfMissing("personal_finance_debt", "idx_pf_debt_user_review", "CREATE INDEX idx_pf_debt_user_review ON personal_finance_debt (user_id, next_review_date)");
+         addIndexIfMissing("personal_finance_payment_obligation", "idx_pf_obligation_schedule_line", "CREATE INDEX idx_pf_obligation_schedule_line ON personal_finance_payment_obligation (schedule_line_id)");
+     }
+ 
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceMonthlyPlan.java /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceMonthlyPlan.java
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceMonthlyPlan.java	2026-07-03 13:15:10.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceMonthlyPlan.java	2026-07-03 18:23:15.934105537 +0000
+@@ -10,6 +10,7 @@
+         List<PersonalFinanceMonthlyPlanItem> basicLivingItems,
+         List<PersonalFinanceMonthlyPlanItem> debtItems,
+         List<PersonalFinanceMonthlyPlanItem> otherItems,
++        List<PersonalFinanceDelinquentDebtItem> delinquentDebts,
+         BigDecimal expectedIncome,
+         BigDecimal receivedIncome,
+         BigDecimal basicLivingTotal,
+@@ -21,8 +22,12 @@
+         BigDecimal projectedBalance,
+         BigDecimal cashAfterBasicLiving,
+         BigDecimal cashAfterAllObligations,
++        BigDecimal delinquentDebtPenTotal,
++        BigDecimal delinquentDebtUsdTotal,
++        long delinquentDebtCount,
+         long overdueCount,
+-        long highInterestDebtCount
++        long highInterestDebtCount,
++        long reviewDueCount
+ ) {
+     public boolean hasDeficit() {
+         return projectedBalance.compareTo(BigDecimal.ZERO) < 0;
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceNegotiationStatus.java /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceNegotiationStatus.java
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceNegotiationStatus.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceNegotiationStatus.java	2026-07-03 18:22:30.669167341 +0000
+@@ -0,0 +1,22 @@
++package com.ecoamazonas.eco_agua.personalfinance;
++
++public enum PersonalFinanceNegotiationStatus {
++    NOT_STARTED("Sin iniciar"),
++    PENDING_CONTACT("Pendiente de contactar"),
++    IN_PROGRESS("En conversación"),
++    PROPOSAL_RECEIVED("Propuesta recibida"),
++    AGREEMENT_REACHED("Acuerdo alcanzado"),
++    REPROGRAMMED("Reprogramada"),
++    PAUSED("Pausada"),
++    CLOSED("Cerrada");
++
++    private final String label;
++
++    PersonalFinanceNegotiationStatus(String label) {
++        this.label = label;
++    }
++
++    public String getLabel() {
++        return label;
++    }
++}
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceObligationSourceType.java /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceObligationSourceType.java
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceObligationSourceType.java	2026-07-03 13:15:10.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceObligationSourceType.java	2026-07-03 18:23:17.143373426 +0000
+@@ -7,6 +7,7 @@
+     DEBT_SCHEDULE("Cronograma de deuda"),
+     PRIVATE_LENDER_INTEREST("Interés prestamista"),
+     AUTO_DEDUCTION("Descuento automático"),
++    DEBT_VOLUNTARY_PAYMENT("Abono voluntario a deuda"),
+     STUDY_CYCLE("Estudio por ciclo"),
+     LIFE_COST("Costo de vida");
+ 
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinancePaymentObligationRepository.java /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinancePaymentObligationRepository.java
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinancePaymentObligationRepository.java	2026-07-03 13:15:10.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinancePaymentObligationRepository.java	2026-07-03 18:26:36.626569942 +0000
+@@ -4,6 +4,7 @@
+ import org.springframework.data.jpa.repository.JpaRepository;
+ 
+ import java.time.LocalDate;
++import java.util.Collection;
+ import java.util.List;
+ import java.util.Optional;
+ 
+@@ -12,6 +13,7 @@
+     List<PersonalFinancePaymentObligation> findByUserOrderByDueDateAscPriorityAscIdAsc(UserAccount user);
+     Optional<PersonalFinancePaymentObligation> findByIdAndUser(Long id, UserAccount user);
+     Optional<PersonalFinancePaymentObligation> findByScheduleLineIdAndUser(Long scheduleLineId, UserAccount user);
++    List<PersonalFinancePaymentObligation> findByUserAndSourceIdAndSourceTypeIn(UserAccount user, Long sourceId, Collection<PersonalFinanceObligationSourceType> sourceTypes);
+     boolean existsByUserAndSourceTypeAndSourceIdAndDueDateBetween(UserAccount user, PersonalFinanceObligationSourceType sourceType, Long sourceId, LocalDate start, LocalDate end);
+     boolean existsByUserAndSourceTypeAndSourceIdAndDueDate(UserAccount user, PersonalFinanceObligationSourceType sourceType, Long sourceId, LocalDate dueDate);
+ }
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceService.java /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceService.java
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceService.java	2026-07-03 13:15:10.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceService.java	2026-07-03 18:26:58.881592916 +0000
+@@ -68,12 +68,16 @@
+         List<PersonalFinanceIncomeEvent> incomes = incomeEventRepository.findByUserAndExpectedDateBetweenOrderByExpectedDateAscIdAsc(user, start, end);
+         List<PersonalFinanceDebt> debts = debtsForMonthlyPlan(user);
+         List<PersonalFinancePaymentObligation> obligations = paymentObligationRepository.findByUserAndDueDateBetweenOrderByDueDateAscPriorityAscIdAsc(user, start, end);
++        List<PersonalFinanceDelinquentDebtItem> delinquentDebts = delinquentDebtsForPlan(user);
+ 
+         List<PersonalFinanceMonthlyPlanItem> basicItems = new ArrayList<>();
+         List<PersonalFinanceMonthlyPlanItem> debtItems = new ArrayList<>();
+         List<PersonalFinanceMonthlyPlanItem> otherItems = new ArrayList<>();
+ 
+         for (PersonalFinancePaymentObligation obligation : obligations) {
++            if (obligation.getStatus() == PersonalFinanceObligationStatus.CANCELLED) {
++                continue;
++            }
+             PersonalFinanceMonthlyPlanItem item = itemFromObligation(obligation);
+             if (obligation.getGroup() == PersonalFinanceObligationGroup.BASIC_LIVING || obligation.getGroup() == PersonalFinanceObligationGroup.STUDY) {
+                 basicItems.add(item);
+@@ -113,6 +117,17 @@
+                 + basicItems.stream().filter(item -> item.status() == PersonalFinanceObligationStatus.OVERDUE).count()
+                 + otherItems.stream().filter(item -> item.status() == PersonalFinanceObligationStatus.OVERDUE).count();
+         long highInterestDebtCount = debts.stream().filter(PersonalFinanceDebt::isHighInterest).count();
++        BigDecimal delinquentDebtPenTotal = delinquentDebts.stream()
++                .filter(item -> item.currency() == PersonalFinanceCurrency.PEN)
++                .map(PersonalFinanceDelinquentDebtItem::currentBalance)
++                .map(this::safe)
++                .reduce(BigDecimal.ZERO, BigDecimal::add);
++        BigDecimal delinquentDebtUsdTotal = delinquentDebts.stream()
++                .filter(item -> item.currency() == PersonalFinanceCurrency.USD)
++                .map(PersonalFinanceDelinquentDebtItem::currentBalance)
++                .map(this::safe)
++                .reduce(BigDecimal.ZERO, BigDecimal::add);
++        long reviewDueCount = delinquentDebts.stream().filter(PersonalFinanceDelinquentDebtItem::reviewDue).count();
+ 
+         return new PersonalFinanceMonthlyPlan(
+                 yearMonth,
+@@ -120,6 +135,7 @@
+                 basicItems,
+                 debtItems,
+                 otherItems,
++                delinquentDebts,
+                 expectedIncome,
+                 receivedIncome,
+                 basicTotal,
+@@ -131,8 +147,12 @@
+                 projectedBalance,
+                 cashAfterBasic,
+                 cashAfterAll,
++                delinquentDebtPenTotal,
++                delinquentDebtUsdTotal,
++                delinquentDebts.size(),
+                 overdueCount,
+-                highInterestDebtCount
++                highInterestDebtCount,
++                reviewDueCount
+         );
+     }
+ 
+@@ -167,6 +187,36 @@
+         paymentObligationRepository.findByIdAndUser(id, currentUserService.currentUser()).ifPresent(paymentObligationRepository::delete);
+     }
+ 
++    @Transactional
++    public PersonalFinancePaymentObligation createVoluntaryPayment(Long debtId, PersonalFinanceVoluntaryPaymentForm form) {
++        UserAccount user = currentUserService.currentUser();
++        PersonalFinanceDebt debt = debtRepository.findByIdAndUser(debtId, user).orElseThrow();
++        BigDecimal amount = defaultAmount(form.getAmount());
++        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
++            throw new IllegalArgumentException("El monto del abono debe ser mayor que cero.");
++        }
++        LocalDate dueDate = form.getDueDate() == null ? LocalDate.now() : form.getDueDate();
++        PersonalFinancePaymentObligation obligation = new PersonalFinancePaymentObligation();
++        obligation.setUser(user);
++        obligation.setSourceType(PersonalFinanceObligationSourceType.DEBT_VOLUNTARY_PAYMENT);
++        obligation.setSourceId(debt.getId());
++        obligation.setGroup(PersonalFinanceObligationGroup.DEBT_PAYMENT);
++        obligation.setTitle("Abono voluntario - " + debt.getName());
++        obligation.setAmountDue(amount);
++        obligation.setAmountPaid(BigDecimal.ZERO);
++        obligation.setCurrency(defaultEnum(form.getCurrency(), debt.getCurrency()));
++        obligation.setDueDate(dueDate);
++        obligation.setStatus(dueDate.isBefore(LocalDate.now()) ? PersonalFinanceObligationStatus.OVERDUE : PersonalFinanceObligationStatus.PENDING);
++        obligation.setPriority(defaultEnum(form.getPriority(), debt.getPriority()));
++        List<String> notes = new ArrayList<>();
++        notes.add("Abono voluntario creado desde deuda en seguimiento");
++        if (form.getNotes() != null && !form.getNotes().isBlank()) {
++            notes.add(form.getNotes().trim());
++        }
++        obligation.setNotes(String.join(" · ", notes));
++        return paymentObligationRepository.save(obligation);
++    }
++
+     @Transactional(readOnly = true)
+     public List<PersonalFinanceDebt> debts() {
+         return debtRepository.findByUserOrderByStatusAscDueDayAscNameAsc(currentUserService.currentUser());
+@@ -199,8 +249,18 @@
+         entity.setStatus(defaultEnum(debt.getStatus(), PersonalFinanceDebtStatus.ACTIVE));
+         entity.setPriority(defaultEnum(debt.getPriority(), PersonalFinancePriority.MEDIUM));
+         entity.setFixedPayment(debt.isFixedPayment());
++        entity.setPreviousMonthlyPayment(defaultAmount(debt.getPreviousMonthlyPayment()));
++        entity.setLastPaymentDate(debt.getLastPaymentDate());
++        entity.setDelinquencyStartDate(debt.getDelinquencyStartDate());
++        entity.setCollectionStatus(defaultEnum(debt.getCollectionStatus(), PersonalFinanceCollectionStatus.NONE));
++        entity.setNegotiationStatus(defaultEnum(debt.getNegotiationStatus(), PersonalFinanceNegotiationStatus.NOT_STARTED));
++        entity.setNextReviewDate(debt.getNextReviewDate());
+         entity.setNotes(clean(debt.getNotes()));
+-        debtRepository.save(entity);
++        normalizeTrackingDebt(entity);
++        PersonalFinanceDebt saved = debtRepository.save(entity);
++        if (saved.isDelinquentTracking()) {
++            cancelGeneratedObligationsForTrackingDebt(user, saved);
++        }
+     }
+ 
+     @Transactional(readOnly = true)
+@@ -529,6 +589,9 @@
+         List<PersonalFinanceDebtScheduleLine> lines = debtScheduleLineRepository.findByUserAndDueDateBetweenOrderByDueDateAscLineNumberAscIdAsc(user, start, end);
+         int created = 0;
+         for (PersonalFinanceDebtScheduleLine line : lines) {
++            if (line.getDebt() == null || line.getDebt().isDelinquentTracking() || !line.getDebt().isAutoGenerateMonthly()) {
++                continue;
++            }
+             if (line.getStatus() == PersonalFinanceObligationStatus.CANCELLED) {
+                 continue;
+             }
+@@ -598,12 +661,44 @@
+         return created;
+     }
+ 
++    private List<PersonalFinanceDelinquentDebtItem> delinquentDebtsForPlan(UserAccount user) {
++        return debtRepository.findByUserOrderByStatusAscDueDayAscNameAsc(user).stream()
++                .filter(PersonalFinanceDebt::isDelinquentTracking)
++                .map(debt -> new PersonalFinanceDelinquentDebtItem(
++                        debt.getId(),
++                        debt.getName(),
++                        debt.getCreditorName(),
++                        defaultEnum(debt.getCurrency(), PersonalFinanceCurrency.PEN),
++                        safe(debt.getCurrentBalance()),
++                        safe(debt.getPreviousMonthlyPayment()),
++                        defaultEnum(debt.getStatus(), PersonalFinanceDebtStatus.STOPPED_PAYMENT),
++                        defaultEnum(debt.getPriority(), PersonalFinancePriority.MEDIUM),
++                        defaultEnum(debt.getCollectionStatus(), PersonalFinanceCollectionStatus.NONE),
++                        defaultEnum(debt.getNegotiationStatus(), PersonalFinanceNegotiationStatus.NOT_STARTED),
++                        debt.getLastPaymentDate(),
++                        debt.getDelinquencyStartDate(),
++                        debt.overdueDays(),
++                        debt.getNextReviewDate(),
++                        debt.getContactName(),
++                        debt.getNotes()
++                ))
++                .sorted(Comparator
++                        .comparing(PersonalFinanceDelinquentDebtItem::reviewDue).reversed()
++                        .thenComparing(PersonalFinanceDelinquentDebtItem::priority)
++                        .thenComparing(PersonalFinanceDelinquentDebtItem::overdueDays, Comparator.reverseOrder())
++                        .thenComparing(PersonalFinanceDelinquentDebtItem::name, Comparator.nullsLast(String::compareToIgnoreCase)))
++                .toList();
++    }
++
+     private List<PersonalFinanceDebt> debtsForMonthlyPlan(UserAccount user) {
+         return debtRepository.findByUserOrderByStatusAscDueDayAscNameAsc(user).stream()
+                 .filter(debt -> debt.getStatus() == PersonalFinanceDebtStatus.ACTIVE
+                         || debt.getStatus() == PersonalFinanceDebtStatus.OVERDUE
+                         || debt.getStatus() == PersonalFinanceDebtStatus.STOPPED_PAYMENT
++                        || debt.getStatus() == PersonalFinanceDebtStatus.COLLECTION
++                        || debt.getStatus() == PersonalFinanceDebtStatus.PENDING_NEGOTIATION
+                         || debt.getStatus() == PersonalFinanceDebtStatus.NEGOTIATION
++                        || debt.getStatus() == PersonalFinanceDebtStatus.REPROGRAMMED
+                         || debt.getStatus() == PersonalFinanceDebtStatus.SUSPENDED)
+                 .toList();
+     }
+@@ -626,6 +721,7 @@
+                 obligation.getSourceType() != PersonalFinanceObligationSourceType.MANUAL
+                         && obligation.getSourceType() != PersonalFinanceObligationSourceType.STUDY_CYCLE
+                         && obligation.getSourceType() != PersonalFinanceObligationSourceType.LIFE_COST
++                        && obligation.getSourceType() != PersonalFinanceObligationSourceType.DEBT_VOLUNTARY_PAYMENT
+         );
+     }
+ 
+@@ -702,6 +798,44 @@
+         return status == PersonalFinanceObligationStatus.PAID ? PersonalFinanceObligationStatus.PENDING : status;
+     }
+ 
++    private void cancelGeneratedObligationsForTrackingDebt(UserAccount user, PersonalFinanceDebt debt) {
++        List<PersonalFinanceObligationSourceType> generatedSources = List.of(
++                PersonalFinanceObligationSourceType.DEBT,
++                PersonalFinanceObligationSourceType.DEBT_SCHEDULE,
++                PersonalFinanceObligationSourceType.PRIVATE_LENDER_INTEREST,
++                PersonalFinanceObligationSourceType.AUTO_DEDUCTION
++        );
++        for (PersonalFinancePaymentObligation obligation : paymentObligationRepository.findByUserAndSourceIdAndSourceTypeIn(user, debt.getId(), generatedSources)) {
++            if (obligation.getStatus() == PersonalFinanceObligationStatus.PAID
++                    || safe(obligation.getAmountPaid()).compareTo(BigDecimal.ZERO) > 0
++                    || obligation.getStatus() == PersonalFinanceObligationStatus.CANCELLED) {
++                continue;
++            }
++            obligation.setStatus(PersonalFinanceObligationStatus.CANCELLED);
++            String existingNotes = clean(obligation.getNotes());
++            obligation.setNotes(existingNotes == null || existingNotes.isBlank()
++                    ? "Cancelada automáticamente al pasar la deuda a seguimiento de mora"
++                    : existingNotes + " · Cancelada automáticamente al pasar la deuda a seguimiento de mora");
++            paymentObligationRepository.save(obligation);
++        }
++    }
++
++    private void normalizeTrackingDebt(PersonalFinanceDebt debt) {
++        boolean trackingStatus = debt.getStatus() == PersonalFinanceDebtStatus.STOPPED_PAYMENT
++                || debt.getStatus() == PersonalFinanceDebtStatus.COLLECTION
++                || debt.getStatus() == PersonalFinanceDebtStatus.PENDING_NEGOTIATION
++                || debt.getStatus() == PersonalFinanceDebtStatus.NEGOTIATION;
++        if (trackingStatus) {
++            debt.setScheduleMode(PersonalFinanceDebtScheduleMode.TRACKING_ONLY);
++            debt.setAutoGenerateMonthly(false);
++            debt.setFixedPayment(false);
++        }
++        if (debt.getScheduleMode() == PersonalFinanceDebtScheduleMode.TRACKING_ONLY) {
++            debt.setAutoGenerateMonthly(false);
++            debt.setFixedPayment(false);
++        }
++    }
++
+     private PersonalFinanceDebtScheduleMode inferScheduleMode(PersonalFinanceDebt debt) {
+         if (debt.getDebtType() == PersonalFinanceDebtType.PRIVATE_LENDER && safe(debt.getInterestRateMonthly()).compareTo(BigDecimal.ZERO) > 0) {
+             return PersonalFinanceDebtScheduleMode.PRIVATE_LENDER_INTEREST;
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceVoluntaryPaymentForm.java /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceVoluntaryPaymentForm.java
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceVoluntaryPaymentForm.java	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/java/com/ecoamazonas/eco_agua/personalfinance/PersonalFinanceVoluntaryPaymentForm.java	2026-07-03 18:22:30.680363490 +0000
+@@ -0,0 +1,53 @@
++package com.ecoamazonas.eco_agua.personalfinance;
++
++import java.math.BigDecimal;
++import java.time.LocalDate;
++
++public class PersonalFinanceVoluntaryPaymentForm {
++
++    private BigDecimal amount = BigDecimal.ZERO;
++    private LocalDate dueDate = LocalDate.now();
++    private PersonalFinanceCurrency currency = PersonalFinanceCurrency.PEN;
++    private PersonalFinancePriority priority = PersonalFinancePriority.MEDIUM;
++    private String notes;
++
++    public BigDecimal getAmount() {
++        return amount;
++    }
++
++    public void setAmount(BigDecimal amount) {
++        this.amount = amount;
++    }
++
++    public LocalDate getDueDate() {
++        return dueDate;
++    }
++
++    public void setDueDate(LocalDate dueDate) {
++        this.dueDate = dueDate;
++    }
++
++    public PersonalFinanceCurrency getCurrency() {
++        return currency;
++    }
++
++    public void setCurrency(PersonalFinanceCurrency currency) {
++        this.currency = currency;
++    }
++
++    public PersonalFinancePriority getPriority() {
++        return priority;
++    }
++
++    public void setPriority(PersonalFinancePriority priority) {
++        this.priority = priority;
++    }
++
++    public String getNotes() {
++        return notes;
++    }
++
++    public void setNotes(String notes) {
++        this.notes = notes;
++    }
++}
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/resources/templates/personal_finance/debt_voluntary_payment.html /mnt/data/gasto5c2_build/src/main/resources/templates/personal_finance/debt_voluntary_payment.html
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/resources/templates/personal_finance/debt_voluntary_payment.html	1970-01-01 00:00:00.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/resources/templates/personal_finance/debt_voluntary_payment.html	2026-07-03 18:24:51.779669828 +0000
+@@ -0,0 +1,89 @@
++<!DOCTYPE html>
++<html lang="es" xmlns:th="http://www.thymeleaf.org">
++<head th:replace="fragments/head_admin :: adminHead('GastoClaro - Abono voluntario')"></head>
++<body>
++<div class="app-layout" th:with="activePage='gasto_claro_debts'">
++  <aside th:replace="fragments/sidebar :: sidebar"></aside>
++  <div class="main-content">
++    <header th:replace="fragments/topbar :: topbar"></header>
++    <main class="content-wrapper gasto-claro-page">
++      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
++        <div>
++          <h1 class="h4 mb-1">Crear abono voluntario</h1>
++          <p class="text-muted mb-0">Agrega al plan mensual solo el monto que realmente decidiste pagar. Esto no reactiva el cronograma antiguo.</p>
++        </div>
++        <a th:href="@{/gasto-claro/debts}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Volver a deudas</a>
++      </div>
++
++      <div th:replace="personal_finance/_nav :: nav('debts')"></div>
++      <div th:if="${message}" class="alert alert-info border-0 shadow-sm" th:text="${message}">Mensaje</div>
++
++      <div class="row g-3">
++        <div class="col-lg-5">
++          <div class="card border-0 shadow-sm h-100">
++            <div class="card-header bg-white fw-semibold">Deuda en seguimiento</div>
++            <div class="card-body">
++              <h2 class="h5" th:text="${debt.name}">Deuda</h2>
++              <div class="text-muted mb-3" th:text="${debt.creditorName != null and !#strings.isEmpty(debt.creditorName) ? debt.creditorName : debt.debtType.label}">Acreedor</div>
++              <dl class="row small mb-0">
++                <dt class="col-6">Saldo pendiente</dt>
++                <dd class="col-6 text-end"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.currentBalance,1,'POINT',2,'POINT')}">0.00</span></dd>
++                <dt class="col-6">Estado</dt>
++                <dd class="col-6 text-end" th:text="${debt.status.label}">En mora</dd>
++                <dt class="col-6">Días aproximados</dt>
++                <dd class="col-6 text-end" th:text="${debt.delinquencyStartDate != null ? debt.overdueDays() : '-'}">-</dd>
++                <dt class="col-6">Cobranza</dt>
++                <dd class="col-6 text-end" th:text="${debt.collectionStatus.label}">Sin gestión</dd>
++                <dt class="col-6">Negociación</dt>
++                <dd class="col-6 text-end" th:text="${debt.negotiationStatus.label}">Sin iniciar</dd>
++              </dl>
++              <div class="alert alert-warning small mt-3 mb-0">El abono aparecerá como obligación del mes elegido. El saldo total de la deuda no se reducirá automáticamente hasta implementar el registro real de pagos en 5D.</div>
++            </div>
++          </div>
++        </div>
++
++        <div class="col-lg-7">
++          <div class="card border-0 shadow-sm">
++            <div class="card-header bg-white fw-semibold">Datos del abono</div>
++            <div class="card-body">
++              <form th:action="@{/gasto-claro/debts/{id}/voluntary-payment(id=${debt.id})}" method="post" th:object="${paymentForm}" class="row g-3">
++                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
++                <div class="col-md-6">
++                  <label class="form-label">Monto decidido</label>
++                  <input type="number" step="0.01" min="0.01" class="form-control" th:field="*{amount}" required>
++                </div>
++                <div class="col-md-6">
++                  <label class="form-label">Moneda</label>
++                  <select class="form-select" th:field="*{currency}">
++                    <option th:each="currency : ${currencies}" th:value="${currency}" th:text="${currency}">PEN</option>
++                  </select>
++                </div>
++                <div class="col-md-6">
++                  <label class="form-label">Fecha prevista</label>
++                  <input type="date" class="form-control" th:field="*{dueDate}" required>
++                </div>
++                <div class="col-md-6">
++                  <label class="form-label">Prioridad</label>
++                  <select class="form-select" th:field="*{priority}">
++                    <option th:each="priority : ${priorities}" th:value="${priority}" th:text="${priority.label}">Media</option>
++                  </select>
++                </div>
++                <div class="col-12">
++                  <label class="form-label">Motivo u observación</label>
++                  <textarea class="form-control" rows="3" th:field="*{notes}" placeholder="Ej. Abono para iniciar negociación, oferta de liquidación o pago acordado."></textarea>
++                </div>
++                <div class="col-12 d-grid gap-2 d-md-flex justify-content-md-end">
++                  <a th:href="@{/gasto-claro/debts}" class="btn btn-outline-secondary">Cancelar</a>
++                  <button type="submit" class="btn btn-warning"><i class="bi bi-cash-coin"></i> Agregar al plan mensual</button>
++                </div>
++              </form>
++            </div>
++          </div>
++        </div>
++      </div>
++    </main>
++  </div>
++</div>
++<div th:replace="fragments/scripts_admin :: scripts"></div>
++</body>
++</html>
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/resources/templates/personal_finance/debts.html /mnt/data/gasto5c2_build/src/main/resources/templates/personal_finance/debts.html
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/resources/templates/personal_finance/debts.html	2026-07-03 13:15:10.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/resources/templates/personal_finance/debts.html	2026-07-03 18:30:14.527893908 +0000
+@@ -16,7 +16,11 @@
+       </div>
+ 
+       <div th:replace="personal_finance/_nav :: nav('debts')"></div>
+-      <div th:if="${message}" class="alert" th:classappend="${messageType == 'success'} ? ' alert-success' : ' alert-danger'" th:text="${message}">Mensaje</div>
++      <div th:if="${message}" class="alert" th:classappend="${messageType == 'success'} ? ' alert-success' : ' alert-info'" th:text="${message}">Mensaje</div>
++
++      <div class="alert alert-info border-0 shadow-sm">
++        <strong>Deudas en mora:</strong> usa “Solo seguimiento / mora”, registra el saldo total y deja desactivada la generación mensual. Se mostrarán aparte en el Plan mensual y no aumentarán el déficit del mes hasta que crees un abono voluntario.
++      </div>
+ 
+       <div class="row g-3">
+         <div class="col-lg-4">
+@@ -28,11 +32,11 @@
+                 <input type="hidden" th:field="*{id}"/>
+                 <div class="col-12">
+                   <label class="form-label">Nombre</label>
+-                  <input type="text" class="form-control" th:field="*{name}" placeholder="Visa Oro Interbank PEN" required>
++                  <input type="text" class="form-control" th:field="*{name}" placeholder="Tarjeta principal PEN" required>
+                 </div>
+                 <div class="col-12">
+                   <label class="form-label">Acreedor</label>
+-                  <input type="text" class="form-control" th:field="*{creditorName}" placeholder="Interbank, BCP, tercero...">
++                  <input type="text" class="form-control" th:field="*{creditorName}" placeholder="Banco, tienda, prestamista o tercero...">
+                 </div>
+                 <div class="col-md-6">
+                   <label class="form-label">Tipo</label>
+@@ -101,7 +105,7 @@
+                 </div>
+                 <div class="col-md-6 d-flex align-items-end">
+                   <div class="form-check">
+-                    
++
+                     <input class="form-check-input" type="checkbox" th:field="*{fixedPayment}">
+                     <label class="form-check-label">Tiene cuota fija</label>
+                   </div>
+@@ -120,14 +124,44 @@
+                 </div>
+                 <div class="col-md-6 d-flex align-items-end">
+                   <div class="form-check">
+-                    
++
+                     <input class="form-check-input" type="checkbox" th:field="*{autoGenerateMonthly}">
+                     <label class="form-check-label">Generar obligaciones desde cronograma</label>
+                   </div>
+                 </div>
++                <div class="col-12"><hr class="my-1"><div class="fw-semibold">Seguimiento de mora y negociación</div><div class="form-text">Completa este bloque cuando ya no sigues el cronograma original.</div></div>
++                <div class="col-md-6">
++                  <label class="form-label">Cuota anterior referencial</label>
++                  <input type="number" step="0.01" min="0" class="form-control" th:field="*{previousMonthlyPayment}" placeholder="Ej. 180.00">
++                </div>
++                <div class="col-md-6">
++                  <label class="form-label">Fecha del último pago</label>
++                  <input type="date" class="form-control" th:field="*{lastPaymentDate}">
++                </div>
++                <div class="col-md-6">
++                  <label class="form-label">Inicio de mora</label>
++                  <input type="date" class="form-control" th:field="*{delinquencyStartDate}">
++                  <div class="form-text">Permite calcular los días aproximados de atraso.</div>
++                </div>
++                <div class="col-md-6">
++                  <label class="form-label">Próxima revisión</label>
++                  <input type="date" class="form-control" th:field="*{nextReviewDate}">
++                </div>
++                <div class="col-md-6">
++                  <label class="form-label">Estado de cobranza</label>
++                  <select class="form-select" th:field="*{collectionStatus}">
++                    <option th:each="collection : ${collectionStatuses}" th:value="${collection}" th:text="${collection.label}">Sin gestión</option>
++                  </select>
++                </div>
++                <div class="col-md-6">
++                  <label class="form-label">Estado de negociación</label>
++                  <select class="form-select" th:field="*{negotiationStatus}">
++                    <option th:each="negotiation : ${negotiationStatuses}" th:value="${negotiation}" th:text="${negotiation.label}">Sin iniciar</option>
++                  </select>
++                </div>
+                 <div class="col-12">
+                   <label class="form-label">Notas</label>
+-                  <textarea class="form-control" rows="2" th:field="*{notes}"></textarea>
++                  <textarea class="form-control" rows="3" th:field="*{notes}" placeholder="Días aproximados, llamadas, ofertas, situación en central de riesgo o acuerdos pendientes."></textarea>
+                 </div>
+                 <div class="col-12 d-grid gap-2">
+                   <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Guardar</button>
+@@ -156,20 +190,33 @@
+                       <span th:text="${debt.holderType.label}">A mi nombre</span>
+                       <br><small class="text-muted" th:text="${debt.contactName != null and !#strings.isEmpty(debt.contactName) ? debt.contactName : '-'}">-</small>
+                     </td>
+-                    <td th:text="${debt.dueDay != null ? 'Día ' + debt.dueDay : '-'}">Día 5</td>
++                    <td>
++                      <span th:unless="${debt.delinquentTracking}" th:text="${debt.dueDay != null ? 'Día ' + debt.dueDay : '-'}">Día 5</span>
++                      <span th:if="${debt.delinquentTracking}" class="text-muted">Sin fecha exigible</span>
++                      <br><small th:if="${debt.delinquentTracking and debt.nextReviewDate != null}" class="text-muted">Revisar: <span th:text="${debt.nextReviewDate}">2026-07-30</span></small>
++                    </td>
+                     <td>
+                       <span class="badge text-bg-info" th:text="${debt.scheduleMode != null ? debt.scheduleMode.label : 'Pago mensual simple'}">Cronograma</span>
+                       <br><small class="text-muted" th:if="${debt.installmentCount != null and debt.installmentCount > 0}"><span th:text="${debt.installmentCount}">0</span> cuotas/meses</small>
+                     </td>
+-                    <td><span class="badge text-bg-light" th:text="${debt.status.label}">Activa</span></td>
++                    <td>
++                      <span class="badge" th:classappend="${debt.delinquentTracking} ? ' text-bg-danger' : ' text-bg-light'" th:text="${debt.status.label}">Activa</span>
++                      <div class="small text-muted mt-1" th:if="${debt.delinquentTracking}">
++                        <span th:if="${debt.delinquencyStartDate != null}"><span th:text="${debt.overdueDays()}">0</span> días aprox.</span>
++                        <span th:if="${debt.collectionStatus != null and debt.collectionStatus.name() != 'NONE'}" th:text="${debt.collectionStatus.label}">Cobranza</span>
++                      </div>
++                    </td>
+                     <td><span class="badge text-bg-secondary" th:text="${debt.priority.label}">Media</span></td>
+                     <td class="text-end"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.currentBalance,1,'POINT',2,'POINT')}">0.00</span></td>
+                     <td class="text-end">
+-                      <span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.monthlyPressure(),1,'POINT',2,'POINT')}">0.00</span>
++                      <span th:unless="${debt.delinquentTracking}"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.monthlyPressure(),1,'POINT',2,'POINT')}">0.00</span></span>
++                      <span th:if="${debt.delinquentTracking}" class="badge text-bg-secondary">No exigible este mes</span>
++                      <br><small class="text-muted" th:if="${debt.delinquentTracking and debt.previousMonthlyPayment != null and debt.previousMonthlyPayment.signum() > 0}">Cuota anterior: <span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.previousMonthlyPayment,1,'POINT',2,'POINT')}">0.00</span></small>
+                       <br><small class="text-danger" th:if="${debt.interestRateMonthly != null and debt.interestRateMonthly.signum() > 0}"><span th:text="${#numbers.formatDecimal(debt.interestRateMonthly,1,'POINT',2,'POINT')}">0.00</span>% mensual</small>
+                     </td>
+                     <td class="text-end">
+-                      <a th:href="@{/gasto-claro/debts/{id}/schedule(id=${debt.id})}" class="btn btn-sm btn-outline-success" title="Cronograma"><i class="bi bi-calendar2-week"></i></a>
++                      <a th:unless="${debt.delinquentTracking}" th:href="@{/gasto-claro/debts/{id}/schedule(id=${debt.id})}" class="btn btn-sm btn-outline-success" title="Cronograma"><i class="bi bi-calendar2-week"></i></a>
++                      <a th:if="${debt.delinquentTracking}" th:href="@{/gasto-claro/debts/{id}/voluntary-payment(id=${debt.id})}" class="btn btn-sm btn-outline-warning" title="Crear abono voluntario"><i class="bi bi-cash-coin"></i></a>
+                       <a th:href="@{/gasto-claro/debts(editId=${debt.id})}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="bi bi-pencil"></i></a>
+                       <form th:action="@{/gasto-claro/debts/{id}/delete(id=${debt.id})}" method="post" class="d-inline" onsubmit="return confirm('¿Eliminar esta deuda personal?')">
+                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+diff -ruN /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/resources/templates/personal_finance/monthly_plan.html /mnt/data/gasto5c2_build/src/main/resources/templates/personal_finance/monthly_plan.html
+--- /mnt/data/gasto5c2_work/gastoclaro-personal-phase5c2-context-20260703-131535/src/main/resources/templates/personal_finance/monthly_plan.html	2026-07-03 13:15:10.000000000 +0000
++++ /mnt/data/gasto5c2_build/src/main/resources/templates/personal_finance/monthly_plan.html	2026-07-03 18:28:34.115592500 +0000
+@@ -56,7 +56,7 @@
+         </div>
+         <div class="col-6 col-xl-2">
+           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+-            <div class="text-muted small">Deudas</div>
++            <div class="text-muted small">Deudas exigibles</div>
+             <div class="h5 mb-0">S/ <span th:text="${#numbers.formatDecimal(plan.debtTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+           </div></div>
+         </div>
+@@ -157,6 +157,54 @@
+             </div>
+           </div>
+ 
++          <div class="gasto-excel-card mb-3" th:if="${!#lists.isEmpty(plan.delinquentDebts())}">
++            <div class="gasto-excel-title d-flex flex-wrap justify-content-between gap-2">
++              <span>Deudas en mora / seguimiento</span>
++              <span class="small fw-normal">No se suman al pago exigible ni al déficit del mes</span>
++            </div>
++            <div class="table-responsive">
++              <table class="table table-sm gasto-excel-table align-middle mb-0">
++                <thead><tr><th>Deuda</th><th>Situación</th><th>Atraso</th><th>Negociación</th><th class="text-end">Saldo</th><th>Último pago</th><th>Próxima revisión</th><th></th></tr></thead>
++                <tbody>
++                <tr th:each="debt : ${plan.delinquentDebts()}" th:classappend="${debt.reviewDue()} ? ' table-warning' : ''">
++                  <td>
++                    <strong th:text="${debt.name()}">Deuda</strong>
++                    <br><small class="text-muted" th:text="${debt.creditorName() != null and !#strings.isEmpty(debt.creditorName()) ? debt.creditorName() : 'Sin acreedor'}">Acreedor</small>
++                    <small class="text-muted" th:if="${debt.contactName() != null and !#strings.isEmpty(debt.contactName())}"> · <span th:text="${debt.contactName()}">Contacto</span></small>
++                  </td>
++                  <td>
++                    <span class="badge text-bg-danger" th:text="${debt.status().label}">En mora</span>
++                    <br><small class="text-muted" th:text="${debt.collectionStatus().label}">Cobranza</small>
++                  </td>
++                  <td>
++                    <span th:if="${debt.delinquencyStartDate() != null}"><strong th:text="${debt.overdueDays()}">0</strong> días aprox.<br><small class="text-muted" th:text="${debt.delinquencyStartDate()}">Fecha</small></span>
++                    <span th:unless="${debt.delinquencyStartDate() != null}" class="text-muted">Sin fecha</span>
++                  </td>
++                  <td th:text="${debt.negotiationStatus().label}">Sin iniciar</td>
++                  <td class="text-end fw-semibold"><span th:text="${debt.currency()}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.currentBalance(),1,'POINT',2,'POINT')}">0.00</span></td>
++                  <td th:text="${debt.lastPaymentDate() != null ? debt.lastPaymentDate() : '-'}">-</td>
++                  <td>
++                    <span th:text="${debt.nextReviewDate() != null ? debt.nextReviewDate() : '-'}">-</span>
++                    <span th:if="${debt.reviewDue()}" class="badge text-bg-warning ms-1">Revisar</span>
++                  </td>
++                  <td class="text-end text-nowrap">
++                    <a th:href="@{/gasto-claro/debts/{id}/voluntary-payment(id=${debt.id()})}" class="btn btn-sm btn-outline-warning" title="Crear abono voluntario"><i class="bi bi-cash-coin"></i></a>
++                    <a th:href="@{/gasto-claro/debts(editId=${debt.id()})}" class="btn btn-sm btn-outline-secondary" title="Actualizar seguimiento"><i class="bi bi-pencil"></i></a>
++                  </td>
++                </tr>
++                <tr class="gasto-total-row">
++                  <td colspan="4">SALDO TOTAL EN SEGUIMIENTO</td>
++                  <td class="text-end">
++                    <div>PEN <span th:text="${#numbers.formatDecimal(plan.delinquentDebtPenTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
++                    <div th:if="${plan.delinquentDebtUsdTotal().signum() > 0}">USD <span th:text="${#numbers.formatDecimal(plan.delinquentDebtUsdTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
++                  </td>
++                  <td colspan="3"><span class="small">Solo panorama total; no es pago obligatorio del mes.</span></td>
++                </tr>
++                </tbody>
++              </table>
++            </div>
++          </div>
++
+           <div class="gasto-excel-card" th:if="${!#lists.isEmpty(plan.otherItems())}">
+             <div class="gasto-excel-title">Otros compromisos</div>
+             <div class="table-responsive">
+@@ -179,7 +227,7 @@
+                 <input type="hidden" name="month" th:value="${selectedMonth}"/>
+                 <div class="col-12">
+                   <label class="form-label small">Título</label>
+-                  <input type="text" class="form-control form-control-sm" th:field="*{title}" placeholder="Ej. UTP ciclo, préstamo Nicolas, comida mínima" required>
++                  <input type="text" class="form-control form-control-sm" th:field="*{title}" placeholder="Ej. matrícula de ciclo, deuda familiar o comida mínima" required>
+                 </div>
+                 <div class="col-6">
+                   <label class="form-label small">Grupo</label>
+@@ -240,7 +288,7 @@
+             <div class="card-body small">
+               <p class="mb-2"><strong>Costo de vida primero:</strong> alquiler, servicios, salud, transporte y compromisos que te mantienen operativo.</p>
+               <p class="mb-2"><strong>Luego deudas críticas:</strong> interés alto, atrasos, presión personal o riesgo alto.</p>
+-              <p class="mb-0"><strong>5C:</strong> agregará priorización automática tipo “tengo S/ X, qué cubro primero”.</p>
++              <p class="mb-0"><strong>Mora:</strong> el saldo en seguimiento no aumenta el pago exigible. Solo cuenta cuando creas un abono voluntario para el mes.</p>
+             </div>
+           </div>
+         </div>

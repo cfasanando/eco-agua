@@ -117,6 +117,8 @@ public class PersonalFinanceController {
         model.addAttribute("debtStatuses", PersonalFinanceDebtStatus.values());
         model.addAttribute("debtHolderTypes", PersonalFinanceDebtHolderType.values());
         model.addAttribute("scheduleModes", PersonalFinanceDebtScheduleMode.values());
+        model.addAttribute("collectionStatuses", PersonalFinanceCollectionStatus.values());
+        model.addAttribute("negotiationStatuses", PersonalFinanceNegotiationStatus.values());
         model.addAttribute("priorities", PersonalFinancePriority.values());
         model.addAttribute("currencies", PersonalFinanceCurrency.values());
         return "personal_finance/debts";
@@ -136,6 +138,42 @@ public class PersonalFinanceController {
         redirectAttributes.addFlashAttribute("message", "Deuda eliminada del módulo personal.");
         redirectAttributes.addFlashAttribute("messageType", "success");
         return "redirect:/gasto-claro/debts";
+    }
+
+    @GetMapping("/debts/{id}/voluntary-payment")
+    public String voluntaryPayment(
+            @PathVariable("id") Long id,
+            Model model
+    ) {
+        PersonalFinanceDebt debt = service.debt(id);
+        PersonalFinanceVoluntaryPaymentForm form = new PersonalFinanceVoluntaryPaymentForm();
+        form.setCurrency(debt.getCurrency());
+        form.setPriority(debt.getPriority());
+        model.addAttribute("activePage", "gasto_claro_debts");
+        model.addAttribute("debt", debt);
+        model.addAttribute("paymentForm", form);
+        model.addAttribute("priorities", PersonalFinancePriority.values());
+        model.addAttribute("currencies", PersonalFinanceCurrency.values());
+        return "personal_finance/debt_voluntary_payment";
+    }
+
+    @PostMapping("/debts/{id}/voluntary-payment")
+    public String createVoluntaryPayment(
+            @PathVariable("id") Long id,
+            @ModelAttribute("paymentForm") PersonalFinanceVoluntaryPaymentForm form,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            PersonalFinancePaymentObligation obligation = service.createVoluntaryPayment(id, form);
+            redirectAttributes.addFlashAttribute("message", "Abono voluntario agregado al plan mensual.");
+            redirectAttributes.addFlashAttribute("messageType", "success");
+            YearMonth selectedMonth = YearMonth.from(obligation.getDueDate());
+            return "redirect:/gasto-claro/monthly-plan?year=" + selectedMonth.getYear() + "&month=" + selectedMonth.getMonthValue();
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("message", exception.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "info");
+            return "redirect:/gasto-claro/debts/" + id + "/voluntary-payment";
+        }
     }
 
     @GetMapping("/debts/{id}/schedule")

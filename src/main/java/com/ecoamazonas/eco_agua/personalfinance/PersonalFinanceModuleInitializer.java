@@ -130,6 +130,12 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
                     priority VARCHAR(30) NOT NULL DEFAULT 'MEDIUM',
                     has_fixed_payment BIT NOT NULL DEFAULT 1,
+                    previous_monthly_payment DECIMAL(14,2) NULL DEFAULT 0.00,
+                    last_payment_date DATE NULL,
+                    delinquency_start_date DATE NULL,
+                    collection_status VARCHAR(40) NOT NULL DEFAULT 'NONE',
+                    negotiation_status VARCHAR(40) NOT NULL DEFAULT 'NOT_STARTED',
+                    next_review_date DATE NULL,
                     notes VARCHAR(1000) NULL,
                     created_at DATETIME(6) NOT NULL,
                     updated_at DATETIME(6) NOT NULL,
@@ -138,6 +144,8 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     KEY idx_pf_debt_user_due (user_id, due_day),
                     KEY idx_pf_debt_user_priority (user_id, priority),
                     KEY idx_pf_debt_user_schedule_mode (user_id, schedule_mode),
+                    KEY idx_pf_debt_user_delinquency (user_id, delinquency_start_date),
+                    KEY idx_pf_debt_user_review (user_id, next_review_date),
                     CONSTRAINT fk_pf_debt_user FOREIGN KEY (user_id) REFERENCES `user` (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
@@ -225,9 +233,17 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
         addColumnIfMissing("personal_finance_debt", "schedule_end_date", "ALTER TABLE personal_finance_debt ADD COLUMN schedule_end_date DATE NULL AFTER schedule_start_date");
         addColumnIfMissing("personal_finance_debt", "installment_count", "ALTER TABLE personal_finance_debt ADD COLUMN installment_count INT NULL AFTER schedule_end_date");
         addColumnIfMissing("personal_finance_debt", "auto_generate_monthly", "ALTER TABLE personal_finance_debt ADD COLUMN auto_generate_monthly BIT NOT NULL DEFAULT 1 AFTER installment_count");
+        addColumnIfMissing("personal_finance_debt", "previous_monthly_payment", "ALTER TABLE personal_finance_debt ADD COLUMN previous_monthly_payment DECIMAL(14,2) NULL DEFAULT 0.00 AFTER has_fixed_payment");
+        addColumnIfMissing("personal_finance_debt", "last_payment_date", "ALTER TABLE personal_finance_debt ADD COLUMN last_payment_date DATE NULL AFTER previous_monthly_payment");
+        addColumnIfMissing("personal_finance_debt", "delinquency_start_date", "ALTER TABLE personal_finance_debt ADD COLUMN delinquency_start_date DATE NULL AFTER last_payment_date");
+        addColumnIfMissing("personal_finance_debt", "collection_status", "ALTER TABLE personal_finance_debt ADD COLUMN collection_status VARCHAR(40) NOT NULL DEFAULT 'NONE' AFTER delinquency_start_date");
+        addColumnIfMissing("personal_finance_debt", "negotiation_status", "ALTER TABLE personal_finance_debt ADD COLUMN negotiation_status VARCHAR(40) NOT NULL DEFAULT 'NOT_STARTED' AFTER collection_status");
+        addColumnIfMissing("personal_finance_debt", "next_review_date", "ALTER TABLE personal_finance_debt ADD COLUMN next_review_date DATE NULL AFTER negotiation_status");
         addColumnIfMissing("personal_finance_payment_obligation", "schedule_line_id", "ALTER TABLE personal_finance_payment_obligation ADD COLUMN schedule_line_id BIGINT NULL AFTER source_id");
         addIndexIfMissing("personal_finance_debt", "idx_pf_debt_user_priority", "CREATE INDEX idx_pf_debt_user_priority ON personal_finance_debt (user_id, priority)");
         addIndexIfMissing("personal_finance_debt", "idx_pf_debt_user_schedule_mode", "CREATE INDEX idx_pf_debt_user_schedule_mode ON personal_finance_debt (user_id, schedule_mode)");
+        addIndexIfMissing("personal_finance_debt", "idx_pf_debt_user_delinquency", "CREATE INDEX idx_pf_debt_user_delinquency ON personal_finance_debt (user_id, delinquency_start_date)");
+        addIndexIfMissing("personal_finance_debt", "idx_pf_debt_user_review", "CREATE INDEX idx_pf_debt_user_review ON personal_finance_debt (user_id, next_review_date)");
         addIndexIfMissing("personal_finance_payment_obligation", "idx_pf_obligation_schedule_line", "CREATE INDEX idx_pf_obligation_schedule_line ON personal_finance_payment_obligation (schedule_line_id)");
     }
 

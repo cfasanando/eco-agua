@@ -56,7 +56,7 @@
         </div>
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
-            <div class="text-muted small">Deudas</div>
+            <div class="text-muted small">Deudas exigibles</div>
             <div class="h5 mb-0">S/ <span th:text="${#numbers.formatDecimal(plan.debtTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
           </div></div>
         </div>
@@ -157,6 +157,54 @@
             </div>
           </div>
 
+          <div class="gasto-excel-card mb-3" th:if="${!#lists.isEmpty(plan.delinquentDebts())}">
+            <div class="gasto-excel-title d-flex flex-wrap justify-content-between gap-2">
+              <span>Deudas en mora / seguimiento</span>
+              <span class="small fw-normal">No se suman al pago exigible ni al déficit del mes</span>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm gasto-excel-table align-middle mb-0">
+                <thead><tr><th>Deuda</th><th>Situación</th><th>Atraso</th><th>Negociación</th><th class="text-end">Saldo</th><th>Último pago</th><th>Próxima revisión</th><th></th></tr></thead>
+                <tbody>
+                <tr th:each="debt : ${plan.delinquentDebts()}" th:classappend="${debt.reviewDue()} ? ' table-warning' : ''">
+                  <td>
+                    <strong th:text="${debt.name()}">Deuda</strong>
+                    <br><small class="text-muted" th:text="${debt.creditorName() != null and !#strings.isEmpty(debt.creditorName()) ? debt.creditorName() : 'Sin acreedor'}">Acreedor</small>
+                    <small class="text-muted" th:if="${debt.contactName() != null and !#strings.isEmpty(debt.contactName())}"> · <span th:text="${debt.contactName()}">Contacto</span></small>
+                  </td>
+                  <td>
+                    <span class="badge text-bg-danger" th:text="${debt.status().label}">En mora</span>
+                    <br><small class="text-muted" th:text="${debt.collectionStatus().label}">Cobranza</small>
+                  </td>
+                  <td>
+                    <span th:if="${debt.delinquencyStartDate() != null}"><strong th:text="${debt.overdueDays()}">0</strong> días aprox.<br><small class="text-muted" th:text="${debt.delinquencyStartDate()}">Fecha</small></span>
+                    <span th:unless="${debt.delinquencyStartDate() != null}" class="text-muted">Sin fecha</span>
+                  </td>
+                  <td th:text="${debt.negotiationStatus().label}">Sin iniciar</td>
+                  <td class="text-end fw-semibold"><span th:text="${debt.currency()}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.currentBalance(),1,'POINT',2,'POINT')}">0.00</span></td>
+                  <td th:text="${debt.lastPaymentDate() != null ? debt.lastPaymentDate() : '-'}">-</td>
+                  <td>
+                    <span th:text="${debt.nextReviewDate() != null ? debt.nextReviewDate() : '-'}">-</span>
+                    <span th:if="${debt.reviewDue()}" class="badge text-bg-warning ms-1">Revisar</span>
+                  </td>
+                  <td class="text-end text-nowrap">
+                    <a th:href="@{/gasto-claro/debts/{id}/voluntary-payment(id=${debt.id()})}" class="btn btn-sm btn-outline-warning" title="Crear abono voluntario"><i class="bi bi-cash-coin"></i></a>
+                    <a th:href="@{/gasto-claro/debts(editId=${debt.id()})}" class="btn btn-sm btn-outline-secondary" title="Actualizar seguimiento"><i class="bi bi-pencil"></i></a>
+                  </td>
+                </tr>
+                <tr class="gasto-total-row">
+                  <td colspan="4">SALDO TOTAL EN SEGUIMIENTO</td>
+                  <td class="text-end">
+                    <div>PEN <span th:text="${#numbers.formatDecimal(plan.delinquentDebtPenTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+                    <div th:if="${plan.delinquentDebtUsdTotal().signum() > 0}">USD <span th:text="${#numbers.formatDecimal(plan.delinquentDebtUsdTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+                  </td>
+                  <td colspan="3"><span class="small">Solo panorama total; no es pago obligatorio del mes.</span></td>
+                </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <div class="gasto-excel-card" th:if="${!#lists.isEmpty(plan.otherItems())}">
             <div class="gasto-excel-title">Otros compromisos</div>
             <div class="table-responsive">
@@ -179,7 +227,7 @@
                 <input type="hidden" name="month" th:value="${selectedMonth}"/>
                 <div class="col-12">
                   <label class="form-label small">Título</label>
-                  <input type="text" class="form-control form-control-sm" th:field="*{title}" placeholder="Ej. UTP ciclo, préstamo Nicolas, comida mínima" required>
+                  <input type="text" class="form-control form-control-sm" th:field="*{title}" placeholder="Ej. matrícula de ciclo, deuda familiar o comida mínima" required>
                 </div>
                 <div class="col-6">
                   <label class="form-label small">Grupo</label>
@@ -240,7 +288,7 @@
             <div class="card-body small">
               <p class="mb-2"><strong>Costo de vida primero:</strong> alquiler, servicios, salud, transporte y compromisos que te mantienen operativo.</p>
               <p class="mb-2"><strong>Luego deudas críticas:</strong> interés alto, atrasos, presión personal o riesgo alto.</p>
-              <p class="mb-0"><strong>5C:</strong> agregará priorización automática tipo “tengo S/ X, qué cubro primero”.</p>
+              <p class="mb-0"><strong>Mora:</strong> el saldo en seguimiento no aumenta el pago exigible. Solo cuenta cuando creas un abono voluntario para el mes.</p>
             </div>
           </div>
         </div>

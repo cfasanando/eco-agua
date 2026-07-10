@@ -180,6 +180,65 @@ public class PersonalFinanceDebt {
                 || status == PersonalFinanceDebtStatus.NEGOTIATION;
     }
 
+    @Transient
+    public PersonalFinanceDebtClassification classification() {
+        PersonalFinanceDebtType type = debtType == null ? PersonalFinanceDebtType.OTHER : debtType;
+        PersonalFinanceDebtHolderType holder = holderType == null ? PersonalFinanceDebtHolderType.UNKNOWN : holderType;
+        PersonalFinanceDebtScheduleMode mode = scheduleMode == null ? PersonalFinanceDebtScheduleMode.SIMPLE_MONTHLY : scheduleMode;
+
+        if (type == PersonalFinanceDebtType.PRIVATE_LENDER || mode == PersonalFinanceDebtScheduleMode.PRIVATE_LENDER_INTEREST) {
+            return PersonalFinanceDebtClassification.PRIVATE_LENDER;
+        }
+        if (type == PersonalFinanceDebtType.BANK_THIRD_PARTY) {
+            return PersonalFinanceDebtClassification.BANK_THIRD_PARTY;
+        }
+        if (type == PersonalFinanceDebtType.CREDIT_CARD || type == PersonalFinanceDebtType.STORE_CREDIT) {
+            if (holder == PersonalFinanceDebtHolderType.THIRD_PARTY_NAME || holder == PersonalFinanceDebtHolderType.SHARED) {
+                return PersonalFinanceDebtClassification.THIRD_PARTY_CONTRIBUTION;
+            }
+            return PersonalFinanceDebtClassification.CREDIT_CARD;
+        }
+        if (type == PersonalFinanceDebtType.BANK_LOAN || mode == PersonalFinanceDebtScheduleMode.BANK_SCHEDULE) {
+            return holder == PersonalFinanceDebtHolderType.THIRD_PARTY_NAME
+                    ? PersonalFinanceDebtClassification.BANK_THIRD_PARTY
+                    : PersonalFinanceDebtClassification.BANK_OWN;
+        }
+        if (type == PersonalFinanceDebtType.THIRD_PARTY_LOAN) {
+            return PersonalFinanceDebtClassification.FAMILY_DIRECT;
+        }
+        if (type == PersonalFinanceDebtType.RECURRING_COMMITMENT) {
+            String normalizedName = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
+            return normalizedName.contains("junta")
+                    ? PersonalFinanceDebtClassification.SAVINGS_CIRCLE
+                    : PersonalFinanceDebtClassification.RECURRING_COMMITMENT;
+        }
+        if (holder == PersonalFinanceDebtHolderType.THIRD_PARTY_NAME || holder == PersonalFinanceDebtHolderType.SHARED) {
+            return PersonalFinanceDebtClassification.THIRD_PARTY_CONTRIBUTION;
+        }
+        return PersonalFinanceDebtClassification.OTHER;
+    }
+
+    @Transient
+    public boolean hasKnownBalance() {
+        return safeAmount(currentBalance).compareTo(BigDecimal.ZERO) > 0
+                || safeAmount(originalAmount).compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    @Transient
+    public BigDecimal outstandingBalance() {
+        BigDecimal balance = safeAmount(currentBalance);
+        return balance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : balance;
+    }
+
+    @Transient
+    public boolean isBankBalanceReference() {
+        return classification().isBankRelated();
+    }
+
+    private BigDecimal safeAmount(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
     public long overdueDays() {
         if (delinquencyStartDate == null) {
             return 0;

@@ -27,7 +27,10 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         createTables();
         upgradeDebtTable();
+        upgradeDebtScheduleTable();
         upgradeRecurringTables();
+        upgradePaymentHistory();
+        backfillLegacyPayments();
         ensureModuleSetting();
         LOGGER.info("GastoClaro Personal base schema is ready.");
     }
@@ -188,11 +191,20 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     title VARCHAR(180) NOT NULL,
                     principal_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
                     interest_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    insurance_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
                     fee_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
                     total_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
                     currency VARCHAR(8) NOT NULL DEFAULT 'PEN',
                     due_date DATE NULL,
                     status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+                    paid_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    paid_principal_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    paid_interest_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    paid_insurance_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    paid_fee_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    paid_penalty_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    paid_other_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    paid_at DATE NULL,
                     generated_obligation_id BIGINT NULL,
                     notes VARCHAR(1000) NULL,
                     created_at DATETIME(6) NOT NULL,
@@ -202,10 +214,73 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     KEY idx_pf_schedule_debt_due (debt_id, due_date),
                     KEY idx_pf_schedule_user_status (user_id, status),
                     KEY idx_pf_schedule_obligation (generated_obligation_id),
+                    KEY idx_pf_schedule_debt_line (debt_id, line_number),
                     CONSTRAINT fk_pf_schedule_user FOREIGN KEY (user_id) REFERENCES `user` (id),
                     CONSTRAINT fk_pf_schedule_debt FOREIGN KEY (debt_id) REFERENCES personal_finance_debt (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS personal_finance_payment (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    public_id VARCHAR(36) NOT NULL,
+                    user_id INT NOT NULL,
+                    obligation_id BIGINT NULL,
+                    debt_id BIGINT NULL,
+                    schedule_line_id BIGINT NULL,
+                    obligation_title VARCHAR(180) NOT NULL,
+                    debt_name VARCHAR(160) NULL,
+                    payment_date DATE NOT NULL,
+                    total_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    principal_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    interest_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    insurance_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    fee_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    penalty_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    other_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    currency VARCHAR(8) NOT NULL DEFAULT 'PEN',
+                    payment_method VARCHAR(30) NOT NULL DEFAULT 'OTHER',
+                    origin VARCHAR(30) NOT NULL DEFAULT 'MANUAL',
+                    operation_number VARCHAR(100) NULL,
+                    recipient VARCHAR(180) NULL,
+                    notes VARCHAR(1500) NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+                    receipt_original_name VARCHAR(255) NULL,
+                    receipt_stored_path VARCHAR(500) NULL,
+                    receipt_content_type VARCHAR(120) NULL,
+                    receipt_size_bytes BIGINT NULL,
+                    legacy_source_key VARCHAR(100) NULL,
+                    reversed_at DATETIME(6) NULL,
+                    reversed_by VARCHAR(120) NULL,
+                    reversal_reason VARCHAR(500) NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    updated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_pf_payment_public_id (public_id),
+                    UNIQUE KEY uk_pf_payment_legacy_key (legacy_source_key),
+                    KEY idx_pf_payment_user_date (user_id, payment_date),
+                    KEY idx_pf_payment_user_status (user_id, status),
+                    KEY idx_pf_payment_obligation (obligation_id),
+                    KEY idx_pf_payment_debt (debt_id),
+                    KEY idx_pf_payment_schedule_line (schedule_line_id),
+                    CONSTRAINT fk_pf_payment_user FOREIGN KEY (user_id) REFERENCES `user` (id),
+                    CONSTRAINT fk_pf_payment_obligation FOREIGN KEY (obligation_id) REFERENCES personal_finance_payment_obligation (id) ON DELETE SET NULL,
+                    CONSTRAINT fk_pf_payment_debt FOREIGN KEY (debt_id) REFERENCES personal_finance_debt (id) ON DELETE SET NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+    }
+
+    private void upgradeDebtScheduleTable() {
+        addColumnIfMissing("personal_finance_debt_schedule_line", "insurance_amount", "ALTER TABLE personal_finance_debt_schedule_line ADD COLUMN insurance_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER interest_amount");
+        addColumnIfMissing("personal_finance_debt_schedule_line", "paid_amount", "ALTER TABLE personal_finance_debt_schedule_line ADD COLUMN paid_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER status");
+        addColumnIfMissing("personal_finance_debt_schedule_line", "paid_principal_amount", "ALTER TABLE personal_finance_debt_schedule_line ADD COLUMN paid_principal_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER paid_amount");
+        addColumnIfMissing("personal_finance_debt_schedule_line", "paid_interest_amount", "ALTER TABLE personal_finance_debt_schedule_line ADD COLUMN paid_interest_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER paid_principal_amount");
+        addColumnIfMissing("personal_finance_debt_schedule_line", "paid_insurance_amount", "ALTER TABLE personal_finance_debt_schedule_line ADD COLUMN paid_insurance_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER paid_interest_amount");
+        addColumnIfMissing("personal_finance_debt_schedule_line", "paid_fee_amount", "ALTER TABLE personal_finance_debt_schedule_line ADD COLUMN paid_fee_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER paid_insurance_amount");
+        addColumnIfMissing("personal_finance_debt_schedule_line", "paid_penalty_amount", "ALTER TABLE personal_finance_debt_schedule_line ADD COLUMN paid_penalty_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER paid_fee_amount");
+        addColumnIfMissing("personal_finance_debt_schedule_line", "paid_other_amount", "ALTER TABLE personal_finance_debt_schedule_line ADD COLUMN paid_other_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER paid_penalty_amount");
+        addColumnIfMissing("personal_finance_debt_schedule_line", "paid_at", "ALTER TABLE personal_finance_debt_schedule_line ADD COLUMN paid_at DATE NULL AFTER paid_other_amount");
+        addIndexIfMissing("personal_finance_debt_schedule_line", "idx_pf_schedule_debt_line", "CREATE INDEX idx_pf_schedule_debt_line ON personal_finance_debt_schedule_line (debt_id, line_number)");
     }
 
     private void upgradeRecurringTables() {
@@ -245,6 +320,159 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
         addIndexIfMissing("personal_finance_debt", "idx_pf_debt_user_delinquency", "CREATE INDEX idx_pf_debt_user_delinquency ON personal_finance_debt (user_id, delinquency_start_date)");
         addIndexIfMissing("personal_finance_debt", "idx_pf_debt_user_review", "CREATE INDEX idx_pf_debt_user_review ON personal_finance_debt (user_id, next_review_date)");
         addIndexIfMissing("personal_finance_payment_obligation", "idx_pf_obligation_schedule_line", "CREATE INDEX idx_pf_obligation_schedule_line ON personal_finance_payment_obligation (schedule_line_id)");
+    }
+
+    private void upgradePaymentHistory() {
+        addColumnIfMissing("personal_finance_payment", "origin", "ALTER TABLE personal_finance_payment ADD COLUMN origin VARCHAR(30) NOT NULL DEFAULT 'MANUAL' AFTER payment_method");
+        addIndexIfMissing("personal_finance_payment", "idx_pf_payment_user_date", "CREATE INDEX idx_pf_payment_user_date ON personal_finance_payment (user_id, payment_date)");
+        addIndexIfMissing("personal_finance_payment", "idx_pf_payment_user_status", "CREATE INDEX idx_pf_payment_user_status ON personal_finance_payment (user_id, status)");
+        addIndexIfMissing("personal_finance_payment", "idx_pf_payment_obligation", "CREATE INDEX idx_pf_payment_obligation ON personal_finance_payment (obligation_id)");
+        addIndexIfMissing("personal_finance_payment", "idx_pf_payment_debt", "CREATE INDEX idx_pf_payment_debt ON personal_finance_payment (debt_id)");
+        addIndexIfMissing("personal_finance_payment", "idx_pf_payment_schedule_line", "CREATE INDEX idx_pf_payment_schedule_line ON personal_finance_payment (schedule_line_id)");
+    }
+
+    private void backfillLegacyPayments() {
+        jdbcTemplate.update("""
+                INSERT INTO personal_finance_payment (
+                    public_id, user_id, obligation_id, debt_id, schedule_line_id,
+                    obligation_title, debt_name, payment_date,
+                    total_amount, principal_amount, interest_amount, insurance_amount,
+                    fee_amount, penalty_amount, other_amount, currency, payment_method, origin,
+                    notes, status, legacy_source_key, created_at, updated_at
+                )
+                SELECT
+                    UUID(),
+                    o.user_id,
+                    o.id,
+                    d.id,
+                    o.schedule_line_id,
+                    o.title,
+                    d.name,
+                    COALESCE(s.paid_at, o.due_date, DATE(o.updated_at), CURRENT_DATE()),
+                    o.amount_paid,
+                    CASE
+                        WHEN s.id IS NOT NULL AND s.total_amount > 0 AND o.amount_paid >= s.total_amount THEN s.principal_amount
+                        ELSE 0.00
+                    END,
+                    CASE
+                        WHEN s.id IS NOT NULL AND s.total_amount > 0 AND o.amount_paid >= s.total_amount THEN s.interest_amount
+                        ELSE 0.00
+                    END,
+                    CASE
+                        WHEN s.id IS NOT NULL AND s.total_amount > 0 AND o.amount_paid >= s.total_amount THEN s.insurance_amount
+                        ELSE 0.00
+                    END,
+                    CASE
+                        WHEN s.id IS NOT NULL AND s.total_amount > 0 AND o.amount_paid >= s.total_amount THEN s.fee_amount
+                        ELSE 0.00
+                    END,
+                    0.00,
+                    GREATEST(0.00, o.amount_paid - (
+                        CASE WHEN s.id IS NOT NULL AND s.total_amount > 0 AND o.amount_paid >= s.total_amount THEN s.principal_amount ELSE 0.00 END +
+                        CASE WHEN s.id IS NOT NULL AND s.total_amount > 0 AND o.amount_paid >= s.total_amount THEN s.interest_amount ELSE 0.00 END +
+                        CASE WHEN s.id IS NOT NULL AND s.total_amount > 0 AND o.amount_paid >= s.total_amount THEN s.insurance_amount ELSE 0.00 END +
+                        CASE WHEN s.id IS NOT NULL AND s.total_amount > 0 AND o.amount_paid >= s.total_amount THEN s.fee_amount ELSE 0.00 END
+                    )),
+                    o.currency,
+                    'OTHER',
+                    'LEGACY_MIGRATION',
+                    'Migrated from the previous paid amount during GastoClaro Phase 5D.',
+                    'ACTIVE',
+                    CONCAT('OBLIGATION:', o.id),
+                    COALESCE(o.updated_at, CURRENT_TIMESTAMP(6)),
+                    COALESCE(o.updated_at, CURRENT_TIMESTAMP(6))
+                FROM personal_finance_payment_obligation o
+                LEFT JOIN personal_finance_debt_schedule_line s ON s.id = o.schedule_line_id
+                LEFT JOIN personal_finance_debt d ON d.id = CASE
+                    WHEN o.source_type IN ('DEBT','DEBT_SCHEDULE','PRIVATE_LENDER_INTEREST','AUTO_DEDUCTION','DEBT_VOLUNTARY_PAYMENT') THEN o.source_id
+                    ELSE NULL
+                END
+                WHERE o.amount_paid > 0
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM personal_finance_payment p
+                    WHERE p.legacy_source_key = CONCAT('OBLIGATION:', o.id)
+                  )
+                """);
+
+        jdbcTemplate.update("""
+                INSERT INTO personal_finance_payment (
+                    public_id, user_id, obligation_id, debt_id, schedule_line_id,
+                    obligation_title, debt_name, payment_date,
+                    total_amount, principal_amount, interest_amount, insurance_amount,
+                    fee_amount, penalty_amount, other_amount, currency, payment_method, origin,
+                    notes, status, legacy_source_key, created_at, updated_at
+                )
+                SELECT
+                    UUID(),
+                    s.user_id,
+                    NULL,
+                    s.debt_id,
+                    s.id,
+                    s.title,
+                    d.name,
+                    COALESCE(s.paid_at, s.due_date, DATE(s.updated_at), CURRENT_DATE()),
+                    s.paid_amount,
+                    CASE WHEN s.paid_amount >= s.total_amount THEN s.principal_amount ELSE 0.00 END,
+                    CASE WHEN s.paid_amount >= s.total_amount THEN s.interest_amount ELSE 0.00 END,
+                    CASE WHEN s.paid_amount >= s.total_amount THEN s.insurance_amount ELSE 0.00 END,
+                    CASE WHEN s.paid_amount >= s.total_amount THEN s.fee_amount ELSE 0.00 END,
+                    0.00,
+                    CASE WHEN s.paid_amount >= s.total_amount
+                        THEN GREATEST(0.00, s.paid_amount - s.principal_amount - s.interest_amount - s.insurance_amount - s.fee_amount)
+                        ELSE s.paid_amount
+                    END,
+                    s.currency,
+                    'OTHER',
+                    'LEGACY_MIGRATION',
+                    'Migrated from a legacy schedule payment during GastoClaro Phase 5D.',
+                    'ACTIVE',
+                    CONCAT('SCHEDULE:', s.id),
+                    COALESCE(s.updated_at, CURRENT_TIMESTAMP(6)),
+                    COALESCE(s.updated_at, CURRENT_TIMESTAMP(6))
+                FROM personal_finance_debt_schedule_line s
+                JOIN personal_finance_debt d ON d.id = s.debt_id
+                WHERE s.paid_amount > 0
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM personal_finance_payment p
+                    WHERE p.schedule_line_id = s.id
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM personal_finance_payment p
+                    WHERE p.legacy_source_key = CONCAT('SCHEDULE:', s.id)
+                  )
+                """);
+
+        jdbcTemplate.update("""
+                UPDATE personal_finance_debt_schedule_line s
+                LEFT JOIN (
+                    SELECT
+                        schedule_line_id,
+                        SUM(CASE WHEN status = 'ACTIVE' THEN total_amount ELSE 0 END) AS total_paid,
+                        SUM(CASE WHEN status = 'ACTIVE' THEN principal_amount ELSE 0 END) AS principal_paid,
+                        SUM(CASE WHEN status = 'ACTIVE' THEN interest_amount ELSE 0 END) AS interest_paid,
+                        SUM(CASE WHEN status = 'ACTIVE' THEN insurance_amount ELSE 0 END) AS insurance_paid,
+                        SUM(CASE WHEN status = 'ACTIVE' THEN fee_amount ELSE 0 END) AS fee_paid,
+                        SUM(CASE WHEN status = 'ACTIVE' THEN penalty_amount ELSE 0 END) AS penalty_paid,
+                        SUM(CASE WHEN status = 'ACTIVE' THEN other_amount ELSE 0 END) AS other_paid,
+                        MAX(CASE WHEN status = 'ACTIVE' THEN payment_date ELSE NULL END) AS last_paid_at
+                    FROM personal_finance_payment
+                    WHERE schedule_line_id IS NOT NULL
+                    GROUP BY schedule_line_id
+                ) p ON p.schedule_line_id = s.id
+                SET
+                    s.paid_amount = COALESCE(p.total_paid, s.paid_amount, 0.00),
+                    s.paid_principal_amount = COALESCE(p.principal_paid, 0.00),
+                    s.paid_interest_amount = COALESCE(p.interest_paid, 0.00),
+                    s.paid_insurance_amount = COALESCE(p.insurance_paid, 0.00),
+                    s.paid_fee_amount = COALESCE(p.fee_paid, 0.00),
+                    s.paid_penalty_amount = COALESCE(p.penalty_paid, 0.00),
+                    s.paid_other_amount = COALESCE(p.other_paid, 0.00),
+                    s.paid_at = COALESCE(p.last_paid_at, s.paid_at)
+                WHERE p.schedule_line_id IS NOT NULL
+                """);
     }
 
     private void addColumnIfMissing(String tableName, String columnName, String sql) {

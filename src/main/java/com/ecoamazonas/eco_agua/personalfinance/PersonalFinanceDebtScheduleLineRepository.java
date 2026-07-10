@@ -12,6 +12,7 @@ public interface PersonalFinanceDebtScheduleLineRepository extends JpaRepository
     List<PersonalFinanceDebtScheduleLine> findByUserAndDueDateBetweenOrderByDueDateAscLineNumberAscIdAsc(UserAccount user, LocalDate start, LocalDate end);
     Optional<PersonalFinanceDebtScheduleLine> findByIdAndUser(Long id, UserAccount user);
     Optional<PersonalFinanceDebtScheduleLine> findByUserAndDebtAndDueDateAndLineType(UserAccount user, PersonalFinanceDebt debt, LocalDate dueDate, PersonalFinanceScheduleLineType lineType);
+    Optional<PersonalFinanceDebtScheduleLine> findByUserAndDebtAndLineNumber(UserAccount user, PersonalFinanceDebt debt, Integer lineNumber);
     boolean existsByUserAndDebtAndDueDateAndLineType(UserAccount user, PersonalFinanceDebt debt, LocalDate dueDate, PersonalFinanceScheduleLineType lineType);
     long countByUserAndDebt(UserAccount user, PersonalFinanceDebt debt);
 }

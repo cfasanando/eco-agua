@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('GastoClaro - Prioridad mensual')"></head>
+<body>
+<div class="app-layout" th:with="activePage='gasto_claro_monthly_priority'">
+  <aside th:replace="fragments/sidebar :: sidebar"></aside>
+  <div class="main-content">
+    <header th:replace="fragments/topbar :: topbar"></header>
+    <main class="content-wrapper gasto-claro-page">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div>
+          <h1 class="h4 mb-1">Prioridad mensual y modo rojo</h1>
+          <p class="text-muted mb-0">Distribuye el dinero disponible entre costo básico, estudios, deudas y compromisos postergables sin mezclar monedas.</p>
+        </div>
+        <a th:href="@{/gasto-claro/monthly-plan(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-calendar2-week"></i> Abrir plan mensual
+        </a>
+      </div>
+
+      <div th:replace="personal_finance/_nav :: nav('monthly_priority')"></div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+          <form th:action="@{/gasto-claro/monthly-priority}" method="get" class="row g-3 align-items-end">
+            <div class="col-6 col-md-2">
+              <label class="form-label small">Año</label>
+              <input type="number" class="form-control form-control-sm" name="year" th:value="${selectedYear}">
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label small">Mes</label>
+              <input type="number" min="1" max="12" class="form-control form-control-sm" name="month" th:value="${selectedMonth}">
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label small">Moneda</label>
+              <select class="form-select form-select-sm" name="currency">
+                <option th:each="currency : ${currencies}"
+                        th:value="${currency}"
+                        th:text="${currency}"
+                        th:selected="${currency == selectedCurrency}">PEN</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label small">Base de dinero</label>
+              <select class="form-select form-select-sm" name="cashBasis" id="cashBasisSelect">
+                <option th:each="basis : ${cashBases}"
+                        th:value="${basis}"
+                        th:text="${basis.label}"
+                        th:selected="${basis == selectedCashBasis}">Ingreso esperado</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label small">Dinero disponible manual</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text" th:text="${selectedCurrency}">PEN</span>
+                <input type="number" min="0" step="0.01" class="form-control" name="availableCash" id="availableCashInput"
+                       th:value="${availableCash}" placeholder="0.00">
+              </div>
+            </div>
+            <div class="col-12 d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <div class="small text-muted">El monto manual solo se usa cuando eliges “Dinero disponible manual”.</div>
+              <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-calculator"></i> Calcular prioridad</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div th:if="${selectedCashBasis.name() == 'MANUAL' and availableCash == null}" class="alert alert-warning border-0 shadow-sm">
+        Ingresa el efectivo realmente disponible para obtener una distribución manual útil.
+      </div>
+
+      <div th:if="${priorityPlan.hasExcludedCurrencies()}" class="alert alert-info border-0 shadow-sm">
+        Esta vista solo calcula <strong th:text="${selectedCurrency}">PEN</strong>.
+        Se excluyeron <span th:text="${priorityPlan.excludedIncomeCount()}">0</span> ingreso(s) y
+        <span th:text="${priorityPlan.excludedObligationCount()}">0</span> obligación(es) de otra moneda para evitar una proyección incorrecta.
+      </div>
+
+      <section class="gasto-priority-hero mb-4" th:classappend="${' gasto-priority-hero--' + priorityPlan.healthLevel().cssClass}">
+        <div>
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span class="badge bg-light text-dark" th:text="${priorityPlan.healthLevel().label}">En rojo</span>
+            <span class="small opacity-75"><span th:text="${selectedMonth}">7</span>/<span th:text="${selectedYear}">2026</span> · <span th:text="${selectedCurrency}">PEN</span></span>
+          </div>
+          <h2 class="h4 mb-2" th:text="${priorityPlan.headline()}">El mes está en rojo.</h2>
+          <p class="mb-0 opacity-90" th:text="${priorityPlan.recommendation()}">Recomendación.</p>
+        </div>
+        <div class="gasto-priority-cash">
+          <span class="small d-block opacity-75">Disponible para asignar</span>
+          <span th:text="${selectedCurrency}">PEN</span>
+          <span th:text="${#numbers.formatDecimal(priorityPlan.availableCash(),1,'POINT',2,'POINT')}">0.00</span>
+          <small class="d-block opacity-75 mt-1" th:text="${selectedCashBasis.label}">Ingreso esperado</small>
+        </div>
+      </section>
+
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-2">
+          <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+            <div class="text-muted small">Ingreso esperado</div>
+            <div class="h5 mb-0"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.expectedIncome(),1,'POINT',2,'POINT')}">0.00</span></div>
+          </div></div>
+        </div>
+        <div class="col-6 col-xl-2">
+          <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+            <div class="text-muted small">Ya pagado</div>
+            <div class="h5 mb-0 text-primary"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.alreadyPaid(),1,'POINT',2,'POINT')}">0.00</span></div>
+          </div></div>
+        </div>
+        <div class="col-6 col-xl-2">
+          <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+            <div class="text-muted small">Básico pendiente</div>
+            <div class="h5 mb-0"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.essentialPending(),1,'POINT',2,'POINT')}">0.00</span></div>
+          </div></div>
+        </div>
+        <div class="col-6 col-xl-2">
+          <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+            <div class="text-muted small">Deudas pendientes</div>
+            <div class="h5 mb-0"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.debtPending(),1,'POINT',2,'POINT')}">0.00</span></div>
+          </div></div>
+        </div>
+        <div class="col-6 col-xl-2">
+          <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+            <div class="text-muted small">Sin cobertura</div>
+            <div class="h5 mb-0" th:classappend="${priorityPlan.unfundedTotal().signum() > 0} ? ' text-danger' : ' text-success'">
+              <span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.unfundedTotal(),1,'POINT',2,'POINT')}">0.00</span>
+            </div>
+          </div></div>
+        </div>
+        <div class="col-6 col-xl-2">
+          <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+            <div class="text-muted small">Saldo libre</div>
+            <div class="h5 mb-0 text-success"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.remainingCash(),1,'POINT',2,'POINT')}">0.00</span></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-xl-9">
+          <div class="gasto-excel-card">
+            <div class="gasto-excel-title d-flex flex-wrap justify-content-between gap-2">
+              <span>Orden recomendado de pago</span>
+              <span class="small fw-normal">No ejecuta pagos ni modifica importes; es una distribución calculada.</span>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm gasto-excel-table gasto-priority-table align-middle mb-0">
+                <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Concepto</th>
+                  <th>Motivo</th>
+                  <th>Vence</th>
+                  <th class="text-end">Pendiente</th>
+                  <th class="text-end">Pagar ahora</th>
+                  <th class="text-end">Sin cobertura</th>
+                  <th>Resultado</th>
+                  <th class="text-end">Caja restante</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="item : ${priorityPlan.items()}"
+                    th:classappend="${item.allocationStatus().name() == 'UNFUNDED'} ? ' table-danger' : (${item.allocationStatus().name() == 'PARTIAL'} ? ' table-warning' : '')">
+                  <td class="fw-bold" th:text="${item.position()}">1</td>
+                  <td>
+                    <strong th:text="${item.title()}">Concepto</strong>
+                    <div class="small text-muted">
+                      <span th:text="${item.group().label}">Grupo</span> ·
+                      <span th:text="${item.priority().label}">Prioridad</span>
+                      <span th:if="${item.obligationStatus().name() == 'OVERDUE'}" class="badge text-bg-danger ms-1">Vencido</span>
+                    </div>
+                  </td>
+                  <td class="small" th:text="${item.reason()}">Motivo</td>
+                  <td th:text="${item.dueDate() != null ? item.dueDate() : '-'}">-</td>
+                  <td class="text-end text-nowrap"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(item.pendingAmount(),1,'POINT',2,'POINT')}">0.00</span></td>
+                  <td class="text-end text-nowrap fw-semibold"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(item.recommendedAmount(),1,'POINT',2,'POINT')}">0.00</span></td>
+                  <td class="text-end text-nowrap" th:classappend="${item.unfundedAmount().signum() > 0} ? ' text-danger fw-semibold' : ''"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(item.unfundedAmount(),1,'POINT',2,'POINT')}">0.00</span></td>
+                  <td><span class="badge" th:classappend="${' text-bg-' + item.allocationStatus().bootstrapClass}" th:text="${item.allocationStatus().label}">Cubierto</span></td>
+                  <td class="text-end text-nowrap"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(item.cashAfter(),1,'POINT',2,'POINT')}">0.00</span></td>
+                </tr>
+                <tr th:if="${!priorityPlan.hasItems()}">
+                  <td colspan="9" class="text-center text-muted py-4">
+                    No existen obligaciones pendientes en esta moneda. Genera el mes o registra compromisos en el Plan mensual.
+                  </td>
+                </tr>
+                </tbody>
+                <tfoot th:if="${priorityPlan.hasItems()}">
+                <tr class="gasto-total-row">
+                  <td colspan="4">TOTAL</td>
+                  <td class="text-end"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.totalPending(),1,'POINT',2,'POINT')}">0.00</span></td>
+                  <td class="text-end"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.allocatedTotal(),1,'POINT',2,'POINT')}">0.00</span></td>
+                  <td class="text-end"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.unfundedTotal(),1,'POINT',2,'POINT')}">0.00</span></td>
+                  <td colspan="2"></td>
+                </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-xl-3">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white"><strong>Lectura de riesgo</strong></div>
+            <div class="card-body small">
+              <div class="d-flex justify-content-between gap-2 mb-2">
+                <span class="text-muted">Brecha de costo básico</span>
+                <strong th:classappend="${priorityPlan.essentialGap().signum() > 0} ? ' text-danger' : ' text-success'">
+                  <span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.essentialGap(),1,'POINT',2,'POINT')}">0.00</span>
+                </strong>
+              </div>
+              <div class="d-flex justify-content-between gap-2 mb-2">
+                <span class="text-muted">Presión de deuda</span>
+                <strong><span th:text="${#numbers.formatDecimal(priorityPlan.debtPressurePercentage(),1,'POINT',1,'POINT')}">0.0</span>%</strong>
+              </div>
+              <div class="d-flex justify-content-between gap-2 mb-2">
+                <span class="text-muted">Pagos cubiertos</span>
+                <strong th:text="${priorityPlan.coveredCount()}">0</strong>
+              </div>
+              <div class="d-flex justify-content-between gap-2 mb-2">
+                <span class="text-muted">Pagos parciales</span>
+                <strong th:text="${priorityPlan.partialCount()}">0</strong>
+              </div>
+              <div class="d-flex justify-content-between gap-2">
+                <span class="text-muted">Pagos sin cobertura</span>
+                <strong class="text-danger" th:text="${priorityPlan.unfundedCount()}">0</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm mb-3" th:if="${priorityPlan.largestDebtTitle() != null}">
+            <div class="card-header bg-white"><strong>Mayor carga de deuda</strong></div>
+            <div class="card-body small">
+              <div class="fw-semibold mb-1" th:text="${priorityPlan.largestDebtTitle()}">Deuda</div>
+              <div class="h5 mb-1"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.largestDebtAmount(),1,'POINT',2,'POINT')}">0.00</span></div>
+              <div class="text-muted">Representa <span th:text="${#numbers.formatDecimal(priorityPlan.largestDebtSharePercentage(),1,'POINT',1,'POINT')}">0.0</span>% del ingreso mensual usado como referencia.</div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white"><strong>Cómo se calcula</strong></div>
+            <div class="card-body small text-muted">
+              <p class="mb-2"><strong>Ingreso esperado:</strong> ingreso del mes menos pagos ya registrados.</p>
+              <p class="mb-2"><strong>Ingreso recibido:</strong> solo ingresos cobrados menos pagos ya registrados.</p>
+              <p class="mb-0"><strong>Manual:</strong> usa exactamente el efectivo que indiques, sin restar pagos anteriores.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const basisSelect = document.getElementById('cashBasisSelect');
+    const manualInput = document.getElementById('availableCashInput');
+
+    const updateManualState = () => {
+      const manualMode = basisSelect && basisSelect.value === 'MANUAL';
+      if (manualInput) {
+        manualInput.required = manualMode;
+        manualInput.closest('.input-group')?.classList.toggle('opacity-50', !manualMode);
+      }
+    };
+
+    basisSelect?.addEventListener('change', updateManualState);
+    updateManualState();
+  });
+</script>
+<div th:replace="fragments/scripts_admin :: scripts"></div>
+</body>
+</html>

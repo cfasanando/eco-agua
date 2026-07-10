@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('GastoClaro - Registrar pago')"></head>
+<body>
+<div class="app-layout" th:with="activePage='gasto_claro_payments'">
+  <aside th:replace="fragments/sidebar :: sidebar"></aside>
+  <div class="main-content">
+    <header th:replace="fragments/topbar :: topbar"></header>
+    <main class="content-wrapper">
+      <link rel="stylesheet" th:href="@{/css/personal-finance-payments.css}">
+
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+        <div>
+          <h1 class="h4 mb-1">Registrar pago</h1>
+          <p class="text-muted mb-0">Registra el pago real y separa cuánto corresponde a capital, interés y cargos.</p>
+        </div>
+        <a th:href="${returnTo}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-arrow-left"></i> Volver
+        </a>
+      </div>
+
+      <div th:replace="personal_finance/_nav :: nav('payments')"></div>
+      <div th:if="${message}" class="alert" th:classappend="${messageType == 'success'} ? ' alert-success' : (${messageType == 'danger'} ? ' alert-danger' : ' alert-info')" th:text="${message}">Mensaje</div>
+
+      <section class="payment-context-card mb-3">
+        <div>
+          <span class="payment-context-label">Compromiso</span>
+          <strong th:text="${paymentContext.obligationTitle()}">Cuota</strong>
+          <small th:if="${paymentContext.debtName() != null}">
+            Deuda: <span th:text="${paymentContext.debtName()}">Deuda</span>
+          </small>
+        </div>
+        <div>
+          <span class="payment-context-label">Vencimiento</span>
+          <strong th:text="${paymentContext.dueDate() != null ? #temporals.format(paymentContext.dueDate(), 'dd/MM/yyyy') : '-'}">-</strong>
+          <small th:if="${paymentContext.scheduleLineNumber() != null}">Cuota <span th:text="${paymentContext.scheduleLineNumber()}">1</span></small>
+        </div>
+        <div>
+          <span class="payment-context-label">Importe</span>
+          <strong><span th:text="${paymentContext.currency() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : paymentContext.currency()}">S/</span> <span th:text="${#numbers.formatDecimal(paymentContext.amountDue(),1,'POINT',2,'POINT')}">0.00</span></strong>
+          <small>Pagado: <span th:text="${#numbers.formatDecimal(paymentContext.amountPaid(),1,'POINT',2,'POINT')}">0.00</span></small>
+        </div>
+        <div class="payment-context-pending">
+          <span class="payment-context-label">Pendiente</span>
+          <strong><span th:text="${paymentContext.currency() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : paymentContext.currency()}">S/</span> <span id="pendingAmountLabel" th:data-value="${paymentContext.pendingAmount()}" th:text="${#numbers.formatDecimal(paymentContext.pendingAmount(),1,'POINT',2,'POINT')}">0.00</span></strong>
+          <small th:if="${paymentContext.debtBalanceKnown()}">Saldo deuda: <span th:text="${#numbers.formatDecimal(paymentContext.debtBalance(),1,'POINT',2,'POINT')}">0.00</span></small>
+        </div>
+      </section>
+
+      <div class="row g-3">
+        <div class="col-xl-8">
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
+              <strong>Datos del pago</strong>
+              <span id="componentStatus" class="badge text-bg-secondary">Verifica la distribución</span>
+            </div>
+            <div class="card-body">
+              <form th:action="@{/gasto-claro/obligations/{id}/payment(id=${paymentContext.obligationId()})}"
+                    th:object="${paymentForm}"
+                    method="post"
+                    enctype="multipart/form-data"
+                    id="paymentForm"
+                    class="row g-3">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <input type="hidden" name="returnTo" th:value="${returnTo}"/>
+
+                <div class="col-md-4">
+                  <label class="form-label">Fecha real del pago</label>
+                  <input type="date" class="form-control" th:field="*{paymentDate}" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Monto total pagado</label>
+                  <div class="input-group">
+                    <span class="input-group-text" th:text="${paymentContext.currency() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : paymentContext.currency()}">S/</span>
+                    <input type="number" min="0.01" step="0.01" class="form-control js-payment-component" data-role="total" th:field="*{totalAmount}" required>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Método</label>
+                  <select class="form-select" th:field="*{paymentMethod}">
+                    <option th:each="method : ${paymentMethods}" th:value="${method}" th:text="${method.label}">Método</option>
+                  </select>
+                </div>
+
+                <div class="col-12">
+                  <div class="payment-breakdown-title">
+                    <div>
+                      <strong>Distribución del pago</strong>
+                      <small>Solo el capital reduce el saldo de la deuda.</small>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="usePendingButton">Restaurar pendiente sugerido</button>
+                  </div>
+                </div>
+
+                <div class="col-sm-6 col-lg-4">
+                  <label class="form-label">Capital amortizado</label>
+                  <input type="number" min="0" step="0.01" class="form-control js-payment-component" data-role="component" th:field="*{principalAmount}">
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                  <label class="form-label">Interés pagado</label>
+                  <input type="number" min="0" step="0.01" class="form-control js-payment-component" data-role="component" th:field="*{interestAmount}">
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                  <label class="form-label">Seguro</label>
+                  <input type="number" min="0" step="0.01" class="form-control js-payment-component" data-role="component" th:field="*{insuranceAmount}">
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                  <label class="form-label">Comisión</label>
+                  <input type="number" min="0" step="0.01" class="form-control js-payment-component" data-role="component" th:field="*{feeAmount}">
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                  <label class="form-label">Mora / penalidad</label>
+                  <input type="number" min="0" step="0.01" class="form-control js-payment-component" data-role="component" th:field="*{penaltyAmount}">
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                  <label class="form-label">Otros / no clasificado</label>
+                  <input type="number" min="0" step="0.01" class="form-control js-payment-component" data-role="component" th:field="*{otherAmount}">
+                </div>
+
+                <div class="col-12">
+                  <div class="payment-balance-check">
+                    <span>Suma distribuida</span>
+                    <strong><span th:text="${paymentContext.currency() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : paymentContext.currency()}">S/</span> <span id="componentTotal">0.00</span></strong>
+                    <span>Diferencia</span>
+                    <strong id="componentDifference">0.00</strong>
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label">Número de operación</label>
+                  <input type="text" maxlength="100" class="form-control" th:field="*{operationNumber}" placeholder="Código de transferencia, Yape o voucher">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Persona o entidad que recibió</label>
+                  <input type="text" maxlength="180" class="form-control" th:field="*{recipient}" placeholder="Banco, prestamista, familiar...">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Comprobante</label>
+                  <input type="file" name="receipt" class="form-control" accept="application/pdf,image/jpeg,image/png,image/webp">
+                  <div class="form-text">PDF, JPG, PNG o WEBP. Máximo 5 MB. El archivo queda privado y solo puede abrirlo su propietario.</div>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Observación</label>
+                  <textarea class="form-control" rows="3" maxlength="1500" th:field="*{notes}" placeholder="Detalle útil para recordar el pago o acuerdo"></textarea>
+                </div>
+                <div class="col-12 d-flex justify-content-end gap-2">
+                  <a th:href="${returnTo}" class="btn btn-outline-secondary">Cancelar</a>
+                  <button type="submit" class="btn btn-success" id="submitPaymentButton">
+                    <i class="bi bi-check2-circle"></i> Registrar pago
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-xl-4">
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white"><strong>Historial de este compromiso</strong></div>
+            <div class="card-body p-0">
+              <div class="list-group list-group-flush" th:if="${!#lists.isEmpty(recentPayments)}">
+                <div class="list-group-item" th:each="payment : ${recentPayments}">
+                  <div class="d-flex justify-content-between gap-2">
+                    <strong><span th:text="${payment.currency() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : payment.currency()}">S/</span> <span th:text="${#numbers.formatDecimal(payment.totalAmount(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                    <span class="badge" th:classappend="${payment.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinancePaymentStatus).ACTIVE} ? ' text-bg-success' : ' text-bg-secondary'" th:text="${payment.status().label}">Vigente</span>
+                  </div>
+                  <small class="text-muted"><span th:text="${#temporals.format(payment.paymentDate(), 'dd/MM/yyyy')}">Fecha</span> · <span th:text="${payment.paymentMethod().label}">Método</span></small>
+                </div>
+              </div>
+              <div th:if="${#lists.isEmpty(recentPayments)}" class="text-center text-muted p-4">Aún no existen pagos registrados.</div>
+            </div>
+            <div class="card-footer bg-white" th:if="${!#lists.isEmpty(recentPayments)}">
+              <a th:href="@{/gasto-claro/payments}" class="btn btn-sm btn-outline-primary w-100">Ver historial completo</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div th:replace="fragments/scripts_admin :: scripts"></div>
+<script th:inline="javascript">
+(() => {
+  const pending = Number(document.getElementById('pendingAmountLabel')?.dataset.value || 0);
+  const totalInput = document.querySelector('[data-role="total"]');
+  const componentInputs = Array.from(document.querySelectorAll('[data-role="component"]'));
+  const componentTotal = document.getElementById('componentTotal');
+  const difference = document.getElementById('componentDifference');
+  const status = document.getElementById('componentStatus');
+  const submit = document.getElementById('submitPaymentButton');
+  const suggestedValues = new Map(
+    [totalInput, ...componentInputs]
+      .filter(Boolean)
+      .map(input => [input, input.value])
+  );
+
+  const numberValue = (input) => Number.parseFloat(input?.value || '0') || 0;
+  const update = () => {
+    const total = numberValue(totalInput);
+    const distributed = componentInputs.reduce((sum, input) => sum + numberValue(input), 0);
+    const delta = Math.round((total - distributed) * 100) / 100;
+    componentTotal.textContent = distributed.toFixed(2);
+    difference.textContent = delta.toFixed(2);
+    const valid = total > 0 && Math.abs(delta) < 0.005;
+    const exceedsPending = total > pending + 0.005;
+    status.textContent = valid
+      ? (exceedsPending ? 'Distribución correcta · incluye importe extraordinario' : 'Distribución correcta')
+      : 'La suma no coincide';
+    status.className = 'badge ' + (valid ? (exceedsPending ? 'text-bg-warning' : 'text-bg-success') : 'text-bg-danger');
+    submit.disabled = !valid;
+  };
+
+  document.querySelectorAll('.js-payment-component').forEach(input => input.addEventListener('input', update));
+  document.getElementById('usePendingButton')?.addEventListener('click', () => {
+    suggestedValues.forEach((value, input) => {
+      input.value = value;
+    });
+    update();
+  });
+  update();
+})();
+</script>
+</body>
+</html>

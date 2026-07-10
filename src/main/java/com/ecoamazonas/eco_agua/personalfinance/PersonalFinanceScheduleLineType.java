@@ -3,6 +3,7 @@ package com.ecoamazonas.eco_agua.personalfinance;
 public enum PersonalFinanceScheduleLineType {
     INSTALLMENT("Cuota"),
     INTEREST("Interés"),
+    LENDER_INSTALLMENT("Cuota prestamista"),
     PRINCIPAL("Capital"),
     ONE_TIME("Pago único"),
     AUTO_DEDUCTION("Descuento automático"),

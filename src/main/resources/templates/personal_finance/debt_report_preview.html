@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('GastoClaro - Informe financiero')"></head>
+<body>
+<div class="app-layout" th:with="activePage='gasto_claro_debt_report'">
+  <aside th:replace="fragments/sidebar :: sidebar"></aside>
+  <div class="main-content">
+    <header th:replace="fragments/topbar :: topbar"></header>
+    <main class="content-wrapper">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+          <h1 class="h4 mb-1">Informes financieros</h1>
+          <p class="text-muted mb-0">Genera un informe integral o selecciona únicamente los tipos de deuda, costo de vida e ingresos que deseas presentar.</p>
+        </div>
+        <a th:href="@{/gasto-claro/monthly-plan(year=${options.startMonth().year},month=${options.startMonth().monthValue})}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Plan mensual</a>
+      </div>
+
+      <div th:replace="personal_finance/_nav :: nav('debt_report')"></div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold">Opciones y contenido del informe</div>
+        <div class="card-body">
+          <form id="pfDebtReportFilters" th:action="@{/gasto-claro/debt-report}" method="get">
+            <div class="row g-3 align-items-end">
+              <div class="col-sm-6 col-lg-2">
+                <label class="form-label">Fecha de corte</label>
+                <input type="date" class="form-control" name="cutoffDate" th:value="${options.cutoffDate()}" />
+              </div>
+              <div class="col-6 col-lg-1">
+                <label class="form-label">Año</label>
+                <input type="number" class="form-control" name="year" th:value="${options.startMonth().year}" />
+              </div>
+              <div class="col-6 col-lg-1">
+                <label class="form-label">Mes</label>
+                <input type="number" min="1" max="12" class="form-control" name="month" th:value="${options.startMonth().monthValue}" />
+              </div>
+              <div class="col-6 col-lg-1">
+                <label class="form-label">Meses</label>
+                <input type="number" min="1" max="60" class="form-control" name="months" th:value="${options.months()}" />
+              </div>
+              <div class="col-sm-6 col-lg-2">
+                <label class="form-label">Cronogramas</label>
+                <select class="form-select" name="includeSchedules"><option value="true" th:selected="${options.includeSchedules()}">Incluir</option><option value="false" th:selected="${!options.includeSchedules()}">No incluir</option></select>
+              </div>
+              <div class="col-sm-6 col-lg-2">
+                <label class="form-label">Notas privadas</label>
+                <select class="form-select" name="includePrivateNotes"><option value="true" th:selected="${options.includePrivateNotes()}">Incluir</option><option value="false" th:selected="${!options.includePrivateNotes()}">Ocultar</option></select>
+              </div>
+              <div class="col-sm-6 col-lg-2">
+                <label class="form-label">Anonimizar</label>
+                <select class="form-select" name="anonymizeContacts"><option value="false" th:selected="${!options.anonymizeContacts()}">No</option><option value="true" th:selected="${options.anonymizeContacts()}">Sí</option></select>
+              </div>
+            </div>
+
+            <hr class="my-4" />
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h2 class="h6 mb-1">Contenido del informe</h2>
+                <p class="small text-muted mb-0">Los totales, cronogramas y fichas se recalculan usando únicamente las opciones marcadas.</p>
+              </div>
+              <div class="d-flex flex-wrap gap-1 pf-report-presets">
+                <button type="button" class="btn btn-outline-primary btn-sm" data-report-preset="all">Todo</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-report-preset="own-banks">Bancos propios</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-report-preset="third-party">Deudas por terceros</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-report-preset="lenders">Prestamistas</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-report-preset="savings-circle">Junta</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-report-preset="living-cost">Costo de vida</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-report-preset="clear">Limpiar</button>
+              </div>
+            </div>
+
+            <div class="row g-2">
+              <div class="col-12 col-lg-8">
+                <div class="border rounded p-3 h-100">
+                  <div class="fw-semibold small text-uppercase text-muted mb-2">Deudas</div>
+                  <div class="row g-2">
+                    <th:block th:each="section : ${reportSections}" th:if="${section.debtSection}">
+                      <div class="col-sm-6 col-xl-4">
+                        <label class="form-check border rounded px-3 py-2 w-100 mb-0">
+                          <input class="form-check-input pf-report-section" type="checkbox" name="sections" th:value="${section.code}" th:checked="${options.sectionSelected(section)}" />
+                          <span class="form-check-label" th:text="${section.label}">Categoría</span>
+                        </label>
+                      </div>
+                    </th:block>
+                  </div>
+                </div>
+              </div>
+              <div class="col-12 col-lg-4">
+                <div class="border rounded p-3 h-100">
+                  <div class="fw-semibold small text-uppercase text-muted mb-2">Contexto financiero</div>
+                  <div class="d-grid gap-2">
+                    <th:block th:each="section : ${reportSections}" th:unless="${section.debtSection}">
+                      <label class="form-check border rounded px-3 py-2 w-100 mb-0">
+                        <input class="form-check-input pf-report-section" type="checkbox" name="sections" th:value="${section.code}" th:checked="${options.sectionSelected(section)}" />
+                        <span class="form-check-label" th:text="${section.label}">Contenido</span>
+                      </label>
+                    </th:block>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+              <div id="pfReportFilterWarning" class="small text-danger d-none">Selecciona al menos una categoría.</div>
+              <button type="submit" class="btn btn-primary"><i class="bi bi-funnel"></i> Aplicar filtros</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="alert alert-info border-0 shadow-sm py-2">
+        <strong>Contenido actual:</strong> <span th:text="${report.selectionSummary()}">Todas las categorías</span>.
+        Los importes del resumen corresponden solo a esta selección.
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mb-4">
+        <a class="btn btn-outline-primary"
+           th:href="@{/gasto-claro/debt-report(year=${options.startMonth().year},month=${options.startMonth().monthValue},months=${options.months()},cutoffDate=${options.cutoffDate()},shared=false,includeSchedules=${options.includeSchedules()},includePrivateNotes=true,anonymizeContacts=false,sections=${options.sectionCodesCsv()})}">
+          <i class="bi bi-eye"></i> Vista privada
+        </a>
+        <a class="btn btn-outline-secondary"
+           th:href="@{/gasto-claro/debt-report(year=${options.startMonth().year},month=${options.startMonth().monthValue},months=${options.months()},cutoffDate=${options.cutoffDate()},shared=true,includeSchedules=${options.includeSchedules()},sections=${options.sectionCodesCsv()})}">
+          <i class="bi bi-person-lock"></i> Vista compartible
+        </a>
+        <a class="btn btn-danger"
+           th:href="@{/gasto-claro/debt-report/pdf(year=${options.startMonth().year},month=${options.startMonth().monthValue},months=${options.months()},cutoffDate=${options.cutoffDate()},shared=false,includeSchedules=${options.includeSchedules()},includePrivateNotes=${options.includePrivateNotes()},anonymizeContacts=${options.anonymizeContacts()},sections=${options.sectionCodesCsv()})}">
+          <i class="bi bi-file-earmark-pdf"></i> PDF privado
+        </a>
+        <a class="btn btn-success"
+           th:href="@{/gasto-claro/debt-report/pdf(year=${options.startMonth().year},month=${options.startMonth().monthValue},months=${options.months()},cutoffDate=${options.cutoffDate()},shared=true,includeSchedules=${options.includeSchedules()},sections=${options.sectionCodesCsv()})}">
+          <i class="bi bi-share"></i> PDF para compartir
+        </a>
+        <button type="button" class="btn btn-outline-dark" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir vista</button>
+      </div>
+
+      <div class="alert alert-warning border-0 shadow-sm" th:if="${options.shared()}">
+        La versión compartible anonimiza contactos y elimina notas privadas. Los nombres de bancos pueden mantenerse para que el informe siga siendo comprensible.
+      </div>
+
+      <div class="card border-0 shadow-sm">
+        <div class="card-body bg-white">
+          <th:block th:replace="~{personal_finance/_debt_report_styles :: styles}"></th:block>
+          <div th:replace="~{personal_finance/_debt_report_content :: content(${report}, ${options}, ${fmt})}"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script>
+(() => {
+  const form = document.getElementById('pfDebtReportFilters');
+  if (!form) return;
+  const boxes = [...form.querySelectorAll('.pf-report-section')];
+  const presets = {
+    'all': boxes.map(box => box.value),
+    'own-banks': ['bank-own', 'credit-card'],
+    'third-party': ['bank-third-party', 'third-party-contribution'],
+    'lenders': ['private-lender'],
+    'savings-circle': ['savings-circle'],
+    'living-cost': ['living-cost'],
+    'clear': []
+  };
+  form.querySelectorAll('[data-report-preset]').forEach(button => {
+    button.addEventListener('click', () => {
+      const selected = new Set(presets[button.dataset.reportPreset] || []);
+      boxes.forEach(box => { box.checked = selected.has(box.value); });
+      document.getElementById('pfReportFilterWarning')?.classList.add('d-none');
+    });
+  });
+  form.addEventListener('submit', event => {
+    if (boxes.some(box => box.checked)) return;
+    event.preventDefault();
+    document.getElementById('pfReportFilterWarning')?.classList.remove('d-none');
+  });
+})();
+</script>
+</body>
+</html>

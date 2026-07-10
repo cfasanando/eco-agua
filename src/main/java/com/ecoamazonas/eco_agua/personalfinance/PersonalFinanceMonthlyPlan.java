@@ -24,6 +24,7 @@ public record PersonalFinanceMonthlyPlan(
         BigDecimal cashAfterAllObligations,
         BigDecimal delinquentDebtPenTotal,
         BigDecimal delinquentDebtUsdTotal,
+        PersonalFinanceDebtPortfolioSummary debtPortfolio,
         long delinquentDebtCount,
         long overdueCount,
         long highInterestDebtCount,

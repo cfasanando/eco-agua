@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('GastoClaro - Cronograma bancario real')"></head>
+<body>
+<div class="app-layout" th:with="activePage='gasto_claro_debts'">
+  <aside th:replace="fragments/sidebar :: sidebar"></aside>
+  <div class="main-content">
+    <header th:replace="fragments/topbar :: topbar"></header>
+    <main class="content-wrapper gasto-claro-page">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+          <h1 class="h4 mb-1">Cronograma bancario real</h1>
+          <p class="text-muted mb-0">Importa capital, interés, seguro y total por cuota sin reemplazar pagos registrados.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <a th:href="@{/gasto-claro/debts/{id}/payments(id=${debt.id})}" class="btn btn-outline-dark btn-sm"><i class="bi bi-clock-history"></i> Historial de pagos</a>
+          <a th:href="@{/gasto-claro/debts/{id}/schedule(id=${debt.id})}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square"></i> Ajuste manual</a>
+          <a th:href="@{/gasto-claro/monthly-plan}" class="btn btn-outline-success btn-sm"><i class="bi bi-calendar-check"></i> Plan mensual</a>
+          <a th:href="@{/gasto-claro/debts}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Deudas</a>
+        </div>
+      </div>
+
+      <div th:replace="personal_finance/_nav :: nav('debts')"></div>
+
+      <div th:if="${message}" class="alert border-0 shadow-sm"
+           th:classappend="${messageType == 'success'} ? ' alert-success' : (${messageType == 'danger'} ? ' alert-danger' : ' alert-info')"
+           th:text="${message}">Mensaje</div>
+
+      <section class="gasto-month-hero mb-4">
+        <div>
+          <div class="text-uppercase small fw-bold opacity-75">Deuda seleccionada</div>
+          <div class="h4 mb-1" th:text="${debt.name}">Deuda</div>
+          <div class="small opacity-75">
+            <span th:text="${debt.debtType.label}">Tipo</span>
+            <span th:if="${debt.creditorName != null and !#strings.isEmpty(debt.creditorName)}"> · <span th:text="${debt.creditorName}">Acreedor</span></span>
+            <span th:if="${debt.contactName != null and !#strings.isEmpty(debt.contactName)}"> · Contacto: <span th:text="${debt.contactName}">Contacto</span></span>
+          </div>
+        </div>
+        <div class="gasto-hero-number">
+          <span class="small d-block">Capital pendiente</span>
+          <span th:text="${debt.currency}">PEN</span>
+          <span th:text="${#numbers.formatDecimal(summary.principalPending(),1,'POINT',2,'POINT')}">0.00</span>
+        </div>
+      </section>
+
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-2"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Cuotas</div><div class="h5 mb-0" th:text="${summary.totalLines()}">0</div></div></div></div>
+        <div class="col-6 col-lg-2"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Pagadas</div><div class="h5 mb-0 text-success" th:text="${summary.paidLines()}">0</div></div></div></div>
+        <div class="col-6 col-lg-2"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Pendientes</div><div class="h5 mb-0" th:text="${summary.pendingLines()}">0</div></div></div></div>
+        <div class="col-6 col-lg-2"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Vencidas</div><div class="h5 mb-0 text-danger" th:text="${summary.overdueLines()}">0</div></div></div></div>
+        <div class="col-6 col-lg-2"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Interés futuro</div><div class="fw-semibold"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(summary.futureInterest(),1,'POINT',2,'POINT')}">0.00</span></div></div></div></div>
+        <div class="col-6 col-lg-2"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Total futuro</div><div class="fw-semibold"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(summary.futureTotal(),1,'POINT',2,'POINT')}">0.00</span></div></div></div></div>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-xl-8">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white"><strong>Importar CSV o texto</strong></div>
+            <div class="card-body">
+              <div class="alert alert-light border small">
+                Columnas: <code>cuota;fecha;capital;interes;seguro;total</code>. También acepta tabulaciones, comas o barras verticales.
+                Fechas: <code>dd/MM/yyyy</code> o <code>yyyy-MM-dd</code>.
+              </div>
+              <form th:action="@{/gasto-claro/debts/{id}/bank-schedule/import(id=${debt.id})}" method="post" enctype="multipart/form-data" class="row g-3">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <div class="col-12">
+                  <label class="form-label">Pegar filas</label>
+                  <textarea class="form-control font-monospace" rows="8" name="scheduleText" placeholder="22&#9;10/07/2026&#9;425.32&#9;1151.42&#9;0.00&#9;1576.74"></textarea>
+                </div>
+                <div class="col-md-7">
+                  <label class="form-label">Archivo CSV/TXT</label>
+                  <input type="file" class="form-control" name="scheduleFile" accept=".csv,.txt,text/csv,text/plain">
+                </div>
+                <div class="col-md-5 d-flex align-items-end">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="true" name="replaceExisting" id="replaceExisting">
+                    <label class="form-check-label" for="replaceExisting">Reemplazar filas existentes sin pagos</label>
+                  </div>
+                </div>
+                <div class="col-12 d-flex justify-content-end">
+                  <button type="submit" class="btn btn-primary"><i class="bi bi-upload"></i> Importar cronograma</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-xl-4">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white"><strong>Registrar cuotas completas</strong></div>
+            <div class="card-body">
+              <form th:action="@{/gasto-claro/debts/{id}/bank-schedule/mark-paid-through(id=${debt.id})}" method="post" class="row g-2">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <div class="col-12">
+                  <label class="form-label small">Pagadas hasta la cuota</label>
+                  <input type="number" min="1" class="form-control" name="throughLineNumber" placeholder="21" required>
+                </div>
+                <div class="col-12"><div class="form-text">Crea un pago auditable por cada cuota. Para abonos parciales, usa el botón de pago de la fila.</div></div>
+                <div class="col-12 d-grid"><button type="submit" class="btn btn-success"><i class="bi bi-check2-all"></i> Registrar cuotas completas</button></div>
+              </form>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white"><strong>Resumen de capital</strong></div>
+            <div class="card-body small d-grid gap-2">
+              <div class="d-flex justify-content-between"><span>Capital original</span><strong><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(summary.principalTotal(),1,'POINT',2,'POINT')}">0.00</span></strong></div>
+              <div class="d-flex justify-content-between"><span>Capital amortizado</span><strong><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(summary.principalPaid(),1,'POINT',2,'POINT')}">0.00</span></strong></div>
+              <div class="d-flex justify-content-between"><span>Capital pendiente</span><strong><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(summary.principalPending(),1,'POINT',2,'POINT')}">0.00</span></strong></div>
+              <hr class="my-1">
+              <div th:if="${summary.nextInstallment() != null}">
+                <div class="text-muted">Próxima cuota</div>
+                <div class="fw-semibold">#<span th:text="${summary.nextInstallment().lineNumber}">22</span> · <span th:text="${summary.nextInstallment().dueDate}">2026-07-10</span></div>
+                <div><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(summary.nextInstallment().pendingAmount(),1,'POINT',2,'POINT')}">0.00</span></div>
+              </div>
+              <div th:if="${summary.nextInstallment() == null}" class="text-success">No hay cuotas pendientes.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gasto-excel-card">
+        <div class="gasto-excel-title">Detalle del cronograma</div>
+        <div class="table-responsive">
+          <table class="table table-sm gasto-excel-table align-middle mb-0">
+            <thead>
+            <tr><th>#</th><th>Fecha</th><th>Estado</th><th class="text-end">Capital</th><th class="text-end">Interés</th><th class="text-end">Seguro</th><th class="text-end">Total</th><th class="text-end">Pagado</th><th class="text-end">Pendiente</th><th>Plan mensual</th><th></th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="line : ${scheduleLines}" th:classappend="${line.isPaidLike()} ? ' table-success' : (${line.dueDate != null and line.dueDate.isBefore(today)} ? ' table-warning' : '')">
+              <td th:text="${line.lineNumber}">1</td>
+              <td th:text="${line.dueDate}">2026-07-10</td>
+              <td><span class="badge bg-light text-dark" th:text="${line.status.label}">Pendiente</span></td>
+              <td class="text-end" th:text="${#numbers.formatDecimal(line.principalAmount,1,'POINT',2,'POINT')}">0.00</td>
+              <td class="text-end" th:text="${#numbers.formatDecimal(line.interestAmount,1,'POINT',2,'POINT')}">0.00</td>
+              <td class="text-end" th:text="${#numbers.formatDecimal(line.insuranceAmount,1,'POINT',2,'POINT')}">0.00</td>
+              <td class="text-end fw-semibold" th:text="${#numbers.formatDecimal(line.calculatedTotal(),1,'POINT',2,'POINT')}">0.00</td>
+              <td class="text-end" th:text="${#numbers.formatDecimal(line.paidAmount,1,'POINT',2,'POINT')}">0.00</td>
+              <td class="text-end" th:text="${#numbers.formatDecimal(line.pendingAmount(),1,'POINT',2,'POINT')}">0.00</td>
+              <td><span th:if="${line.generatedObligationId != null}" class="badge text-bg-primary">Generado</span><span th:unless="${line.generatedObligationId != null}" class="text-muted">Pendiente de generar</span></td>
+              <td class="text-end text-nowrap">
+                <a th:if="${line.generatedObligationId != null and !line.isPaidLike()}"
+                   th:href="@{/gasto-claro/obligations/{id}/payment(id=${line.generatedObligationId},returnTo=${'/gasto-claro/debts/' + debt.id + '/bank-schedule'})}"
+                   class="btn btn-sm btn-outline-primary" title="Registrar pago parcial o detallado"><i class="bi bi-cash-coin"></i></a>
+                <a th:if="${line.generatedObligationId != null}"
+                   th:href="@{/gasto-claro/debts/{id}/payments(id=${debt.id})}"
+                   class="btn btn-sm btn-outline-dark" title="Ver historial"><i class="bi bi-clock-history"></i></a>
+                <form th:if="${!line.isPaidLike()}" th:action="@{/gasto-claro/debts/{debtId}/bank-schedule/lines/{lineId}/paid(debtId=${debt.id},lineId=${line.id})}" method="post" class="d-inline">
+                  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                  <input type="hidden" name="paid" value="true">
+                  <button type="submit" class="btn btn-sm btn-outline-success" title="Marcar pagada"><i class="bi bi-check2"></i></button>
+                </form>
+                <form th:if="${line.isPaidLike()}" th:action="@{/gasto-claro/debts/{debtId}/bank-schedule/lines/{lineId}/paid(debtId=${debt.id},lineId=${line.id})}" method="post" class="d-inline" onsubmit="return confirm('¿Revertir los pagos activos de esta cuota y restaurarla como pendiente? El historial se conservará.')">
+                  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                  <input type="hidden" name="paid" value="false">
+                  <button type="submit" class="btn btn-sm btn-outline-warning" title="Revertir pagos y reabrir"><i class="bi bi-arrow-counterclockwise"></i></button>
+                </form>
+                <a th:href="@{/gasto-claro/debts/{id}/schedule(id=${debt.id},editLineId=${line.id})}" class="btn btn-sm btn-outline-primary" title="Editar detalle"><i class="bi bi-pencil"></i></a>
+              </td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(scheduleLines)}"><td colspan="11" class="text-center text-muted py-5">Aún no hay cronograma bancario. Pega las filas del documento o carga un CSV.</td></tr>
+            </tbody>
+            <tfoot th:if="${!#lists.isEmpty(scheduleLines)}" class="table-light fw-semibold">
+            <tr><td colspan="3">TOTALES</td><td class="text-end" th:text="${#numbers.formatDecimal(summary.principalTotal(),1,'POINT',2,'POINT')}">0.00</td><td class="text-end" th:text="${#numbers.formatDecimal(summary.interestTotal(),1,'POINT',2,'POINT')}">0.00</td><td class="text-end" th:text="${#numbers.formatDecimal(summary.insuranceTotal(),1,'POINT',2,'POINT')}">0.00</td><td class="text-end" th:text="${#numbers.formatDecimal(summary.scheduledTotal(),1,'POINT',2,'POINT')}">0.00</td><td colspan="4"></td></tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div th:replace="fragments/scripts_admin :: scripts"></div>
+</body>
+</html>

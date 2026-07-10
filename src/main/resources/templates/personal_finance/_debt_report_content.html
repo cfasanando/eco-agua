@@ -1,0 +1,277 @@
+<div xmlns:th="http://www.thymeleaf.org" th:fragment="content(report, options, fmt)" class="pf-report">
+  <section class="cover">
+    <div class="cover-kicker">GastoClaro personal</div>
+    <h1 th:text="${report.title()}">Informe financiero</h1>
+    <div class="cover-rule"></div>
+    <p class="muted">Documento preparado con el contenido seleccionado para explicar saldos, cuotas, vencimientos y capacidad mensual de forma ordenada.</p>
+
+    <table class="cover-meta">
+      <tr><td>Fecha de corte</td><td th:text="${fmt.date(report.cutoffDate())}">08/07/2026</td></tr>
+      <tr><td>Período proyectado</td><td><span th:text="${fmt.month(report.startMonth())}">Julio 2026</span> - <span th:text="${report.months()}">12</span> meses</td></tr>
+      <tr><td>Contenido</td><td th:text="${report.selectionSummary()}">Contenido seleccionado</td></tr>
+      <tr><td>Versión</td><td th:text="${report.version().label}">Privado completo</td></tr>
+      <tr><td>Titular</td><td th:text="${report.ownerLabel()}">Usuario</td></tr>
+      <tr><td>Generado</td><td th:text="${fmt.dateTime(report.generatedAt())}">08/07/2026 14:00</td></tr>
+    </table>
+
+    <div class="confidential">
+      <strong>Documento confidencial.</strong>
+      Este informe es informativo y se construye con los datos registrados en GastoClaro. No constituye contrato, cesión de deuda, liquidación bancaria ni certificación de saldos.
+    </div>
+  </section>
+
+  <section>
+    <h2>Resumen del contenido seleccionado</h2>
+
+    <table class="summary-grid" th:if="${report.debtContentIncluded()}">
+      <tr>
+        <td><span class="summary-label">Capital conocido</span><span class="summary-value" th:text="${fmt.money(report.knownCapitalPen(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</span></td>
+        <td><span class="summary-label">Pago deudas primer mes</span><span class="summary-value" th:text="${fmt.money(report.firstMonthDebtPayments(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</span></td>
+        <td><span class="summary-label">Deudas incluidas</span><span class="summary-value" th:text="${report.activeDebtCount()}">0</span></td>
+        <td><span class="summary-label">Saldo no definido</span><span class="summary-value" th:text="${report.unknownBalanceCount()}">0</span></td>
+      </tr>
+      <tr>
+        <td><span class="summary-label">Pagos futuros programados</span><span class="summary-value" th:text="${fmt.money(report.futureScheduledPaymentsPen(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</span></td>
+        <td><span class="summary-label">Interés futuro programado</span><span class="summary-value" th:text="${fmt.money(report.futureScheduledInterestPen(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</span></td>
+        <td><span class="summary-label">Interés alto</span><span class="summary-value" th:text="${report.highInterestDebtCount()}">0</span></td>
+        <td><span class="summary-label">Cancelables con cuota</span><span class="summary-value" th:text="${report.settlementOpportunityCount()}">0</span></td>
+      </tr>
+    </table>
+
+    <table class="summary-grid" th:if="${report.livingCostIncluded()}">
+      <tr>
+        <td><span class="summary-label">Costo de vida primer mes</span><span class="summary-value" th:text="${fmt.money(report.firstMonthBasicExpenses(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</span></td>
+        <td><span class="summary-label">Conceptos activos</span><span class="summary-value" th:text="${report.livingCosts().size()}">0</span></td>
+        <td><span class="summary-label">Costo proyectado del período</span><span class="summary-value" th:text="${fmt.money(report.projectedLivingCostPeriodPen(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</span></td>
+        <td><span class="summary-label">Meses proyectados</span><span class="summary-value" th:text="${report.months()}">12</span></td>
+      </tr>
+    </table>
+
+    <table class="summary-grid" th:if="${report.incomeCapacityIncluded()}">
+      <tr>
+        <td><span class="summary-label">Ingreso primer mes</span><span class="summary-value" th:text="${fmt.money(report.firstMonthIncome(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</span></td>
+        <td><span class="summary-label">Fuentes activas</span><span class="summary-value" th:text="${report.incomeSources().size()}">0</span></td>
+        <td><span class="summary-label">Ingreso proyectado del período</span><span class="summary-value" th:text="${fmt.money(report.projectedIncomePeriodPen(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</span></td>
+        <td><span class="summary-label">Saldo primer mes</span><span class="summary-value" th:classappend="${report.firstMonthProjectedBalance() != null and report.firstMonthProjectedBalance().signum() < 0} ? ' negative' : ' positive'" th:text="${fmt.money(report.firstMonthProjectedBalance(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</span></td>
+      </tr>
+    </table>
+
+    <div class="notice warning" th:if="${report.debtContentIncluded() and report.knownCapitalUsd().signum() > 0}">
+      Además del total en soles, existen saldos conocidos en dólares por <strong th:text="${fmt.money(report.knownCapitalUsd(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).USD)}">US$ 0.00</strong>.
+    </div>
+    <div class="notice" th:if="${report.incomeCapacityIncluded()}">
+      El saldo proyectado considera únicamente los grupos marcados: ingresos seleccionados, costo de vida si fue incluido y pagos de las categorías de deuda elegidas.
+    </div>
+  </section>
+
+  <section th:if="${report.debtContentIncluded()}">
+    <h2>Resumen por tipo de deuda</h2>
+    <table class="data">
+      <thead><tr><th style="width:42%">Categoría</th><th style="width:18%">Deudas</th><th style="width:20%">Capital PEN</th><th style="width:20%">Capital USD</th></tr></thead>
+      <tbody>
+      <tr th:each="category : ${report.categoryTotals()}">
+        <td th:text="${category.label()}">Categoría</td>
+        <td class="text-center" th:text="${category.debtCount()}">0</td>
+        <td class="text-right" th:text="${fmt.money(category.penAmount(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</td>
+        <td class="text-right" th:text="${fmt.money(category.usdAmount(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).USD)}">US$ 0.00</td>
+      </tr>
+      <tr th:if="${report.categoryTotals().isEmpty()}"><td colspan="4" class="text-center muted">No hay deudas activas en las categorías seleccionadas.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="page-break" th:if="${report.debtContentIncluded()}">
+    <h2>Inventario de deudas seleccionadas</h2>
+    <table class="data">
+      <thead>
+      <tr><th style="width:24%">Deuda</th><th style="width:16%">Tipo</th><th style="width:14%">Prioridad</th><th style="width:15%">Saldo</th><th style="width:14%">Pago mensual</th><th style="width:10%">Interés</th><th style="width:12%">Fin</th></tr>
+      </thead>
+      <tbody>
+      <tr th:each="debt : ${report.debts()}">
+        <td><span class="strong" th:text="${debt.name()}">Deuda</span><br/><span class="small muted" th:text="${debt.creditorName()}">Acreedor</span></td>
+        <td th:text="${debt.classificationLabel()}">Tipo</td>
+        <td th:text="${debt.priorityLabel()}">Alta</td>
+        <td class="text-right" th:text="${fmt.moneyOrUndefined(debt.outstandingBalance(), debt.balanceKnown(), debt.currency())}">S/ 0.00</td>
+        <td class="text-right" th:text="${fmt.money(debt.monthlyPayment(), debt.currency())}">S/ 0.00</td>
+        <td class="text-right" th:text="${fmt.percent(debt.monthlyInterestRate())}">0%</td>
+        <td><span th:text="${fmt.date(debt.estimatedEndDate())}">No definida</span><br/><span class="small muted" th:if="${debt.estimatedEndDateApproximate()}">Estimación</span></td>
+      </tr>
+      <tr th:if="${report.debts().isEmpty()}"><td colspan="7" class="text-center muted">No hay deudas activas en las categorías seleccionadas.</td></tr>
+      </tbody>
+    </table>
+    <p class="small muted">Los saldos bancarios son referenciales. El importe exacto de cancelación debe solicitarse a la entidad financiera en la fecha de pago.</p>
+  </section>
+
+  <section class="page-break" th:if="${report.livingCostIncluded()}">
+    <h2>Costo de vida</h2>
+    <p class="muted">Detalle de gastos recurrentes activos durante el período seleccionado.</p>
+    <table class="data">
+      <thead><tr><th style="width:25%">Concepto</th><th style="width:17%">Categoría</th><th style="width:13%">Frecuencia</th><th style="width:10%">Vence</th><th style="width:17%">Primer mes</th><th style="width:18%">Total período</th></tr></thead>
+      <tbody>
+      <tr th:each="item : ${report.livingCosts()}">
+        <td><span class="strong" th:text="${item.name()}">Gasto</span><br/><span class="small muted" th:text="${item.mandatory() ? 'Esencial / obligatorio' : 'No obligatorio'}">Esencial</span></td>
+        <td th:text="${item.categoryLabel()}">Servicios</td>
+        <td th:text="${item.frequencyLabel()}">Mensual</td>
+        <td th:text="${item.dueDay() != null ? 'Día ' + item.dueDay() : 'No definido'}">Día 30</td>
+        <td class="text-right" th:text="${fmt.money(item.firstMonthAmount(), item.currency())}">S/ 0.00</td>
+        <td class="text-right strong" th:text="${fmt.money(item.projectedPeriodAmount(), item.currency())}">S/ 0.00</td>
+      </tr>
+      <tr th:if="${report.livingCosts().isEmpty()}"><td colspan="6" class="text-center muted">No hay gastos recurrentes activos para el período.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="page-break" th:if="${report.incomeCapacityIncluded()}">
+    <h2>Ingresos y capacidad de pago</h2>
+    <p class="muted">Fuentes recurrentes activas y proyección del período seleccionado.</p>
+    <table class="data">
+      <thead><tr><th style="width:28%">Fuente</th><th style="width:18%">Tipo</th><th style="width:14%">Frecuencia</th><th style="width:10%">Fecha</th><th style="width:15%">Primer mes</th><th style="width:15%">Total período</th></tr></thead>
+      <tbody>
+      <tr th:each="item : ${report.incomeSources()}">
+        <td class="strong" th:text="${item.name()}">Ingreso</td>
+        <td th:text="${item.typeLabel()}">Sueldo</td>
+        <td th:text="${item.frequencyLabel()}">Mensual</td>
+        <td th:text="${item.expectedDay() != null ? 'Día ' + item.expectedDay() : 'No definido'}">Día 15</td>
+        <td class="text-right" th:text="${fmt.money(item.firstMonthAmount(), item.currency())}">S/ 0.00</td>
+        <td class="text-right strong" th:text="${fmt.money(item.projectedPeriodAmount(), item.currency())}">S/ 0.00</td>
+      </tr>
+      <tr th:if="${report.incomeSources().isEmpty()}"><td colspan="6" class="text-center muted">No hay fuentes recurrentes activas para el período.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="page-break">
+    <h2>Proyección mensual consolidada</h2>
+    <table class="data">
+      <thead>
+      <tr>
+        <th>Mes</th>
+        <th th:if="${report.incomeCapacityIncluded()}">Ingresos</th>
+        <th th:if="${report.livingCostIncluded()}">Costo básico</th>
+        <th th:if="${report.debtContentIncluded()}">Cuotas deuda</th>
+        <th th:if="${report.incomeCapacityIncluded()}">Saldo</th>
+        <th th:if="${report.debtContentIncluded()}">Pagos</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr th:each="month : ${report.monthlyProjection()}">
+        <td th:text="${fmt.month(month.month())}">Julio 2026</td>
+        <td th:if="${report.incomeCapacityIncluded()}" class="text-right" th:text="${fmt.money(month.expectedIncome(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</td>
+        <td th:if="${report.livingCostIncluded()}" class="text-right" th:text="${fmt.money(month.basicExpenses(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</td>
+        <td th:if="${report.debtContentIncluded()}" class="text-right" th:text="${fmt.money(month.debtPayments(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</td>
+        <td th:if="${report.incomeCapacityIncluded()}" class="text-right" th:classappend="${month.deficit()} ? ' negative' : ' positive'" th:text="${fmt.money(month.projectedBalance(), T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN)}">S/ 0.00</td>
+        <td th:if="${report.debtContentIncluded()}" class="text-center" th:text="${month.payments().size()}">0</td>
+      </tr>
+      </tbody>
+    </table>
+
+    <div th:if="${report.debtContentIncluded()}" th:each="month : ${report.monthlyProjection()}">
+      <div th:if="${!month.payments().isEmpty()}">
+        <h3 th:text="${fmt.month(month.month())}">Julio 2026</h3>
+        <table class="data">
+          <thead><tr><th style="width:12%">Fecha</th><th style="width:30%">Deuda</th><th style="width:18%">Tipo</th><th style="width:14%">Capital</th><th style="width:13%">Interés</th><th style="width:13%">Total</th></tr></thead>
+          <tbody>
+          <tr th:each="payment : ${month.payments()}">
+            <td th:text="${fmt.date(payment.dueDate())}">10/07/2026</td>
+            <td><span th:text="${payment.debtName()}">Deuda</span><br/><span class="small muted" th:if="${payment.projected()}">Proyección</span></td>
+            <td th:text="${payment.classificationLabel()}">Tipo</td>
+            <td class="text-right" th:text="${fmt.money(payment.principalAmount(), payment.currency())}">S/ 0.00</td>
+            <td class="text-right" th:text="${fmt.money(payment.interestAmount(), payment.currency())}">S/ 0.00</td>
+            <td class="text-right strong" th:text="${fmt.money(payment.totalAmount(), payment.currency())}">S/ 0.00</td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-break" th:if="${report.debtContentIncluded()}">
+    <h2>Deudas de menor saldo para evaluar cancelación</h2>
+    <div class="notice">
+      Esta lista ordena únicamente las deudas incluidas en el filtro, de menor a mayor saldo conocido. Antes de pagar o transferir una deuda deben confirmarse el saldo, los intereses, la titularidad y las condiciones del acreedor.
+    </div>
+    <table class="data">
+      <thead><tr><th style="width:30%">Deuda</th><th style="width:20%">Tipo</th><th style="width:18%">Saldo</th><th style="width:17%">Pago mensual</th><th style="width:15%">Observación</th></tr></thead>
+      <tbody>
+      <tr th:each="debt : ${report.cancellationCandidates()}">
+        <td th:text="${debt.name()}">Deuda</td>
+        <td th:text="${debt.classificationLabel()}">Tipo</td>
+        <td class="text-right strong" th:text="${fmt.money(debt.outstandingBalance(), debt.currency())}">S/ 0.00</td>
+        <td class="text-right" th:text="${fmt.money(debt.monthlyPayment(), debt.currency())}">S/ 0.00</td>
+        <td><span class="badge badge-success" th:if="${debt.settlementOpportunity()}">Puede cerrarse con la cuota</span><span th:unless="${debt.settlementOpportunity()}">Requiere capital adicional</span></td>
+      </tr>
+      <tr th:if="${report.cancellationCandidates().isEmpty()}"><td colspan="5" class="text-center muted">No hay deudas con saldo conocido en la selección.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="page-break" th:if="${report.debtContentIncluded() and !report.debts().isEmpty()}">
+    <h2>Ficha individual de cada deuda</h2>
+    <div class="debt-card" th:each="debt : ${report.debts()}">
+      <div class="debt-card-header">
+        <h3 th:text="${debt.name()}">Deuda</h3>
+        <span class="badge" th:text="${debt.classificationLabel()}">Tipo</span>
+        <span class="badge badge-danger" th:if="${debt.delinquent()}">Mora / seguimiento</span>
+        <span class="badge badge-warning" th:if="${debt.highInterest()}">Interés alto</span>
+        <span class="badge badge-success" th:if="${debt.settlementOpportunity()}">Cancelable</span>
+      </div>
+      <div class="debt-card-body">
+        <table class="detail-grid">
+          <tr>
+            <td><span class="label">Acreedor</span><span class="value" th:text="${debt.creditorName()}">Acreedor</span></td>
+            <td><span class="label">Titular</span><span class="value" th:text="${debt.holderLabel()}">Titular</span></td>
+            <td><span class="label">Contacto</span><span class="value" th:text="${debt.contactName()}">Contacto</span></td>
+            <td><span class="label">Estado</span><span class="value" th:text="${debt.statusLabel()}">Activa</span></td>
+          </tr>
+          <tr>
+            <td><span class="label">Monto original</span><span class="value" th:text="${fmt.money(debt.originalAmount(), debt.currency())}">S/ 0.00</span></td>
+            <td><span class="label">Capital pendiente</span><span class="value" th:text="${fmt.moneyOrUndefined(debt.outstandingBalance(), debt.balanceKnown(), debt.currency())}">S/ 0.00</span></td>
+            <td><span class="label">Pago mensual</span><span class="value" th:text="${fmt.money(debt.monthlyPayment(), debt.currency())}">S/ 0.00</span></td>
+            <td><span class="label">Interés mensual</span><span class="value" th:text="${fmt.percent(debt.monthlyInterestRate())}">0%</span></td>
+          </tr>
+          <tr>
+            <td><span class="label">Próximo vencimiento</span><span class="value" th:text="${fmt.date(debt.nextDueDate())}">No definido</span></td>
+            <td><span class="label">Cuotas pendientes</span><span class="value" th:text="${debt.remainingInstallments() > 0 ? debt.remainingInstallments() : 'No definido'}">0</span></td>
+            <td><span class="label">Fin estimado</span><span class="value" th:text="${fmt.date(debt.estimatedEndDate())}">No definido</span></td>
+            <td><span class="label">Modo</span><span class="value" th:text="${debt.scheduleModeLabel()}">Cronograma</span></td>
+          </tr>
+          <tr>
+            <td><span class="label">Capital futuro programado</span><span class="value" th:text="${fmt.money(debt.futurePrincipal(), debt.currency())}">S/ 0.00</span></td>
+            <td><span class="label">Interés futuro programado</span><span class="value" th:text="${fmt.money(debt.futureInterest(), debt.currency())}">S/ 0.00</span></td>
+            <td><span class="label">Pagos futuros programados</span><span class="value" th:text="${fmt.money(debt.futurePayments(), debt.currency())}">S/ 0.00</span></td>
+            <td><span class="label">Negociación</span><span class="value" th:text="${debt.negotiationStatusLabel()}">Sin iniciar</span></td>
+          </tr>
+        </table>
+        <div class="notice warning small" th:if="${debt.bankBalanceReference()}">El saldo bancario es referencial. Solicitar liquidación oficial antes de una cancelación total.</div>
+        <div th:if="${debt.notes() != null and !debt.notes().isBlank()}">
+          <h3>Observaciones privadas</h3>
+          <p style="white-space: pre-wrap" th:text="${debt.notes()}">Notas</p>
+        </div>
+
+        <div class="schedule-block" th:if="${options.includeSchedules() and !debt.scheduleItems().isEmpty()}">
+          <h3>Cronograma registrado</h3>
+          <table class="data">
+            <thead><tr><th style="width:7%">#</th><th style="width:14%">Fecha</th><th style="width:16%">Capital</th><th style="width:15%">Interés</th><th style="width:13%">Otros</th><th style="width:16%">Total</th><th style="width:19%">Estado</th></tr></thead>
+            <tbody>
+            <tr th:each="line : ${debt.scheduleItems()}">
+              <td class="text-center" th:text="${line.installmentNumber() != null ? line.installmentNumber() : '-'}">1</td>
+              <td th:text="${fmt.date(line.dueDate())}">10/07/2026</td>
+              <td class="text-right" th:text="${fmt.money(line.principalAmount(), line.currency())}">S/ 0.00</td>
+              <td class="text-right" th:text="${fmt.money(line.interestAmount(), line.currency())}">S/ 0.00</td>
+              <td class="text-right" th:text="${fmt.money(line.otherAmount(), line.currency())}">S/ 0.00</td>
+              <td class="text-right strong" th:text="${fmt.money(line.totalAmount(), line.currency())}">S/ 0.00</td>
+              <td th:text="${line.statusLabel()}">Pendiente</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer-note">
+    Fecha de corte: <span th:text="${fmt.date(report.cutoffDate())}">08/07/2026</span>.
+    Contenido: <span th:text="${report.selectionSummary()}">Selección</span>.
+    Los datos provienen del registro personal de GastoClaro. Verifique saldos, tasas, fechas y condiciones antes de presentar una propuesta o realizar un pago.
+  </div>
+</div>

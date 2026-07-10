@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/head_admin :: adminHead('GastoClaro - Historial de pagos')"></head>
+<body>
+<div class="app-layout" th:with="activePage='gasto_claro_payments'">
+  <aside th:replace="fragments/sidebar :: sidebar"></aside>
+  <div class="main-content">
+    <header th:replace="fragments/topbar :: topbar"></header>
+    <main class="content-wrapper">
+      <link rel="stylesheet" th:href="@{/css/personal-finance-payments.css}">
+
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+        <div>
+          <h1 class="h4 mb-1">Pagos y abonos</h1>
+          <p class="text-muted mb-0">Historial real de pagos, capital amortizado, intereses, cargos y comprobantes.</p>
+        </div>
+        <a th:href="@{/gasto-claro/monthly-plan}" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-calendar2-week"></i> Ir al Plan mensual
+        </a>
+      </div>
+
+      <div th:replace="personal_finance/_nav :: nav('payments')"></div>
+      <div th:if="${message}" class="alert" th:classappend="${messageType == 'success'} ? ' alert-success' : (${messageType == 'danger'} ? ' alert-danger' : ' alert-info')" th:text="${message}">Mensaje</div>
+
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <form th:action="@{/gasto-claro/payments}" method="get" class="row g-2 align-items-end">
+            <div class="col-sm-4 col-lg-2">
+              <label class="form-label small">Año</label>
+              <input type="number" name="year" class="form-control form-control-sm" th:value="${selectedYear}" min="2000" max="2100">
+            </div>
+            <div class="col-sm-4 col-lg-2">
+              <label class="form-label small">Mes</label>
+              <select name="month" class="form-select form-select-sm">
+                <option th:each="monthNumber : ${#numbers.sequence(1,12)}" th:value="${monthNumber}" th:selected="${monthNumber == selectedMonth}" th:text="${monthNumber}">1</option>
+              </select>
+            </div>
+            <div class="col-sm-8 col-lg-4">
+              <label class="form-label small">Deuda</label>
+              <select name="debtId" class="form-select form-select-sm">
+                <option value="">Todas las deudas y compromisos</option>
+                <option th:each="debt : ${debts}" th:value="${debt.id}" th:selected="${selectedDebtId != null and selectedDebtId == debt.id}" th:text="${debt.name}">Deuda</option>
+              </select>
+            </div>
+            <div class="col-sm-4 col-lg-2">
+              <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" name="all" value="true" id="allMonths" th:checked="${includeAllMonths}">
+                <label class="form-check-label" for="allMonths">Todos los meses</label>
+              </div>
+            </div>
+            <div class="col-sm-4 col-lg-2 d-grid">
+              <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Aplicar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <section class="payment-summary-grid mb-3">
+        <div><span>Pagado vigente</span><strong>S/ <span th:text="${#numbers.formatDecimal(summary.totalPaid(),1,'POINT',2,'POINT')}">0.00</span></strong><small th:text="${summary.activeCount() + ' operaciones'}">0 operaciones</small></div>
+        <div><span>Capital amortizado</span><strong>S/ <span th:text="${#numbers.formatDecimal(summary.principalPaid(),1,'POINT',2,'POINT')}">0.00</span></strong><small>Reduce saldo de deuda</small></div>
+        <div><span>Intereses</span><strong>S/ <span th:text="${#numbers.formatDecimal(summary.interestPaid(),1,'POINT',2,'POINT')}">0.00</span></strong><small>Costo financiero pagado</small></div>
+        <div><span>Seguro, comisión y mora</span><strong>S/ <span th:text="${#numbers.formatDecimal(summary.chargesPaid(),1,'POINT',2,'POINT')}">0.00</span></strong><small>Cargos adicionales</small></div>
+        <div><span>Revertido</span><strong>S/ <span th:text="${#numbers.formatDecimal(summary.reversedTotal(),1,'POINT',2,'POINT')}">0.00</span></strong><small th:text="${summary.reversedCount() + ' operaciones'}">0 operaciones</small></div>
+      </section>
+      <div class="form-text mb-3">Resumen monetario en soles. Los pagos registrados en USD permanecen visibles en el detalle sin mezclarse con los totales PEN.</div>
+
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
+          <strong>Historial</strong>
+          <span class="badge text-bg-light" th:text="${payments.size() + ' registros'}">0 registros</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0 payment-history-table">
+            <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Compromiso / deuda</th>
+              <th>Distribución</th>
+              <th>Método</th>
+              <th class="text-end">Total</th>
+              <th>Estado</th>
+              <th class="text-center"><span class="visually-hidden">Acciones</span><i class="bi bi-three-dots"></i></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="payment : ${payments}" th:classappend="${payment.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinancePaymentStatus).REVERSED} ? ' payment-row-reversed' : ''">
+              <td data-label="Fecha">
+                <strong th:text="${#temporals.format(payment.paymentDate(), 'dd/MM/yyyy')}">01/01/2026</strong>
+              </td>
+              <td data-label="Compromiso">
+                <strong th:text="${payment.obligationTitle()}">Compromiso</strong>
+                <small th:if="${payment.debtName() != null}" th:text="${payment.debtName()}">Deuda</small>
+                <small th:if="${payment.recipient() != null}">Recibió: <span th:text="${payment.recipient()}">Entidad</span></small>
+              </td>
+              <td data-label="Distribución">
+                <div class="payment-breakdown-lines">
+                  <span th:if="${payment.principalAmount().signum() > 0}">Capital <b th:text="${#numbers.formatDecimal(payment.principalAmount(),1,'POINT',2,'POINT')}">0.00</b></span>
+                  <span th:if="${payment.interestAmount().signum() > 0}">Interés <b th:text="${#numbers.formatDecimal(payment.interestAmount(),1,'POINT',2,'POINT')}">0.00</b></span>
+                  <span th:if="${payment.chargesAmount().signum() > 0}">Cargos <b th:text="${#numbers.formatDecimal(payment.chargesAmount(),1,'POINT',2,'POINT')}">0.00</b></span>
+                  <span th:if="${payment.otherAmount().signum() > 0}">Otros <b th:text="${#numbers.formatDecimal(payment.otherAmount(),1,'POINT',2,'POINT')}">0.00</b></span>
+                </div>
+              </td>
+              <td data-label="Método">
+                <span th:text="${payment.paymentMethod().label}">Transferencia</span>
+                <small th:if="${payment.origin() != T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinancePaymentOrigin).MANUAL}" th:text="${payment.origin().label}">Origen</small>
+                <small th:if="${payment.operationNumber() != null}" th:text="${payment.operationNumber()}">Operación</small>
+              </td>
+              <td data-label="Total" class="text-end payment-total-cell">
+                <strong><span th:text="${payment.currency() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : payment.currency()}">S/</span> <span th:text="${#numbers.formatDecimal(payment.totalAmount(),1,'POINT',2,'POINT')}">0.00</span></strong>
+              </td>
+              <td data-label="Estado">
+                <span class="badge" th:classappend="${payment.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinancePaymentStatus).ACTIVE} ? ' text-bg-success' : ' text-bg-secondary'" th:text="${payment.status().label}">Vigente</span>
+                <small th:if="${payment.reversalReason() != null}" th:text="${payment.reversalReason()}">Motivo</small>
+              </td>
+              <td class="text-center payment-actions">
+                <a th:if="${payment.hasReceipt()}" th:href="@{/gasto-claro/payments/{publicId}/receipt(publicId=${payment.publicId()})}" class="btn btn-sm btn-outline-primary" title="Descargar comprobante" aria-label="Descargar comprobante"><i class="bi bi-paperclip"></i></a>
+                <button th:if="${payment.notes() != null}"
+                        type="button"
+                        class="btn btn-sm btn-outline-info js-payment-note"
+                        data-bs-toggle="modal"
+                        data-bs-target="#paymentNoteModal"
+                        th:data-title="${payment.obligationTitle()}"
+                        th:data-note="${payment.notes()}"
+                        title="Ver observación"
+                        aria-label="Ver observación"><i class="bi bi-chat-left-text"></i></button>
+                <button th:if="${payment.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinancePaymentStatus).ACTIVE}"
+                        type="button"
+                        class="btn btn-sm btn-outline-danger js-reverse-payment"
+                        data-bs-toggle="modal"
+                        data-bs-target="#reversePaymentModal"
+                        th:data-action="@{/gasto-claro/payments/{id}/reverse(id=${payment.id()})}"
+                        th:data-title="${payment.obligationTitle()}"
+                        title="Revertir pago"
+                        aria-label="Revertir pago"><i class="bi bi-arrow-counterclockwise"></i></button>
+              </td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(payments)}">
+              <td colspan="7" class="text-center text-muted py-5">No existen pagos para los filtros seleccionados.</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="modal fade" id="paymentNoteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="paymentNoteTitle">Observación del pago</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0 text-break" id="paymentNoteText"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="reversePaymentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" id="reversePaymentForm">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <input type="hidden" name="returnTo" value="/gasto-claro/payments"/>
+        <div class="modal-header">
+          <h5 class="modal-title">Revertir pago</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Se restaurarán los importes y el historial quedará marcado como revertido.</p>
+          <p class="fw-semibold" id="reversePaymentTitle"></p>
+          <label class="form-label">Motivo de la reversión</label>
+          <textarea name="reason" class="form-control" rows="3" maxlength="500" required placeholder="Ej. registro duplicado o monto incorrecto"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-danger">Revertir pago</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div th:replace="fragments/scripts_admin :: scripts"></div>
+<script>
+(() => {
+  const form = document.getElementById('reversePaymentForm');
+  const title = document.getElementById('reversePaymentTitle');
+  const returnTo = form?.querySelector('input[name="returnTo"]');
+  if (returnTo) {
+    returnTo.value = window.location.pathname + window.location.search;
+  }
+  document.querySelectorAll('.js-reverse-payment').forEach(button => {
+    button.addEventListener('click', () => {
+      form.action = button.dataset.action;
+      title.textContent = button.dataset.title || '';
+      form.querySelector('textarea[name="reason"]').value = '';
+    });
+  });
+
+  const noteTitle = document.getElementById('paymentNoteTitle');
+  const noteText = document.getElementById('paymentNoteText');
+  document.querySelectorAll('.js-payment-note').forEach(button => {
+    button.addEventListener('click', () => {
+      noteTitle.textContent = button.dataset.title || 'Observación del pago';
+      noteText.textContent = button.dataset.note || '';
+    });
+  });
+})();
+</script>
+</body>
+</html>

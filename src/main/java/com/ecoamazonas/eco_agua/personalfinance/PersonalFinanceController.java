@@ -9,7 +9,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.YearMonth;
 
@@ -58,6 +62,7 @@ public class PersonalFinanceController {
         model.addAttribute("selectedYear", selectedMonth.getYear());
         model.addAttribute("selectedMonth", selectedMonth.getMonthValue());
         model.addAttribute("plan", service.monthlyPlan(selectedMonth));
+        model.addAttribute("liveSummary", service.monthlyLiveSummary(selectedMonth, PersonalFinanceCurrency.PEN));
         model.addAttribute("obligationForm", form);
         model.addAttribute("obligationGroups", PersonalFinanceObligationGroup.values());
         model.addAttribute("obligationStatuses", PersonalFinanceObligationStatus.values());
@@ -65,6 +70,30 @@ public class PersonalFinanceController {
         model.addAttribute("priorities", PersonalFinancePriority.values());
         model.addAttribute("currencies", PersonalFinanceCurrency.values());
         return "personal_finance/monthly_plan";
+    }
+
+    @GetMapping("/monthly-priority")
+    public String monthlyPriority(
+            @RequestParam(name = "year", required = false) Integer year,
+            @RequestParam(name = "month", required = false) Integer month,
+            @RequestParam(name = "currency", required = false) PersonalFinanceCurrency currency,
+            @RequestParam(name = "cashBasis", required = false) PersonalFinanceCashBasis cashBasis,
+            @RequestParam(name = "availableCash", required = false) BigDecimal availableCash,
+            Model model
+    ) {
+        YearMonth selectedMonth = selectedMonth(year, month);
+        PersonalFinanceCurrency selectedCurrency = currency == null ? PersonalFinanceCurrency.PEN : currency;
+        PersonalFinanceCashBasis selectedCashBasis = cashBasis == null ? PersonalFinanceCashBasis.EXPECTED : cashBasis;
+        model.addAttribute("activePage", "gasto_claro_monthly_priority");
+        model.addAttribute("selectedYear", selectedMonth.getYear());
+        model.addAttribute("selectedMonth", selectedMonth.getMonthValue());
+        model.addAttribute("selectedCurrency", selectedCurrency);
+        model.addAttribute("selectedCashBasis", selectedCashBasis);
+        model.addAttribute("availableCash", availableCash);
+        model.addAttribute("currencies", PersonalFinanceCurrency.values());
+        model.addAttribute("cashBases", PersonalFinanceCashBasis.values());
+        model.addAttribute("priorityPlan", service.priorityPlan(selectedMonth, selectedCurrency, selectedCashBasis, availableCash));
+        return "personal_finance/monthly_priority";
     }
 
     @PostMapping("/monthly-plan/obligations")
@@ -199,6 +228,78 @@ public class PersonalFinanceController {
         return "personal_finance/debt_schedule";
     }
 
+    @GetMapping("/debts/{id}/bank-schedule")
+    public String bankSchedule(@PathVariable("id") Long id, Model model) {
+        PersonalFinanceDebt debt = service.debt(id);
+        model.addAttribute("activePage", "gasto_claro_debts");
+        model.addAttribute("debt", debt);
+        model.addAttribute("scheduleLines", service.debtSchedule(id));
+        model.addAttribute("summary", service.bankScheduleSummary(id));
+        model.addAttribute("today", LocalDate.now());
+        return "personal_finance/bank_schedule";
+    }
+
+    @PostMapping("/debts/{id}/bank-schedule/import")
+    public String importBankSchedule(
+            @PathVariable("id") Long id,
+            @RequestParam(name = "scheduleText", required = false) String scheduleText,
+            @RequestParam(name = "scheduleFile", required = false) MultipartFile scheduleFile,
+            @RequestParam(name = "replaceExisting", defaultValue = "false") boolean replaceExisting,
+            RedirectAttributes redirectAttributes
+    ) {
+        String content = scheduleText == null ? "" : scheduleText;
+        try {
+            if (scheduleFile != null && !scheduleFile.isEmpty()) {
+                String fileContent = new String(scheduleFile.getBytes(), StandardCharsets.UTF_8);
+                content = content.isBlank() ? fileContent : content + "\n" + fileContent;
+            }
+            PersonalFinanceBankScheduleImportResult result = service.importBankSchedule(id, content, replaceExisting);
+            redirectAttributes.addFlashAttribute("message", result.success()
+                    ? result.summary()
+                    : result.summary() + " " + String.join(" | ", result.errors()));
+            redirectAttributes.addFlashAttribute("messageType", result.success() ? "success" : "danger");
+        } catch (IOException exception) {
+            redirectAttributes.addFlashAttribute("message", "No se pudo leer el archivo seleccionado.");
+            redirectAttributes.addFlashAttribute("messageType", "danger");
+        }
+        return "redirect:/gasto-claro/debts/" + id + "/bank-schedule";
+    }
+
+    @PostMapping("/debts/{id}/bank-schedule/mark-paid-through")
+    public String markBankSchedulePaidThrough(
+            @PathVariable("id") Long id,
+            @RequestParam("throughLineNumber") Integer throughLineNumber,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            int updated = service.markBankSchedulePaidThrough(id, throughLineNumber);
+            redirectAttributes.addFlashAttribute("message", "Cuotas marcadas como pagadas: " + updated + ".");
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("message", exception.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "danger");
+        }
+        return "redirect:/gasto-claro/debts/" + id + "/bank-schedule";
+    }
+
+    @PostMapping("/debts/{debtId}/bank-schedule/lines/{lineId}/paid")
+    public String setBankScheduleLinePaid(
+            @PathVariable("debtId") Long debtId,
+            @PathVariable("lineId") Long lineId,
+            @RequestParam(name = "paid", defaultValue = "true") boolean paid,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            service.setBankScheduleLinePaid(debtId, lineId, paid);
+            redirectAttributes.addFlashAttribute("message", paid ? "Cuota marcada como pagada." : "Cuota reabierta como pendiente.");
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("message", exception.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "danger");
+        }
+        return "redirect:/gasto-claro/debts/" + debtId + "/bank-schedule";
+    }
+
     @PostMapping("/debts/{id}/schedule/generate")
     public String generateDebtSchedule(
             @PathVariable("id") Long id,
@@ -208,9 +309,14 @@ public class PersonalFinanceController {
             RedirectAttributes redirectAttributes
     ) {
         YearMonth selectedMonth = selectedMonth(year, month);
-        int created = service.generateDebtSchedule(id, selectedMonth, months);
-        redirectAttributes.addFlashAttribute("message", "Cronograma generado: " + created + " fila(s) nuevas.");
-        redirectAttributes.addFlashAttribute("messageType", "success");
+        try {
+            PersonalFinanceDebtScheduleGenerationResult result = service.generateDebtSchedule(id, selectedMonth, months);
+            redirectAttributes.addFlashAttribute("message", result.summary());
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("message", exception.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "danger");
+        }
         return "redirect:/gasto-claro/debts/" + id + "/schedule";
     }
 

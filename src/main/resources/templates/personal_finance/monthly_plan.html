@@ -12,7 +12,10 @@
           <h1 class="h4 mb-1">Plan mensual GastoClaro</h1>
           <p class="text-muted mb-0">Vista operativa tipo Excel: primero genera el mes desde plantillas recurrentes y luego revisa ingresos, costo de vida, deudas, pagado, pendiente y déficit.</p>
         </div>
-        <form th:action="@{/gasto-claro/monthly-plan}" method="get" class="d-flex gap-2 align-items-end">
+        <div class="d-flex flex-wrap gap-2 align-items-end">
+          <a th:href="@{/gasto-claro/payments(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-success"><i class="bi bi-cash-coin"></i> Pagos</a>
+          <a th:href="@{/gasto-claro/debt-report(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-danger"><i class="bi bi-file-earmark-pdf"></i> Informe de deudas</a>
+          <form th:action="@{/gasto-claro/monthly-plan}" method="get" class="d-flex gap-2 align-items-end">
           <div>
             <label class="form-label small mb-1">Año</label>
             <input type="number" class="form-control form-control-sm" name="year" th:value="${selectedYear}" style="max-width: 95px;">
@@ -21,8 +24,9 @@
             <label class="form-label small mb-1">Mes</label>
             <input type="number" class="form-control form-control-sm" min="1" max="12" name="month" th:value="${selectedMonth}" style="max-width: 85px;">
           </div>
-          <button type="submit" class="btn btn-sm btn-primary">Ver mes</button>
-        </form>
+            <button type="submit" class="btn btn-sm btn-primary">Ver mes</button>
+          </form>
+        </div>
       </div>
 
       <div th:replace="personal_finance/_nav :: nav('monthly_plan')"></div>
@@ -38,6 +42,54 @@
         <div class="gasto-hero-number" th:classappend="${plan.projectedBalance().signum() < 0} ? ' text-danger' : ' text-success'">
           <span class="small d-block">Saldo proyectado</span>
           S/ <span th:text="${#numbers.formatDecimal(plan.projectedBalance(),1,'POINT',2,'POINT')}">0.00</span>
+        </div>
+      </section>
+
+      <section class="gasto-live-control mb-4" aria-live="polite">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+          <div>
+            <div class="text-uppercase small fw-bold text-primary">Control real del mes</div>
+            <h2 class="h5 mb-1">Marca lo que cobraste y lo que ya pagaste</h2>
+            <p class="small text-muted mb-0">El saldo real usa ingresos recibidos menos pagos registrados. La casilla crea un pago completo rápido; usa el botón de pago para abonos parciales y separar capital, interés y cargos.</p>
+          </div>
+          <div class="text-end">
+            <div class="small text-muted">Avance de pagos</div>
+            <strong><span id="livePaidPayments" th:text="${liveSummary.paidPayments()}">0</span>/<span id="liveTotalPayments" th:text="${liveSummary.totalPayments()}">0</span></strong>
+          </div>
+        </div>
+        <div id="liveControlMessage" class="alert alert-danger py-2 px-3 d-none" role="alert"></div>
+        <div class="row g-2">
+          <div class="col-6 col-lg-3">
+            <div class="gasto-live-stat">
+              <span>Ingreso recibido</span>
+              <strong>PEN <span id="liveReceivedIncome" th:text="${#numbers.formatDecimal(liveSummary.receivedIncome(),1,'POINT',2,'POINT')}">0.00</span></strong>
+              <small><span id="liveReceivedIncomes" th:text="${liveSummary.receivedIncomes()}">0</span>/<span id="liveTotalIncomes" th:text="${liveSummary.totalIncomes()}">0</span> ingresos</small>
+            </div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="gasto-live-stat">
+              <span>Pagado confirmado</span>
+              <strong>PEN <span id="livePaidTotal" th:text="${#numbers.formatDecimal(liveSummary.paidTotal(),1,'POINT',2,'POINT')}">0.00</span></strong>
+              <small>Incluye abonos parciales registrados</small>
+            </div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="gasto-live-stat" id="liveBalanceCard" th:classappend="${liveSummary.realBalance().signum() < 0} ? ' is-negative' : ' is-positive'">
+              <span>Saldo real disponible</span>
+              <strong>PEN <span id="liveRealBalance" th:text="${#numbers.formatDecimal(liveSummary.realBalance(),1,'POINT',2,'POINT')}">0.00</span></strong>
+              <small>Recibido menos pagado</small>
+            </div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="gasto-live-stat">
+              <span>Falta pagar</span>
+              <strong>PEN <span id="livePendingTotal" th:text="${#numbers.formatDecimal(liveSummary.pendingTotal(),1,'POINT',2,'POINT')}">0.00</span></strong>
+              <small><span id="livePendingPayments" th:text="${liveSummary.pendingPayments()}">0</span> pendientes</small>
+            </div>
+          </div>
+        </div>
+        <div class="progress mt-3" role="progressbar" aria-label="Avance mensual" aria-valuemin="0" aria-valuemax="100" th:aria-valuenow="${liveSummary.completionPercentage()}">
+          <div id="liveProgressBar" class="progress-bar" th:style="'width: ' + ${liveSummary.completionPercentage()} + '%'" th:text="${liveSummary.completionPercentage()} + '%'">0%</div>
         </div>
       </section>
 
@@ -83,12 +135,20 @@
       </div>
 
       <div class="alert border-0 shadow-sm mb-4" th:classappend="${plan.hasDeficit()} ? ' alert-danger' : ' alert-success'">
-        <div class="fw-semibold" th:if="${plan.hasDeficit()}">Este mes está en rojo.</div>
-        <div class="fw-semibold" th:unless="${plan.hasDeficit()}">Este mes tiene saldo positivo proyectado.</div>
-        <div class="small">
-          Ingresos menos obligaciones: S/
-          <span th:text="${#numbers.formatDecimal(plan.projectedBalance(),1,'POINT',2,'POINT')}">0.00</span>.
-          Primero cubre costo de vida básico y luego deudas con interés alto, atraso o presión personal.
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <div class="fw-semibold" th:if="${plan.hasDeficit()}">Este mes está en rojo.</div>
+            <div class="fw-semibold" th:unless="${plan.hasDeficit()}">Este mes tiene saldo positivo proyectado.</div>
+            <div class="small">
+              Ingresos menos obligaciones: S/
+              <span th:text="${#numbers.formatDecimal(plan.projectedBalance(),1,'POINT',2,'POINT')}">0.00</span>.
+              Primero cubre costo de vida básico y luego deudas con interés alto, atraso o presión personal.
+            </div>
+          </div>
+          <a th:href="@{/gasto-claro/monthly-priority(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm"
+             th:classappend="${plan.hasDeficit()} ? ' btn-light' : ' btn-outline-success'">
+            <i class="bi bi-list-check"></i> Ver orden de pago
+          </a>
         </div>
       </div>
 
@@ -113,17 +173,39 @@
             <div class="gasto-excel-title">Ingresos</div>
             <div class="table-responsive">
               <table class="table table-sm gasto-excel-table align-middle mb-0">
-                <thead><tr><th>Fuente</th><th>Estado</th><th>Fecha</th><th class="text-end">Monto</th><th>Observación</th></tr></thead>
+                <thead><tr><th class="text-center">Recibido</th><th>Fuente</th><th>Estado</th><th>Fecha</th><th class="text-end">Monto</th><th class="gasto-note-cell">Nota</th></tr></thead>
                 <tbody>
-                <tr th:each="income : ${plan.incomes()}">
+                <tr th:each="income : ${plan.incomes()}" data-income-row>
+                  <td class="text-center">
+                    <input type="checkbox" class="form-check-input js-income-checkbox"
+                           th:checked="${income.status == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceIncomeStatus).RECEIVED}"
+                           th:disabled="${income.status == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceIncomeStatus).CANCELLED or income.status == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceIncomeStatus).MISSED}"
+                           th:data-url="@{/gasto-claro/monthly-plan/incomes/{id}/received-status(id=${income.id})}"
+                           th:aria-label="${'Marcar ingreso ' + income.title + ' como recibido'}">
+                  </td>
                   <td><strong th:text="${income.title}">Ingreso</strong><br><small class="text-muted" th:text="${income.incomeSource != null ? income.incomeSource.name : 'Manual'}">Fuente</small></td>
-                  <td><span class="badge bg-light text-dark" th:text="${income.status.label}">Planeado</span></td>
+                  <td><span class="badge bg-light text-dark js-income-status" th:text="${income.status.label}">Planeado</span></td>
                   <td th:text="${income.expectedDate}">2026-07-01</td>
                   <td class="text-end"><span th:text="${income.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(income.amount,1,'POINT',2,'POINT')}">0.00</span></td>
-                  <td class="small text-muted" th:text="${income.notes}">-</td>
+                  <td class="gasto-note-cell">
+                    <button th:if="${income.notes != null and !#strings.isEmpty(income.notes)}"
+                            type="button"
+                            class="btn btn-sm btn-outline-info gasto-note-button"
+                            data-bs-toggle="modal"
+                            data-bs-target="#gastoNotesModal"
+                            title="Ver observación"
+                            th:aria-label="${'Ver observación de ' + income.title}">
+                      <i class="bi bi-chat-left-text" aria-hidden="true"></i>
+                      <span class="visually-hidden">Ver observación</span>
+                      <span class="d-none js-gasto-note-title" th:text="${income.title}">Ingreso</span>
+                      <span class="d-none js-gasto-note-source" th:text="${income.incomeSource != null ? income.incomeSource.name : 'Ingreso manual'}">Origen</span>
+                      <span class="d-none js-gasto-note-content" th:text="${income.notes}">Observación</span>
+                    </button>
+                    <span th:unless="${income.notes != null and !#strings.isEmpty(income.notes)}" class="text-muted" aria-label="Sin observación">—</span>
+                  </td>
                 </tr>
-                <tr th:if="${#lists.isEmpty(plan.incomes())}"><td colspan="5" class="text-center text-muted py-3">Presiona “Generar / actualizar mes” para crear los ingresos desde tus fuentes recurrentes, o registra un ingreso puntual en la pestaña Ingresos.</td></tr>
-                <tr class="gasto-total-row"><td colspan="3">TOTAL INGRESOS</td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(plan.expectedIncome(),1,'POINT',2,'POINT')}">0.00</span></td><td></td></tr>
+                <tr th:if="${#lists.isEmpty(plan.incomes())}"><td colspan="6" class="text-center text-muted py-3">Presiona “Generar / actualizar mes” para crear los ingresos desde tus fuentes recurrentes, o registra un ingreso puntual en la pestaña Ingresos.</td></tr>
+                <tr class="gasto-total-row"><td colspan="4">TOTAL INGRESOS</td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(plan.expectedIncome(),1,'POINT',2,'POINT')}">0.00</span></td><td></td></tr>
                 </tbody>
               </table>
             </div>
@@ -132,26 +214,98 @@
           <div class="gasto-excel-card mb-3">
             <div class="gasto-excel-title">Costo de vida básico</div>
             <div class="table-responsive">
-              <table class="table table-sm gasto-excel-table align-middle mb-0">
-                <thead><tr><th>Concepto</th><th>Prioridad</th><th>Fecha</th><th>Estado</th><th class="text-end">Monto</th><th class="text-end">Pagado</th><th class="text-end">Pendiente</th><th>Observación</th><th></th></tr></thead>
+              <table class="table table-sm gasto-excel-table align-middle mb-0" data-payment-table>
+                <thead><tr><th class="text-center">Hecho</th><th>Concepto</th><th>Prioridad</th><th>Fecha</th><th>Estado</th><th class="text-end">Monto</th><th class="text-end">Pagado</th><th class="text-end">Pendiente</th><th class="gasto-note-cell">Nota</th><th></th></tr></thead>
                 <tbody th:replace="personal_finance/monthly_plan :: itemRows(${plan.basicLivingItems()}, ${selectedYear}, ${selectedMonth})"></tbody>
                 <tbody>
-                <tr th:if="${#lists.isEmpty(plan.basicLivingItems())}"><td colspan="9" class="text-center text-muted py-3">Aún no tienes costo de vida o compromisos básicos para este mes.</td></tr>
-                <tr class="gasto-total-row"><td colspan="4">TOTAL COSTO DE VIDA</td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(plan.basicLivingTotal(),1,'POINT',2,'POINT')}">0.00</span></td><td></td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(plan.basicLivingTotal(),1,'POINT',2,'POINT')}">0.00</span></td><td colspan="2"></td></tr>
+                <tr th:if="${#lists.isEmpty(plan.basicLivingItems())}"><td colspan="10" class="text-center text-muted py-3">Aún no tienes costo de vida o compromisos básicos para este mes.</td></tr>
+                <tr class="gasto-total-row js-payment-total"><td colspan="5">TOTAL COSTO DE VIDA</td><td class="text-end">PEN <span class="js-group-due">0.00</span></td><td class="text-end">PEN <span class="js-group-paid">0.00</span></td><td class="text-end">PEN <span class="js-group-pending">0.00</span></td><td colspan="2"></td></tr>
                 </tbody>
               </table>
             </div>
           </div>
 
+          <section class="gasto-debt-portfolio mb-3" aria-labelledby="debtPortfolioTitle">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <div>
+                <h2 id="debtPortfolioTitle" class="h6 mb-0">Panorama de capital pendiente</h2>
+                <div class="small text-muted">No mezcla la cuota del mes con el saldo total; incluye deudas activas y en seguimiento.</div>
+              </div>
+              <div class="small text-muted">
+                <span id="debtKnownBalanceCount" th:text="${plan.debtPortfolio().knownBalanceCount()}">0</span> saldos conocidos ·
+                <span id="debtUndefinedBalanceCount" th:text="${plan.debtPortfolio().undefinedBalanceCount()}">0</span> sin saldo definido
+              </div>
+            </div>
+            <div class="row g-2">
+              <div class="col-6 col-lg">
+                <div class="gasto-debt-summary-card is-total">
+                  <span>Capital conocido</span>
+                  <strong>S/ <span id="debtKnownPenTotal" th:text="${#numbers.formatDecimal(plan.debtPortfolio().knownPenTotal(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                  <small th:if="${plan.debtPortfolio().hasUsdBalance()}">USD <span id="debtKnownUsdTotal" th:text="${#numbers.formatDecimal(plan.debtPortfolio().knownUsdTotal(),1,'POINT',2,'POINT')}">0.00</span></small>
+                </div>
+              </div>
+              <div class="col-6 col-lg">
+                <div class="gasto-debt-summary-card">
+                  <span>Bancos y tarjetas</span>
+                  <strong>S/ <span id="debtBankPenTotal" th:text="${#numbers.formatDecimal(plan.debtPortfolio().bankPenTotal(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                </div>
+              </div>
+              <div class="col-6 col-lg">
+                <div class="gasto-debt-summary-card">
+                  <span>Prestamistas</span>
+                  <strong>S/ <span id="debtLenderPenTotal" th:text="${#numbers.formatDecimal(plan.debtPortfolio().lenderPenTotal(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                </div>
+              </div>
+              <div class="col-6 col-lg">
+                <div class="gasto-debt-summary-card">
+                  <span>Familia / directas</span>
+                  <strong>S/ <span id="debtDirectPenTotal" th:text="${#numbers.formatDecimal(plan.debtPortfolio().directPenTotal(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                </div>
+              </div>
+              <div class="col-12 col-lg">
+                <div class="gasto-debt-summary-card">
+                  <span>Otros compromisos</span>
+                  <strong>S/ <span id="debtCommitmentPenTotal" th:text="${#numbers.formatDecimal(plan.debtPortfolio().commitmentPenTotal().add(plan.debtPortfolio().otherPenTotal()),1,'POINT',2,'POINT')}">0.00</span></strong>
+                  <small><span id="debtSettlementOpportunityCount" th:text="${plan.debtPortfolio().settlementOpportunityCount()}">0</span> cancelables con el pago del mes</small>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <div class="gasto-excel-card mb-3">
-            <div class="gasto-excel-title">Deudas x pagar</div>
-            <div class="table-responsive">
-              <table class="table table-sm gasto-excel-table align-middle mb-0">
-                <thead><tr><th>Proveedor / Deuda</th><th>Prioridad</th><th>Fecha</th><th>Estado</th><th class="text-end">Monto</th><th class="text-end">Pagado</th><th class="text-end">Pendiente</th><th>Observación</th><th></th></tr></thead>
-                <tbody th:replace="personal_finance/monthly_plan :: itemRows(${plan.debtItems()}, ${selectedYear}, ${selectedMonth})"></tbody>
+            <div class="gasto-excel-title gasto-debt-table-title">
+              <span>Deudas x pagar</span>
+              <span class="small fw-normal">Montos en S/. · pago del mes ≠ saldo total</span>
+            </div>
+            <div class="gasto-debt-table-wrap">
+              <table class="table table-sm gasto-excel-table gasto-debt-table align-middle mb-0" data-payment-table>
+                <thead>
+                <tr>
+                  <th class="text-center gasto-debt-check">✓</th>
+                  <th>Deuda</th>
+                  <th>Vence</th>
+                  <th class="text-end">Pago</th>
+                  <th class="text-end">Pend.</th>
+                  <th class="text-end">Saldo</th>
+                  <th class="text-center"><span class="visually-hidden">Acciones</span><i class="bi bi-three-dots" aria-hidden="true"></i></th>
+                </tr>
+                </thead>
+                <tbody th:replace="personal_finance/monthly_plan :: debtItemRows(${plan.debtItems()}, ${selectedYear}, ${selectedMonth})"></tbody>
                 <tbody>
-                <tr th:if="${#lists.isEmpty(plan.debtItems())}"><td colspan="9" class="text-center text-muted py-3">Aún no tienes deudas exigibles o compromisos de deuda para este mes.</td></tr>
-                <tr class="gasto-total-row"><td colspan="4">TOTAL DEUDAS</td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(plan.debtTotal(),1,'POINT',2,'POINT')}">0.00</span></td><td></td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(plan.debtTotal(),1,'POINT',2,'POINT')}">0.00</span></td><td colspan="2"></td></tr>
+                <tr th:if="${#lists.isEmpty(plan.debtItems())}"><td colspan="7" class="text-center text-muted py-3">Aún no tienes deudas exigibles o compromisos de deuda para este mes.</td></tr>
+                <tr class="gasto-total-row js-payment-total">
+                  <td colspan="7">
+                    <div class="gasto-debt-total-grid">
+                      <strong>TOTAL DEUDAS DEL MES</strong>
+                      <div class="gasto-debt-total-metrics">
+                        <span><small>Pago</small><b>S/ <span class="js-group-due">0.00</span></b></span>
+                        <span><small>Pagado</small><b>S/ <span class="js-group-paid">0.00</span></b></span>
+                        <span><small>Pendiente</small><b>S/ <span class="js-group-pending">0.00</span></b></span>
+                        <span><small>Capital</small><b>S/ <span id="debtKnownPenTotalInline" th:text="${#numbers.formatDecimal(plan.debtPortfolio().knownPenTotal(),1,'POINT',2,'POINT')}">0.00</span></b></span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
                 </tbody>
               </table>
             </div>
@@ -208,9 +362,10 @@
           <div class="gasto-excel-card" th:if="${!#lists.isEmpty(plan.otherItems())}">
             <div class="gasto-excel-title">Otros compromisos</div>
             <div class="table-responsive">
-              <table class="table table-sm gasto-excel-table align-middle mb-0">
-                <thead><tr><th>Concepto</th><th>Prioridad</th><th>Fecha</th><th>Estado</th><th class="text-end">Monto</th><th class="text-end">Pagado</th><th class="text-end">Pendiente</th><th>Observación</th><th></th></tr></thead>
+              <table class="table table-sm gasto-excel-table align-middle mb-0" data-payment-table>
+                <thead><tr><th class="text-center">Hecho</th><th>Concepto</th><th>Prioridad</th><th>Fecha</th><th>Estado</th><th class="text-end">Monto</th><th class="text-end">Pagado</th><th class="text-end">Pendiente</th><th class="gasto-note-cell">Nota</th><th></th></tr></thead>
                 <tbody th:replace="personal_finance/monthly_plan :: itemRows(${plan.otherItems()}, ${selectedYear}, ${selectedMonth})"></tbody>
+                <tbody><tr class="gasto-total-row js-payment-total"><td colspan="5">TOTAL OTROS COMPROMISOS</td><td class="text-end">PEN <span class="js-group-due">0.00</span></td><td class="text-end">PEN <span class="js-group-paid">0.00</span></td><td class="text-end">PEN <span class="js-group-pending">0.00</span></td><td colspan="2"></td></tr></tbody>
               </table>
             </div>
           </div>
@@ -245,9 +400,18 @@
                   <label class="form-label small">Monto</label>
                   <input type="number" step="0.01" min="0" class="form-control form-control-sm" th:field="*{amountDue}" required>
                 </div>
-                <div class="col-6">
-                  <label class="form-label small">Pagado ahora</label>
-                  <input type="number" step="0.01" min="0" class="form-control form-control-sm" th:field="*{amountPaid}">
+                <div class="col-6" th:if="${obligationForm.id != null}">
+                  <label class="form-label small">Pagado registrado</label>
+                  <div class="form-control form-control-sm bg-light">
+                    <span th:text="${obligationForm.currency == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : obligationForm.currency}">S/</span>
+                    <span th:text="${#numbers.formatDecimal(obligationForm.amountPaid,1,'POINT',2,'POINT')}">0.00</span>
+                  </div>
+                </div>
+                <div class="col-6 d-grid align-content-end" th:if="${obligationForm.id != null and obligationForm.status != T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceObligationStatus).CANCELLED}">
+                  <a class="btn btn-sm btn-outline-success"
+                     th:href="@{/gasto-claro/obligations/{id}/payment(id=${obligationForm.id},returnTo=${'/gasto-claro/monthly-plan?year=' + selectedYear + '&month=' + selectedMonth})}">
+                    <i class="bi bi-cash-coin"></i> Registrar pago o abono
+                  </a>
                 </div>
                 <div class="col-6">
                   <label class="form-label small">Moneda</label>
@@ -262,8 +426,15 @@
                 <div class="col-6">
                   <label class="form-label small">Estado</label>
                   <select class="form-select form-select-sm" th:field="*{status}">
-                    <option th:each="status : ${obligationStatuses}" th:value="${status}" th:text="${status.label}">Pendiente</option>
+                    <option th:each="status : ${obligationStatuses}"
+                            th:if="${status == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceObligationStatus).PENDING
+                                or status == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceObligationStatus).OVERDUE
+                                or status == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceObligationStatus).CANCELLED
+                                or status == obligationForm.status}"
+                            th:value="${status}"
+                            th:text="${status.label}">Pendiente</option>
                   </select>
+                  <div class="form-text">Pagado y parcial se calculan desde el historial de pagos.</div>
                 </div>
                 <div class="col-6">
                   <label class="form-label small">Prioridad</label>
@@ -298,7 +469,13 @@
 </div>
 
 <tbody th:fragment="itemRows(items, selectedYear, selectedMonth)" xmlns:th="http://www.thymeleaf.org">
-<tr th:each="item : ${items}" th:classappend="${item.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceObligationStatus).OVERDUE} ? ' table-danger' : (${item.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceObligationStatus).PAID} ? ' table-success' : '')">
+<tr th:each="item : ${items}" data-payment-row th:data-currency="${item.currency()}" th:classappend="${item.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceObligationStatus).OVERDUE} ? ' table-danger' : (${item.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceObligationStatus).PAID} ? ' table-success' : '')">
+  <td class="text-center">
+    <input type="checkbox" class="form-check-input js-payment-checkbox"
+           th:checked="${item.isPaid()}"
+           th:data-url="@{/gasto-claro/monthly-plan/obligations/{id}/payment-status(id=${item.id()})}"
+           th:aria-label="${'Marcar ' + item.title() + ' como pagado'}">
+  </td>
   <td>
     <strong th:text="${item.title()}">Concepto</strong>
     <br><small class="text-muted" th:text="${item.sourceLabel()}">Origen</small>
@@ -306,13 +483,33 @@
   </td>
   <td><span class="badge" th:classappend="${item.priority().name() == 'CRITICAL'} ? ' bg-danger' : (${item.priority().name() == 'HIGH'} ? ' bg-warning text-dark' : ' bg-secondary')" th:text="${item.priority().label}">Media</span></td>
   <td th:text="${item.dueDate() != null ? item.dueDate() : '-'}">-</td>
-  <td><span class="badge bg-light text-dark" th:text="${item.status().label}">Pendiente</span></td>
-  <td class="text-end"><span th:text="${item.currency()}">PEN</span> <span th:text="${#numbers.formatDecimal(item.amountDue(),1,'POINT',2,'POINT')}">0.00</span></td>
-  <td class="text-end"><span th:text="${item.currency()}">PEN</span> <span th:text="${#numbers.formatDecimal(item.amountPaid(),1,'POINT',2,'POINT')}">0.00</span></td>
-  <td class="text-end fw-semibold"><span th:text="${item.currency()}">PEN</span> <span th:text="${#numbers.formatDecimal(item.pendingAmount(),1,'POINT',2,'POINT')}">0.00</span></td>
-  <td class="small text-muted" th:text="${item.notes()}">-</td>
-  <td class="text-end">
-    <a th:if="${!item.generated()}" class="btn btn-sm btn-outline-secondary" th:href="@{/gasto-claro/monthly-plan(year=${selectedYear},month=${selectedMonth},editId=${item.id()})}"><i class="bi bi-pencil"></i></a>
+  <td><span class="badge bg-light text-dark js-payment-status" th:text="${item.status().label}">Pendiente</span></td>
+  <td class="text-end"><span th:text="${item.currency()}">PEN</span> <span class="js-amount-due" th:data-value="${item.amountDue()}" th:text="${#numbers.formatDecimal(item.amountDue(),1,'POINT',2,'POINT')}">0.00</span></td>
+  <td class="text-end"><span th:text="${item.currency()}">PEN</span> <span class="js-amount-paid" th:data-value="${item.amountPaid()}" th:text="${#numbers.formatDecimal(item.amountPaid(),1,'POINT',2,'POINT')}">0.00</span></td>
+  <td class="text-end fw-semibold"><span th:text="${item.currency()}">PEN</span> <span class="js-amount-pending" th:data-value="${item.pendingAmount()}" th:text="${#numbers.formatDecimal(item.pendingAmount(),1,'POINT',2,'POINT')}">0.00</span></td>
+  <td class="gasto-note-cell">
+    <button th:if="${item.notes() != null and !#strings.isEmpty(item.notes())}"
+            type="button"
+            class="btn btn-sm btn-outline-info gasto-note-button"
+            data-bs-toggle="modal"
+            data-bs-target="#gastoNotesModal"
+            title="Ver observación"
+            th:aria-label="${'Ver observación de ' + item.title()}">
+      <i class="bi bi-chat-left-text" aria-hidden="true"></i>
+      <span class="visually-hidden">Ver observación</span>
+      <span class="d-none js-gasto-note-title" th:text="${item.title()}">Concepto</span>
+      <span class="d-none js-gasto-note-source" th:text="${item.sourceLabel()}">Origen</span>
+      <span class="d-none js-gasto-note-content" th:text="${item.notes()}">Observación</span>
+    </button>
+    <span th:unless="${item.notes() != null and !#strings.isEmpty(item.notes())}" class="text-muted" aria-label="Sin observación">—</span>
+  </td>
+  <td class="text-end text-nowrap">
+    <a th:if="${item.pendingAmount().signum() > 0}"
+       class="btn btn-sm btn-outline-success"
+       th:href="@{/gasto-claro/obligations/{id}/payment(id=${item.id()},returnTo=${'/gasto-claro/monthly-plan?year=' + selectedYear + '&month=' + selectedMonth})}"
+       title="Registrar pago o abono" th:aria-label="${'Registrar pago de ' + item.title()}"><i class="bi bi-cash-coin"></i></a>
+    <a class="btn btn-sm btn-outline-primary" th:href="@{/gasto-claro/payments(year=${selectedYear},month=${selectedMonth})}" title="Ver historial de pagos" aria-label="Ver historial de pagos"><i class="bi bi-clock-history"></i></a>
+    <a th:if="${!item.generated()}" class="btn btn-sm btn-outline-secondary" th:href="@{/gasto-claro/monthly-plan(year=${selectedYear},month=${selectedMonth},editId=${item.id()})}" title="Editar compromiso"><i class="bi bi-pencil"></i></a>
     <form th:if="${!item.generated()}" th:action="@{/gasto-claro/monthly-plan/obligations/{id}/delete(id=${item.id()})}" method="post" class="d-inline">
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
       <input type="hidden" name="year" th:value="${selectedYear}"/>
@@ -323,6 +520,351 @@
 </tr>
 </tbody>
 
+<tbody th:fragment="debtItemRows(items, selectedYear, selectedMonth)" xmlns:th="http://www.thymeleaf.org">
+<tr th:each="item : ${items}"
+    th:with="currencyLabel=${#strings.equals(item.currency(), 'PEN') ? 'S/' : item.currency()}"
+    data-payment-row
+    th:data-currency="${item.currency()}"
+    th:data-debt-id="${item.debtId()}"
+    th:classappend="${item.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceObligationStatus).OVERDUE} ? ' table-danger' : (${item.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceObligationStatus).PAID} ? ' table-success' : '')">
+  <td class="text-center gasto-debt-check">
+    <input type="checkbox" class="form-check-input js-payment-checkbox"
+           th:checked="${item.isPaid()}"
+           th:data-url="@{/gasto-claro/monthly-plan/obligations/{id}/payment-status(id=${item.id()})}"
+           th:aria-label="${'Marcar ' + item.title() + ' como pagado'}">
+  </td>
+  <td class="gasto-debt-main">
+    <div class="gasto-debt-name-row">
+      <strong th:text="${item.title()}">Deuda</strong>
+      <span th:if="${item.generated()}" class="gasto-auto-icon" title="Generado automáticamente" aria-label="Generado automáticamente">
+        <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+      </span>
+    </div>
+    <small class="gasto-debt-source" th:text="${item.sourceLabel()}">Origen</small>
+    <div class="gasto-debt-badges">
+      <span class="badge gasto-debt-type-badge"
+            th:classappend="${item.debtClassification().badgeClass}"
+            th:text="${item.debtClassification().label}">Tipo</span>
+      <span class="badge gasto-priority-badge"
+            th:classappend="${item.priority().name() == 'CRITICAL'} ? ' bg-danger' : (${item.priority().name() == 'HIGH'} ? ' bg-warning text-dark' : ' bg-secondary')"
+            th:text="${item.priority().label}">Media</span>
+      <span class="badge bg-light text-dark js-payment-status gasto-status-badge" th:text="${item.status().label}">Pendiente</span>
+    </div>
+  </td>
+  <td class="gasto-debt-date" data-label="Vence">
+    <span th:text="${item.dueDate() != null ? #temporals.format(item.dueDate(), 'dd/MM') : '-'}">-</span>
+  </td>
+  <td class="text-end gasto-debt-payment" data-label="Pago">
+    <div class="gasto-money-value">
+      <span class="gasto-currency-label" th:text="${currencyLabel}">S/</span>
+      <strong class="js-amount-due" th:data-value="${item.amountDue()}" th:text="${#numbers.formatDecimal(item.amountDue(),1,'POINT',2,'POINT')}">0.00</strong>
+    </div>
+    <small class="gasto-debt-paid-detail js-debt-paid-detail" th:classappend="${item.amountPaid().signum() == 0} ? ' d-none' : ''">
+      Pagado: <span th:text="${currencyLabel}">S/</span> <span class="js-amount-paid" th:data-value="${item.amountPaid()}" th:text="${#numbers.formatDecimal(item.amountPaid(),1,'POINT',2,'POINT')}">0.00</span>
+    </small>
+  </td>
+  <td class="text-end fw-semibold gasto-debt-pending" data-label="Pendiente">
+    <span class="gasto-currency-label" th:text="${currencyLabel}">S/</span>
+    <span class="js-amount-pending" th:data-value="${item.pendingAmount()}" th:text="${#numbers.formatDecimal(item.pendingAmount(),1,'POINT',2,'POINT')}">0.00</span>
+  </td>
+  <td class="text-end gasto-debt-balance-cell" data-label="Saldo">
+    <div class="js-debt-balance-known" th:classappend="${!item.debtBalanceKnown()} ? ' d-none' : ''">
+      <div class="gasto-money-value">
+        <span class="gasto-currency-label" th:text="${currencyLabel}">S/</span>
+        <strong class="js-debt-balance" th:data-value="${item.debtOutstandingBalance()}" th:text="${#numbers.formatDecimal(item.debtOutstandingBalance(),1,'POINT',2,'POINT')}">0.00</strong>
+      </div>
+      <small class="text-muted js-bank-balance-reference gasto-balance-reference" th:classappend="${!item.bankBalanceReference()} ? ' d-none' : ''" title="Capital referencial; confirma el monto de cancelación con la entidad">
+        <i class="bi bi-info-circle" aria-hidden="true"></i> Referencial
+      </small>
+      <span class="badge text-bg-success mt-1 js-settlement-opportunity gasto-settlement-badge" th:classappend="${!item.settlementOpportunity()} ? ' d-none' : ''">Cerrable</span>
+      <span class="badge text-bg-success mt-1 js-debt-cleared gasto-settlement-badge" th:classappend="${item.debtOutstandingBalance().signum() != 0} ? ' d-none' : ''">Cancelado</span>
+    </div>
+    <div class="js-debt-balance-unknown" th:classappend="${item.debtBalanceKnown()} ? ' d-none' : ''">
+      <span class="badge text-bg-light text-dark" title="Registra el saldo actual en la deuda para evaluar su cancelación">No definido</span>
+    </div>
+  </td>
+  <td class="text-center gasto-debt-actions">
+    <div class="gasto-debt-action-group">
+      <a th:if="${item.pendingAmount().signum() > 0}"
+         class="btn btn-sm btn-outline-success gasto-debt-action-button"
+         th:href="@{/gasto-claro/obligations/{id}/payment(id=${item.id()},returnTo=${'/gasto-claro/monthly-plan?year=' + selectedYear + '&month=' + selectedMonth})}"
+         title="Registrar pago o abono"
+         th:aria-label="${'Registrar pago de ' + item.title()}"><i class="bi bi-cash-coin"></i></a>
+      <a th:if="${item.hasLinkedDebt()}" class="btn btn-sm btn-outline-primary gasto-debt-action-button"
+         th:href="@{/gasto-claro/payments(debtId=${item.debtId()},year=${selectedYear},month=${selectedMonth})}"
+         title="Ver historial de pagos"
+         aria-label="Ver historial de pagos"><i class="bi bi-clock-history"></i></a>
+      <a th:unless="${item.hasLinkedDebt()}" class="btn btn-sm btn-outline-primary gasto-debt-action-button"
+         th:href="@{/gasto-claro/payments(year=${selectedYear},month=${selectedMonth})}"
+         title="Ver historial de pagos"
+         aria-label="Ver historial de pagos"><i class="bi bi-clock-history"></i></a>
+      <button th:if="${item.hasLinkedDebt()}"
+              type="button"
+              class="btn btn-sm btn-outline-primary gasto-debt-action-button js-debt-settlement-button"
+              th:classappend="${!item.debtBalanceKnown() or item.debtOutstandingBalance().signum() <= 0} ? ' d-none' : ''"
+              data-bs-toggle="modal"
+              data-bs-target="#gastoDebtSettlementModal"
+              title="Evaluar cancelación"
+              th:aria-label="${'Evaluar cancelación de ' + item.debtName()}"
+              th:data-debt-name="${item.debtName()}"
+              th:data-debt-type="${item.debtClassification().label}"
+              th:data-currency="${item.currency()}"
+              th:data-balance="${item.debtOutstandingBalance()}"
+              th:data-payment="${item.amountDue()}"
+              th:data-gap="${item.settlementGap()}"
+              th:data-bank-reference="${item.bankBalanceReference()}"
+              th:data-opportunity="${item.settlementOpportunity()}"
+              th:data-edit-url="@{/gasto-claro/debts(editId=${item.debtId()})}">
+        <i class="bi bi-calculator" aria-hidden="true"></i>
+      </button>
+      <button th:if="${item.notes() != null and !#strings.isEmpty(item.notes())}"
+              type="button"
+              class="btn btn-sm btn-outline-info gasto-note-button gasto-debt-action-button"
+              data-bs-toggle="modal"
+              data-bs-target="#gastoNotesModal"
+              title="Ver observación"
+              th:aria-label="${'Ver observación de ' + item.title()}">
+        <i class="bi bi-chat-left-text" aria-hidden="true"></i>
+        <span class="visually-hidden">Ver observación</span>
+        <span class="d-none js-gasto-note-title" th:text="${item.title()}">Concepto</span>
+        <span class="d-none js-gasto-note-source" th:text="${item.sourceLabel()}">Origen</span>
+        <span class="d-none js-gasto-note-content" th:text="${item.notes()}">Observación</span>
+      </button>
+      <a th:if="${item.hasLinkedDebt()}" class="btn btn-sm btn-outline-secondary gasto-debt-action-button" th:href="@{/gasto-claro/debts(editId=${item.debtId()})}" title="Editar deuda" th:aria-label="${'Editar ' + item.title()}"><i class="bi bi-pencil"></i></a>
+      <a th:if="${!item.generated() and !item.hasLinkedDebt()}" class="btn btn-sm btn-outline-secondary gasto-debt-action-button" th:href="@{/gasto-claro/monthly-plan(year=${selectedYear},month=${selectedMonth},editId=${item.id()})}" title="Editar compromiso" th:aria-label="${'Editar ' + item.title()}"><i class="bi bi-pencil"></i></a>
+      <form th:if="${!item.generated() and !item.hasLinkedDebt()}" th:action="@{/gasto-claro/monthly-plan/obligations/{id}/delete(id=${item.id()})}" method="post" class="d-inline">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <input type="hidden" name="year" th:value="${selectedYear}"/>
+        <input type="hidden" name="month" th:value="${selectedMonth}"/>
+        <button type="submit" class="btn btn-sm btn-outline-danger gasto-debt-action-button" onclick="return confirm('¿Eliminar compromiso manual?')" title="Eliminar" th:aria-label="${'Eliminar ' + item.title()}"><i class="bi bi-trash"></i></button>
+      </form>
+    </div>
+  </td>
+</tr>
+</tbody>
+
+<div th:replace="personal_finance/_notes_dialog :: notesDialog"></div>
+<div th:replace="personal_finance/_debt_settlement_dialog :: debtSettlementDialog"></div>
 <div th:replace="fragments/scripts_admin :: scripts"></div>
+<script th:src="@{/js/personal-finance-notes-dialog.js}"></script>
+<script th:src="@{/js/personal-finance-debt-settlement-dialog.js}"></script>
+<script th:inline="javascript">
+(() => {
+    const selectedYear = /*[[${selectedYear}]]*/ 2026;
+    const selectedMonth = /*[[${selectedMonth}]]*/ 1;
+    const csrfHeader = /*[[${_csrf != null ? _csrf.headerName : 'X-CSRF-TOKEN'}]]*/ 'X-CSRF-TOKEN';
+    const csrfToken = /*[[${_csrf != null ? _csrf.token : ''}]]*/ '';
+    const messageBox = document.getElementById('liveControlMessage');
+
+    const money = (value) => Number(value || 0).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+
+    const setText = (id, value) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    };
+
+    const showError = (message) => {
+        if (!messageBox) return;
+        messageBox.textContent = message || 'No se pudo actualizar el control mensual.';
+        messageBox.classList.remove('d-none');
+    };
+
+    const clearError = () => {
+        if (!messageBox) return;
+        messageBox.textContent = '';
+        messageBox.classList.add('d-none');
+    };
+
+    const updateStatusBadge = (badge, status, label) => {
+        if (!badge) return;
+        const markerClass = badge.classList.contains('js-income-status') ? 'js-income-status' : 'js-payment-status';
+        badge.textContent = label;
+        badge.className = 'badge ' + markerClass;
+        if (status === 'PAID' || status === 'RECEIVED') {
+            badge.classList.add('text-bg-success');
+        } else if (status === 'OVERDUE' || status === 'MISSED') {
+            badge.classList.add('text-bg-danger');
+        } else if (status === 'PARTIAL') {
+            badge.classList.add('text-bg-warning');
+        } else {
+            badge.classList.add('bg-light', 'text-dark');
+        }
+    };
+
+    const applySummary = (data) => {
+        setText('liveReceivedIncome', money(data.receivedIncome));
+        setText('livePaidTotal', money(data.paidTotal));
+        setText('liveRealBalance', money(data.realBalance));
+        setText('livePendingTotal', money(data.pendingTotal));
+        setText('livePaidPayments', data.paidPayments);
+        setText('liveTotalPayments', data.totalPayments);
+        setText('livePendingPayments', data.pendingPayments);
+        setText('liveReceivedIncomes', data.receivedIncomes);
+        setText('liveTotalIncomes', data.totalIncomes);
+        if (data.debtKnownPenTotal !== undefined) {
+            setText('debtKnownPenTotal', money(data.debtKnownPenTotal));
+            setText('debtKnownPenTotalInline', money(data.debtKnownPenTotal));
+            setText('debtKnownUsdTotal', money(data.debtKnownUsdTotal));
+            setText('debtBankPenTotal', money(data.debtBankPenTotal));
+            setText('debtLenderPenTotal', money(data.debtLenderPenTotal));
+            setText('debtDirectPenTotal', money(data.debtDirectPenTotal));
+            setText('debtCommitmentPenTotal', money(Number(data.debtCommitmentPenTotal || 0) + Number(data.debtOtherPenTotal || 0)));
+            setText('debtKnownBalanceCount', data.debtKnownBalanceCount);
+            setText('debtUndefinedBalanceCount', data.debtUndefinedBalanceCount);
+            setText('debtSettlementOpportunityCount', data.debtSettlementOpportunityCount);
+        }
+
+        const balanceCard = document.getElementById('liveBalanceCard');
+        if (balanceCard) {
+            balanceCard.classList.toggle('is-negative', Number(data.realBalance) < 0);
+            balanceCard.classList.toggle('is-positive', Number(data.realBalance) >= 0);
+        }
+
+        const progress = document.getElementById('liveProgressBar');
+        if (progress) {
+            const percentage = Number(data.completionPercentage || 0);
+            progress.style.width = percentage + '%';
+            progress.textContent = percentage + '%';
+            progress.parentElement?.setAttribute('aria-valuenow', String(percentage));
+        }
+    };
+
+    const refreshGroupTotals = () => {
+        document.querySelectorAll('[data-payment-table]').forEach((table) => {
+            let due = 0;
+            let paid = 0;
+            let pending = 0;
+            table.querySelectorAll('[data-payment-row]').forEach((row) => {
+                if ((row.dataset.currency || 'PEN') !== 'PEN') return;
+                due += Number(row.querySelector('.js-amount-due')?.dataset.value || 0);
+                paid += Number(row.querySelector('.js-amount-paid')?.dataset.value || 0);
+                pending += Number(row.querySelector('.js-amount-pending')?.dataset.value || 0);
+            });
+            const totalRow = table.querySelector('.js-payment-total');
+            if (!totalRow) return;
+            const dueElement = totalRow.querySelector('.js-group-due');
+            const paidElement = totalRow.querySelector('.js-group-paid');
+            const pendingElement = totalRow.querySelector('.js-group-pending');
+            if (dueElement) dueElement.textContent = money(due);
+            if (paidElement) paidElement.textContent = money(paid);
+            if (pendingElement) pendingElement.textContent = money(pending);
+        });
+    };
+
+    const updateDebtBalanceRows = (data) => {
+        if (!data.debtId) return;
+        const balance = Number(data.debtOutstandingBalance || 0);
+        const known = Boolean(data.debtBalanceKnown);
+        document.querySelectorAll('[data-debt-id]').forEach((row) => {
+            if (String(row.dataset.debtId || '') !== String(data.debtId)) return;
+            row.querySelector('.js-debt-balance-known')?.classList.toggle('d-none', !known);
+            row.querySelector('.js-debt-balance-unknown')?.classList.toggle('d-none', known);
+
+            const balanceElement = row.querySelector('.js-debt-balance');
+            if (balanceElement) {
+                balanceElement.dataset.value = String(balance);
+                balanceElement.textContent = money(balance);
+            }
+
+            const payment = Number(row.querySelector('.js-amount-due')?.dataset.value || 0);
+            const opportunity = known && balance > 0 && payment >= balance;
+            const gap = Math.max(0, balance - payment);
+            row.querySelector('.js-settlement-opportunity')?.classList.toggle('d-none', !opportunity);
+            row.querySelector('.js-debt-cleared')?.classList.toggle('d-none', !known || balance !== 0);
+
+            const button = row.querySelector('.js-debt-settlement-button');
+            if (button) {
+                button.classList.toggle('d-none', !known || balance <= 0);
+                button.dataset.balance = String(balance);
+                button.dataset.payment = String(payment);
+                button.dataset.gap = String(gap);
+                button.dataset.opportunity = String(opportunity);
+            }
+        });
+    };
+
+    const updatePaymentRow = (input, data) => {
+        const row = input.closest('[data-payment-row]');
+        if (!row) return;
+        input.checked = Boolean(data.paid);
+        updateStatusBadge(row.querySelector('.js-payment-status'), data.status, data.statusLabel);
+
+        const paidElement = row.querySelector('.js-amount-paid');
+        const pendingElement = row.querySelector('.js-amount-pending');
+        if (paidElement) {
+            paidElement.dataset.value = data.amountPaid;
+            paidElement.textContent = money(data.amountPaid);
+        }
+        row.querySelector('.js-debt-paid-detail')?.classList.toggle('d-none', Number(data.amountPaid || 0) <= 0);
+        if (pendingElement) {
+            pendingElement.dataset.value = data.pendingAmount;
+            pendingElement.textContent = money(data.pendingAmount);
+        }
+        row.classList.toggle('table-success', data.status === 'PAID');
+        row.classList.toggle('table-danger', data.status === 'OVERDUE');
+        updateDebtBalanceRows(data);
+    };
+
+    const updateIncomeRow = (input, data) => {
+        const row = input.closest('[data-income-row]');
+        if (!row) return;
+        input.checked = Boolean(data.received);
+        updateStatusBadge(row.querySelector('.js-income-status'), data.status, data.statusLabel);
+    };
+
+    const postToggle = async (input, parameterName, updateRow) => {
+        const requestedValue = input.checked;
+        input.disabled = true;
+        clearError();
+        const body = new URLSearchParams();
+        body.set(parameterName, String(requestedValue));
+        body.set('year', String(selectedYear));
+        body.set('month', String(selectedMonth));
+        const headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+        };
+        if (csrfHeader && csrfToken) headers[csrfHeader] = csrfToken;
+
+        try {
+            const response = await fetch(input.dataset.url, {
+                method: 'POST',
+                headers,
+                body
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'No se pudo guardar el cambio.');
+            }
+            updateRow(input, data);
+            applySummary(data);
+            refreshGroupTotals();
+        } catch (error) {
+            input.checked = !requestedValue;
+            showError(error.message);
+        } finally {
+            input.disabled = false;
+        }
+    };
+
+    document.querySelectorAll('.js-payment-checkbox').forEach((input) => {
+        input.addEventListener('change', () => {
+            if (!input.checked && !window.confirm('¿Reabrir este compromiso? Se revertirá únicamente el registro rápido asociado. Los pagos manuales no se modificarán.')) {
+                input.checked = true;
+                return;
+            }
+            postToggle(input, 'paid', updatePaymentRow);
+        });
+    });
+    document.querySelectorAll('.js-income-checkbox').forEach((input) => {
+        input.addEventListener('change', () => postToggle(input, 'received', updateIncomeRow));
+    });
+
+    refreshGroupTotals();
+})();
+</script>
 </body>
 </html>

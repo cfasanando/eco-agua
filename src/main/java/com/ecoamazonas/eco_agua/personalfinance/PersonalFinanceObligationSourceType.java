@@ -5,7 +5,7 @@ public enum PersonalFinanceObligationSourceType {
     DEBT("Deuda"),
     MANUAL("Manual"),
     DEBT_SCHEDULE("Cronograma de deuda"),
-    PRIVATE_LENDER_INTEREST("Interés prestamista"),
+    PRIVATE_LENDER_INTEREST("Cuota de prestamista"),
     AUTO_DEDUCTION("Descuento automático"),
     DEBT_VOLUNTARY_PAYMENT("Abono voluntario a deuda"),
     STUDY_CYCLE("Estudio por ciclo"),

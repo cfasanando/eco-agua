@@ -8,10 +8,17 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 public class PersonalFinanceService {
@@ -23,6 +30,7 @@ public class PersonalFinanceService {
     private final PersonalFinancePaymentObligationRepository paymentObligationRepository;
     private final PersonalFinanceDebtScheduleLineRepository debtScheduleLineRepository;
     private final PersonalFinanceCurrentUserService currentUserService;
+    private final PersonalFinancePaymentService paymentService;
 
     public PersonalFinanceService(
             PersonalFinanceDebtRepository debtRepository,
@@ -31,7 +39,8 @@ public class PersonalFinanceService {
             PersonalFinanceIncomeEventRepository incomeEventRepository,
             PersonalFinancePaymentObligationRepository paymentObligationRepository,
             PersonalFinanceDebtScheduleLineRepository debtScheduleLineRepository,
-            PersonalFinanceCurrentUserService currentUserService
+            PersonalFinanceCurrentUserService currentUserService,
+            PersonalFinancePaymentService paymentService
     ) {
         this.debtRepository = debtRepository;
         this.fixedExpenseRepository = fixedExpenseRepository;
@@ -40,6 +49,7 @@ public class PersonalFinanceService {
         this.paymentObligationRepository = paymentObligationRepository;
         this.debtScheduleLineRepository = debtScheduleLineRepository;
         this.currentUserService = currentUserService;
+        this.paymentService = paymentService;
     }
 
     @Transactional(readOnly = true)
@@ -67,6 +77,12 @@ public class PersonalFinanceService {
 
         List<PersonalFinanceIncomeEvent> incomes = incomeEventRepository.findByUserAndExpectedDateBetweenOrderByExpectedDateAscIdAsc(user, start, end);
         List<PersonalFinanceDebt> debts = debtsForMonthlyPlan(user);
+        Map<Long, PersonalFinanceDebt> debtsById = new HashMap<>();
+        for (PersonalFinanceDebt debt : debts) {
+            if (debt.getId() != null) {
+                debtsById.put(debt.getId(), debt);
+            }
+        }
         List<PersonalFinancePaymentObligation> obligations = paymentObligationRepository.findByUserAndDueDateBetweenOrderByDueDateAscPriorityAscIdAsc(user, start, end);
         List<PersonalFinanceDelinquentDebtItem> delinquentDebts = delinquentDebtsForPlan(user);
 
@@ -78,7 +94,7 @@ public class PersonalFinanceService {
             if (obligation.getStatus() == PersonalFinanceObligationStatus.CANCELLED) {
                 continue;
             }
-            PersonalFinanceMonthlyPlanItem item = itemFromObligation(obligation);
+            PersonalFinanceMonthlyPlanItem item = itemFromObligation(obligation, linkedDebtForObligation(obligation, debtsById));
             if (obligation.getGroup() == PersonalFinanceObligationGroup.BASIC_LIVING || obligation.getGroup() == PersonalFinanceObligationGroup.STUDY) {
                 basicItems.add(item);
             } else if (obligation.getGroup() == PersonalFinanceObligationGroup.DEBT_PAYMENT) {
@@ -128,6 +144,7 @@ public class PersonalFinanceService {
                 .map(this::safe)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         long reviewDueCount = delinquentDebts.stream().filter(PersonalFinanceDelinquentDebtItem::reviewDue).count();
+        PersonalFinanceDebtPortfolioSummary debtPortfolio = debtPortfolioSummary(debts, debtItems);
 
         return new PersonalFinanceMonthlyPlan(
                 yearMonth,
@@ -149,10 +166,260 @@ public class PersonalFinanceService {
                 cashAfterAll,
                 delinquentDebtPenTotal,
                 delinquentDebtUsdTotal,
+                debtPortfolio,
                 delinquentDebts.size(),
                 overdueCount,
                 highInterestDebtCount,
                 reviewDueCount
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public PersonalFinanceMonthlyLiveSummary monthlyLiveSummary(YearMonth yearMonth, PersonalFinanceCurrency requestedCurrency) {
+        PersonalFinanceCurrency currency = defaultEnum(requestedCurrency, PersonalFinanceCurrency.PEN);
+        PersonalFinanceMonthlyPlan plan = monthlyPlan(yearMonth);
+
+        BigDecimal expectedIncome = plan.incomes().stream()
+                .filter(income -> defaultEnum(income.getCurrency(), PersonalFinanceCurrency.PEN) == currency)
+                .filter(income -> income.getStatus() != PersonalFinanceIncomeStatus.CANCELLED
+                        && income.getStatus() != PersonalFinanceIncomeStatus.MISSED)
+                .map(PersonalFinanceIncomeEvent::getAmount)
+                .map(this::safe)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal receivedIncome = plan.incomes().stream()
+                .filter(income -> defaultEnum(income.getCurrency(), PersonalFinanceCurrency.PEN) == currency)
+                .filter(income -> income.getStatus() == PersonalFinanceIncomeStatus.RECEIVED)
+                .map(PersonalFinanceIncomeEvent::getAmount)
+                .map(this::safe)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<PersonalFinanceMonthlyPlanItem> items = new ArrayList<>();
+        items.addAll(plan.basicLivingItems());
+        items.addAll(plan.debtItems());
+        items.addAll(plan.otherItems());
+        List<PersonalFinanceMonthlyPlanItem> currencyItems = items.stream()
+                .filter(item -> defaultEnum(item.currency(), PersonalFinanceCurrency.PEN) == currency)
+                .toList();
+
+        BigDecimal paidTotal = totalPaid(currencyItems);
+        BigDecimal pendingTotal = totalPending(currencyItems);
+        long paidPayments = currencyItems.stream().filter(PersonalFinanceMonthlyPlanItem::isPaid).count();
+        long totalIncomes = plan.incomes().stream()
+                .filter(income -> defaultEnum(income.getCurrency(), PersonalFinanceCurrency.PEN) == currency)
+                .filter(income -> income.getStatus() != PersonalFinanceIncomeStatus.CANCELLED
+                        && income.getStatus() != PersonalFinanceIncomeStatus.MISSED)
+                .count();
+        long receivedIncomes = plan.incomes().stream()
+                .filter(income -> defaultEnum(income.getCurrency(), PersonalFinanceCurrency.PEN) == currency)
+                .filter(income -> income.getStatus() == PersonalFinanceIncomeStatus.RECEIVED)
+                .count();
+
+        return new PersonalFinanceMonthlyLiveSummary(
+                yearMonth,
+                currency,
+                expectedIncome,
+                receivedIncome,
+                paidTotal,
+                pendingTotal,
+                receivedIncome.subtract(paidTotal),
+                expectedIncome.subtract(paidTotal.add(pendingTotal)),
+                currencyItems.size(),
+                paidPayments,
+                currencyItems.size() - paidPayments,
+                totalIncomes,
+                receivedIncomes
+        );
+    }
+
+    @Transactional
+    public PersonalFinancePaymentObligation setPaymentObligationPaid(Long id, boolean paid) {
+        return paymentService.setObligationPaid(id, paid);
+    }
+
+    @Transactional
+    public PersonalFinanceIncomeEvent setIncomeEventReceived(Long id, boolean received) {
+        UserAccount user = currentUserService.currentUser();
+        PersonalFinanceIncomeEvent event = incomeEventRepository.findByIdAndUser(id, user).orElseThrow();
+        if (event.getStatus() == PersonalFinanceIncomeStatus.CANCELLED || event.getStatus() == PersonalFinanceIncomeStatus.MISSED) {
+            throw new IllegalArgumentException("No se puede cambiar este ingreso desde el control rápido.");
+        }
+        event.setStatus(received ? PersonalFinanceIncomeStatus.RECEIVED : PersonalFinanceIncomeStatus.PLANNED);
+        event.setReceivedDate(received ? LocalDate.now() : null);
+        return incomeEventRepository.save(event);
+    }
+
+    @Transactional(readOnly = true)
+    public PersonalFinancePriorityPlan priorityPlan(
+            YearMonth yearMonth,
+            PersonalFinanceCurrency requestedCurrency,
+            PersonalFinanceCashBasis requestedCashBasis,
+            BigDecimal requestedManualCash
+    ) {
+        PersonalFinanceMonthlyPlan monthlyPlan = monthlyPlan(yearMonth);
+        PersonalFinanceCurrency currency = defaultEnum(requestedCurrency, PersonalFinanceCurrency.PEN);
+        PersonalFinanceCashBasis cashBasis = defaultEnum(requestedCashBasis, PersonalFinanceCashBasis.EXPECTED);
+        BigDecimal manualCash = nonNegative(requestedManualCash);
+
+        List<PersonalFinanceMonthlyPlanItem> allItems = new ArrayList<>();
+        allItems.addAll(monthlyPlan.basicLivingItems());
+        allItems.addAll(monthlyPlan.debtItems());
+        allItems.addAll(monthlyPlan.otherItems());
+
+        BigDecimal expectedIncome = monthlyPlan.incomes().stream()
+                .filter(income -> defaultEnum(income.getCurrency(), PersonalFinanceCurrency.PEN) == currency)
+                .filter(income -> income.getStatus() != PersonalFinanceIncomeStatus.CANCELLED
+                        && income.getStatus() != PersonalFinanceIncomeStatus.MISSED)
+                .map(PersonalFinanceIncomeEvent::getAmount)
+                .map(this::safe)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal receivedIncome = monthlyPlan.incomes().stream()
+                .filter(income -> defaultEnum(income.getCurrency(), PersonalFinanceCurrency.PEN) == currency)
+                .filter(income -> income.getStatus() == PersonalFinanceIncomeStatus.RECEIVED)
+                .map(PersonalFinanceIncomeEvent::getAmount)
+                .map(this::safe)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal alreadyPaid = allItems.stream()
+                .filter(item -> defaultEnum(item.currency(), PersonalFinanceCurrency.PEN) == currency)
+                .map(PersonalFinanceMonthlyPlanItem::amountPaid)
+                .map(this::safe)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal cashBasisAmount = switch (cashBasis) {
+            case RECEIVED -> receivedIncome;
+            case MANUAL -> manualCash;
+            default -> expectedIncome;
+        };
+        BigDecimal availableCash = cashBasis == PersonalFinanceCashBasis.MANUAL
+                ? manualCash
+                : nonNegative(cashBasisAmount.subtract(alreadyPaid));
+
+        List<PersonalFinanceMonthlyPlanItem> candidates = allItems.stream()
+                .filter(item -> defaultEnum(item.currency(), PersonalFinanceCurrency.PEN) == currency)
+                .filter(item -> !item.isPaid())
+                .filter(item -> safe(item.pendingAmount()).compareTo(BigDecimal.ZERO) > 0)
+                .sorted(priorityComparator())
+                .toList();
+
+        BigDecimal essentialPending = candidates.stream()
+                .filter(this::isEssential)
+                .map(PersonalFinanceMonthlyPlanItem::pendingAmount)
+                .map(this::safe)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal debtPending = candidates.stream()
+                .filter(item -> item.group() == PersonalFinanceObligationGroup.DEBT_PAYMENT)
+                .map(PersonalFinanceMonthlyPlanItem::pendingAmount)
+                .map(this::safe)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal otherPending = candidates.stream()
+                .filter(item -> !isEssential(item) && item.group() != PersonalFinanceObligationGroup.DEBT_PAYMENT)
+                .map(PersonalFinanceMonthlyPlanItem::pendingAmount)
+                .map(this::safe)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalPending = essentialPending.add(debtPending).add(otherPending);
+
+        List<PersonalFinancePriorityPlanItem> priorityItems = new ArrayList<>();
+        BigDecimal cashRemaining = availableCash;
+        int position = 1;
+        for (PersonalFinanceMonthlyPlanItem item : candidates) {
+            BigDecimal pendingAmount = nonNegative(item.pendingAmount());
+            BigDecimal recommendedAmount = pendingAmount.min(cashRemaining);
+            BigDecimal unfundedAmount = pendingAmount.subtract(recommendedAmount);
+            cashRemaining = nonNegative(cashRemaining.subtract(recommendedAmount));
+            PersonalFinanceAllocationStatus allocationStatus = allocationStatus(recommendedAmount, pendingAmount);
+            priorityItems.add(new PersonalFinancePriorityPlanItem(
+                    position++,
+                    item.id(),
+                    item.title(),
+                    item.sourceLabel(),
+                    item.sourceType(),
+                    item.group(),
+                    item.currency(),
+                    pendingAmount,
+                    item.dueDate(),
+                    item.status(),
+                    item.priority(),
+                    recommendedAmount,
+                    unfundedAmount,
+                    cashRemaining,
+                    allocationStatus,
+                    allocationReason(item),
+                    isEssential(item),
+                    item.generated()
+            ));
+        }
+
+        BigDecimal allocatedTotal = priorityItems.stream()
+                .map(PersonalFinancePriorityPlanItem::recommendedAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal unfundedTotal = priorityItems.stream()
+                .map(PersonalFinancePriorityPlanItem::unfundedAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal unfundedDebtTotal = priorityItems.stream()
+                .filter(item -> item.group() == PersonalFinanceObligationGroup.DEBT_PAYMENT)
+                .map(PersonalFinancePriorityPlanItem::unfundedAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal essentialGap = nonNegative(essentialPending.subtract(availableCash));
+        BigDecimal incomeForPressure = expectedIncome.compareTo(BigDecimal.ZERO) > 0 ? expectedIncome : cashBasisAmount;
+        BigDecimal debtPressurePercentage = percentage(debtPending, incomeForPressure);
+
+        PersonalFinanceMonthlyPlanItem largestDebt = candidates.stream()
+                .filter(item -> item.group() == PersonalFinanceObligationGroup.DEBT_PAYMENT)
+                .max(Comparator.comparing(PersonalFinanceMonthlyPlanItem::pendingAmount))
+                .orElse(null);
+        String largestDebtTitle = largestDebt == null ? null : largestDebt.title();
+        BigDecimal largestDebtAmount = largestDebt == null ? BigDecimal.ZERO : safe(largestDebt.pendingAmount());
+        BigDecimal largestDebtSharePercentage = percentage(largestDebtAmount, incomeForPressure);
+
+        PersonalFinanceHealthLevel healthLevel = healthLevel(
+                totalPending,
+                availableCash,
+                essentialGap,
+                unfundedTotal,
+                unfundedDebtTotal,
+                debtPressurePercentage
+        );
+
+        long excludedIncomeCount = monthlyPlan.incomes().stream()
+                .filter(income -> defaultEnum(income.getCurrency(), PersonalFinanceCurrency.PEN) != currency)
+                .count();
+        long excludedObligationCount = allItems.stream()
+                .filter(item -> defaultEnum(item.currency(), PersonalFinanceCurrency.PEN) != currency)
+                .filter(item -> !item.isPaid())
+                .filter(item -> safe(item.pendingAmount()).compareTo(BigDecimal.ZERO) > 0)
+                .count();
+
+        return new PersonalFinancePriorityPlan(
+                yearMonth,
+                currency,
+                cashBasis,
+                manualCash,
+                expectedIncome,
+                receivedIncome,
+                alreadyPaid,
+                cashBasisAmount,
+                availableCash,
+                essentialPending,
+                debtPending,
+                otherPending,
+                totalPending,
+                allocatedTotal,
+                unfundedTotal,
+                unfundedDebtTotal,
+                cashRemaining,
+                essentialGap,
+                debtPressurePercentage,
+                largestDebtTitle,
+                largestDebtAmount,
+                largestDebtSharePercentage,
+                healthLevel,
+                healthHeadline(healthLevel),
+                healthRecommendation(healthLevel),
+                priorityItems,
+                priorityItems.stream().filter(item -> item.allocationStatus() == PersonalFinanceAllocationStatus.COVERED).count(),
+                priorityItems.stream().filter(item -> item.allocationStatus() == PersonalFinanceAllocationStatus.PARTIAL).count(),
+                priorityItems.stream().filter(item -> item.allocationStatus() == PersonalFinanceAllocationStatus.UNFUNDED).count(),
+                excludedIncomeCount,
+                excludedObligationCount
         );
     }
 
@@ -172,11 +439,16 @@ public class PersonalFinanceService {
         entity.setSourceId(obligation.getSourceId());
         entity.setGroup(defaultEnum(obligation.getGroup(), PersonalFinanceObligationGroup.OTHER));
         entity.setTitle(clean(obligation.getTitle()));
+        boolean newEntity = entity.getId() == null;
+        BigDecimal recordedPaidAmount = newEntity ? BigDecimal.ZERO : defaultAmount(entity.getAmountPaid());
+        PersonalFinanceObligationStatus requestedStatus = defaultEnum(obligation.getStatus(), PersonalFinanceObligationStatus.PENDING);
         entity.setAmountDue(defaultAmount(obligation.getAmountDue()));
-        entity.setAmountPaid(defaultAmount(obligation.getAmountPaid()));
+        entity.setAmountPaid(recordedPaidAmount);
         entity.setCurrency(defaultEnum(obligation.getCurrency(), PersonalFinanceCurrency.PEN));
         entity.setDueDate(obligation.getDueDate());
-        entity.setStatus(resolveObligationStatus(defaultEnum(obligation.getStatus(), PersonalFinanceObligationStatus.PENDING), entity.getAmountDue(), entity.getAmountPaid()));
+        entity.setStatus(requestedStatus == PersonalFinanceObligationStatus.CANCELLED
+                ? PersonalFinanceObligationStatus.CANCELLED
+                : resolveObligationStatus(PersonalFinanceObligationStatus.PENDING, entity.getAmountDue(), recordedPaidAmount));
         entity.setPriority(defaultEnum(obligation.getPriority(), PersonalFinancePriority.MEDIUM));
         entity.setNotes(clean(obligation.getNotes()));
         paymentObligationRepository.save(entity);
@@ -402,6 +674,122 @@ public class PersonalFinanceService {
         return debtScheduleLineRepository.findByIdAndUser(id, currentUserService.currentUser()).orElseThrow();
     }
 
+    @Transactional(readOnly = true)
+    public PersonalFinanceBankScheduleSummary bankScheduleSummary(Long debtId) {
+        UserAccount user = currentUserService.currentUser();
+        PersonalFinanceDebt debt = debtRepository.findByIdAndUser(debtId, user).orElseThrow();
+        return summarizeBankSchedule(debtScheduleLineRepository.findByUserAndDebtOrderByDueDateAscLineNumberAscIdAsc(user, debt));
+    }
+
+    @Transactional
+    public PersonalFinanceBankScheduleImportResult importBankSchedule(Long debtId, String rawContent, boolean replaceExisting) {
+        UserAccount user = currentUserService.currentUser();
+        PersonalFinanceDebt debt = debtRepository.findByIdAndUser(debtId, user).orElseThrow();
+        List<String> errors = new ArrayList<>();
+        List<ImportedBankScheduleRow> rows = parseBankScheduleRows(rawContent, errors);
+        if (!errors.isEmpty()) {
+            return new PersonalFinanceBankScheduleImportResult(rows.size(), 0, 0, 0, List.copyOf(errors));
+        }
+        if (rows.isEmpty()) {
+            return new PersonalFinanceBankScheduleImportResult(0, 0, 0, 0, List.of("No se encontraron cuotas válidas para importar."));
+        }
+
+        List<PersonalFinanceDebtScheduleLine> existingLines = debtScheduleLineRepository.findByUserAndDebtOrderByDueDateAscLineNumberAscIdAsc(user, debt);
+        if (replaceExisting) {
+            for (PersonalFinanceDebtScheduleLine existing : existingLines) {
+                if (hasRecordedSchedulePayment(existing, user)) {
+                    errors.add("No se puede reemplazar el cronograma porque la cuota " + displayLineNumber(existing) + " ya tiene pago registrado.");
+                }
+            }
+            if (!errors.isEmpty()) {
+                return new PersonalFinanceBankScheduleImportResult(rows.size(), 0, 0, 0, List.copyOf(errors));
+            }
+            for (PersonalFinanceDebtScheduleLine existing : existingLines) {
+                removeGeneratedObligation(existing, user);
+            }
+            debtScheduleLineRepository.deleteAll(existingLines);
+            debtScheduleLineRepository.flush();
+        }
+
+        int created = 0;
+        int updated = 0;
+        int preservedPaid = 0;
+        for (ImportedBankScheduleRow row : rows) {
+            PersonalFinanceDebtScheduleLine entity = debtScheduleLineRepository
+                    .findByUserAndDebtAndLineNumber(user, debt, row.lineNumber())
+                    .orElseGet(PersonalFinanceDebtScheduleLine::new);
+            boolean isNew = entity.getId() == null;
+            boolean preservePayment = !isNew && hasRecordedSchedulePayment(entity, user);
+
+            entity.setUser(user);
+            entity.setDebt(debt);
+            entity.setLineNumber(row.lineNumber());
+            entity.setLineType(PersonalFinanceScheduleLineType.INSTALLMENT);
+            entity.setTitle("Cuota " + row.lineNumber());
+            entity.setPrincipalAmount(row.principal());
+            entity.setInterestAmount(row.interest());
+            entity.setInsuranceAmount(row.insurance());
+            entity.setFeeAmount(BigDecimal.ZERO);
+            entity.setTotalAmount(row.total());
+            entity.setCurrency(defaultEnum(debt.getCurrency(), PersonalFinanceCurrency.PEN));
+            entity.setDueDate(row.dueDate());
+            entity.setNotes("Cronograma bancario real importado.");
+            if (!preservePayment) {
+                entity.setPaidAmount(BigDecimal.ZERO);
+                entity.setPaidAt(null);
+                entity.setStatus(row.dueDate().isBefore(LocalDate.now())
+                        ? PersonalFinanceObligationStatus.OVERDUE
+                        : PersonalFinanceObligationStatus.PENDING);
+            } else {
+                preservedPaid++;
+            }
+            PersonalFinanceDebtScheduleLine saved = debtScheduleLineRepository.save(entity);
+            synchronizeGeneratedObligation(saved, user);
+            if (isNew) created++; else updated++;
+        }
+
+        List<PersonalFinanceDebtScheduleLine> currentLines = debtScheduleLineRepository.findByUserAndDebtOrderByDueDateAscLineNumberAscIdAsc(user, debt);
+        debt.setScheduleMode(PersonalFinanceDebtScheduleMode.BANK_SCHEDULE);
+        debt.setAutoGenerateMonthly(true);
+        debt.setFixedPayment(true);
+        updateDebtFromBankSchedule(debt, currentLines);
+        return new PersonalFinanceBankScheduleImportResult(rows.size(), created, updated, preservedPaid, List.of());
+    }
+
+    @Transactional
+    public int markBankSchedulePaidThrough(Long debtId, Integer throughLineNumber) {
+        if (throughLineNumber == null || throughLineNumber <= 0) {
+            throw new IllegalArgumentException("Indica un número de cuota válido.");
+        }
+        UserAccount user = currentUserService.currentUser();
+        PersonalFinanceDebt debt = debtRepository.findByIdAndUser(debtId, user).orElseThrow();
+        int updated = 0;
+        List<PersonalFinanceDebtScheduleLine> lines = debtScheduleLineRepository.findByUserAndDebtOrderByDueDateAscLineNumberAscIdAsc(user, debt);
+        for (PersonalFinanceDebtScheduleLine line : lines) {
+            if (line.getLineNumber() == null
+                    || line.getLineNumber() > throughLineNumber
+                    || line.getStatus() == PersonalFinanceObligationStatus.CANCELLED
+                    || line.isPaidLike()) {
+                continue;
+            }
+            if (paymentService.setScheduleLinePaid(line.getId(), true)) {
+                updated++;
+            }
+        }
+        return updated;
+    }
+
+    @Transactional
+    public void setBankScheduleLinePaid(Long debtId, Long lineId, boolean paid) {
+        UserAccount user = currentUserService.currentUser();
+        PersonalFinanceDebt debt = debtRepository.findByIdAndUser(debtId, user).orElseThrow();
+        PersonalFinanceDebtScheduleLine line = debtScheduleLineRepository.findByIdAndUser(lineId, user).orElseThrow();
+        if (line.getDebt() == null || !debt.getId().equals(line.getDebt().getId())) {
+            throw new IllegalArgumentException("La cuota no pertenece a esta deuda.");
+        }
+        paymentService.setScheduleLinePaid(lineId, paid);
+    }
+
     @Transactional
     public void saveDebtScheduleLine(Long debtId, PersonalFinanceDebtScheduleLine line) {
         UserAccount user = currentUserService.currentUser();
@@ -416,41 +804,84 @@ public class PersonalFinanceService {
         entity.setTitle(clean(line.getTitle()));
         entity.setPrincipalAmount(defaultAmount(line.getPrincipalAmount()));
         entity.setInterestAmount(defaultAmount(line.getInterestAmount()));
+        entity.setInsuranceAmount(defaultAmount(line.getInsuranceAmount()));
         entity.setFeeAmount(defaultAmount(line.getFeeAmount()));
         entity.setTotalAmount(defaultAmount(line.getTotalAmount()));
         entity.setCurrency(defaultEnum(line.getCurrency(), debt.getCurrency()));
         entity.setDueDate(line.getDueDate());
-        entity.setStatus(resolveObligationStatus(defaultEnum(line.getStatus(), PersonalFinanceObligationStatus.PENDING), entity.calculatedTotal(), BigDecimal.ZERO));
-        entity.setGeneratedObligationId(line.getGeneratedObligationId());
+        if (entity.getId() == null) {
+            entity.setPaidAmount(BigDecimal.ZERO);
+            entity.setPaidAt(null);
+            entity.setStatus(entity.getDueDate() != null && entity.getDueDate().isBefore(LocalDate.now())
+                    ? PersonalFinanceObligationStatus.OVERDUE
+                    : PersonalFinanceObligationStatus.PENDING);
+        }
+        if (entity.getId() == null || line.getGeneratedObligationId() != null) {
+            entity.setGeneratedObligationId(line.getGeneratedObligationId());
+        }
         entity.setNotes(clean(line.getNotes()));
-        debtScheduleLineRepository.save(entity);
+        PersonalFinanceDebtScheduleLine saved = debtScheduleLineRepository.save(entity);
+        synchronizeGeneratedObligation(saved, user);
+        refreshDebtBalanceFromSchedule(debt, user);
     }
 
     @Transactional
     public void deleteDebtScheduleLine(Long id) {
-        debtScheduleLineRepository.findByIdAndUser(id, currentUserService.currentUser()).ifPresent(debtScheduleLineRepository::delete);
+        UserAccount user = currentUserService.currentUser();
+        debtScheduleLineRepository.findByIdAndUser(id, user).ifPresent(line -> {
+            if (hasRecordedSchedulePayment(line, user)) {
+                throw new IllegalArgumentException("No se puede eliminar una cuota que ya tiene pago registrado.");
+            }
+            PersonalFinanceDebt debt = line.getDebt();
+            removeGeneratedObligation(line, user);
+            debtScheduleLineRepository.delete(line);
+            if (debt != null && debt.getScheduleMode() == PersonalFinanceDebtScheduleMode.BANK_SCHEDULE) {
+                debtScheduleLineRepository.flush();
+                updateDebtFromBankSchedule(
+                        debt,
+                        debtScheduleLineRepository.findByUserAndDebtOrderByDueDateAscLineNumberAscIdAsc(user, debt)
+                );
+            }
+        });
     }
 
     @Transactional
-    public int generateDebtSchedule(Long debtId, YearMonth fromMonth, Integer requestedMonths) {
+    public PersonalFinanceDebtScheduleGenerationResult generateDebtSchedule(Long debtId, YearMonth fromMonth, Integer requestedMonths) {
         UserAccount user = currentUserService.currentUser();
         PersonalFinanceDebt debt = debtRepository.findByIdAndUser(debtId, user).orElseThrow();
         PersonalFinanceDebtScheduleMode mode = defaultEnum(debt.getScheduleMode(), inferScheduleMode(debt));
         if (mode == PersonalFinanceDebtScheduleMode.TRACKING_ONLY) {
-            return 0;
+            return PersonalFinanceDebtScheduleGenerationResult.empty(false);
         }
+
+        if (mode == PersonalFinanceDebtScheduleMode.PRIVATE_LENDER_INTEREST
+                && (requestedMonths == null || requestedMonths <= 0)
+                && (debt.getInstallmentCount() == null || debt.getInstallmentCount() <= 0)) {
+            throw new IllegalArgumentException("Indica el número de cuotas para calcular capital e interés automáticamente.");
+        }
+
         int count = requestedMonths != null && requestedMonths > 0 ? requestedMonths : defaultScheduleCount(debt, mode);
         count = Math.max(1, Math.min(60, count));
         if (mode == PersonalFinanceDebtScheduleMode.ONE_TIME) {
             count = 1;
         }
+
         LocalDate firstDue = firstDueDate(debt, fromMonth);
+        if (mode == PersonalFinanceDebtScheduleMode.PRIVATE_LENDER_INTEREST) {
+            return generatePrivateLenderAmortizationSchedule(user, debt, firstDue, count);
+        }
+
         int baseLineNumber = (int) debtScheduleLineRepository.countByUserAndDebt(user, debt);
         int created = 0;
+        int unchanged = 0;
         for (int i = 0; i < count; i++) {
-            LocalDate dueDate = mode == PersonalFinanceDebtScheduleMode.ONE_TIME ? firstDue : YearMonth.from(firstDue).plusMonths(i).atDay(Math.min(firstDue.getDayOfMonth(), YearMonth.from(firstDue).plusMonths(i).lengthOfMonth()));
+            YearMonth dueMonth = YearMonth.from(firstDue).plusMonths(i);
+            LocalDate dueDate = mode == PersonalFinanceDebtScheduleMode.ONE_TIME
+                    ? firstDue
+                    : dueMonth.atDay(Math.min(firstDue.getDayOfMonth(), dueMonth.lengthOfMonth()));
             PersonalFinanceScheduleLineType lineType = lineTypeForMode(mode);
             if (debtScheduleLineRepository.existsByUserAndDebtAndDueDateAndLineType(user, debt, dueDate, lineType)) {
+                unchanged++;
                 continue;
             }
             PersonalFinanceDebtScheduleLine line = new PersonalFinanceDebtScheduleLine();
@@ -461,13 +892,13 @@ public class PersonalFinanceService {
             line.setTitle(scheduleTitle(debt, mode, i + 1));
             line.setCurrency(debt.getCurrency());
             line.setDueDate(dueDate);
-            line.setStatus(dueDate.isBefore(LocalDate.now()) ? PersonalFinanceObligationStatus.OVERDUE : PersonalFinanceObligationStatus.PENDING);
+            line.setStatus(defaultPendingStatus(dueDate));
             applyScheduleAmounts(line, debt, mode);
             line.setNotes(scheduleNotes(debt, mode));
             debtScheduleLineRepository.save(line);
             created++;
         }
-        return created;
+        return new PersonalFinanceDebtScheduleGenerationResult(created, 0, 0, 0, unchanged, false);
     }
 
     @Transactional
@@ -561,6 +992,18 @@ public class PersonalFinanceService {
             if (!debtScheduleAppliesToMonth(debt, mode, yearMonth)) {
                 continue;
             }
+            if (mode == PersonalFinanceDebtScheduleMode.PRIVATE_LENDER_INTEREST
+                    && debt.getInstallmentCount() != null
+                    && debt.getInstallmentCount() > 0) {
+                PersonalFinanceDebtScheduleGenerationResult result = generatePrivateLenderAmortizationSchedule(
+                        user,
+                        debt,
+                        firstDueDate(debt, yearMonth),
+                        debt.getInstallmentCount()
+                );
+                created += result.created();
+                continue;
+            }
             LocalDate dueDate = debtDueDateForMonth(debt, yearMonth, mode);
             PersonalFinanceScheduleLineType lineType = lineTypeForMode(mode);
             if (debtScheduleLineRepository.existsByUserAndDebtAndDueDateAndLineType(user, debt, dueDate, lineType)) {
@@ -592,7 +1035,7 @@ public class PersonalFinanceService {
             if (line.getDebt() == null || line.getDebt().isDelinquentTracking() || !line.getDebt().isAutoGenerateMonthly()) {
                 continue;
             }
-            if (line.getStatus() == PersonalFinanceObligationStatus.CANCELLED) {
+            if (line.getStatus() == PersonalFinanceObligationStatus.CANCELLED || line.isPaidLike()) {
                 continue;
             }
             if (line.getGeneratedObligationId() != null && paymentObligationRepository.findByIdAndUser(line.getGeneratedObligationId(), user).isPresent()) {
@@ -609,7 +1052,7 @@ public class PersonalFinanceService {
             obligation.setGroup(PersonalFinanceObligationGroup.DEBT_PAYMENT);
             obligation.setTitle(line.getTitle());
             obligation.setAmountDue(line.calculatedTotal());
-            obligation.setAmountPaid(BigDecimal.ZERO);
+            obligation.setAmountPaid(defaultAmount(line.getPaidAmount()));
             obligation.setCurrency(line.getCurrency());
             obligation.setDueDate(line.getDueDate());
             obligation.setStatus(line.getDueDate() != null && line.getDueDate().isBefore(LocalDate.now()) ? PersonalFinanceObligationStatus.OVERDUE : line.getStatus());
@@ -703,7 +1146,19 @@ public class PersonalFinanceService {
                 .toList();
     }
 
-    private PersonalFinanceMonthlyPlanItem itemFromObligation(PersonalFinancePaymentObligation obligation) {
+    private PersonalFinanceMonthlyPlanItem itemFromObligation(
+            PersonalFinancePaymentObligation obligation,
+            PersonalFinanceDebt debt
+    ) {
+        boolean debtBalanceKnown = debt != null && debt.hasKnownBalance();
+        BigDecimal debtBalance = debt == null ? BigDecimal.ZERO : debt.outstandingBalance();
+        PersonalFinanceDebtClassification classification = debt == null
+                ? PersonalFinanceDebtClassification.MANUAL_COMMITMENT
+                : debt.classification();
+        boolean settlementOpportunity = debtBalanceKnown
+                && debtBalance.compareTo(BigDecimal.ZERO) > 0
+                && safe(obligation.getAmountDue()).compareTo(debtBalance) >= 0;
+
         return new PersonalFinanceMonthlyPlanItem(
                 obligation.getId(),
                 obligation.getTitle(),
@@ -721,7 +1176,99 @@ public class PersonalFinanceService {
                 obligation.getSourceType() != PersonalFinanceObligationSourceType.MANUAL
                         && obligation.getSourceType() != PersonalFinanceObligationSourceType.STUDY_CYCLE
                         && obligation.getSourceType() != PersonalFinanceObligationSourceType.LIFE_COST
-                        && obligation.getSourceType() != PersonalFinanceObligationSourceType.DEBT_VOLUNTARY_PAYMENT
+                        && obligation.getSourceType() != PersonalFinanceObligationSourceType.DEBT_VOLUNTARY_PAYMENT,
+                debt == null ? null : debt.getId(),
+                debt == null ? null : debt.getName(),
+                classification,
+                debtBalance,
+                debtBalanceKnown,
+                debt != null && debt.isBankBalanceReference(),
+                settlementOpportunity
+        );
+    }
+
+    private PersonalFinanceDebt linkedDebtForObligation(
+            PersonalFinancePaymentObligation obligation,
+            Map<Long, PersonalFinanceDebt> debtsById
+    ) {
+        if (obligation == null
+                || obligation.getGroup() != PersonalFinanceObligationGroup.DEBT_PAYMENT
+                || obligation.getSourceId() == null) {
+            return null;
+        }
+        PersonalFinanceObligationSourceType sourceType = defaultEnum(
+                obligation.getSourceType(),
+                PersonalFinanceObligationSourceType.MANUAL
+        );
+        if (sourceType == PersonalFinanceObligationSourceType.DEBT
+                || sourceType == PersonalFinanceObligationSourceType.DEBT_SCHEDULE
+                || sourceType == PersonalFinanceObligationSourceType.PRIVATE_LENDER_INTEREST
+                || sourceType == PersonalFinanceObligationSourceType.AUTO_DEDUCTION
+                || sourceType == PersonalFinanceObligationSourceType.DEBT_VOLUNTARY_PAYMENT) {
+            return debtsById.get(obligation.getSourceId());
+        }
+        return null;
+    }
+
+    private PersonalFinanceDebtPortfolioSummary debtPortfolioSummary(
+            List<PersonalFinanceDebt> debts,
+            List<PersonalFinanceMonthlyPlanItem> debtItems
+    ) {
+        BigDecimal bankPen = BigDecimal.ZERO;
+        BigDecimal lenderPen = BigDecimal.ZERO;
+        BigDecimal directPen = BigDecimal.ZERO;
+        BigDecimal commitmentPen = BigDecimal.ZERO;
+        BigDecimal otherPen = BigDecimal.ZERO;
+        BigDecimal knownPen = BigDecimal.ZERO;
+        BigDecimal knownUsd = BigDecimal.ZERO;
+        long knownCount = 0;
+        long undefinedCount = 0;
+
+        for (PersonalFinanceDebt debt : debts) {
+            if (!debt.hasKnownBalance()) {
+                undefinedCount++;
+                continue;
+            }
+            knownCount++;
+            BigDecimal balance = debt.outstandingBalance();
+            PersonalFinanceCurrency currency = defaultEnum(debt.getCurrency(), PersonalFinanceCurrency.PEN);
+            if (currency == PersonalFinanceCurrency.USD) {
+                knownUsd = knownUsd.add(balance);
+                continue;
+            }
+            knownPen = knownPen.add(balance);
+            PersonalFinanceDebtClassification classification = debt.classification();
+            if (classification.isBankRelated()) {
+                bankPen = bankPen.add(balance);
+            } else if (classification.isLender()) {
+                lenderPen = lenderPen.add(balance);
+            } else if (classification.isDirect()) {
+                directPen = directPen.add(balance);
+            } else if (classification.isCommitment()) {
+                commitmentPen = commitmentPen.add(balance);
+            } else {
+                otherPen = otherPen.add(balance);
+            }
+        }
+
+        Set<Long> opportunityDebtIds = new HashSet<>();
+        for (PersonalFinanceMonthlyPlanItem item : debtItems) {
+            if (item.debtId() != null && item.settlementOpportunity()) {
+                opportunityDebtIds.add(item.debtId());
+            }
+        }
+
+        return new PersonalFinanceDebtPortfolioSummary(
+                bankPen,
+                lenderPen,
+                directPen,
+                commitmentPen,
+                otherPen,
+                knownPen,
+                knownUsd,
+                knownCount,
+                undefinedCount,
+                opportunityDebtIds.size()
         );
     }
 
@@ -743,6 +1290,137 @@ public class PersonalFinanceService {
 
     private BigDecimal totalPending(List<PersonalFinanceMonthlyPlanItem> items) {
         return items.stream().map(PersonalFinanceMonthlyPlanItem::pendingAmount).map(this::safe).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private Comparator<PersonalFinanceMonthlyPlanItem> priorityComparator() {
+        return Comparator
+                .comparingInt(this::priorityBucket)
+                .thenComparing(item -> item.status() != PersonalFinanceObligationStatus.OVERDUE)
+                .thenComparing(PersonalFinanceMonthlyPlanItem::dueDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(PersonalFinanceMonthlyPlanItem::priority)
+                .thenComparing(PersonalFinanceMonthlyPlanItem::title, Comparator.nullsLast(String::compareToIgnoreCase));
+    }
+
+    private int priorityBucket(PersonalFinanceMonthlyPlanItem item) {
+        if (item.priority() == PersonalFinancePriority.OPTIONAL) {
+            return 90;
+        }
+        if (item.sourceType() == PersonalFinanceObligationSourceType.AUTO_DEDUCTION) {
+            return 0;
+        }
+        if (item.group() == PersonalFinanceObligationGroup.BASIC_LIVING) {
+            return item.priority() == PersonalFinancePriority.CRITICAL || item.priority() == PersonalFinancePriority.HIGH ? 1 : 3;
+        }
+        if (item.group() == PersonalFinanceObligationGroup.STUDY) {
+            return item.priority() == PersonalFinancePriority.CRITICAL || item.priority() == PersonalFinancePriority.HIGH ? 2 : 4;
+        }
+        if (item.group() == PersonalFinanceObligationGroup.DEBT_PAYMENT) {
+            if (item.status() == PersonalFinanceObligationStatus.OVERDUE) {
+                return 5;
+            }
+            return switch (item.priority()) {
+                case CRITICAL -> 6;
+                case HIGH -> 7;
+                case MEDIUM -> 9;
+                case LOW -> 10;
+                case OPTIONAL -> 90;
+            };
+        }
+        return item.priority() == PersonalFinancePriority.CRITICAL || item.priority() == PersonalFinancePriority.HIGH ? 8 : 11;
+    }
+
+    private boolean isEssential(PersonalFinanceMonthlyPlanItem item) {
+        return item.priority() != PersonalFinancePriority.OPTIONAL
+                && (item.group() == PersonalFinanceObligationGroup.BASIC_LIVING
+                || item.group() == PersonalFinanceObligationGroup.STUDY);
+    }
+
+    private PersonalFinanceAllocationStatus allocationStatus(BigDecimal recommendedAmount, BigDecimal pendingAmount) {
+        if (recommendedAmount.compareTo(pendingAmount) >= 0) {
+            return PersonalFinanceAllocationStatus.COVERED;
+        }
+        if (recommendedAmount.compareTo(BigDecimal.ZERO) > 0) {
+            return PersonalFinanceAllocationStatus.PARTIAL;
+        }
+        return PersonalFinanceAllocationStatus.UNFUNDED;
+    }
+
+    private String allocationReason(PersonalFinanceMonthlyPlanItem item) {
+        if (item.sourceType() == PersonalFinanceObligationSourceType.AUTO_DEDUCTION) {
+            return "Descuento automático: reserva este importe antes de distribuir el resto.";
+        }
+        if (item.group() == PersonalFinanceObligationGroup.BASIC_LIVING) {
+            return "Costo de vida básico: protege vivienda, servicios, salud o continuidad diaria.";
+        }
+        if (item.group() == PersonalFinanceObligationGroup.STUDY) {
+            return "Estudio programado: cubre solo lo que vence este mes y evita financiarlo con deuda cara.";
+        }
+        if (item.status() == PersonalFinanceObligationStatus.OVERDUE) {
+            return "Pago vencido: revisa mora, penalidad y posibilidad de negociación antes de pagar.";
+        }
+        if (item.group() == PersonalFinanceObligationGroup.DEBT_PAYMENT
+                && (item.priority() == PersonalFinancePriority.CRITICAL || item.priority() == PersonalFinancePriority.HIGH)) {
+            return "Deuda prioritaria: atiéndela después del costo básico y confirma que el pago reduzca el riesgo o el saldo.";
+        }
+        if (item.priority() == PersonalFinancePriority.OPTIONAL) {
+            return "Compromiso opcional: posterga mientras el mes tenga déficit.";
+        }
+        if (item.group() == PersonalFinanceObligationGroup.DEBT_PAYMENT) {
+            return "Deuda de prioridad media o baja: negocia fecha o monto si no queda efectivo.";
+        }
+        return "Compromiso postergable: revisa si puede moverse al siguiente mes sin generar un costo mayor.";
+    }
+
+    private PersonalFinanceHealthLevel healthLevel(
+            BigDecimal totalPending,
+            BigDecimal availableCash,
+            BigDecimal essentialGap,
+            BigDecimal unfundedTotal,
+            BigDecimal unfundedDebtTotal,
+            BigDecimal debtPressurePercentage
+    ) {
+        if (totalPending.compareTo(BigDecimal.ZERO) <= 0 || unfundedTotal.compareTo(BigDecimal.ZERO) <= 0) {
+            return PersonalFinanceHealthLevel.STABLE;
+        }
+        if (availableCash.compareTo(BigDecimal.ZERO) <= 0 || essentialGap.compareTo(BigDecimal.ZERO) > 0) {
+            return PersonalFinanceHealthLevel.CRITICAL;
+        }
+        if (unfundedDebtTotal.compareTo(BigDecimal.ZERO) > 0 || debtPressurePercentage.compareTo(new BigDecimal("50.0")) >= 0) {
+            return PersonalFinanceHealthLevel.RED;
+        }
+        return PersonalFinanceHealthLevel.TIGHT;
+    }
+
+    private String healthHeadline(PersonalFinanceHealthLevel healthLevel) {
+        return switch (healthLevel) {
+            case STABLE -> "El dinero disponible cubre los compromisos pendientes del mes.";
+            case TIGHT -> "El mes está ajustado y requiere postergar compromisos no esenciales.";
+            case RED -> "El costo básico puede cubrirse, pero no alcanza para todas las deudas.";
+            case CRITICAL -> "El dinero disponible no alcanza para cubrir el costo básico del mes.";
+        };
+    }
+
+    private String healthRecommendation(PersonalFinanceHealthLevel healthLevel) {
+        return switch (healthLevel) {
+            case STABLE -> "Mantén una reserva antes de adelantar deuda y registra cada pago para conservar una proyección real.";
+            case TIGHT -> "Cubre el orden sugerido y posterga lo opcional. No agregues nuevas cuotas sin liberar flujo mensual.";
+            case RED -> "Paga primero el costo básico y las deudas críticas o vencidas. Negocia el resto antes de usar otro préstamo.";
+            case CRITICAL -> "Protege vivienda, servicios, salud y transporte. Reduce o negocia pagos de deuda antes de asumir nueva deuda.";
+        };
+    }
+
+    private BigDecimal percentage(BigDecimal amount, BigDecimal base) {
+        BigDecimal safeBase = safe(base);
+        if (safeBase.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return safe(amount)
+                .multiply(new BigDecimal("100"))
+                .divide(safeBase, 1, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal nonNegative(BigDecimal value) {
+        return safe(value).max(BigDecimal.ZERO);
     }
 
     private LocalDate dateFromDueDay(YearMonth yearMonth, Integer dueDay) {
@@ -871,7 +1549,7 @@ public class PersonalFinanceService {
 
     private PersonalFinanceScheduleLineType lineTypeForMode(PersonalFinanceDebtScheduleMode mode) {
         return switch (mode) {
-            case PRIVATE_LENDER_INTEREST -> PersonalFinanceScheduleLineType.INTEREST;
+            case PRIVATE_LENDER_INTEREST -> PersonalFinanceScheduleLineType.LENDER_INSTALLMENT;
             case ONE_TIME -> PersonalFinanceScheduleLineType.ONE_TIME;
             case AUTO_DEDUCTION -> PersonalFinanceScheduleLineType.AUTO_DEDUCTION;
             default -> PersonalFinanceScheduleLineType.INSTALLMENT;
@@ -880,7 +1558,7 @@ public class PersonalFinanceService {
 
     private String scheduleTitle(PersonalFinanceDebt debt, PersonalFinanceDebtScheduleMode mode, int number) {
         String prefix = switch (mode) {
-            case PRIVATE_LENDER_INTEREST -> "Interés mensual";
+            case PRIVATE_LENDER_INTEREST -> "Cuota prestamista";
             case ONE_TIME -> "Pago único";
             case AUTO_DEDUCTION -> "Descuento automático";
             case BANK_SCHEDULE -> "Cuota bancaria";
@@ -910,7 +1588,8 @@ public class PersonalFinanceService {
     }
 
     private PersonalFinanceObligationSourceType sourceTypeForLine(PersonalFinanceDebtScheduleLine line) {
-        if (line.getLineType() == PersonalFinanceScheduleLineType.INTEREST) {
+        if (line.getLineType() == PersonalFinanceScheduleLineType.INTEREST
+                || line.getLineType() == PersonalFinanceScheduleLineType.LENDER_INSTALLMENT) {
             return PersonalFinanceObligationSourceType.PRIVATE_LENDER_INTEREST;
         }
         if (line.getLineType() == PersonalFinanceScheduleLineType.AUTO_DEDUCTION) {
@@ -924,6 +1603,9 @@ public class PersonalFinanceService {
         notes.add(mode.getLabel());
         if (debt.getInterestRateMonthly() != null && debt.getInterestRateMonthly().compareTo(BigDecimal.ZERO) > 0) {
             notes.add("Interés mensual " + debt.getInterestRateMonthly() + "%");
+        }
+        if (mode == PersonalFinanceDebtScheduleMode.PRIVATE_LENDER_INTEREST) {
+            notes.add("Solo interés mensual; genera un cronograma con número de cuotas para amortizar capital");
         }
         String debtNotes = debtPlanNotes(debt);
         if (debtNotes != null && !debtNotes.isBlank()) {
@@ -986,6 +1668,434 @@ public class PersonalFinanceService {
         }
         long index = ChronoUnit.MONTHS.between(YearMonth.from(debt.getScheduleStartDate()), yearMonth);
         return (int) Math.max(1, index + 1);
+    }
+
+    private PersonalFinanceBankScheduleSummary summarizeBankSchedule(List<PersonalFinanceDebtScheduleLine> lines) {
+        int paidLines = 0;
+        int pendingLines = 0;
+        int overdueLines = 0;
+        BigDecimal principalTotal = BigDecimal.ZERO;
+        BigDecimal interestTotal = BigDecimal.ZERO;
+        BigDecimal insuranceTotal = BigDecimal.ZERO;
+        BigDecimal feeTotal = BigDecimal.ZERO;
+        BigDecimal scheduledTotal = BigDecimal.ZERO;
+        BigDecimal principalPaid = BigDecimal.ZERO;
+        BigDecimal principalPending = BigDecimal.ZERO;
+        BigDecimal futureTotal = BigDecimal.ZERO;
+        BigDecimal futureInterest = BigDecimal.ZERO;
+        PersonalFinanceDebtScheduleLine nextInstallment = null;
+
+        for (PersonalFinanceDebtScheduleLine line : lines) {
+            principalTotal = principalTotal.add(safe(line.getPrincipalAmount()));
+            interestTotal = interestTotal.add(safe(line.getInterestAmount()));
+            insuranceTotal = insuranceTotal.add(safe(line.getInsuranceAmount()));
+            feeTotal = feeTotal.add(safe(line.getFeeAmount()));
+            scheduledTotal = scheduledTotal.add(line.calculatedTotal());
+            boolean paid = line.isPaidLike();
+            boolean cancelled = line.getStatus() == PersonalFinanceObligationStatus.CANCELLED;
+            if (!cancelled) {
+                principalPaid = principalPaid.add(safe(line.getPaidPrincipalAmount()));
+                principalPending = principalPending.add(line.principalPendingAmount());
+            }
+            if (paid) {
+                paidLines++;
+            } else if (!cancelled) {
+                pendingLines++;
+                futureTotal = futureTotal.add(line.pendingAmount());
+                futureInterest = futureInterest.add(line.interestPendingAmount());
+                if (line.getDueDate() != null && line.getDueDate().isBefore(LocalDate.now())) {
+                    overdueLines++;
+                }
+                if (nextInstallment == null || compareSchedulePosition(line, nextInstallment) < 0) {
+                    nextInstallment = line;
+                }
+            }
+        }
+        return new PersonalFinanceBankScheduleSummary(
+                lines.size(), paidLines, pendingLines, overdueLines,
+                principalTotal, interestTotal, insuranceTotal, feeTotal, scheduledTotal,
+                principalPaid, principalPending, futureTotal, futureInterest, nextInstallment
+        );
+    }
+
+    private int compareSchedulePosition(PersonalFinanceDebtScheduleLine left, PersonalFinanceDebtScheduleLine right) {
+        if (left.getDueDate() == null && right.getDueDate() != null) return 1;
+        if (left.getDueDate() != null && right.getDueDate() == null) return -1;
+        if (left.getDueDate() != null) {
+            int dateCompare = left.getDueDate().compareTo(right.getDueDate());
+            if (dateCompare != 0) return dateCompare;
+        }
+        return Integer.compare(left.getLineNumber() == null ? Integer.MAX_VALUE : left.getLineNumber(),
+                right.getLineNumber() == null ? Integer.MAX_VALUE : right.getLineNumber());
+    }
+
+    private List<ImportedBankScheduleRow> parseBankScheduleRows(String rawContent, List<String> errors) {
+        List<ImportedBankScheduleRow> rows = new ArrayList<>();
+        if (rawContent == null || rawContent.isBlank()) {
+            errors.add("Pega el cronograma o selecciona un archivo CSV/TXT.");
+            return rows;
+        }
+        if (rawContent.length() > 1_000_000) {
+            errors.add("El archivo o texto supera el límite de 1 MB.");
+            return rows;
+        }
+        Set<Integer> lineNumbers = new HashSet<>();
+        String[] rawLines = rawContent.replace("\r", "").split("\n");
+        for (int index = 0; index < rawLines.length; index++) {
+            String rawLine = rawLines[index].trim();
+            if (rawLine.isBlank() || rawLine.startsWith("#")) continue;
+            String normalized = rawLine.toLowerCase(Locale.ROOT);
+            if (normalized.contains("cuota") && normalized.contains("fecha")) continue;
+            if (normalized.startsWith("totales") || normalized.startsWith("total")) continue;
+
+            String[] columns = splitScheduleColumns(rawLine);
+            if (columns.length < 6) {
+                errors.add("Línea " + (index + 1) + ": se esperaban 6 columnas (cuota, fecha, capital, interés, seguro, total).");
+                continue;
+            }
+            try {
+                int lineNumber = Integer.parseInt(cleanCell(columns[0]));
+                if (lineNumber <= 0) throw new IllegalArgumentException("número de cuota inválido");
+                if (!lineNumbers.add(lineNumber)) throw new IllegalArgumentException("número de cuota duplicado");
+                LocalDate dueDate = parseScheduleDate(cleanCell(columns[1]));
+                BigDecimal principal = parseScheduleAmount(columns[2]);
+                BigDecimal interest = parseScheduleAmount(columns[3]);
+                BigDecimal insurance = parseScheduleAmount(columns[4]);
+                BigDecimal total = parseScheduleAmount(columns[5]);
+                BigDecimal calculated = principal.add(interest).add(insurance);
+                if (total.compareTo(BigDecimal.ZERO) <= 0) {
+                    total = calculated;
+                }
+                if (calculated.subtract(total).abs().compareTo(new BigDecimal("0.20")) > 0) {
+                    throw new IllegalArgumentException("capital + interés + seguro no coincide con el total");
+                }
+                rows.add(new ImportedBankScheduleRow(lineNumber, dueDate, principal, interest, insurance, total));
+            } catch (RuntimeException exception) {
+                errors.add("Línea " + (index + 1) + ": " + exception.getMessage() + ".");
+            }
+        }
+        rows.sort(Comparator.comparing(ImportedBankScheduleRow::lineNumber));
+        return rows;
+    }
+
+    private String[] splitScheduleColumns(String rawLine) {
+        if (rawLine.contains("\t")) return rawLine.split("\t+");
+        if (rawLine.contains(";")) return rawLine.split(";");
+        if (rawLine.contains("|") ) return rawLine.split("\\|");
+        String[] commaColumns = rawLine.split(",");
+        if (commaColumns.length >= 6 && rawLine.indexOf('/') >= 0) return commaColumns;
+        return rawLine.trim().split("\\s+");
+    }
+
+    private String cleanCell(String value) {
+        if (value == null) return "";
+        String cleaned = value.trim();
+        if (cleaned.startsWith("\"") && cleaned.endsWith("\"") && cleaned.length() >= 2) {
+            cleaned = cleaned.substring(1, cleaned.length() - 1);
+        }
+        return cleaned.trim();
+    }
+
+    private LocalDate parseScheduleDate(String value) {
+        List<DateTimeFormatter> formatters = List.of(
+                DateTimeFormatter.ofPattern("d/M/uuuu"),
+                DateTimeFormatter.ofPattern("d/M/uu"),
+                DateTimeFormatter.ISO_LOCAL_DATE
+        );
+        for (DateTimeFormatter formatter : formatters) {
+            try {
+                return LocalDate.parse(value, formatter);
+            } catch (DateTimeParseException ignored) {
+            }
+        }
+        throw new IllegalArgumentException("fecha inválida: " + value);
+    }
+
+    private BigDecimal parseScheduleAmount(String value) {
+        String cleaned = cleanCell(value)
+                .replace("S/", "")
+                .replace("PEN", "")
+                .replace(" ", "")
+                .replaceAll("[^0-9,.-]", "");
+        if (cleaned.isBlank() || cleaned.equals("-")) return BigDecimal.ZERO;
+        int lastComma = cleaned.lastIndexOf(',');
+        int lastDot = cleaned.lastIndexOf('.');
+        if (lastComma >= 0 && lastDot >= 0) {
+            if (lastComma > lastDot) {
+                cleaned = cleaned.replace(".", "").replace(',', '.');
+            } else {
+                cleaned = cleaned.replace(",", "");
+            }
+        } else if (lastComma >= 0) {
+            cleaned = cleaned.replace(',', '.');
+        }
+        try {
+            BigDecimal amount = new BigDecimal(cleaned).setScale(2, RoundingMode.HALF_UP);
+            if (amount.compareTo(BigDecimal.ZERO) < 0) throw new IllegalArgumentException("monto negativo");
+            return amount;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("monto inválido: " + value);
+        }
+    }
+
+    private PersonalFinanceDebtScheduleGenerationResult generatePrivateLenderAmortizationSchedule(
+            UserAccount user,
+            PersonalFinanceDebt debt,
+            LocalDate firstDue,
+            int count
+    ) {
+        List<PersonalFinanceLenderInstallment> installments = PersonalFinanceLenderAmortizationCalculator.calculate(
+                safe(debt.getCurrentBalance()),
+                safe(debt.getInterestRateMonthly()),
+                count
+        );
+        List<PersonalFinanceDebtScheduleLine> existingLines =
+                debtScheduleLineRepository.findByUserAndDebtOrderByDueDateAscLineNumberAscIdAsc(user, debt);
+        Set<LocalDate> targetDates = new HashSet<>();
+        int baseLineNumber = existingLines.stream()
+                .filter(line -> line.getDueDate() != null && line.getDueDate().isBefore(firstDue))
+                .map(PersonalFinanceDebtScheduleLine::getLineNumber)
+                .filter(java.util.Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0);
+
+        int created = 0;
+        int updated = 0;
+        int removed = 0;
+        int protectedLines = 0;
+        int unchanged = 0;
+
+        for (PersonalFinanceLenderInstallment installment : installments) {
+            YearMonth dueMonth = YearMonth.from(firstDue).plusMonths(installment.number() - 1L);
+            LocalDate dueDate = dueMonth.atDay(Math.min(firstDue.getDayOfMonth(), dueMonth.lengthOfMonth()));
+            targetDates.add(dueDate);
+
+            List<PersonalFinanceDebtScheduleLine> matchingLines = existingLines.stream()
+                    .filter(existing -> dueDate.equals(existing.getDueDate()))
+                    .toList();
+            PersonalFinanceDebtScheduleLine line = matchingLines.isEmpty() ? null : matchingLines.get(0);
+            for (int duplicateIndex = 1; duplicateIndex < matchingLines.size(); duplicateIndex++) {
+                PersonalFinanceDebtScheduleLine duplicate = matchingLines.get(duplicateIndex);
+                if (hasRecordedSchedulePayment(duplicate, user)) {
+                    protectedLines++;
+                    continue;
+                }
+                removeGeneratedObligation(duplicate, user);
+                debtScheduleLineRepository.delete(duplicate);
+                removed++;
+            }
+            if (line != null && hasRecordedSchedulePayment(line, user)) {
+                protectedLines++;
+                continue;
+            }
+
+            boolean isNew = line == null;
+            if (isNew) {
+                line = new PersonalFinanceDebtScheduleLine();
+                line.setUser(user);
+                line.setDebt(debt);
+                line.setLineNumber(baseLineNumber + installment.number());
+                line.setPaidAmount(BigDecimal.ZERO);
+            } else if (line.getLineNumber() == null) {
+                line.setLineNumber(baseLineNumber + installment.number());
+            }
+
+            line.setLineType(PersonalFinanceScheduleLineType.LENDER_INSTALLMENT);
+            line.setTitle("Cuota prestamista - " + debt.getName() + " #" + installment.number());
+            line.setCurrency(defaultEnum(debt.getCurrency(), PersonalFinanceCurrency.PEN));
+            line.setDueDate(dueDate);
+            line.setPrincipalAmount(installment.principalAmount());
+            line.setInterestAmount(installment.interestAmount());
+            line.setInsuranceAmount(BigDecimal.ZERO);
+            line.setFeeAmount(BigDecimal.ZERO);
+            line.setTotalAmount(installment.totalAmount());
+            line.setPaidAmount(BigDecimal.ZERO);
+            line.setPaidAt(null);
+            line.setStatus(defaultPendingStatus(dueDate));
+            line.setNotes(lenderInstallmentNotes(debt, installment));
+
+            PersonalFinanceDebtScheduleLine saved = debtScheduleLineRepository.save(line);
+            synchronizeGeneratedObligation(saved, user);
+            if (isNew) {
+                created++;
+            } else {
+                updated++;
+            }
+        }
+
+        for (PersonalFinanceDebtScheduleLine line : existingLines) {
+            if (!isGeneratedLenderLine(line)
+                    || line.getDueDate() == null
+                    || line.getDueDate().isBefore(firstDue)
+                    || targetDates.contains(line.getDueDate())) {
+                continue;
+            }
+            if (hasRecordedSchedulePayment(line, user)) {
+                protectedLines++;
+                continue;
+            }
+            removeGeneratedObligation(line, user);
+            debtScheduleLineRepository.delete(line);
+            removed++;
+        }
+
+        debt.setScheduleMode(PersonalFinanceDebtScheduleMode.PRIVATE_LENDER_INTEREST);
+        debt.setInstallmentCount(count);
+        debt.setScheduleStartDate(firstDue);
+        YearMonth lastMonth = YearMonth.from(firstDue).plusMonths(count - 1L);
+        debt.setScheduleEndDate(lastMonth.atDay(Math.min(firstDue.getDayOfMonth(), lastMonth.lengthOfMonth())));
+        debt.setMonthlyDueAmount(installments.get(0).totalAmount());
+        debt.setFixedPayment(false);
+        debt.setAutoGenerateMonthly(true);
+        debtRepository.save(debt);
+
+        return new PersonalFinanceDebtScheduleGenerationResult(
+                created,
+                updated,
+                removed,
+                protectedLines,
+                unchanged,
+                true
+        );
+    }
+
+    private boolean isGeneratedLenderLine(PersonalFinanceDebtScheduleLine line) {
+        if (line.getLineType() == PersonalFinanceScheduleLineType.LENDER_INSTALLMENT) {
+            return true;
+        }
+        return line.getLineType() == PersonalFinanceScheduleLineType.INTEREST
+                && line.getTitle() != null
+                && line.getTitle().startsWith("Interés mensual");
+    }
+
+    private PersonalFinanceObligationStatus defaultPendingStatus(LocalDate dueDate) {
+        return dueDate != null && dueDate.isBefore(LocalDate.now())
+                ? PersonalFinanceObligationStatus.OVERDUE
+                : PersonalFinanceObligationStatus.PENDING;
+    }
+
+    private String lenderInstallmentNotes(
+            PersonalFinanceDebt debt,
+            PersonalFinanceLenderInstallment installment
+    ) {
+        return "Capital fijo + interés sobre saldo pendiente"
+                + " · Saldo inicial " + installment.openingBalance()
+                + " · Capital " + installment.principalAmount()
+                + " · Interés " + safe(debt.getInterestRateMonthly()) + "% = " + installment.interestAmount()
+                + " · Saldo final " + installment.closingBalance();
+    }
+
+    private boolean hasRecordedSchedulePayment(PersonalFinanceDebtScheduleLine line, UserAccount user) {
+        if (line.isPaidLike() || safe(line.getPaidAmount()).compareTo(BigDecimal.ZERO) > 0
+                || line.getStatus() == PersonalFinanceObligationStatus.PARTIAL) {
+            return true;
+        }
+        return paymentObligationRepository.findByScheduleLineIdAndUser(line.getId(), user)
+                .map(obligation -> obligation.isPaidLike() || safe(obligation.getAmountPaid()).compareTo(BigDecimal.ZERO) > 0
+                        || obligation.getStatus() == PersonalFinanceObligationStatus.PARTIAL)
+                .orElse(false);
+    }
+
+    private void removeGeneratedObligation(PersonalFinanceDebtScheduleLine line, UserAccount user) {
+        paymentObligationRepository.findByScheduleLineIdAndUser(line.getId(), user).ifPresent(paymentObligationRepository::delete);
+        line.setGeneratedObligationId(null);
+    }
+
+    private void synchronizeGeneratedObligation(PersonalFinanceDebtScheduleLine line, UserAccount user) {
+        paymentObligationRepository.findByScheduleLineIdAndUser(line.getId(), user).ifPresent(obligation -> {
+            obligation.setSourceType(sourceTypeForLine(line));
+            obligation.setSourceId(line.getDebt() == null ? obligation.getSourceId() : line.getDebt().getId());
+            obligation.setTitle(line.getTitle());
+            obligation.setAmountDue(line.calculatedTotal());
+            obligation.setAmountPaid(defaultAmount(line.getPaidAmount()));
+            obligation.setCurrency(line.getCurrency());
+            obligation.setDueDate(line.getDueDate());
+            obligation.setStatus(resolveObligationStatus(line.getStatus(), obligation.getAmountDue(), obligation.getAmountPaid()));
+            obligation.setNotes(scheduleObligationNotes(line));
+            if (line.getDebt() != null) {
+                obligation.setPriority(defaultEnum(line.getDebt().getPriority(), PersonalFinancePriority.MEDIUM));
+            }
+            if (line.getStatus() == PersonalFinanceObligationStatus.CANCELLED) {
+                obligation.setStatus(PersonalFinanceObligationStatus.CANCELLED);
+            }
+            paymentObligationRepository.save(obligation);
+            line.setGeneratedObligationId(obligation.getId());
+        });
+    }
+
+    private void refreshDebtBalanceFromSchedule(PersonalFinanceDebt debt, UserAccount user) {
+        if (debt == null || debt.getId() == null) {
+            return;
+        }
+        List<PersonalFinanceDebtScheduleLine> lines =
+                debtScheduleLineRepository.findByUserAndDebtOrderByDueDateAscLineNumberAscIdAsc(user, debt);
+        if (lines.isEmpty()) {
+            return;
+        }
+        PersonalFinanceDebtScheduleMode mode = defaultEnum(debt.getScheduleMode(), PersonalFinanceDebtScheduleMode.SIMPLE_MONTHLY);
+        if (mode == PersonalFinanceDebtScheduleMode.BANK_SCHEDULE) {
+            updateDebtFromBankSchedule(debt, lines);
+            return;
+        }
+        if (mode != PersonalFinanceDebtScheduleMode.PRIVATE_LENDER_INTEREST
+                && mode != PersonalFinanceDebtScheduleMode.ONE_TIME) {
+            return;
+        }
+
+        BigDecimal principalTotal = lines.stream()
+                .filter(line -> line.getStatus() != PersonalFinanceObligationStatus.CANCELLED)
+                .map(PersonalFinanceDebtScheduleLine::getPrincipalAmount)
+                .map(this::safe)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (principalTotal.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        BigDecimal principalPending = lines.stream()
+                .filter(line -> line.getStatus() != PersonalFinanceObligationStatus.CANCELLED)
+                .map(PersonalFinanceDebtScheduleLine::principalPendingAmount)
+                .map(this::safe)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        debt.setCurrentBalance(principalPending);
+        if (safe(debt.getOriginalAmount()).compareTo(BigDecimal.ZERO) <= 0 && principalTotal.compareTo(BigDecimal.ZERO) > 0) {
+            debt.setOriginalAmount(principalTotal);
+        }
+        debtRepository.save(debt);
+    }
+
+    private void updateDebtFromBankSchedule(PersonalFinanceDebt debt, List<PersonalFinanceDebtScheduleLine> lines) {
+        if (lines == null || lines.isEmpty()) return;
+        List<PersonalFinanceDebtScheduleLine> sorted = lines.stream().sorted(this::compareSchedulePosition).toList();
+        PersonalFinanceBankScheduleSummary summary = summarizeBankSchedule(sorted);
+        debt.setScheduleMode(PersonalFinanceDebtScheduleMode.BANK_SCHEDULE);
+        debt.setAutoGenerateMonthly(true);
+        debt.setFixedPayment(true);
+        debt.setInstallmentCount(sorted.stream().map(PersonalFinanceDebtScheduleLine::getLineNumber).filter(java.util.Objects::nonNull).max(Integer::compareTo).orElse(sorted.size()));
+        debt.setScheduleStartDate(sorted.stream().map(PersonalFinanceDebtScheduleLine::getDueDate).filter(java.util.Objects::nonNull).min(LocalDate::compareTo).orElse(debt.getScheduleStartDate()));
+        debt.setScheduleEndDate(sorted.stream().map(PersonalFinanceDebtScheduleLine::getDueDate).filter(java.util.Objects::nonNull).max(LocalDate::compareTo).orElse(debt.getScheduleEndDate()));
+        debt.setCurrentBalance(summary.principalPending());
+        if (debt.getOriginalAmount() == null || debt.getOriginalAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            debt.setOriginalAmount(summary.principalTotal());
+        }
+        if (summary.nextInstallment() != null) {
+            debt.setMonthlyDueAmount(summary.nextInstallment().calculatedTotal());
+            if (summary.nextInstallment().getDueDate() != null) debt.setDueDay(summary.nextInstallment().getDueDate().getDayOfMonth());
+        }
+        debtRepository.save(debt);
+    }
+
+    private String displayLineNumber(PersonalFinanceDebtScheduleLine line) {
+        return line.getLineNumber() == null ? String.valueOf(line.getId()) : String.valueOf(line.getLineNumber());
+    }
+
+    private record ImportedBankScheduleRow(
+            int lineNumber,
+            LocalDate dueDate,
+            BigDecimal principal,
+            BigDecimal interest,
+            BigDecimal insurance,
+            BigDecimal total
+    ) {
     }
 
     private int nextScheduleLineNumber(UserAccount user, PersonalFinanceDebt debt) {

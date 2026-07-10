@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('GastoClaro - Calendario y alertas')}"></head>
+<body>
+<div class="app-layout" th:with="activePage='gasto_claro_alerts'">
+  <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+  <div class="main-content">
+    <header th:replace="~{fragments/topbar :: topbar}"></header>
+    <main class="content-wrapper gasto-claro-page">
+      <link rel="stylesheet" th:href="@{/css/personal-finance-alerts.css}">
+
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div>
+          <h1 class="h4 mb-1">Calendario y alertas</h1>
+          <p class="text-muted mb-0">Revisa vencimientos, cobros esperados y seguimientos de negociación en un solo lugar.</p>
+        </div>
+        <div class="d-flex gap-2">
+          <a th:href="@{/gasto-claro/monthly-plan(year=${selectedYear},month=${selectedMonth})}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-calendar2-week"></i> Plan mensual
+          </a>
+          <a th:href="@{/gasto-claro/payments(year=${selectedYear},month=${selectedMonth})}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-cash-coin"></i> Pagos
+          </a>
+        </div>
+      </div>
+
+      <div th:replace="~{personal_finance/_nav :: nav('alerts')}"></div>
+
+      <div class="alert alert-info border-0 shadow-sm d-flex gap-2 align-items-start">
+        <i class="bi bi-shield-check fs-5"></i>
+        <div>
+          <strong>Centro informativo.</strong>
+          Esta pantalla no marca pagos, no cambia ingresos ni actualiza acuerdos automáticamente. Las acciones abren el registro correspondiente para que confirmes cada operación.
+        </div>
+      </div>
+
+      <section class="alert-summary-grid mb-3">
+        <article class="alert-summary-card">
+          <span>Pagos vencidos</span>
+          <strong class="text-danger" th:text="${center.summary().overduePayments()}">0</strong>
+          <small>Obligaciones aún pendientes</small>
+        </article>
+        <article class="alert-summary-card">
+          <span>Vencen hoy</span>
+          <strong th:classappend="${center.summary().dueToday() > 0} ? ' text-warning' : ' text-success'" th:text="${center.summary().dueToday()}">0</strong>
+          <small>Pagos, ingresos y seguimientos</small>
+        </article>
+        <article class="alert-summary-card">
+          <span>Próximos 7 días</span>
+          <strong class="text-primary" th:text="${center.summary().upcomingSevenDays()}">0</strong>
+          <small>Eventos que requieren atención</small>
+        </article>
+        <article class="alert-summary-card">
+          <span>Pagos parciales</span>
+          <strong th:classappend="${center.summary().partialPayments() > 0} ? ' text-warning' : ' text-success'" th:text="${center.summary().partialPayments()}">0</strong>
+          <small>Compromisos todavía abiertos</small>
+        </article>
+        <article class="alert-summary-card">
+          <span>Ingresos pendientes</span>
+          <strong th:text="${center.summary().pendingIncomes()}">0</strong>
+          <small>Planeados y no recibidos</small>
+        </article>
+        <article class="alert-summary-card">
+          <span>Seguimientos vencidos</span>
+          <strong th:classappend="${center.summary().negotiationFollowUps() > 0} ? ' text-danger' : ' text-success'" th:text="${center.summary().negotiationFollowUps()}">0</strong>
+          <small>Negociaciones abiertas</small>
+        </article>
+      </section>
+
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <form th:action="@{/gasto-claro/alerts}" method="get" class="row g-2 align-items-end">
+            <div class="col-6 col-md-2">
+              <label class="form-label small">Año</label>
+              <input type="number" name="year" min="2000" max="2100" class="form-control form-control-sm" th:value="${selectedYear}">
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label small">Mes</label>
+              <select name="month" class="form-select form-select-sm">
+                <option th:each="monthNumber : ${#numbers.sequence(1,12)}"
+                        th:value="${monthNumber}"
+                        th:selected="${monthNumber == selectedMonth}"
+                        th:text="${monthNumber}">1</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label small">Tipo</label>
+              <select name="category" class="form-select form-select-sm">
+                <option th:each="category : ${categories}"
+                        th:value="${category}"
+                        th:selected="${category == selectedCategory}"
+                        th:text="${category.label}">Todas</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label small">Alcance de alertas</label>
+              <select name="scope" class="form-select form-select-sm">
+                <option th:each="scope : ${scopes}"
+                        th:value="${scope}"
+                        th:selected="${scope == selectedScope}"
+                        th:text="${scope.label}">Todas las alertas</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-2 d-grid">
+              <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Aplicar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-12 col-xxl-8">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <div>
+                <strong th:text="${center.monthLabel()}">Julio 2026</strong>
+                <div class="small text-muted" th:text="${center.totalCalendarEvents() + ' eventos visibles en el calendario'}">0 eventos</div>
+              </div>
+              <div class="btn-group btn-group-sm">
+                <a class="btn btn-outline-secondary"
+                   th:href="@{/gasto-claro/alerts(year=${center.previousMonth().year},month=${center.previousMonth().monthValue},category=${selectedCategory},scope=${selectedScope})}"
+                   title="Mes anterior"><i class="bi bi-chevron-left"></i></a>
+                <a class="btn btn-outline-secondary" th:href="@{/gasto-claro/alerts}">Hoy</a>
+                <a class="btn btn-outline-secondary"
+                   th:href="@{/gasto-claro/alerts(year=${center.nextMonth().year},month=${center.nextMonth().monthValue},category=${selectedCategory},scope=${selectedScope})}"
+                   title="Mes siguiente"><i class="bi bi-chevron-right"></i></a>
+              </div>
+            </div>
+            <div class="card-body p-0 alert-calendar-shell">
+              <div class="alert-calendar">
+                <div class="alert-calendar-weekdays">
+                  <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+                </div>
+                <div class="alert-calendar-grid">
+                  <div th:each="day : ${center.calendarDays()}"
+                       class="alert-calendar-day"
+                       th:classappend="${(!day.inSelectedMonth() ? ' is-outside' : '') + (day.today() ? ' is-today' : '')}">
+                    <div class="alert-calendar-day-number">
+                      <span th:text="${day.date().dayOfMonth}">1</span>
+                      <span class="badge rounded-pill text-bg-primary" th:if="${day.events().size() > 0}" th:text="${day.events().size()}">1</span>
+                    </div>
+                    <a th:each="event, eventStat : ${day.events()}"
+                       th:if="${eventStat.index < 3}"
+                       th:href="${event.actionUrl()}"
+                       class="alert-calendar-event"
+                       th:classappend="${' ' + event.cssClass()}"
+                       th:title="${event.detail()}">
+                      <span class="alert-calendar-event-title"><i class="bi" th:classappend="${' ' + event.icon()}"></i> <span th:text="${event.title()}">Evento</span></span>
+                      <span class="alert-calendar-event-meta">
+                        <span th:if="${event.amount() != null}"><span th:text="${event.currencySymbol()}">S/</span> <span th:text="${#numbers.formatDecimal(event.amount(),1,'POINT',2,'POINT')}">0.00</span> · </span>
+                        <span th:text="${event.statusLabel()}">Pendiente</span>
+                      </span>
+                    </a>
+                    <div class="small text-muted mt-1" th:if="${day.hiddenEventCount() > 0}" th:text="${'+' + day.hiddenEventCount() + ' eventos más'}">+1 evento más</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xxl-4">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
+              <strong>Alertas priorizadas</strong>
+              <span class="badge text-bg-light" th:text="${center.alerts().size() + ' alertas'}">0 alertas</span>
+            </div>
+            <div class="card-body alert-center-list">
+              <div class="d-grid gap-2" th:if="${!center.alerts().isEmpty()}">
+                <article th:each="item : ${center.alerts()}" class="alert-center-card" th:classappend="${' ' + item.cardClass()}">
+                  <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div class="min-w-0">
+                      <div class="small text-muted"><i class="bi" th:classappend="${' ' + item.category().icon}"></i> <span th:text="${item.category().label}">Pagos</span></div>
+                      <div class="fw-semibold text-break" th:text="${item.title()}">Título</div>
+                    </div>
+                    <span class="badge" th:classappend="${' text-bg-' + item.severity().bootstrapClass}" th:text="${item.statusLabel()}">Vencido</span>
+                  </div>
+                  <div class="small text-muted mt-1" th:text="${item.detail()}">Detalle</div>
+                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mt-2">
+                    <div>
+                      <div class="small" th:classappend="${item.overdue() ? ' text-danger' : ''}">
+                        <i class="bi bi-calendar-event"></i>
+                        <span th:text="${#temporals.format(item.date(), 'dd/MM/yyyy')}">09/07/2026</span>
+                        <span th:if="${item.overdue()}"> · hace <span th:text="${-item.daysFromToday()}">1</span> días</span>
+                        <span th:if="${!item.overdue() and !item.today()}"> · en <span th:text="${item.daysFromToday()}">1</span> días</span>
+                      </div>
+                      <div class="fw-semibold" th:if="${item.amount() != null}">
+                        <span th:text="${item.currencySymbol()}">S/</span>
+                        <span th:text="${#numbers.formatDecimal(item.amount(),1,'POINT',2,'POINT')}">0.00</span>
+                      </div>
+                    </div>
+                    <a th:href="${item.actionUrl()}" class="btn btn-outline-primary btn-sm" th:text="${item.actionLabel()}">Revisar</a>
+                  </div>
+                </article>
+              </div>
+              <div class="text-center text-muted py-5" th:if="${center.alerts().isEmpty()}">
+                <i class="bi bi-check-circle fs-1 text-success"></i>
+                <p class="mt-2 mb-0">No hay alertas que coincidan con los filtros seleccionados.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mt-3">
+        <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+          <div>
+            <div class="fw-semibold">Pendiente total registrado</div>
+            <div class="small text-muted">Incluye todas las obligaciones abiertas, incluso las que están fuera del mes visible.</div>
+          </div>
+          <div class="d-flex gap-4">
+            <div><span class="text-muted small d-block">Soles</span><strong>S/ <span th:text="${#numbers.formatDecimal(center.summary().pendingPen(),1,'POINT',2,'POINT')}">0.00</span></strong></div>
+            <div><span class="text-muted small d-block">Dólares</span><strong>US$ <span th:text="${#numbers.formatDecimal(center.summary().pendingUsd(),1,'POINT',2,'POINT')}">0.00</span></strong></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div th:replace="~{fragments/scripts_admin :: scripts}"></div>
+</body>
+</html>

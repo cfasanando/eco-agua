@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('GastoClaro - Simulador de deudas')}"></head>
+<body>
+<div class="app-layout" th:with="activePage='gasto_claro_debt_simulator'">
+  <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+  <div class="main-content">
+    <header th:replace="~{fragments/topbar :: topbar}"></header>
+    <main class="content-wrapper gasto-claro-page">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div>
+          <h1 class="h4 mb-1">Simulador de salida de deudas</h1>
+          <p class="text-muted mb-0">Compara estrategias, dinero extraordinario y aportes mensuales sin modificar saldos ni registrar pagos.</p>
+        </div>
+        <a th:href="@{/gasto-claro/debts}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-credit-card"></i> Ver deudas reales
+        </a>
+      </div>
+
+      <div th:replace="~{personal_finance/_nav :: nav('debt_simulator')}"></div>
+
+      <div class="alert alert-info border-0 shadow-sm d-flex gap-2 align-items-start">
+        <i class="bi bi-shield-check fs-5"></i>
+        <div>
+          <strong>Simulación de solo lectura.</strong>
+          Ningún cálculo de esta pantalla cambia tus deudas, cronogramas, pagos o comprobantes.
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white">
+          <strong>Escenario a evaluar</strong>
+        </div>
+        <div class="card-body">
+          <form th:action="@{/gasto-claro/debt-simulator}" method="get" id="debtSimulatorForm" class="row g-3">
+            <div class="col-6 col-md-2">
+              <label class="form-label small">Año inicial</label>
+              <input type="number" class="form-control form-control-sm" name="year" min="2020" max="2100" th:value="${selectedYear}">
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label small">Mes inicial</label>
+              <input type="number" class="form-control form-control-sm" name="month" min="1" max="12" th:value="${selectedMonth}">
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label small">Moneda</label>
+              <select class="form-select form-select-sm" name="currency">
+                <option th:each="currency : ${currencies}"
+                        th:value="${currency}"
+                        th:text="${currency.name() == 'PEN' ? 'Soles (S/)' : 'Dólares (US$)'}"
+                        th:selected="${currency == selectedCurrency}">Soles</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label small">Estrategia</label>
+              <select class="form-select form-select-sm" name="strategy" id="strategySelect">
+                <option th:each="strategy : ${strategies}"
+                        th:value="${strategy}"
+                        th:text="${strategy.label}"
+                        th:selected="${strategy == selectedStrategy}">Mayor interés primero</option>
+              </select>
+              <div class="form-text" id="strategyDescription" th:text="${selectedStrategy.description}">Descripción</div>
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Dinero extraordinario disponible una vez</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text" th:text="${currencySymbol}">S/</span>
+                <input type="number" min="0" step="0.01" class="form-control" name="lumpSum" th:value="${lumpSum}">
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Aporte adicional mensual</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text" th:text="${currencySymbol}">S/</span>
+                <input type="number" min="0" step="0.01" class="form-control" name="monthlyExtra" th:value="${monthlyExtra}">
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label small">Horizonte máximo</label>
+              <div class="input-group input-group-sm">
+                <input type="number" min="1" max="360" class="form-control" name="horizonMonths" th:value="${horizonMonths}">
+                <span class="input-group-text">meses</span>
+              </div>
+            </div>
+
+            <div class="col-12" id="customSelectionBlock" th:classappend="${selectedStrategy.name() != 'CUSTOM_SELECTION'} ? ' d-none' : ''">
+              <div class="border rounded-3 p-3 bg-light-subtle">
+                <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                  <div>
+                    <strong class="small">Deudas que recibirán dinero extra</strong>
+                    <div class="text-muted small">Las no seleccionadas conservarán únicamente su cuota mensual normal.</div>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleAllTargets">Seleccionar todas</button>
+                </div>
+                <div class="row g-2">
+                  <div class="col-12 col-md-6 col-xl-4" th:each="debt : ${simulation.debts()}">
+                    <label class="border rounded-3 p-2 bg-white d-flex gap-2 h-100 align-items-start">
+                      <input class="form-check-input mt-1 debt-target-checkbox"
+                             type="checkbox"
+                             name="targetDebtIds"
+                             th:value="${debt.debtId()}"
+                             th:checked="${selectedTargetDebtIds.contains(debt.debtId())}">
+                      <span>
+                        <strong class="d-block small" th:text="${debt.name()}">Deuda</strong>
+                        <span class="text-muted small">
+                          <span th:text="${currencySymbol}">S/</span>
+                          <span th:text="${#numbers.formatDecimal(debt.initialBalance(),1,'POINT',2,'POINT')}">0.00</span>
+                          · <span th:text="${#numbers.formatDecimal(debt.monthlyRate(),1,'POINT',2,'POINT')}">0.00</span>% mensual
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12 d-flex flex-wrap justify-content-between align-items-center gap-2">
+              <span class="small text-muted">El cálculo usa el saldo y la cuota actualmente registrados.</span>
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-calculator"></i> Simular escenario
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div th:if="${!simulation.hasDebts()}" class="alert alert-warning border-0 shadow-sm">
+        No existen deudas abiertas con saldo positivo en la moneda seleccionada.
+      </div>
+
+      <th:block th:if="${simulation.hasDebts()}">
+        <div th:if="${simulation.lumpSumUnused().signum() > 0}" class="alert alert-secondary border-0 shadow-sm">
+          Quedaron sin asignar <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.lumpSumUnused(),1,'POINT',2,'POINT')}">0.00</span></strong>
+          del dinero extraordinario. Esto puede ocurrir si el importe supera las deudas o si la selección manual no incluye suficientes saldos.
+        </div>
+
+        <div th:if="${simulation.hasWarnings()}" class="alert alert-warning border-0 shadow-sm">
+          <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle"></i> Consideraciones del cálculo</div>
+          <ul class="mb-0 ps-3 small">
+            <li th:each="warning : ${simulation.warnings()}" th:text="${warning}">Advertencia</li>
+          </ul>
+        </div>
+
+        <section class="p-4 rounded-4 text-white mb-4 shadow-sm"
+                 style="background: linear-gradient(135deg, #193a5a, #1976a3);">
+          <div class="row g-3 align-items-center">
+            <div class="col-lg-8">
+              <div class="small opacity-75 mb-1" th:text="${selectedStrategy.label}">Estrategia</div>
+              <h2 class="h4 mb-2" th:if="${simulation.debtFreeWithinHorizon()}">
+                Podrías terminar en <span th:text="${simulation.strategyDebtFreeMonth()}">2029-09</span>
+              </h2>
+              <h2 class="h4 mb-2" th:unless="${simulation.debtFreeWithinHorizon()}">
+                Quedarían <span th:text="${simulation.remainingDebtCount()}">0</span> deuda(s) al finalizar el horizonte
+              </h2>
+              <p class="mb-0 opacity-90">
+                Saldo proyectado:
+                <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.strategyEndingBalance(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                · mejora frente al ritmo actual:
+                <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.balanceAdvantage(),1,'POINT',2,'POINT')}">0.00</span></strong>
+              </p>
+            </div>
+            <div class="col-lg-4 text-lg-end">
+              <div class="small opacity-75">Presupuesto mensual simulado</div>
+              <div class="display-6 fw-semibold">
+                <span th:text="${currencySymbol}">S/</span>
+                <span th:text="${#numbers.formatDecimal(simulation.totalMonthlyBudget(),1,'POINT',2,'POINT')}">0.00</span>
+              </div>
+              <div class="small opacity-75">Cuotas actuales + aporte adicional</div>
+            </div>
+          </div>
+        </section>
+
+        <div class="row g-3 mb-4">
+          <div class="col-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+              <div class="text-muted small">Deuda actual</div>
+              <div class="h5 mb-0"><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.initialDebt(),1,'POINT',2,'POINT')}">0.00</span></div>
+            </div></div>
+          </div>
+          <div class="col-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+              <div class="text-muted small">Extra inmediato aplicado</div>
+              <div class="h5 mb-0 text-primary"><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.lumpSumApplied(),1,'POINT',2,'POINT')}">0.00</span></div>
+            </div></div>
+          </div>
+          <div class="col-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+              <div class="text-muted small">Saldo al horizonte</div>
+              <div class="h5 mb-0" th:classappend="${simulation.strategyEndingBalance().signum() > 0} ? ' text-danger' : ' text-success'">
+                <span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.strategyEndingBalance(),1,'POINT',2,'POINT')}">0.00</span>
+              </div>
+            </div></div>
+          </div>
+          <div class="col-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+              <div class="text-muted small">Interés estimado</div>
+              <div class="h5 mb-0"><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.strategyInterest(),1,'POINT',2,'POINT')}">0.00</span></div>
+            </div></div>
+          </div>
+          <div class="col-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+              <div class="text-muted small">Interés evitado</div>
+              <div class="h5 mb-0 text-success"><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.estimatedInterestSaved(),1,'POINT',2,'POINT')}">0.00</span></div>
+            </div></div>
+          </div>
+          <div class="col-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+              <div class="text-muted small">Flujo mensual liberado</div>
+              <div class="h5 mb-0 text-success"><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.monthlyPressureFreed(),1,'POINT',2,'POINT')}">0.00</span></div>
+            </div></div>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-xl-7">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white d-flex flex-wrap justify-content-between gap-2">
+                <strong>Comparación con el ritmo actual</strong>
+                <span class="small text-muted" th:text="${horizonMonths + ' meses'}">120 meses</span>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                  <tr>
+                    <th>Indicador</th>
+                    <th class="text-end">Ritmo actual</th>
+                    <th class="text-end">Escenario</th>
+                    <th class="text-end">Mejora</th>
+                  </tr>
+                  </thead>
+                  <tbody>
+                  <tr>
+                    <td>Saldo al finalizar el horizonte</td>
+                    <td class="text-end" th:text="${#numbers.formatDecimal(simulation.baselineEndingBalance(),1,'POINT',2,'POINT')}">0.00</td>
+                    <td class="text-end fw-semibold" th:text="${#numbers.formatDecimal(simulation.strategyEndingBalance(),1,'POINT',2,'POINT')}">0.00</td>
+                    <td class="text-end text-success fw-semibold" th:text="${#numbers.formatDecimal(simulation.balanceAdvantage(),1,'POINT',2,'POINT')}">0.00</td>
+                  </tr>
+                  <tr>
+                    <td>Interés estimado dentro del horizonte</td>
+                    <td class="text-end" th:text="${#numbers.formatDecimal(simulation.baselineInterest(),1,'POINT',2,'POINT')}">0.00</td>
+                    <td class="text-end fw-semibold" th:text="${#numbers.formatDecimal(simulation.strategyInterest(),1,'POINT',2,'POINT')}">0.00</td>
+                    <td class="text-end text-success fw-semibold" th:text="${#numbers.formatDecimal(simulation.estimatedInterestSaved(),1,'POINT',2,'POINT')}">0.00</td>
+                  </tr>
+                  <tr>
+                    <td>Fecha estimada sin deudas</td>
+                    <td class="text-end" th:text="${simulation.baselineDebtFreeWithinHorizon() ? simulation.baselineDebtFreeMonth() : 'Fuera del horizonte'}">-</td>
+                    <td class="text-end fw-semibold" th:text="${simulation.debtFreeWithinHorizon() ? simulation.strategyDebtFreeMonth() : 'Fuera del horizonte'}">-</td>
+                    <td class="text-end text-muted">Estimación</td>
+                  </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-xl-5">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-header bg-white"><strong>Lectura práctica</strong></div>
+              <div class="card-body small">
+                <div class="d-flex justify-content-between gap-3 mb-2">
+                  <span class="text-muted">Cuota mensual actual</span>
+                  <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.currentMonthlyPressure(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                </div>
+                <div class="d-flex justify-content-between gap-3 mb-2">
+                  <span class="text-muted">Aporte adicional</span>
+                  <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(monthlyExtra,1,'POINT',2,'POINT')}">0.00</span></strong>
+                </div>
+                <div class="d-flex justify-content-between gap-3 mb-2">
+                  <span class="text-muted">Total proyectado pagado</span>
+                  <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.strategyTotalPaid(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                </div>
+                <div class="d-flex justify-content-between gap-3 mb-2">
+                  <span class="text-muted">Deudas abiertas al final</span>
+                  <strong th:text="${simulation.remainingDebtCount()}">0</strong>
+                </div>
+                <div class="d-flex justify-content-between gap-3">
+                  <span class="text-muted">Riesgo de saldo creciente</span>
+                  <strong th:classappend="${simulation.negativeAmortizationCount() > 0} ? ' text-danger' : ' text-success'" th:text="${simulation.negativeAmortizationCount()}">0</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-white d-flex flex-wrap justify-content-between gap-2">
+            <strong>Orden y resultado por deuda</strong>
+            <span class="small text-muted">Los montos de la tabla están en <span th:text="${currencySymbol}">S/</span></span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+              <tr>
+                <th>#</th>
+                <th>Deuda</th>
+                <th>Motivo</th>
+                <th class="text-end">Saldo actual</th>
+                <th class="text-end">Tasa mensual</th>
+                <th class="text-end">Cuota</th>
+                <th class="text-end">Extra inmediato</th>
+                <th class="text-end">Interés proyectado</th>
+                <th class="text-end">Saldo final</th>
+                <th>Finalización</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr th:each="debt : ${simulation.debts()}"
+                  th:classappend="${debt.paidOff()} ? ' table-success' : (${debt.negativeAmortizationRisk()} ? ' table-danger' : '')">
+                <td class="fw-semibold" th:text="${debt.position()}">1</td>
+                <td>
+                  <strong th:text="${debt.name()}">Deuda</strong>
+                  <div class="small text-muted">
+                    <span th:text="${debt.classificationLabel()}">Tipo</span> ·
+                    <span th:text="${debt.statusLabel()}">Estado</span>
+                    <span th:if="${debt.bankEstimate()}" class="badge text-bg-warning ms-1">Estimación bancaria</span>
+                    <span th:if="${selectedStrategy.name() == 'CUSTOM_SELECTION' and !debt.selectedTarget()}" class="badge text-bg-secondary ms-1">Sin extra</span>
+                  </div>
+                </td>
+                <td class="small" style="min-width: 210px;" th:text="${debt.reason()}">Motivo</td>
+                <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(debt.initialBalance(),1,'POINT',2,'POINT')}">0.00</td>
+                <td class="text-end text-nowrap"><span th:text="${#numbers.formatDecimal(debt.monthlyRate(),1,'POINT',2,'POINT')}">0.00</span>%</td>
+                <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(debt.monthlyPayment(),1,'POINT',2,'POINT')}">0.00</td>
+                <td class="text-end text-nowrap text-primary fw-semibold" th:text="${#numbers.formatDecimal(debt.lumpSumApplied(),1,'POINT',2,'POINT')}">0.00</td>
+                <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(debt.projectedInterest(),1,'POINT',2,'POINT')}">0.00</td>
+                <td class="text-end text-nowrap fw-semibold" th:classappend="${debt.endingBalance().signum() > 0} ? ' text-danger' : ' text-success'" th:text="${#numbers.formatDecimal(debt.endingBalance(),1,'POINT',2,'POINT')}">0.00</td>
+                <td class="text-nowrap" th:text="${debt.projectedPayoffMonth() != null ? debt.projectedPayoffMonth() : 'No termina'}">-</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-white d-flex flex-wrap justify-content-between gap-2">
+            <strong>Evolución proyectada</strong>
+            <span class="small text-muted">Se muestran los primeros 12 meses, cierres de deuda y cortes anuales.</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+              <tr>
+                <th>Mes</th>
+                <th class="text-end">Saldo inicial</th>
+                <th class="text-end">Interés</th>
+                <th class="text-end">Cuotas</th>
+                <th class="text-end">Pago extra</th>
+                <th class="text-end">Saldo final</th>
+                <th class="text-end">Deudas activas</th>
+                <th class="text-end">Flujo liberado</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr th:each="row : ${simulation.months()}" th:if="${row.milestone()}" th:classappend="${row.paidOffCount() > 0} ? ' table-success' : ''">
+                <td>
+                  <strong th:text="${row.month()}">2026-07</strong>
+                  <span th:if="${row.paidOffCount() > 0}" class="badge text-bg-success ms-1" th:text="${row.paidOffCount() + ' cierre(s)'}">1 cierre</span>
+                </td>
+                <td class="text-end" th:text="${#numbers.formatDecimal(row.openingBalance(),1,'POINT',2,'POINT')}">0.00</td>
+                <td class="text-end" th:text="${#numbers.formatDecimal(row.interestAdded(),1,'POINT',2,'POINT')}">0.00</td>
+                <td class="text-end" th:text="${#numbers.formatDecimal(row.scheduledPaid(),1,'POINT',2,'POINT')}">0.00</td>
+                <td class="text-end text-primary fw-semibold" th:text="${#numbers.formatDecimal(row.extraPaid(),1,'POINT',2,'POINT')}">0.00</td>
+                <td class="text-end fw-semibold" th:text="${#numbers.formatDecimal(row.endingBalance(),1,'POINT',2,'POINT')}">0.00</td>
+                <td class="text-end" th:text="${row.activeDebtCount()}">0</td>
+                <td class="text-end text-success" th:text="${#numbers.formatDecimal(row.monthlyPressureFreed(),1,'POINT',2,'POINT')}">0.00</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </th:block>
+    </main>
+  </div>
+</div>
+
+<script th:inline="javascript">
+  document.addEventListener('DOMContentLoaded', () => {
+    const strategySelect = document.getElementById('strategySelect');
+    const customBlock = document.getElementById('customSelectionBlock');
+    const toggleAllButton = document.getElementById('toggleAllTargets');
+    const descriptions = {
+      HIGHEST_INTEREST: 'Dirige el dinero extra a la deuda con la tasa mensual más alta para reducir el costo financiero.',
+      LOWEST_BALANCE: 'Busca cerrar deudas pequeñas antes para reducir rápidamente la cantidad de compromisos abiertos.',
+      HIGHEST_MONTHLY_PAYMENT: 'Prioriza la deuda con la cuota mensual más alta para liberar capacidad de pago.',
+      FREE_CASH_FLOW: 'Prioriza la mejor relación entre saldo pendiente y cuota mensual para liberar flujo en menos tiempo.',
+      CUSTOM_SELECTION: 'Aplica el dinero extra únicamente a las deudas seleccionadas, en el orden en que aparecen.'
+    };
+    const description = document.getElementById('strategyDescription');
+
+    const updateStrategy = () => {
+      const custom = strategySelect?.value === 'CUSTOM_SELECTION';
+      customBlock?.classList.toggle('d-none', !custom);
+      document.querySelectorAll('.debt-target-checkbox').forEach((checkbox) => {
+        checkbox.disabled = !custom;
+      });
+      if (description && strategySelect) {
+        description.textContent = descriptions[strategySelect.value] || '';
+      }
+    };
+
+    toggleAllButton?.addEventListener('click', () => {
+      const checkboxes = Array.from(document.querySelectorAll('.debt-target-checkbox'));
+      const shouldCheck = checkboxes.some((checkbox) => !checkbox.checked);
+      checkboxes.forEach((checkbox) => {
+        checkbox.checked = shouldCheck;
+      });
+      toggleAllButton.textContent = shouldCheck ? 'Quitar selección' : 'Seleccionar todas';
+    });
+
+    strategySelect?.addEventListener('change', updateStrategy);
+    updateStrategy();
+  });
+</script>
+<div th:replace="~{fragments/scripts_admin :: scripts}"></div>
+</body>
+</html>

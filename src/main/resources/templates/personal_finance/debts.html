@@ -13,9 +13,10 @@
           <p class="text-muted mb-0">Tarjetas, préstamos bancarios, compromisos privados y cuotas mensuales.</p>
         </div>
         <div class="d-flex gap-2">
+          <a th:href="@{/gasto-claro/negotiations}" class="btn btn-outline-primary btn-sm"><i class="bi bi-chat-left-text"></i> Negociaciones</a>
           <a th:href="@{/gasto-claro/payments(all=true)}" class="btn btn-outline-success btn-sm"><i class="bi bi-cash-coin"></i> Historial de pagos</a>
           <a th:href="@{/gasto-claro/debt-report}" class="btn btn-danger btn-sm"><i class="bi bi-file-earmark-pdf"></i> Informe de deudas</a>
-          <a th:href="@{/gasto-claro/dashboard}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Dashboard</a>
+          <a th:href="@{/gasto-claro/dashboard}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Panel</a>
         </div>
       </div>
 
@@ -209,6 +210,9 @@
                         <span th:if="${debt.delinquencyStartDate != null}"><span th:text="${debt.overdueDays()}">0</span> días aprox.</span>
                         <span th:if="${debt.collectionStatus != null and debt.collectionStatus.name() != 'NONE'}" th:text="${debt.collectionStatus.label}">Cobranza</span>
                       </div>
+                      <div class="small text-primary mt-1" th:if="${debt.negotiationStatus != null and debt.negotiationStatus.name() != 'NOT_STARTED'}">
+                        <i class="bi bi-chat-left-text"></i> <span th:text="${debt.negotiationStatus.label}">Negociación</span>
+                      </div>
                     </td>
                     <td><span class="badge text-bg-secondary" th:text="${debt.priority.label}">Media</span></td>
                     <td class="text-end"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.currentBalance,1,'POINT',2,'POINT')}">0.00</span></td>
@@ -222,6 +226,8 @@
                       <a th:if="${!debt.delinquentTracking and debt.scheduleMode.name() == 'BANK_SCHEDULE'}" th:href="@{/gasto-claro/debts/{id}/bank-schedule(id=${debt.id})}" class="btn btn-sm btn-outline-success" title="Cronograma bancario real"><i class="bi bi-bank"></i></a>
                       <a th:if="${!debt.delinquentTracking and debt.scheduleMode.name() != 'BANK_SCHEDULE'}" th:href="@{/gasto-claro/debts/{id}/schedule(id=${debt.id})}" class="btn btn-sm btn-outline-success" title="Cronograma"><i class="bi bi-calendar2-week"></i></a>
                       <a th:if="${debt.delinquentTracking}" th:href="@{/gasto-claro/debts/{id}/voluntary-payment(id=${debt.id})}" class="btn btn-sm btn-outline-warning" title="Crear abono voluntario"><i class="bi bi-cash-coin"></i></a>
+                      <a th:href="@{/gasto-claro/negotiations/new(debtId=${debt.id})}" class="btn btn-sm btn-outline-primary" title="Agregar negociación"><i class="bi bi-chat-left-text"></i></a>
+                      <a th:href="@{/gasto-claro/negotiations(debtId=${debt.id})}" class="btn btn-sm btn-outline-dark" title="Historial de negociaciones"><i class="bi bi-journal-text"></i></a>
                       <a th:href="@{/gasto-claro/debts/{id}/payments(id=${debt.id},all=true)}" class="btn btn-sm btn-outline-secondary" title="Ver pagos"><i class="bi bi-clock-history"></i></a>
                       <a th:href="@{/gasto-claro/debts(editId=${debt.id})}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="bi bi-pencil"></i></a>
                       <form th:action="@{/gasto-claro/debts/{id}/delete(id=${debt.id})}" method="post" class="d-inline" onsubmit="return confirm('¿Eliminar esta deuda personal?')">

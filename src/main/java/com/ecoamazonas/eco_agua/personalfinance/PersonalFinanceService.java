@@ -31,6 +31,7 @@ public class PersonalFinanceService {
     private final PersonalFinanceDebtScheduleLineRepository debtScheduleLineRepository;
     private final PersonalFinanceCurrentUserService currentUserService;
     private final PersonalFinancePaymentService paymentService;
+    private final PersonalFinanceDebtNegotiationRepository debtNegotiationRepository;
 
     public PersonalFinanceService(
             PersonalFinanceDebtRepository debtRepository,
@@ -40,7 +41,8 @@ public class PersonalFinanceService {
             PersonalFinancePaymentObligationRepository paymentObligationRepository,
             PersonalFinanceDebtScheduleLineRepository debtScheduleLineRepository,
             PersonalFinanceCurrentUserService currentUserService,
-            PersonalFinancePaymentService paymentService
+            PersonalFinancePaymentService paymentService,
+            PersonalFinanceDebtNegotiationRepository debtNegotiationRepository
     ) {
         this.debtRepository = debtRepository;
         this.fixedExpenseRepository = fixedExpenseRepository;
@@ -50,6 +52,7 @@ public class PersonalFinanceService {
         this.debtScheduleLineRepository = debtScheduleLineRepository;
         this.currentUserService = currentUserService;
         this.paymentService = paymentService;
+        this.debtNegotiationRepository = debtNegotiationRepository;
     }
 
     @Transactional(readOnly = true)
@@ -542,7 +545,13 @@ public class PersonalFinanceService {
 
     @Transactional
     public void deleteDebt(Long id) {
-        debtRepository.findByIdAndUser(id, currentUserService.currentUser()).ifPresent(debtRepository::delete);
+        UserAccount user = currentUserService.currentUser();
+        debtRepository.findByIdAndUser(id, user).ifPresent(debt -> {
+            if (debtNegotiationRepository.existsByUserAndDebt(user, debt)) {
+                throw new IllegalArgumentException("Esta deuda tiene historial de negociación y no puede eliminarse. Márcala como cancelada o pagada.");
+            }
+            debtRepository.delete(debt);
+        });
     }
 
     @Transactional(readOnly = true)

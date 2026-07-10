@@ -163,9 +163,14 @@ public class PersonalFinanceController {
 
     @PostMapping("/debts/{id}/delete")
     public String deleteDebt(@PathVariable("id") Long id, RedirectAttributes redirectAttributes) {
-        service.deleteDebt(id);
-        redirectAttributes.addFlashAttribute("message", "Deuda eliminada del módulo personal.");
-        redirectAttributes.addFlashAttribute("messageType", "success");
+        try {
+            service.deleteDebt(id);
+            redirectAttributes.addFlashAttribute("message", "Deuda eliminada del módulo personal.");
+            redirectAttributes.addFlashAttribute("messageType", "success");
+        } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("message", exception.getMessage());
+            redirectAttributes.addFlashAttribute("messageType", "info");
+        }
         return "redirect:/gasto-claro/debts";
     }
 

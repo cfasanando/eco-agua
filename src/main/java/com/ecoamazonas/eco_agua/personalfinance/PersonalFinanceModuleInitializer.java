@@ -268,6 +268,48 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     CONSTRAINT fk_pf_payment_debt FOREIGN KEY (debt_id) REFERENCES personal_finance_debt (id) ON DELETE SET NULL
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS personal_finance_debt_negotiation (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    public_id VARCHAR(36) NOT NULL,
+                    user_id INT NOT NULL,
+                    debt_id BIGINT NOT NULL,
+                    conversation_date DATE NOT NULL,
+                    channel VARCHAR(30) NOT NULL DEFAULT 'WHATSAPP',
+                    status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
+                    contact_person VARCHAR(180) NULL,
+                    currency VARCHAR(8) NOT NULL DEFAULT 'PEN',
+                    creditor_requested_amount DECIMAL(14,2) NULL DEFAULT 0.00,
+                    affordable_amount DECIMAL(14,2) NULL DEFAULT 0.00,
+                    initial_payment_amount DECIMAL(14,2) NULL DEFAULT 0.00,
+                    installment_count INT NULL,
+                    proposed_installment_amount DECIMAL(14,2) NULL DEFAULT 0.00,
+                    proposed_monthly_rate DECIMAL(8,4) NULL DEFAULT 0.0000,
+                    first_payment_date DATE NULL,
+                    response_deadline DATE NULL,
+                    next_action_date DATE NULL,
+                    next_action VARCHAR(500) NULL,
+                    private_notes VARCHAR(2000) NULL,
+                    snapshot_current_balance DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    snapshot_monthly_payment DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    snapshot_monthly_rate DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
+                    evidence_original_name VARCHAR(255) NULL,
+                    evidence_stored_path VARCHAR(500) NULL,
+                    evidence_content_type VARCHAR(120) NULL,
+                    evidence_size_bytes BIGINT NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    updated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_pf_negotiation_public_id (public_id),
+                    KEY idx_pf_negotiation_user_date (user_id, conversation_date),
+                    KEY idx_pf_negotiation_user_status (user_id, status),
+                    KEY idx_pf_negotiation_debt_date (debt_id, conversation_date),
+                    KEY idx_pf_negotiation_next_action (user_id, next_action_date),
+                    CONSTRAINT fk_pf_negotiation_user FOREIGN KEY (user_id) REFERENCES `user` (id),
+                    CONSTRAINT fk_pf_negotiation_debt FOREIGN KEY (debt_id) REFERENCES personal_finance_debt (id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
     }
 
     private void upgradeDebtScheduleTable() {

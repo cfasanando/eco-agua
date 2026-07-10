@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/head_admin :: adminHead('GastoClaro - Registro de negociación')}"></head>
+<body>
+<div class="app-layout" th:with="activePage='gasto_claro_negotiations'">
+  <aside th:replace="~{fragments/sidebar :: sidebar}"></aside>
+  <div class="main-content">
+    <header th:replace="~{fragments/topbar :: topbar}"></header>
+    <main class="content-wrapper gasto-claro-page">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div>
+          <h1 class="h4 mb-1" th:text="${negotiationForm.id == null ? 'Nueva negociación' : 'Revisar negociación'}">Nueva negociación</h1>
+          <p class="text-muted mb-0">Documenta la conversación y compara la propuesta con las condiciones actuales de la deuda.</p>
+        </div>
+        <a th:href="@{/gasto-claro/negotiations(debtId=${negotiationForm.debtId})}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Volver al historial</a>
+      </div>
+
+      <div th:replace="~{personal_finance/_nav :: nav('negotiations')}"></div>
+      <div th:if="${message}" class="alert" th:classappend="${messageType == 'danger'} ? ' alert-danger' : ' alert-success'" th:text="${message}">Mensaje</div>
+
+      <div class="alert alert-warning border-0 shadow-sm d-flex gap-2 align-items-start">
+        <i class="bi bi-exclamation-triangle fs-5"></i>
+        <div>
+          <strong>Guardar no significa aplicar.</strong>
+          Aunque el estado sea Aceptada, este registro no actualizará el saldo, la cuota mensual, la tasa de interés, el cronograma ni el historial de pagos.
+        </div>
+      </div>
+
+      <form th:action="@{/gasto-claro/negotiations}" th:object="${negotiationForm}" method="post" enctype="multipart/form-data" id="negotiationForm" class="row g-3">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <input type="hidden" th:field="*{id}">
+
+        <div class="col-xl-7">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white"><strong>Contacto y estado</strong></div>
+            <div class="card-body row g-3">
+              <div class="col-12">
+                <label class="form-label">Deuda</label>
+                <select class="form-select" th:field="*{debtId}" id="debtSelect" required th:disabled="${negotiationForm.id != null}">
+                  <option value="">Selecciona una deuda</option>
+                  <option th:each="debt : ${debts}"
+                          th:value="${debt.id}"
+                          th:text="${debt.name + ' · ' + debt.currency + ' ' + #numbers.formatDecimal(debt.currentBalance,1,'POINT',2,'POINT')}"
+                          th:attr="data-balance=${debt.currentBalance},data-payment=${debt.monthlyPressure()},data-rate=${debt.interestRateMonthly},data-currency=${debt.currency}">Deuda</option>
+                </select>
+                <input th:if="${negotiationForm.id != null}" type="hidden" name="debtId" th:value="${negotiationForm.debtId}">
+                <div class="form-text">Los valores actuales se guardan como una fotografía histórica cuando se crea el registro por primera vez.</div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Fecha de conversación</label>
+                <input type="date" class="form-control" th:field="*{conversationDate}" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Canal</label>
+                <select class="form-select" th:field="*{channel}">
+                  <option th:each="channel : ${channels}" th:value="${channel}" th:text="${channel.label}">WhatsApp</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Estado</label>
+                <select class="form-select" th:field="*{status}">
+                  <option th:each="status : ${statuses}" th:value="${status}" th:text="${status.label}">Borrador</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Persona o área de contacto</label>
+                <input type="text" class="form-control" th:field="*{contactPerson}" maxlength="180" placeholder="Asesor de cobranza, área del banco o prestamista">
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white"><strong>Montos y acuerdo propuesto</strong></div>
+            <div class="card-body row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Monto solicitado por el acreedor</label>
+                <input type="number" min="0" step="0.01" class="form-control proposal-input" th:field="*{creditorRequestedAmount}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Monto total máximo que puedes pagar</label>
+                <input type="number" min="0" step="0.01" class="form-control proposal-input" th:field="*{affordableAmount}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Pago inicial</label>
+                <input type="number" min="0" step="0.01" class="form-control proposal-input" th:field="*{initialPaymentAmount}" id="initialPaymentAmount">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Cuotas</label>
+                <input type="number" min="0" max="600" class="form-control proposal-input" th:field="*{installmentCount}" id="installmentCount">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Cuota propuesta</label>
+                <input type="number" min="0" step="0.01" class="form-control proposal-input" th:field="*{proposedInstallmentAmount}" id="proposedInstallmentAmount">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Tasa mensual propuesta %</label>
+                <input type="number" min="0" step="0.0001" class="form-control proposal-input" th:field="*{proposedMonthlyRate}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Fecha del primer pago</label>
+                <input type="date" class="form-control" th:field="*{firstPaymentDate}">
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white"><strong>Seguimiento</strong></div>
+            <div class="card-body row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Fecha límite de respuesta</label>
+                <input type="date" class="form-control" th:field="*{responseDeadline}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Fecha de próxima acción</label>
+                <input type="date" class="form-control" th:field="*{nextActionDate}">
+              </div>
+              <div class="col-12">
+                <label class="form-label">Próxima acción</label>
+                <input type="text" class="form-control" th:field="*{nextAction}" maxlength="500" placeholder="Volver a llamar, enviar documentos, solicitar carta de liquidación...">
+              </div>
+              <div class="col-12">
+                <label class="form-label">Notas privadas</label>
+                <textarea class="form-control" rows="4" th:field="*{privateNotes}" maxlength="2000" placeholder="Detalles de la conversación, condiciones y riesgos"></textarea>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Evidencia</label>
+                <input type="file" class="form-control" name="evidence" accept="application/pdf,image/jpeg,image/png,image/webp">
+                <div class="form-text">Archivo opcional PDF, JPG, PNG o WEBP, con un máximo de 5 MB. Un nuevo archivo reemplaza la evidencia anterior.</div>
+                <a th:if="${entry != null and entry.hasEvidence()}" th:href="@{/gasto-claro/negotiations/{publicId}/evidence(publicId=${entry.publicId})}" class="btn btn-sm btn-outline-secondary mt-2"><i class="bi bi-paperclip"></i> Descargar evidencia actual</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-xl-5">
+          <div class="card border-0 shadow-sm sticky-xl-top" style="top: 1rem;">
+            <div class="card-header bg-white"><strong>Condiciones actuales vs. propuesta</strong></div>
+            <div class="card-body">
+              <div class="row g-3 mb-3">
+                <div class="col-6">
+                  <div class="text-muted small">Saldo actual registrado</div>
+                  <div class="h5 mb-0"><span id="previewCurrency">S/</span> <span id="previewBalance" th:text="${entry != null ? #numbers.formatDecimal(entry.snapshotCurrentBalance,1,'POINT',2,'POINT') : '0.00'}">0.00</span></div>
+                </div>
+                <div class="col-6">
+                  <div class="text-muted small">Pago mensual actual</div>
+                  <div class="h5 mb-0"><span class="preview-currency">S/</span> <span id="previewCurrentPayment" th:text="${entry != null ? #numbers.formatDecimal(entry.snapshotMonthlyPayment,1,'POINT',2,'POINT') : '0.00'}">0.00</span></div>
+                </div>
+                <div class="col-6">
+                  <div class="text-muted small">Total de la propuesta</div>
+                  <div class="h5 mb-0 text-primary"><span class="preview-currency">S/</span> <span id="previewProposalTotal">0.00</span></div>
+                </div>
+                <div class="col-6">
+                  <div class="text-muted small">Flujo mensual liberado</div>
+                  <div class="h5 mb-0 text-success"><span class="preview-currency">S/</span> <span id="previewMonthlyRelief">0.00</span></div>
+                </div>
+              </div>
+
+              <div th:if="${comparison != null}" class="border-top pt-3 small">
+                <div class="d-flex justify-content-between gap-3 mb-2">
+                  <span class="text-muted">Interés proyectado actual</span>
+                  <strong th:text="${comparison.currentPlanAmortizes() ? #numbers.formatDecimal(comparison.currentProjectedInterest(),1,'POINT',2,'POINT') : 'El pago no amortiza'}">0.00</strong>
+                </div>
+                <div class="d-flex justify-content-between gap-3 mb-2">
+                  <span class="text-muted">Fin estimado actual</span>
+                  <strong th:text="${comparison.currentEstimatedEndDate() != null ? #temporals.format(comparison.currentEstimatedEndDate(), 'MM/yyyy') : 'No estimable'}">-</strong>
+                </div>
+                <div class="d-flex justify-content-between gap-3 mb-2">
+                  <span class="text-muted">Fin estimado de la propuesta</span>
+                  <strong th:text="${comparison.proposalEndDate() != null ? #temporals.format(comparison.proposalEndDate(), 'MM/yyyy') : 'No definido'}">-</strong>
+                </div>
+                <div class="d-flex justify-content-between gap-3 mb-2">
+                  <span class="text-muted">Costo de la propuesta sobre el saldo actual</span>
+                  <strong th:classappend="${comparison.differenceAgainstCurrentBalance().signum() > 0} ? ' text-danger' : ' text-success'" th:text="${#numbers.formatDecimal(comparison.differenceAgainstCurrentBalance(),1,'POINT',2,'POINT')}">0.00</strong>
+                </div>
+                <div class="d-flex justify-content-between gap-3">
+                  <span class="text-muted">Ahorro estimado frente al plan actual</span>
+                  <strong class="text-success" th:text="${#numbers.formatDecimal(comparison.estimatedSavingsAgainstCurrentPlan(),1,'POINT',2,'POINT')}">0.00</strong>
+                </div>
+              </div>
+
+              <div class="alert alert-light border mt-3 mb-0 small">
+                Los montos de liquidación bancaria deben confirmarse con una carta oficial de liquidación antes de realizar un pago real.
+              </div>
+            </div>
+            <div class="card-footer bg-white d-grid gap-2">
+              <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Guardar negociación</button>
+              <a th:href="@{/gasto-claro/negotiations(debtId=${negotiationForm.debtId})}" class="btn btn-outline-secondary">Cancelar</a>
+            </div>
+          </div>
+        </div>
+      </form>
+    </main>
+  </div>
+</div>
+<div th:replace="~{fragments/scripts_admin :: scripts}"></div>
+<script>
+(() => {
+  const debtSelect = document.getElementById('debtSelect');
+  const initialInput = document.getElementById('initialPaymentAmount');
+  const countInput = document.getElementById('installmentCount');
+  const installmentInput = document.getElementById('proposedInstallmentAmount');
+  const balanceOutput = document.getElementById('previewBalance');
+  const currentPaymentOutput = document.getElementById('previewCurrentPayment');
+  const proposalTotalOutput = document.getElementById('previewProposalTotal');
+  const reliefOutput = document.getElementById('previewMonthlyRelief');
+  const currencyOutputs = document.querySelectorAll('#previewCurrency, .preview-currency');
+
+  const numberValue = (element) => {
+    const value = Number.parseFloat(element?.value || '0');
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  };
+  const format = (value) => value.toFixed(2);
+
+  const refresh = () => {
+    const selected = debtSelect?.selectedOptions?.[0];
+    const currentBalance = Number.parseFloat(selected?.dataset?.balance || balanceOutput?.textContent || '0') || 0;
+    const currentPayment = Number.parseFloat(selected?.dataset?.payment || currentPaymentOutput?.textContent || '0') || 0;
+    const currency = (selected?.dataset?.currency || 'PEN') === 'USD' ? 'US$' : 'S/';
+    const proposalTotal = numberValue(initialInput) + (numberValue(countInput) * numberValue(installmentInput));
+    const relief = Math.max(0, currentPayment - numberValue(installmentInput));
+
+    if (balanceOutput && selected?.dataset?.balance) balanceOutput.textContent = format(currentBalance);
+    if (currentPaymentOutput && selected?.dataset?.payment) currentPaymentOutput.textContent = format(currentPayment);
+    if (proposalTotalOutput) proposalTotalOutput.textContent = format(proposalTotal);
+    if (reliefOutput) reliefOutput.textContent = format(relief);
+    currencyOutputs.forEach((element) => { element.textContent = currency; });
+  };
+
+  debtSelect?.addEventListener('change', refresh);
+  document.querySelectorAll('.proposal-input').forEach((element) => element.addEventListener('input', refresh));
+  refresh();
+})();
+</script>
+</body>
+</html>

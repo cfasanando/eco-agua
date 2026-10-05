@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{control_center/fragments/head :: head('Centro de demos')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Centro de demos', 'Vitrina comercial para abrir, revisar y preparar portales demo')}"></header>
+
+        <main class="matrix26-main">
+            <div th:if="${demoCenterSuccess}" class="alert alert-success border-0 shadow-sm d-flex align-items-center gap-2">
+                <i class="bi bi-check-circle-fill"></i>
+                <span th:text="${demoCenterSuccess}">Operación correcta.</span>
+            </div>
+            <div th:if="${demoCenterError}" class="alert alert-danger border-0 shadow-sm d-flex align-items-center gap-2">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <span th:text="${demoCenterError}">No se pudo ejecutar la operación.</span>
+            </div>
+
+            <section class="matrix26-banner">
+                <div>
+                    <span class="matrix26-banner-icon"><i class="bi bi-grid-1x2-fill"></i></span>
+                    <div>
+                        <strong>Un panel para vender, estudiar y controlar tus demos</strong>
+                        <p>
+                            Este centro reúne los portales que ya existen en la plataforma. Los módulos internos se abren directo en el portal actual;
+                            los runtimes separados muestran puerto, base, estado y acciones seguras cuando Matrix26 puede administrarlos.
+                        </p>
+                    </div>
+                </div>
+                <a class="btn btn-light" th:href="@{/control-center/demo-center(refresh=true)}">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Actualizar estados
+                </a>
+            </section>
+
+            <section class="matrix26-stats matrix26-demo-stats">
+                <article class="matrix26-stat-card">
+                    <span class="matrix26-stat-icon is-primary"><i class="bi bi-window-stack"></i></span>
+                    <div><small>Total demos</small><strong th:text="${demoCenter.summary().total()}">0</strong></div>
+                </article>
+                <article class="matrix26-stat-card">
+                    <span class="matrix26-stat-icon is-success"><i class="bi bi-check2-circle"></i></span>
+                    <div><small>Listos</small><strong th:text="${demoCenter.summary().ready()}">0</strong></div>
+                </article>
+                <article class="matrix26-stat-card">
+                    <span class="matrix26-stat-icon is-info"><i class="bi bi-hdd-network"></i></span>
+                    <div><small>Runtimes</small><strong th:text="${demoCenter.summary().managedRuntimes()}">0</strong></div>
+                </article>
+                <article class="matrix26-stat-card">
+                    <span class="matrix26-stat-icon is-warning"><i class="bi bi-database-add"></i></span>
+                    <div><small>Falta data</small><strong th:text="${demoCenter.summary().needsData()}">0</strong></div>
+                </article>
+                <article class="matrix26-stat-card">
+                    <span class="matrix26-stat-icon is-success"><i class="bi bi-broadcast"></i></span>
+                    <div><small>Activos</small><strong th:text="${demoCenter.summary().online()}">0</strong></div>
+                </article>
+            </section>
+
+            <section class="matrix26-panel mb-4" th:if="${!demoCenter.warnings().isEmpty()}">
+                <div class="matrix26-panel-header">
+                    <div>
+                        <span>Observaciones del inventario</span>
+                        <h2>Señales a revisar antes de presentar</h2>
+                    </div>
+                </div>
+                <ul class="matrix26-demo-warning-list">
+                    <li th:each="warning : ${demoCenter.warnings()}">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <span th:text="${warning}">Warning</span>
+                    </li>
+                </ul>
+            </section>
+
+            <section>
+                <div class="matrix26-section-heading">
+                    <div>
+                        <span>Portales comerciales</span>
+                        <h2>Demos disponibles</h2>
+                    </div>
+                    <a th:href="@{/control-center/operations/runtimes(refresh=true)}">Ver Runtime Inventory</a>
+                </div>
+
+                <div class="matrix26-demo-grid">
+                    <article class="matrix26-demo-card" th:each="portal : ${demoCenter.portals()}"
+                             th:style="'--demo-accent:' + ${portal.definition().accentColor()}">
+                        <div class="matrix26-demo-card-top">
+                            <span class="matrix26-demo-icon"><i th:class="'bi ' + ${portal.definition().iconClass()}"></i></span>
+                            <div class="matrix26-demo-title">
+                                <span th:text="${portal.definition().category()}">Categoría</span>
+                                <h3 th:text="${portal.definition().name()}">Portal demo</h3>
+                            </div>
+                        </div>
+
+                        <div class="matrix26-demo-badges">
+                            <span class="badge" th:classappend="${portal.definition().readiness().badgeClass}">
+                                <i th:class="'bi ' + ${portal.definition().readiness().iconClass}"></i>
+                                <span th:text="${portal.definition().readiness().label}">Listo</span>
+                            </span>
+                            <span class="badge" th:classappend="${portal.definition().mode().badgeClass}">
+                                <i th:class="'bi ' + ${portal.definition().mode().iconClass}"></i>
+                                <span th:text="${portal.definition().mode().label}">Modo</span>
+                            </span>
+                            <span class="badge" th:classappend="${portal.statusBadgeClass()}">
+                                <span th:text="${portal.statusLabel()}">Estado</span>
+                            </span>
+                        </div>
+
+                        <p class="matrix26-demo-pitch" th:text="${portal.definition().salesPitch()}">Descripción comercial.</p>
+
+                        <dl class="matrix26-demo-meta">
+                            <div>
+                                <dt>URL</dt>
+                                <dd th:text="${portal.definition().displayUrl()}">http://localhost</dd>
+                            </div>
+                            <div>
+                                <dt>Puerto</dt>
+                                <dd th:text="${portal.definition().port() == null ? 'N/A' : portal.definition().port()}">8081</dd>
+                            </div>
+                            <div>
+                                <dt>Base</dt>
+                                <dd th:text="${portal.definition().databaseName()}">database</dd>
+                            </div>
+                        </dl>
+
+                        <div class="matrix26-module-chips compact">
+                            <span th:each="module : ${portal.definition().modules()}" th:text="${module}">Módulo</span>
+                        </div>
+
+                        <div class="matrix26-demo-actions">
+                            <a class="btn btn-sm btn-primary" target="_blank" rel="noopener"
+                               th:if="${portal.canOpen()}"
+                               th:href="${portal.openUrl()}">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>Abrir
+                            </a>
+                            <a class="btn btn-sm btn-outline-secondary" th:href="@{/control-center/demo-center/{code}(code=${portal.definition().code()}, refresh=true)}">
+                                <i class="bi bi-sliders me-1"></i>Configurar
+                            </a>
+                            <form th:if="${portal.canStart()}" th:action="@{/control-center/demo-center/{code}/start(code=${portal.definition().code()})}" method="post">
+                                <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-play-fill me-1"></i>Iniciar</button>
+                            </form>
+                            <form th:if="${portal.canStop()}" th:action="@{/control-center/demo-center/{code}/stop(code=${portal.definition().code()})}" method="post">
+                                <input th:if="${_csrf != null}" type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <input type="hidden" name="confirmation" th:value="${portal.stopConfirmation()}">
+                                <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-stop-fill me-1"></i>Detener</button>
+                            </form>
+                        </div>
+                    </article>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -39,6 +39,7 @@ public class PersonalFinancePaymentService {
     private final PersonalFinanceDebtRepository debtRepository;
     private final PersonalFinanceDebtScheduleLineRepository scheduleLineRepository;
     private final PersonalFinanceCurrentUserService currentUserService;
+    private final PersonalFinanceReservedFundService reservedFundService;
     private final Path receiptRoot;
 
     public PersonalFinancePaymentService(
@@ -47,6 +48,7 @@ public class PersonalFinancePaymentService {
             PersonalFinanceDebtRepository debtRepository,
             PersonalFinanceDebtScheduleLineRepository scheduleLineRepository,
             PersonalFinanceCurrentUserService currentUserService,
+            PersonalFinanceReservedFundService reservedFundService,
             @Value("${personal.finance.receipt-storage-dir:runtime-data/personal-finance/receipts}") String receiptStorageDir
     ) {
         this.paymentRepository = paymentRepository;
@@ -54,6 +56,7 @@ public class PersonalFinancePaymentService {
         this.debtRepository = debtRepository;
         this.scheduleLineRepository = scheduleLineRepository;
         this.currentUserService = currentUserService;
+        this.reservedFundService = reservedFundService;
         this.receiptRoot = Path.of(receiptStorageDir).toAbsolutePath().normalize();
     }
 
@@ -262,11 +265,31 @@ public class PersonalFinancePaymentService {
         validatePrincipal(normalized.principal(), debt, line);
         validateReceipt(receipt);
 
+        BigDecimal reservedAmount = money(form.getReservedAmount());
+        PersonalFinanceReservedFund reservedFund = null;
+        if (form.getReservedFundId() != null || reservedAmount.signum() > 0) {
+            if (form.getReservedFundId() == null || reservedAmount.signum() <= 0) {
+                throw new IllegalArgumentException("Selecciona una reserva e indica cuánto dinero reservado usarás.");
+            }
+            if (obligation == null) {
+                throw new IllegalArgumentException("La reserva solo puede aplicarse a un compromiso mensual.");
+            }
+            if (reservedAmount.compareTo(normalized.total()) > 0) {
+                throw new IllegalArgumentException("El importe tomado de la reserva no puede superar el pago total.");
+            }
+            reservedFund = reservedFundService.paymentFund(form.getReservedFundId(), obligation.getId());
+            if (money(reservedFund.getAmount()).compareTo(reservedAmount) < 0) {
+                throw new IllegalArgumentException("La reserva seleccionada no tiene saldo suficiente.");
+            }
+        }
+
         PersonalFinancePayment payment = new PersonalFinancePayment();
         payment.setUser(user);
         payment.setObligation(obligation);
         payment.setDebt(debt);
         payment.setScheduleLineId(line == null ? null : line.getId());
+        payment.setReservedFund(reservedFund);
+        payment.setReservedAmount(reservedAmount);
         payment.setObligationTitle(obligation != null ? obligation.getTitle() : line.getTitle());
         payment.setDebtName(debt == null ? null : debt.getName());
         payment.setPaymentDate(form.getPaymentDate() == null ? LocalDate.now() : form.getPaymentDate());
@@ -285,6 +308,9 @@ public class PersonalFinancePaymentService {
         payment.setNotes(clean(form.getNotes()));
         payment.setStatus(PersonalFinancePaymentStatus.ACTIVE);
         payment = paymentRepository.save(payment);
+        if (reservedFund != null) {
+            reservedFundService.consumeForPayment(user, reservedFund, payment, reservedAmount);
+        }
 
         Path storedFile = null;
         try {
@@ -331,6 +357,7 @@ public class PersonalFinancePaymentService {
         payment.setReversedBy(currentUserService.currentUsername());
         payment.setReversalReason(reason);
         paymentRepository.save(payment);
+        reservedFundService.restoreFromReversedPayment(user, payment);
 
         if (payment.getObligation() != null) {
             reconcileObligation(user, payment.getObligation());

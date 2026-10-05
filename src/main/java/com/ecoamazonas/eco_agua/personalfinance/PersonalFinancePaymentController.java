@@ -23,13 +23,16 @@ public class PersonalFinancePaymentController {
 
     private final PersonalFinancePaymentService paymentService;
     private final PersonalFinanceService personalFinanceService;
+    private final PersonalFinanceReservedFundService reservedFundService;
 
     public PersonalFinancePaymentController(
             PersonalFinancePaymentService paymentService,
-            PersonalFinanceService personalFinanceService
+            PersonalFinanceService personalFinanceService,
+            PersonalFinanceReservedFundService reservedFundService
     ) {
         this.paymentService = paymentService;
         this.personalFinanceService = personalFinanceService;
+        this.reservedFundService = reservedFundService;
     }
 
     @GetMapping("/payments")
@@ -71,13 +74,27 @@ public class PersonalFinancePaymentController {
     public String paymentForm(
             @PathVariable("id") Long obligationId,
             @RequestParam(name = "returnTo", required = false) String returnTo,
+            @RequestParam(name = "reservedFundId", required = false) Long reservedFundId,
             Model model
     ) {
         PersonalFinancePaymentContext context = paymentService.paymentContext(obligationId);
+        List<PersonalFinanceReservedFund> availableFunds = reservedFundService.activeFundsForObligation(obligationId);
+        PersonalFinanceReservedFund selectedFund = reservedFundId == null
+                ? null
+                : availableFunds.stream()
+                    .filter(fund -> reservedFundId.equals(fund.getId()))
+                    .findFirst()
+                    .orElse(null);
+        if (selectedFund != null) {
+            context.form().setReservedFundId(selectedFund.getId());
+            context.form().setReservedAmount(selectedFund.getAmount().min(context.pendingAmount()));
+        }
         model.addAttribute("activePage", "gasto_claro_payments");
         model.addAttribute("paymentContext", context);
         model.addAttribute("paymentForm", context.form());
         model.addAttribute("paymentMethods", PersonalFinancePaymentMethod.values());
+        model.addAttribute("availableReservedFunds", availableFunds);
+        model.addAttribute("selectedReservedFund", selectedFund);
         model.addAttribute("recentPayments", paymentService.obligationPayments(obligationId));
         model.addAttribute("returnTo", safeReturnTo(returnTo));
         return "personal_finance/payment_form";
@@ -100,7 +117,8 @@ public class PersonalFinancePaymentController {
         } catch (IllegalArgumentException | IOException exception) {
             redirectAttributes.addFlashAttribute("message", exception.getMessage());
             redirectAttributes.addFlashAttribute("messageType", "danger");
-            return "redirect:/gasto-claro/obligations/" + obligationId + "/payment?returnTo=" + encodeReturnTo(safeReturnTo);
+            String reservedQuery = form.getReservedFundId() == null ? "" : "&reservedFundId=" + form.getReservedFundId();
+            return "redirect:/gasto-claro/obligations/" + obligationId + "/payment?returnTo=" + encodeReturnTo(safeReturnTo) + reservedQuery;
         }
     }
 

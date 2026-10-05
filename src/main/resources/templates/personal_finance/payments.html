@@ -56,11 +56,11 @@
       </div>
 
       <section class="payment-summary-grid mb-3">
-        <div><span>Pagado vigente</span><strong>S/ <span th:text="${#numbers.formatDecimal(summary.totalPaid(),1,'POINT',2,'POINT')}">0.00</span></strong><small th:text="${summary.activeCount() + ' operaciones'}">0 operaciones</small></div>
-        <div><span>Capital amortizado</span><strong>S/ <span th:text="${#numbers.formatDecimal(summary.principalPaid(),1,'POINT',2,'POINT')}">0.00</span></strong><small>Reduce saldo de deuda</small></div>
-        <div><span>Intereses</span><strong>S/ <span th:text="${#numbers.formatDecimal(summary.interestPaid(),1,'POINT',2,'POINT')}">0.00</span></strong><small>Costo financiero pagado</small></div>
-        <div><span>Seguro, comisión y mora</span><strong>S/ <span th:text="${#numbers.formatDecimal(summary.chargesPaid(),1,'POINT',2,'POINT')}">0.00</span></strong><small>Cargos adicionales</small></div>
-        <div><span>Revertido</span><strong>S/ <span th:text="${#numbers.formatDecimal(summary.reversedTotal(),1,'POINT',2,'POINT')}">0.00</span></strong><small th:text="${summary.reversedCount() + ' operaciones'}">0 operaciones</small></div>
+        <div><span>Pagado vigente</span><strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(summary.totalPaid())}">0.00</span></strong><small th:text="${summary.activeCount() + ' operaciones'}">0 operaciones</small></div>
+        <div><span>Capital amortizado</span><strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(summary.principalPaid())}">0.00</span></strong><small>Reduce saldo de deuda</small></div>
+        <div><span>Intereses</span><strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(summary.interestPaid())}">0.00</span></strong><small>Costo financiero pagado</small></div>
+        <div><span>Seguro, comisión y mora</span><strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(summary.chargesPaid())}">0.00</span></strong><small>Cargos adicionales</small></div>
+        <div><span>Revertido</span><strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(summary.reversedTotal())}">0.00</span></strong><small th:text="${summary.reversedCount() + ' operaciones'}">0 operaciones</small></div>
       </section>
       <div class="form-text mb-3">Resumen monetario en soles. Los pagos registrados en USD permanecen visibles en el detalle sin mezclarse con los totales PEN.</div>
 
@@ -94,10 +94,10 @@
               </td>
               <td data-label="Distribución">
                 <div class="payment-breakdown-lines">
-                  <span th:if="${payment.principalAmount().signum() > 0}">Capital <b th:text="${#numbers.formatDecimal(payment.principalAmount(),1,'POINT',2,'POINT')}">0.00</b></span>
-                  <span th:if="${payment.interestAmount().signum() > 0}">Interés <b th:text="${#numbers.formatDecimal(payment.interestAmount(),1,'POINT',2,'POINT')}">0.00</b></span>
-                  <span th:if="${payment.chargesAmount().signum() > 0}">Cargos <b th:text="${#numbers.formatDecimal(payment.chargesAmount(),1,'POINT',2,'POINT')}">0.00</b></span>
-                  <span th:if="${payment.otherAmount().signum() > 0}">Otros <b th:text="${#numbers.formatDecimal(payment.otherAmount(),1,'POINT',2,'POINT')}">0.00</b></span>
+                  <span th:if="${payment.principalAmount().signum() > 0}">Capital <b th:text="${@personalFinanceMoneyFormatter.amount(payment.principalAmount())}">0.00</b></span>
+                  <span th:if="${payment.interestAmount().signum() > 0}">Interés <b th:text="${@personalFinanceMoneyFormatter.amount(payment.interestAmount())}">0.00</b></span>
+                  <span th:if="${payment.chargesAmount().signum() > 0}">Cargos <b th:text="${@personalFinanceMoneyFormatter.amount(payment.chargesAmount())}">0.00</b></span>
+                  <span th:if="${payment.otherAmount().signum() > 0}">Otros <b th:text="${@personalFinanceMoneyFormatter.amount(payment.otherAmount())}">0.00</b></span>
                 </div>
               </td>
               <td data-label="Método">
@@ -106,7 +106,7 @@
                 <small th:if="${payment.operationNumber() != null}" th:text="${payment.operationNumber()}">Operación</small>
               </td>
               <td data-label="Total" class="text-end payment-total-cell">
-                <strong><span th:text="${payment.currency() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : payment.currency()}">S/</span> <span th:text="${#numbers.formatDecimal(payment.totalAmount(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                <strong><span th:text="${@personalFinanceMoneyFormatter.symbol(payment.currency())}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(payment.totalAmount())}">0.00</span></strong>
               </td>
               <td data-label="Estado">
                 <span class="badge" th:classappend="${payment.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinancePaymentStatus).ACTIVE} ? ' text-bg-success' : ' text-bg-secondary'" th:text="${payment.status().label}">Vigente</span>

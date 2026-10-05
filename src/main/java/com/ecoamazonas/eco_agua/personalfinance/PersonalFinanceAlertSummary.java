@@ -9,6 +9,7 @@ public record PersonalFinanceAlertSummary(
         long partialPayments,
         long pendingIncomes,
         long negotiationFollowUps,
+        long unfundedPayments,
         BigDecimal pendingPen,
         BigDecimal pendingUsd
 ) {

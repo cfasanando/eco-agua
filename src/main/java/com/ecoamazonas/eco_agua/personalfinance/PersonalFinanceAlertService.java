@@ -6,6 +6,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
@@ -25,21 +27,25 @@ import java.util.Map;
 public class PersonalFinanceAlertService {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    private static final DecimalFormatSymbols US_SYMBOLS = DecimalFormatSymbols.getInstance(Locale.US);
     private final PersonalFinanceCurrentUserService currentUserService;
     private final PersonalFinancePaymentObligationRepository obligationRepository;
     private final PersonalFinanceIncomeEventRepository incomeEventRepository;
     private final PersonalFinanceDebtNegotiationRepository negotiationRepository;
+    private final PersonalFinanceReservedFundRepository reservedFundRepository;
 
     public PersonalFinanceAlertService(
             PersonalFinanceCurrentUserService currentUserService,
             PersonalFinancePaymentObligationRepository obligationRepository,
             PersonalFinanceIncomeEventRepository incomeEventRepository,
-            PersonalFinanceDebtNegotiationRepository negotiationRepository
+            PersonalFinanceDebtNegotiationRepository negotiationRepository,
+            PersonalFinanceReservedFundRepository reservedFundRepository
     ) {
         this.currentUserService = currentUserService;
         this.obligationRepository = obligationRepository;
         this.incomeEventRepository = incomeEventRepository;
         this.negotiationRepository = negotiationRepository;
+        this.reservedFundRepository = reservedFundRepository;
     }
 
     @Transactional(readOnly = true)
@@ -58,12 +64,15 @@ public class PersonalFinanceAlertService {
         LocalDate today = LocalDate.now();
         UserAccount user = currentUserService.currentUser();
 
-        List<PersonalFinancePaymentObligation> obligations = obligationRepository
-                .findByUserOrderByDueDateAscPriorityAscIdAsc(user);
+        List<PersonalFinancePaymentObligation> obligations = PersonalFinanceObligationVisibility.withoutDuplicateDebtParents(
+                obligationRepository.findByUserOrderByDueDateAscPriorityAscIdAsc(user)
+        );
         List<PersonalFinanceIncomeEvent> incomes = incomeEventRepository
                 .findByUserOrderByExpectedDateAscIdAsc(user);
         List<PersonalFinanceDebtNegotiation> negotiations = negotiationRepository
                 .findByUserOrderByConversationDateDescIdDesc(user);
+        List<PersonalFinanceReservedFund> reservedFunds = reservedFundRepository
+                .findByUserAndStatusOrderByTargetDateAscCreatedAtDesc(user, PersonalFinanceReservedFundStatus.ACTIVE);
 
         String returnTo = "/gasto-claro/alerts?year=" + safeMonth.getYear()
                 + "&month=" + safeMonth.getMonthValue()
@@ -72,6 +81,7 @@ public class PersonalFinanceAlertService {
 
         List<PersonalFinanceAlertItem> allAlerts = new ArrayList<>();
         obligations.forEach(obligation -> addObligationAlert(allAlerts, obligation, safeMonth, today, returnTo));
+        obligations.forEach(obligation -> addFundingAlert(allAlerts, obligation, reservedFunds, safeMonth, today));
         incomes.forEach(income -> addIncomeAlert(allAlerts, income, safeMonth, today));
         negotiations.forEach(entry -> addNegotiationAlerts(allAlerts, entry, safeMonth, today));
 
@@ -163,6 +173,57 @@ public class PersonalFinanceAlertService {
                 overdue,
                 dueToday,
                 partial,
+                ChronoUnit.DAYS.between(today, dueDate)
+        ));
+    }
+
+    private void addFundingAlert(
+            List<PersonalFinanceAlertItem> alerts,
+            PersonalFinancePaymentObligation obligation,
+            List<PersonalFinanceReservedFund> reservedFunds,
+            YearMonth selectedMonth,
+            LocalDate today
+    ) {
+        if (obligation.getDueDate() == null || isClosed(obligation)) {
+            return;
+        }
+        LocalDate dueDate = obligation.getDueDate();
+        boolean overdue = dueDate.isBefore(today);
+        boolean dueToday = dueDate.equals(today);
+        boolean inSelectedMonth = YearMonth.from(dueDate).equals(selectedMonth);
+        if (!overdue && !inSelectedMonth) {
+            return;
+        }
+        BigDecimal reserved = reservedFunds.stream()
+                .filter(fund -> fund.getObligation() != null && fund.getObligation().getId().equals(obligation.getId()))
+                .filter(fund -> fund.getCurrency() == obligation.getCurrency())
+                .map(PersonalFinanceReservedFund::getAmount)
+                .map(this::safe)
+                .reduce(ZERO, BigDecimal::add);
+        BigDecimal pending = money(obligation.pendingAmount());
+        if (reserved.compareTo(pending) >= 0) {
+            return;
+        }
+        BigDecimal gap = pending.subtract(reserved);
+        String detail = reserved.signum() > 0
+                ? "Cobertura parcial: reservado " + formatMoney(reserved) + " de " + formatMoney(pending)
+                : "No existe dinero reservado para este compromiso";
+        alerts.add(new PersonalFinanceAlertItem(
+                "reservation-" + obligation.getId(),
+                PersonalFinanceAlertCategory.RESERVATION,
+                overdue ? PersonalFinanceAlertSeverity.CRITICAL
+                        : (dueToday ? PersonalFinanceAlertSeverity.WARNING : PersonalFinanceAlertSeverity.INFO),
+                dueDate,
+                obligation.getTitle(),
+                detail,
+                money(gap),
+                obligation.getCurrency(),
+                overdue ? "Sin cobertura y vencido" : (dueToday ? "Sin cobertura para hoy" : "Cobertura pendiente"),
+                "/gasto-claro/reserved-funds?year=" + selectedMonth.getYear() + "&month=" + selectedMonth.getMonthValue(),
+                "Reservar dinero",
+                overdue,
+                dueToday,
+                reserved.signum() > 0,
                 ChronoUnit.DAYS.between(today, dueDate)
         ));
     }
@@ -469,7 +530,8 @@ public class PersonalFinanceAlertService {
                     case PAYMENT -> 0;
                     case INCOME -> 1;
                     case NEGOTIATION -> 2;
-                    case ALL -> 3;
+                    case RESERVATION -> 3;
+                    case ALL -> 4;
                 })
                 .thenComparing(PersonalFinanceCalendarEvent::title, String.CASE_INSENSITIVE_ORDER);
     }
@@ -498,6 +560,9 @@ public class PersonalFinanceAlertService {
                 .filter(income -> income.getStatus() != PersonalFinanceIncomeStatus.RECEIVED
                         && income.getStatus() != PersonalFinanceIncomeStatus.CANCELLED)
                 .count();
+        long unfundedPayments = alerts.stream()
+                .filter(item -> item.category() == PersonalFinanceAlertCategory.RESERVATION)
+                .count();
         long negotiationFollowUps = negotiations.stream()
                 .filter(entry -> !entry.getStatus().isTerminal())
                 .filter(entry -> (entry.getNextActionDate() != null && !entry.getNextActionDate().isAfter(today))
@@ -520,6 +585,7 @@ public class PersonalFinanceAlertService {
                 partialPayments,
                 pendingIncomes,
                 negotiationFollowUps,
+                unfundedPayments,
                 money(pendingPen),
                 money(pendingUsd)
         );
@@ -548,7 +614,9 @@ public class PersonalFinanceAlertService {
     }
 
     private String formatMoney(BigDecimal value) {
-        return money(value).toPlainString();
+        DecimalFormat decimal = new DecimalFormat("#,##0.00", US_SYMBOLS);
+        decimal.setRoundingMode(RoundingMode.HALF_UP);
+        return decimal.format(money(value));
     }
 
     private String monthLabel(YearMonth month) {

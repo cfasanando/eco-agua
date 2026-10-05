@@ -52,7 +52,7 @@
                 <div class="col-md-6">
                   <label class="form-label">Moneda</label>
                   <select class="form-select" th:field="*{currency}">
-                    <option th:each="currency : ${currencies}" th:value="${currency}" th:text="${currency}">PEN</option>
+                    <option th:each="currency : ${currencies}" th:value="${currency}" th:text="${@personalFinanceMoneyFormatter.shortLabel(currency)}">S/</option>
                   </select>
                 </div>
                 <div class="col-md-6">
@@ -215,12 +215,12 @@
                       </div>
                     </td>
                     <td><span class="badge text-bg-secondary" th:text="${debt.priority.label}">Media</span></td>
-                    <td class="text-end"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.currentBalance,1,'POINT',2,'POINT')}">0.00</span></td>
+                    <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(debt.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(debt.currentBalance)}">0.00</span></td>
                     <td class="text-end">
-                      <span th:unless="${debt.delinquentTracking}"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.monthlyPressure(),1,'POINT',2,'POINT')}">0.00</span></span>
+                      <span th:unless="${debt.delinquentTracking}"><span th:text="${@personalFinanceMoneyFormatter.symbol(debt.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(debt.monthlyPressure())}">0.00</span></span>
                       <span th:if="${debt.delinquentTracking}" class="badge text-bg-secondary">No exigible este mes</span>
-                      <br><small class="text-muted" th:if="${debt.delinquentTracking and debt.previousMonthlyPayment != null and debt.previousMonthlyPayment.signum() > 0}">Cuota anterior: <span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.previousMonthlyPayment,1,'POINT',2,'POINT')}">0.00</span></small>
-                      <br><small class="text-danger" th:if="${debt.interestRateMonthly != null and debt.interestRateMonthly.signum() > 0}"><span th:text="${#numbers.formatDecimal(debt.interestRateMonthly,1,'POINT',2,'POINT')}">0.00</span>% mensual</small>
+                      <br><small class="text-muted" th:if="${debt.delinquentTracking and debt.previousMonthlyPayment != null and debt.previousMonthlyPayment.signum() > 0}">Cuota anterior: <span th:text="${@personalFinanceMoneyFormatter.symbol(debt.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(debt.previousMonthlyPayment)}">0.00</span></small>
+                      <br><small class="text-danger" th:if="${debt.interestRateMonthly != null and debt.interestRateMonthly.signum() > 0}"><span th:text="${@personalFinanceMoneyFormatter.amount(debt.interestRateMonthly)}">0.00</span>% mensual</small>
                     </td>
                     <td class="text-end">
                       <a th:if="${!debt.delinquentTracking and debt.scheduleMode.name() == 'BANK_SCHEDULE'}" th:href="@{/gasto-claro/debts/{id}/bank-schedule(id=${debt.id})}" class="btn btn-sm btn-outline-success" title="Cronograma bancario real"><i class="bi bi-bank"></i></a>

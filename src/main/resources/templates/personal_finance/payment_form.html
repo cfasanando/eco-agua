@@ -37,13 +37,13 @@
         </div>
         <div>
           <span class="payment-context-label">Importe</span>
-          <strong><span th:text="${paymentContext.currency() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : paymentContext.currency()}">S/</span> <span th:text="${#numbers.formatDecimal(paymentContext.amountDue(),1,'POINT',2,'POINT')}">0.00</span></strong>
-          <small>Pagado: <span th:text="${#numbers.formatDecimal(paymentContext.amountPaid(),1,'POINT',2,'POINT')}">0.00</span></small>
+          <strong><span th:text="${@personalFinanceMoneyFormatter.symbol(paymentContext.currency())}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(paymentContext.amountDue())}">0.00</span></strong>
+          <small>Pagado: <span th:text="${@personalFinanceMoneyFormatter.amount(paymentContext.amountPaid())}">0.00</span></small>
         </div>
         <div class="payment-context-pending">
           <span class="payment-context-label">Pendiente</span>
-          <strong><span th:text="${paymentContext.currency() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : paymentContext.currency()}">S/</span> <span id="pendingAmountLabel" th:data-value="${paymentContext.pendingAmount()}" th:text="${#numbers.formatDecimal(paymentContext.pendingAmount(),1,'POINT',2,'POINT')}">0.00</span></strong>
-          <small th:if="${paymentContext.debtBalanceKnown()}">Saldo deuda: <span th:text="${#numbers.formatDecimal(paymentContext.debtBalance(),1,'POINT',2,'POINT')}">0.00</span></small>
+          <strong><span th:text="${@personalFinanceMoneyFormatter.symbol(paymentContext.currency())}">S/</span> <span id="pendingAmountLabel" th:data-value="${paymentContext.pendingAmount()}" th:text="${@personalFinanceMoneyFormatter.amount(paymentContext.pendingAmount())}">0.00</span></strong>
+          <small th:if="${paymentContext.debtBalanceKnown()}">Saldo deuda: <span th:text="${@personalFinanceMoneyFormatter.amount(paymentContext.debtBalance())}">0.00</span></small>
         </div>
       </section>
 
@@ -71,7 +71,7 @@
                 <div class="col-md-4">
                   <label class="form-label">Monto total pagado</label>
                   <div class="input-group">
-                    <span class="input-group-text" th:text="${paymentContext.currency() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : paymentContext.currency()}">S/</span>
+                    <span class="input-group-text" th:text="${@personalFinanceMoneyFormatter.symbol(paymentContext.currency())}">S/</span>
                     <input type="number" min="0.01" step="0.01" class="form-control js-payment-component" data-role="total" th:field="*{totalAmount}" required>
                   </div>
                 </div>
@@ -80,6 +80,33 @@
                   <select class="form-select" th:field="*{paymentMethod}">
                     <option th:each="method : ${paymentMethods}" th:value="${method}" th:text="${method.label}">Método</option>
                   </select>
+                </div>
+
+                <div class="col-12" th:if="${!#lists.isEmpty(availableReservedFunds)}">
+                  <div class="card border-primary-subtle bg-primary-subtle bg-opacity-25">
+                    <div class="card-body py-3">
+                      <div class="row g-2 align-items-end">
+                        <div class="col-md-7">
+                          <label class="form-label">Usar fondo reservado</label>
+                          <select class="form-select" th:field="*{reservedFundId}" id="reservedFundSelect">
+                            <option value="">No usar reserva</option>
+                            <option th:each="fund : ${availableReservedFunds}"
+                                    th:value="${fund.id}"
+                                    th:data-amount="${fund.amount}"
+                                    th:text="${fund.title + ' · ' + @personalFinanceMoneyFormatter.money(fund.amount, fund.currency)}">Reserva</option>
+                          </select>
+                          <div class="form-text">El dinero se descontará de la reserva solo cuando el pago se guarde correctamente.</div>
+                        </div>
+                        <div class="col-md-5">
+                          <label class="form-label">Importe tomado de la reserva</label>
+                          <div class="input-group">
+                            <span class="input-group-text" th:text="${@personalFinanceMoneyFormatter.symbol(paymentContext.currency())}">S/</span>
+                            <input type="number" min="0" step="0.01" class="form-control" th:field="*{reservedAmount}" id="reservedAmountInput">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="col-12">
@@ -120,7 +147,7 @@
                 <div class="col-12">
                   <div class="payment-balance-check">
                     <span>Suma distribuida</span>
-                    <strong><span th:text="${paymentContext.currency() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : paymentContext.currency()}">S/</span> <span id="componentTotal">0.00</span></strong>
+                    <strong><span th:text="${@personalFinanceMoneyFormatter.symbol(paymentContext.currency())}">S/</span> <span id="componentTotal">0.00</span></strong>
                     <span>Diferencia</span>
                     <strong id="componentDifference">0.00</strong>
                   </div>
@@ -161,7 +188,7 @@
               <div class="list-group list-group-flush" th:if="${!#lists.isEmpty(recentPayments)}">
                 <div class="list-group-item" th:each="payment : ${recentPayments}">
                   <div class="d-flex justify-content-between gap-2">
-                    <strong><span th:text="${payment.currency() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : payment.currency()}">S/</span> <span th:text="${#numbers.formatDecimal(payment.totalAmount(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                    <strong><span th:text="${@personalFinanceMoneyFormatter.symbol(payment.currency())}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(payment.totalAmount())}">0.00</span></strong>
                     <span class="badge" th:classappend="${payment.status() == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinancePaymentStatus).ACTIVE} ? ' text-bg-success' : ' text-bg-secondary'" th:text="${payment.status().label}">Vigente</span>
                   </div>
                   <small class="text-muted"><span th:text="${#temporals.format(payment.paymentDate(), 'dd/MM/yyyy')}">Fecha</span> · <span th:text="${payment.paymentMethod().label}">Método</span></small>
@@ -188,6 +215,8 @@
   const difference = document.getElementById('componentDifference');
   const status = document.getElementById('componentStatus');
   const submit = document.getElementById('submitPaymentButton');
+  const reservedFundSelect = document.getElementById('reservedFundSelect');
+  const reservedAmountInput = document.getElementById('reservedAmountInput');
   const suggestedValues = new Map(
     [totalInput, ...componentInputs]
       .filter(Boolean)
@@ -201,16 +230,34 @@
     const delta = Math.round((total - distributed) * 100) / 100;
     componentTotal.textContent = distributed.toFixed(2);
     difference.textContent = delta.toFixed(2);
-    const valid = total > 0 && Math.abs(delta) < 0.005;
+    const selectedReserve = reservedFundSelect?.selectedOptions?.[0];
+    const reserveAvailable = Number.parseFloat(selectedReserve?.dataset?.amount || '0') || 0;
+    const reserveUsed = numberValue(reservedAmountInput);
+    const reserveValid = reserveUsed >= 0
+      && reserveUsed <= total + 0.005
+      && (!reservedFundSelect?.value ? reserveUsed < 0.005 : reserveUsed > 0 && reserveUsed <= reserveAvailable + 0.005);
+    const valid = total > 0 && Math.abs(delta) < 0.005 && reserveValid;
     const exceedsPending = total > pending + 0.005;
-    status.textContent = valid
-      ? (exceedsPending ? 'Distribución correcta · incluye importe extraordinario' : 'Distribución correcta')
-      : 'La suma no coincide';
+    status.textContent = !reserveValid
+      ? 'Revisa el importe de la reserva'
+      : (valid
+          ? (exceedsPending ? 'Distribución correcta · incluye importe extraordinario' : 'Distribución correcta')
+          : 'La suma no coincide');
     status.className = 'badge ' + (valid ? (exceedsPending ? 'text-bg-warning' : 'text-bg-success') : 'text-bg-danger');
     submit.disabled = !valid;
   };
 
   document.querySelectorAll('.js-payment-component').forEach(input => input.addEventListener('input', update));
+  reservedFundSelect?.addEventListener('change', () => {
+    const available = Number.parseFloat(reservedFundSelect.selectedOptions?.[0]?.dataset?.amount || '0') || 0;
+    if (!reservedFundSelect.value) {
+      reservedAmountInput.value = '0';
+    } else if (numberValue(reservedAmountInput) <= 0 || numberValue(reservedAmountInput) > available) {
+      reservedAmountInput.value = Math.min(available, numberValue(totalInput)).toFixed(2);
+    }
+    update();
+  });
+  reservedAmountInput?.addEventListener('input', update);
   document.getElementById('usePendingButton')?.addEventListener('click', () => {
     suggestedValues.forEach((value, input) => {
       input.value = value;

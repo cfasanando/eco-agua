@@ -35,8 +35,8 @@
               <select class="form-select form-select-sm" name="currency">
                 <option th:each="currency : ${currencies}"
                         th:value="${currency}"
-                        th:text="${currency}"
-                        th:selected="${currency == selectedCurrency}">PEN</option>
+                        th:text="${@personalFinanceMoneyFormatter.shortLabel(currency)}"
+                        th:selected="${currency == selectedCurrency}">S/</option>
               </select>
             </div>
             <div class="col-12 col-md-3">
@@ -51,7 +51,7 @@
             <div class="col-12 col-md-3">
               <label class="form-label small">Dinero disponible manual</label>
               <div class="input-group input-group-sm">
-                <span class="input-group-text" th:text="${selectedCurrency}">PEN</span>
+                <span class="input-group-text" th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span>
                 <input type="number" min="0" step="0.01" class="form-control" name="availableCash" id="availableCashInput"
                        th:value="${availableCash}" placeholder="0.00">
               </div>
@@ -69,7 +69,7 @@
       </div>
 
       <div th:if="${priorityPlan.hasExcludedCurrencies()}" class="alert alert-info border-0 shadow-sm">
-        Esta vista solo calcula <strong th:text="${selectedCurrency}">PEN</strong>.
+        Esta vista solo calcula <strong th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</strong>.
         Se excluyeron <span th:text="${priorityPlan.excludedIncomeCount()}">0</span> ingreso(s) y
         <span th:text="${priorityPlan.excludedObligationCount()}">0</span> obligación(es) de otra moneda para evitar una proyección incorrecta.
       </div>
@@ -78,15 +78,15 @@
         <div>
           <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
             <span class="badge bg-light text-dark" th:text="${priorityPlan.healthLevel().label}">En rojo</span>
-            <span class="small opacity-75"><span th:text="${selectedMonth}">7</span>/<span th:text="${selectedYear}">2026</span> · <span th:text="${selectedCurrency}">PEN</span></span>
+            <span class="small opacity-75"><span th:text="${selectedMonth}">7</span>/<span th:text="${selectedYear}">2026</span> · <span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span></span>
           </div>
           <h2 class="h4 mb-2" th:text="${priorityPlan.headline()}">El mes está en rojo.</h2>
           <p class="mb-0 opacity-90" th:text="${priorityPlan.recommendation()}">Recomendación.</p>
         </div>
         <div class="gasto-priority-cash">
           <span class="small d-block opacity-75">Disponible para asignar</span>
-          <span th:text="${selectedCurrency}">PEN</span>
-          <span th:text="${#numbers.formatDecimal(priorityPlan.availableCash(),1,'POINT',2,'POINT')}">0.00</span>
+          <span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span>
+          <span th:text="${@personalFinanceMoneyFormatter.amount(priorityPlan.availableCash())}">0.00</span>
           <small class="d-block opacity-75 mt-1" th:text="${selectedCashBasis.label}">Ingreso esperado</small>
         </div>
       </section>
@@ -95,39 +95,39 @@
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
             <div class="text-muted small">Ingreso esperado</div>
-            <div class="h5 mb-0"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.expectedIncome(),1,'POINT',2,'POINT')}">0.00</span></div>
+            <div class="h5 mb-0"><span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(priorityPlan.expectedIncome())}">0.00</span></div>
           </div></div>
         </div>
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
             <div class="text-muted small">Ya pagado</div>
-            <div class="h5 mb-0 text-primary"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.alreadyPaid(),1,'POINT',2,'POINT')}">0.00</span></div>
+            <div class="h5 mb-0 text-primary"><span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(priorityPlan.alreadyPaid())}">0.00</span></div>
           </div></div>
         </div>
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
             <div class="text-muted small">Básico pendiente</div>
-            <div class="h5 mb-0"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.essentialPending(),1,'POINT',2,'POINT')}">0.00</span></div>
+            <div class="h5 mb-0"><span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(priorityPlan.essentialPending())}">0.00</span></div>
           </div></div>
         </div>
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
             <div class="text-muted small">Deudas pendientes</div>
-            <div class="h5 mb-0"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.debtPending(),1,'POINT',2,'POINT')}">0.00</span></div>
+            <div class="h5 mb-0"><span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(priorityPlan.debtPending())}">0.00</span></div>
           </div></div>
         </div>
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
             <div class="text-muted small">Sin cobertura</div>
             <div class="h5 mb-0" th:classappend="${priorityPlan.unfundedTotal().signum() > 0} ? ' text-danger' : ' text-success'">
-              <span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.unfundedTotal(),1,'POINT',2,'POINT')}">0.00</span>
+              <span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(priorityPlan.unfundedTotal())}">0.00</span>
             </div>
           </div></div>
         </div>
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
             <div class="text-muted small">Saldo libre</div>
-            <div class="h5 mb-0 text-success"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.remainingCash(),1,'POINT',2,'POINT')}">0.00</span></div>
+            <div class="h5 mb-0 text-success"><span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(priorityPlan.remainingCash())}">0.00</span></div>
           </div></div>
         </div>
       </div>
@@ -168,11 +168,11 @@
                   </td>
                   <td class="small" th:text="${item.reason()}">Motivo</td>
                   <td th:text="${item.dueDate() != null ? item.dueDate() : '-'}">-</td>
-                  <td class="text-end text-nowrap"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(item.pendingAmount(),1,'POINT',2,'POINT')}">0.00</span></td>
-                  <td class="text-end text-nowrap fw-semibold"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(item.recommendedAmount(),1,'POINT',2,'POINT')}">0.00</span></td>
-                  <td class="text-end text-nowrap" th:classappend="${item.unfundedAmount().signum() > 0} ? ' text-danger fw-semibold' : ''"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(item.unfundedAmount(),1,'POINT',2,'POINT')}">0.00</span></td>
+                  <td class="text-end text-nowrap"><span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(item.pendingAmount())}">0.00</span></td>
+                  <td class="text-end text-nowrap fw-semibold"><span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(item.recommendedAmount())}">0.00</span></td>
+                  <td class="text-end text-nowrap" th:classappend="${item.unfundedAmount().signum() > 0} ? ' text-danger fw-semibold' : ''"><span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(item.unfundedAmount())}">0.00</span></td>
                   <td><span class="badge" th:classappend="${' text-bg-' + item.allocationStatus().bootstrapClass}" th:text="${item.allocationStatus().label}">Cubierto</span></td>
-                  <td class="text-end text-nowrap"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(item.cashAfter(),1,'POINT',2,'POINT')}">0.00</span></td>
+                  <td class="text-end text-nowrap"><span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(item.cashAfter())}">0.00</span></td>
                 </tr>
                 <tr th:if="${!priorityPlan.hasItems()}">
                   <td colspan="9" class="text-center text-muted py-4">
@@ -183,9 +183,9 @@
                 <tfoot th:if="${priorityPlan.hasItems()}">
                 <tr class="gasto-total-row">
                   <td colspan="4">TOTAL</td>
-                  <td class="text-end"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.totalPending(),1,'POINT',2,'POINT')}">0.00</span></td>
-                  <td class="text-end"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.allocatedTotal(),1,'POINT',2,'POINT')}">0.00</span></td>
-                  <td class="text-end"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.unfundedTotal(),1,'POINT',2,'POINT')}">0.00</span></td>
+                  <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(priorityPlan.totalPending())}">0.00</span></td>
+                  <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(priorityPlan.allocatedTotal())}">0.00</span></td>
+                  <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(priorityPlan.unfundedTotal())}">0.00</span></td>
                   <td colspan="2"></td>
                 </tr>
                 </tfoot>
@@ -201,7 +201,7 @@
               <div class="d-flex justify-content-between gap-2 mb-2">
                 <span class="text-muted">Brecha de costo básico</span>
                 <strong th:classappend="${priorityPlan.essentialGap().signum() > 0} ? ' text-danger' : ' text-success'">
-                  <span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.essentialGap(),1,'POINT',2,'POINT')}">0.00</span>
+                  <span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(priorityPlan.essentialGap())}">0.00</span>
                 </strong>
               </div>
               <div class="d-flex justify-content-between gap-2 mb-2">
@@ -227,7 +227,7 @@
             <div class="card-header bg-white"><strong>Mayor carga de deuda</strong></div>
             <div class="card-body small">
               <div class="fw-semibold mb-1" th:text="${priorityPlan.largestDebtTitle()}">Deuda</div>
-              <div class="h5 mb-1"><span th:text="${selectedCurrency}">PEN</span> <span th:text="${#numbers.formatDecimal(priorityPlan.largestDebtAmount(),1,'POINT',2,'POINT')}">0.00</span></div>
+              <div class="h5 mb-1"><span th:text="${@personalFinanceMoneyFormatter.symbol(selectedCurrency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(priorityPlan.largestDebtAmount())}">0.00</span></div>
               <div class="text-muted">Representa <span th:text="${#numbers.formatDecimal(priorityPlan.largestDebtSharePercentage(),1,'POINT',1,'POINT')}">0.0</span>% del ingreso mensual usado como referencia.</div>
             </div>
           </div>

@@ -4,7 +4,8 @@ public enum PersonalFinanceAlertCategory {
     ALL("Todas", "bi-grid"),
     PAYMENT("Pagos", "bi-cash-coin"),
     INCOME("Ingresos", "bi-wallet2"),
-    NEGOTIATION("Negociaciones", "bi-chat-left-text");
+    NEGOTIATION("Negociaciones", "bi-chat-left-text"),
+    RESERVATION("Reservas", "bi-wallet2");
 
     private final String label;
     private final String icon;

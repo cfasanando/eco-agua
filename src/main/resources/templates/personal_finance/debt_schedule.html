@@ -35,14 +35,14 @@
         </div>
         <div class="gasto-hero-number">
           <span class="small d-block">Saldo actual</span>
-          <span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.currentBalance,1,'POINT',2,'POINT')}">0.00</span>
+          <span th:text="${@personalFinanceMoneyFormatter.symbol(debt.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(debt.currentBalance)}">0.00</span>
         </div>
       </section>
 
       <div class="row g-3 mb-4">
         <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Modo</div><div class="fw-semibold" th:text="${debt.scheduleMode != null ? debt.scheduleMode.label : 'Pago mensual simple'}">Modo</div></div></div></div>
-        <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Pago mensual</div><div class="fw-semibold"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.monthlyPressure(),1,'POINT',2,'POINT')}">0.00</span></div></div></div></div>
-        <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Interés mensual</div><div class="fw-semibold text-danger"><span th:text="${#numbers.formatDecimal(debt.interestRateMonthly,1,'POINT',2,'POINT')}">0.00</span>%</div></div></div></div>
+        <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Pago mensual</div><div class="fw-semibold"><span th:text="${@personalFinanceMoneyFormatter.symbol(debt.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(debt.monthlyPressure())}">0.00</span></div></div></div></div>
+        <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Interés mensual</div><div class="fw-semibold text-danger"><span th:text="${@personalFinanceMoneyFormatter.amount(debt.interestRateMonthly)}">0.00</span>%</div></div></div></div>
         <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="text-muted small">Líneas</div><div class="fw-semibold" th:text="${#lists.size(scheduleLines)}">0</div></div></div></div>
       </div>
 
@@ -117,7 +117,7 @@
                 <div class="col-md-6">
                   <label class="form-label">Moneda</label>
                   <select class="form-select" th:field="*{currency}">
-                    <option th:each="currency : ${currencies}" th:value="${currency}" th:text="${currency}">PEN</option>
+                    <option th:each="currency : ${currencies}" th:value="${currency}" th:text="${@personalFinanceMoneyFormatter.shortLabel(currency)}">S/</option>
                   </select>
                 </div>
                 <div class="col-12"><label class="form-label">Notas</label><textarea class="form-control" rows="2" th:field="*{notes}"></textarea></div>
@@ -167,11 +167,11 @@
                     <td><span class="badge text-bg-light" th:text="${line.lineType.label}">Cuota</span></td>
                     <td th:text="${line.dueDate}">2026-07-20</td>
                     <td><span class="badge text-bg-secondary" th:text="${line.status.label}">Pendiente</span></td>
-                    <td class="text-end"><span th:text="${line.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(line.principalAmount,1,'POINT',2,'POINT')}">0.00</span></td>
-                    <td class="text-end"><span th:text="${line.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(line.interestAmount,1,'POINT',2,'POINT')}">0.00</span></td>
-                    <td class="text-end"><span th:text="${line.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(line.insuranceAmount,1,'POINT',2,'POINT')}">0.00</span></td>
-                    <td class="text-end fw-semibold"><span th:text="${line.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(line.calculatedTotal(),1,'POINT',2,'POINT')}">0.00</span></td>
-                    <td class="text-end"><span th:text="${line.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(line.paidAmount,1,'POINT',2,'POINT')}">0.00</span></td>
+                    <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(line.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(line.principalAmount)}">0.00</span></td>
+                    <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(line.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(line.interestAmount)}">0.00</span></td>
+                    <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(line.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(line.insuranceAmount)}">0.00</span></td>
+                    <td class="text-end fw-semibold"><span th:text="${@personalFinanceMoneyFormatter.symbol(line.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(line.calculatedTotal())}">0.00</span></td>
+                    <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(line.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(line.paidAmount)}">0.00</span></td>
                     <td><span class="badge" th:classappend="${line.generatedObligationId != null} ? ' text-bg-success' : ' text-bg-warning'" th:text="${line.generatedObligationId != null ? 'Generada' : 'Pendiente'}">Pendiente</span></td>
                     <td class="text-end text-nowrap">
                       <a th:if="${line.generatedObligationId != null}"

@@ -14,7 +14,8 @@ import java.util.UUID;
         @Index(name = "idx_pf_payment_user_status", columnList = "user_id,status"),
         @Index(name = "idx_pf_payment_obligation", columnList = "obligation_id"),
         @Index(name = "idx_pf_payment_debt", columnList = "debt_id"),
-        @Index(name = "idx_pf_payment_schedule_line", columnList = "schedule_line_id")
+        @Index(name = "idx_pf_payment_schedule_line", columnList = "schedule_line_id"),
+        @Index(name = "idx_pf_payment_reserved_fund", columnList = "reserved_fund_id")
 }, uniqueConstraints = {
         @UniqueConstraint(name = "uk_pf_payment_public_id", columnNames = "public_id"),
         @UniqueConstraint(name = "uk_pf_payment_legacy_key", columnNames = "legacy_source_key")
@@ -42,6 +43,13 @@ public class PersonalFinancePayment {
 
     @Column(name = "schedule_line_id")
     private Long scheduleLineId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reserved_fund_id")
+    private PersonalFinanceReservedFund reservedFund;
+
+    @Column(name = "reserved_amount", precision = 14, scale = 2, nullable = false)
+    private BigDecimal reservedAmount = BigDecimal.ZERO;
 
     @Column(name = "obligation_title", nullable = false, length = 180)
     private String obligationTitle;
@@ -173,6 +181,7 @@ public class PersonalFinancePayment {
         if (feeAmount == null) feeAmount = BigDecimal.ZERO;
         if (penaltyAmount == null) penaltyAmount = BigDecimal.ZERO;
         if (otherAmount == null) otherAmount = BigDecimal.ZERO;
+        if (reservedAmount == null) reservedAmount = BigDecimal.ZERO;
         if (currency == null) currency = PersonalFinanceCurrency.PEN;
         if (paymentMethod == null) paymentMethod = PersonalFinancePaymentMethod.OTHER;
         if (origin == null) origin = PersonalFinancePaymentOrigin.MANUAL;
@@ -195,6 +204,10 @@ public class PersonalFinancePayment {
     public void setDebt(PersonalFinanceDebt debt) { this.debt = debt; }
     public Long getScheduleLineId() { return scheduleLineId; }
     public void setScheduleLineId(Long scheduleLineId) { this.scheduleLineId = scheduleLineId; }
+    public PersonalFinanceReservedFund getReservedFund() { return reservedFund; }
+    public void setReservedFund(PersonalFinanceReservedFund reservedFund) { this.reservedFund = reservedFund; }
+    public BigDecimal getReservedAmount() { return reservedAmount; }
+    public void setReservedAmount(BigDecimal reservedAmount) { this.reservedAmount = reservedAmount; }
     public String getObligationTitle() { return obligationTitle; }
     public void setObligationTitle(String obligationTitle) { this.obligationTitle = obligationTitle; }
     public String getDebtName() { return debtName; }

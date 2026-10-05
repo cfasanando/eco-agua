@@ -30,6 +30,7 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
         upgradeDebtScheduleTable();
         upgradeRecurringTables();
         upgradePaymentHistory();
+        upgradeReservedFunds();
         backfillLegacyPayments();
         ensureModuleSetting();
         LOGGER.info("GastoClaro Personal base schema is ready.");
@@ -310,6 +311,60 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
                     CONSTRAINT fk_pf_negotiation_debt FOREIGN KEY (debt_id) REFERENCES personal_finance_debt (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS personal_finance_reserved_fund (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    public_id VARCHAR(36) NOT NULL,
+                    user_id INT NOT NULL,
+                    target_type VARCHAR(30) NOT NULL DEFAULT 'FREE',
+                    obligation_id BIGINT NULL,
+                    debt_id BIGINT NULL,
+                    negotiation_id BIGINT NULL,
+                    title VARCHAR(180) NOT NULL,
+                    amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    target_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    currency VARCHAR(8) NOT NULL DEFAULT 'PEN',
+                    target_date DATE NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+                    notes VARCHAR(1000) NULL,
+                    closed_at DATETIME(6) NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    updated_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_pf_reserved_fund_public_id (public_id),
+                    KEY idx_pf_reserved_fund_user_status (user_id, status),
+                    KEY idx_pf_reserved_fund_user_currency (user_id, currency),
+                    KEY idx_pf_reserved_fund_obligation (obligation_id),
+                    KEY idx_pf_reserved_fund_debt (debt_id),
+                    KEY idx_pf_reserved_fund_negotiation (negotiation_id),
+                    CONSTRAINT fk_pf_reserved_fund_user FOREIGN KEY (user_id) REFERENCES `user` (id),
+                    CONSTRAINT fk_pf_reserved_fund_obligation FOREIGN KEY (obligation_id) REFERENCES personal_finance_payment_obligation (id) ON DELETE SET NULL,
+                    CONSTRAINT fk_pf_reserved_fund_debt FOREIGN KEY (debt_id) REFERENCES personal_finance_debt (id) ON DELETE SET NULL,
+                    CONSTRAINT fk_pf_reserved_fund_negotiation FOREIGN KEY (negotiation_id) REFERENCES personal_finance_debt_negotiation (id) ON DELETE SET NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS personal_finance_reserved_fund_movement (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    user_id INT NOT NULL,
+                    reserved_fund_id BIGINT NOT NULL,
+                    movement_type VARCHAR(30) NOT NULL,
+                    amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    balance_after DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    related_fund_id BIGINT NULL,
+                    payment_id BIGINT NULL,
+                    notes VARCHAR(500) NULL,
+                    created_at DATETIME(6) NOT NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_pf_reserved_movement_user_date (user_id, created_at),
+                    KEY idx_pf_reserved_movement_fund (reserved_fund_id),
+                    KEY idx_pf_reserved_movement_payment (payment_id),
+                    CONSTRAINT fk_pf_reserved_movement_user FOREIGN KEY (user_id) REFERENCES `user` (id),
+                    CONSTRAINT fk_pf_reserved_movement_fund FOREIGN KEY (reserved_fund_id) REFERENCES personal_finance_reserved_fund (id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
     }
 
     private void upgradeDebtScheduleTable() {
@@ -371,6 +426,12 @@ public class PersonalFinanceModuleInitializer implements ApplicationRunner {
         addIndexIfMissing("personal_finance_payment", "idx_pf_payment_obligation", "CREATE INDEX idx_pf_payment_obligation ON personal_finance_payment (obligation_id)");
         addIndexIfMissing("personal_finance_payment", "idx_pf_payment_debt", "CREATE INDEX idx_pf_payment_debt ON personal_finance_payment (debt_id)");
         addIndexIfMissing("personal_finance_payment", "idx_pf_payment_schedule_line", "CREATE INDEX idx_pf_payment_schedule_line ON personal_finance_payment (schedule_line_id)");
+    }
+
+    private void upgradeReservedFunds() {
+        addColumnIfMissing("personal_finance_payment", "reserved_fund_id", "ALTER TABLE personal_finance_payment ADD COLUMN reserved_fund_id BIGINT NULL AFTER schedule_line_id");
+        addColumnIfMissing("personal_finance_payment", "reserved_amount", "ALTER TABLE personal_finance_payment ADD COLUMN reserved_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00 AFTER reserved_fund_id");
+        addIndexIfMissing("personal_finance_payment", "idx_pf_payment_reserved_fund", "CREATE INDEX idx_pf_payment_reserved_fund ON personal_finance_payment (reserved_fund_id)");
     }
 
     private void backfillLegacyPayments() {

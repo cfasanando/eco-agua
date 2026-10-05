@@ -4,8 +4,6 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -20,13 +18,14 @@ public class PersonalFinanceDebtReportFormatter {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
+    private final PersonalFinanceMoneyFormatter moneyFormatter;
+
+    public PersonalFinanceDebtReportFormatter(PersonalFinanceMoneyFormatter moneyFormatter) {
+        this.moneyFormatter = moneyFormatter;
+    }
+
     public String money(BigDecimal value, PersonalFinanceCurrency currency) {
-        BigDecimal safe = value == null ? BigDecimal.ZERO : value;
-        DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(Locale.US);
-        DecimalFormat decimal = new DecimalFormat("#,##0.00", symbols);
-        decimal.setRoundingMode(RoundingMode.HALF_UP);
-        String prefix = currency == PersonalFinanceCurrency.USD ? "US$ " : "S/ ";
-        return prefix + decimal.format(safe);
+        return moneyFormatter.money(value, currency);
     }
 
     public String moneyOrUndefined(BigDecimal value, boolean known, PersonalFinanceCurrency currency) {

@@ -16,6 +16,8 @@ public class PersonalFinancePaymentForm {
     private String operationNumber;
     private String recipient;
     private String notes;
+    private Long reservedFundId;
+    private BigDecimal reservedAmount = BigDecimal.ZERO;
 
     public BigDecimal componentTotal() {
         return safe(principalAmount)
@@ -54,4 +56,8 @@ public class PersonalFinancePaymentForm {
     public void setRecipient(String recipient) { this.recipient = recipient; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+    public Long getReservedFundId() { return reservedFundId; }
+    public void setReservedFundId(Long reservedFundId) { this.reservedFundId = reservedFundId; }
+    public BigDecimal getReservedAmount() { return reservedAmount; }
+    public void setReservedAmount(BigDecimal reservedAmount) { this.reservedAmount = reservedAmount; }
 }

@@ -118,14 +118,14 @@
               </td>
               <td>
                 <div class="small text-muted">Saldo</div>
-                <div class="fw-semibold"><span th:text="${entry.currency.name() == 'PEN' ? 'S/' : 'US$'}">S/</span> <span th:text="${#numbers.formatDecimal(entry.snapshotCurrentBalance,1,'POINT',2,'POINT')}">0.00</span></div>
-                <div class="small text-muted">Mensual: <span th:text="${#numbers.formatDecimal(entry.snapshotMonthlyPayment,1,'POINT',2,'POINT')}">0.00</span> · <span th:text="${#numbers.formatDecimal(entry.snapshotMonthlyRate,1,'POINT',2,'POINT')}">0.00</span>%</div>
+                <div class="fw-semibold"><span th:text="${@personalFinanceMoneyFormatter.symbol(entry.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(entry.snapshotCurrentBalance)}">0.00</span></div>
+                <div class="small text-muted">Mensual: <span th:text="${@personalFinanceMoneyFormatter.amount(entry.snapshotMonthlyPayment)}">0.00</span> · <span th:text="${@personalFinanceMoneyFormatter.amount(entry.snapshotMonthlyRate)}">0.00</span>%</div>
               </td>
               <td>
                 <div class="small text-muted">Total propuesto</div>
-                <div class="fw-semibold"><span th:text="${entry.currency.name() == 'PEN' ? 'S/' : 'US$'}">S/</span> <span th:text="${#numbers.formatDecimal(entry.proposalTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+                <div class="fw-semibold"><span th:text="${@personalFinanceMoneyFormatter.symbol(entry.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(entry.proposalTotal())}">0.00</span></div>
                 <div class="small text-muted" th:if="${entry.installmentCount != null and entry.installmentCount > 0}">
-                  <span th:text="${entry.installmentCount}">0</span> × <span th:text="${#numbers.formatDecimal(entry.proposedInstallmentAmount,1,'POINT',2,'POINT')}">0.00</span>
+                  <span th:text="${entry.installmentCount}">0</span> × <span th:text="${@personalFinanceMoneyFormatter.amount(entry.proposedInstallmentAmount)}">0.00</span>
                   <span th:if="${entry.proposedEndDate() != null}"> · hasta <span th:text="${#temporals.format(entry.proposedEndDate(), 'MM/yyyy')}">-</span></span>
                 </div>
               </td>

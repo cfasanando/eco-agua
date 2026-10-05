@@ -41,7 +41,7 @@
         </div>
         <div class="gasto-hero-number" th:classappend="${plan.projectedBalance().signum() < 0} ? ' text-danger' : ' text-success'">
           <span class="small d-block">Saldo proyectado</span>
-          S/ <span th:text="${#numbers.formatDecimal(plan.projectedBalance(),1,'POINT',2,'POINT')}">0.00</span>
+          S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.projectedBalance())}">0.00</span>
         </div>
       </section>
 
@@ -62,28 +62,28 @@
           <div class="col-6 col-lg-3">
             <div class="gasto-live-stat">
               <span>Ingreso recibido</span>
-              <strong>PEN <span id="liveReceivedIncome" th:text="${#numbers.formatDecimal(liveSummary.receivedIncome(),1,'POINT',2,'POINT')}">0.00</span></strong>
+              <strong>S/ <span id="liveReceivedIncome" th:text="${@personalFinanceMoneyFormatter.amount(liveSummary.receivedIncome())}">0.00</span></strong>
               <small><span id="liveReceivedIncomes" th:text="${liveSummary.receivedIncomes()}">0</span>/<span id="liveTotalIncomes" th:text="${liveSummary.totalIncomes()}">0</span> ingresos</small>
             </div>
           </div>
           <div class="col-6 col-lg-3">
             <div class="gasto-live-stat">
               <span>Pagado confirmado</span>
-              <strong>PEN <span id="livePaidTotal" th:text="${#numbers.formatDecimal(liveSummary.paidTotal(),1,'POINT',2,'POINT')}">0.00</span></strong>
+              <strong>S/ <span id="livePaidTotal" th:text="${@personalFinanceMoneyFormatter.amount(liveSummary.paidTotal())}">0.00</span></strong>
               <small>Incluye abonos parciales registrados</small>
             </div>
           </div>
           <div class="col-6 col-lg-3">
             <div class="gasto-live-stat" id="liveBalanceCard" th:classappend="${liveSummary.realBalance().signum() < 0} ? ' is-negative' : ' is-positive'">
               <span>Saldo real disponible</span>
-              <strong>PEN <span id="liveRealBalance" th:text="${#numbers.formatDecimal(liveSummary.realBalance(),1,'POINT',2,'POINT')}">0.00</span></strong>
+              <strong>S/ <span id="liveRealBalance" th:text="${@personalFinanceMoneyFormatter.amount(liveSummary.realBalance())}">0.00</span></strong>
               <small>Recibido menos pagado</small>
             </div>
           </div>
           <div class="col-6 col-lg-3">
             <div class="gasto-live-stat">
               <span>Falta pagar</span>
-              <strong>PEN <span id="livePendingTotal" th:text="${#numbers.formatDecimal(liveSummary.pendingTotal(),1,'POINT',2,'POINT')}">0.00</span></strong>
+              <strong>S/ <span id="livePendingTotal" th:text="${@personalFinanceMoneyFormatter.amount(liveSummary.pendingTotal())}">0.00</span></strong>
               <small><span id="livePendingPayments" th:text="${liveSummary.pendingPayments()}">0</span> pendientes</small>
             </div>
           </div>
@@ -97,38 +97,38 @@
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
             <div class="text-muted small">Ingresos</div>
-            <div class="h5 mb-0">S/ <span th:text="${#numbers.formatDecimal(plan.expectedIncome(),1,'POINT',2,'POINT')}">0.00</span></div>
+            <div class="h5 mb-0">S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.expectedIncome())}">0.00</span></div>
           </div></div>
         </div>
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
             <div class="text-muted small">Costo básico</div>
-            <div class="h5 mb-0">S/ <span th:text="${#numbers.formatDecimal(plan.basicLivingTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+            <div class="h5 mb-0">S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.basicLivingTotal())}">0.00</span></div>
           </div></div>
         </div>
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
             <div class="text-muted small">Deudas exigibles</div>
-            <div class="h5 mb-0">S/ <span th:text="${#numbers.formatDecimal(plan.debtTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+            <div class="h5 mb-0">S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.debtTotal())}">0.00</span></div>
           </div></div>
         </div>
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
             <div class="text-muted small">Pagado</div>
-            <div class="h5 mb-0 text-primary">S/ <span th:text="${#numbers.formatDecimal(plan.paidTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+            <div class="h5 mb-0 text-primary">S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.paidTotal())}">0.00</span></div>
           </div></div>
         </div>
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
             <div class="text-muted small">Pendiente</div>
-            <div class="h5 mb-0 text-danger">S/ <span th:text="${#numbers.formatDecimal(plan.pendingTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+            <div class="h5 mb-0 text-danger">S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.pendingTotal())}">0.00</span></div>
           </div></div>
         </div>
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
             <div class="text-muted small">Después de básico</div>
             <div class="h5 mb-0" th:classappend="${plan.cashAfterBasicLiving().signum() < 0} ? ' text-danger' : ' text-success'">
-              S/ <span th:text="${#numbers.formatDecimal(plan.cashAfterBasicLiving(),1,'POINT',2,'POINT')}">0.00</span>
+              S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.cashAfterBasicLiving())}">0.00</span>
             </div>
           </div></div>
         </div>
@@ -141,14 +141,20 @@
             <div class="fw-semibold" th:unless="${plan.hasDeficit()}">Este mes tiene saldo positivo proyectado.</div>
             <div class="small">
               Ingresos menos obligaciones: S/
-              <span th:text="${#numbers.formatDecimal(plan.projectedBalance(),1,'POINT',2,'POINT')}">0.00</span>.
+              <span th:text="${@personalFinanceMoneyFormatter.amount(plan.projectedBalance())}">0.00</span>.
               Primero cubre costo de vida básico y luego deudas con interés alto, atraso o presión personal.
             </div>
           </div>
-          <a th:href="@{/gasto-claro/monthly-priority(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm"
-             th:classappend="${plan.hasDeficit()} ? ' btn-light' : ' btn-outline-success'">
-            <i class="bi bi-list-check"></i> Ver orden de pago
-          </a>
+          <div class="d-flex flex-wrap gap-2">
+            <a th:href="@{/gasto-claro/reserved-funds(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm"
+               th:classappend="${plan.hasDeficit()} ? ' btn-light' : ' btn-outline-success'">
+              <i class="bi bi-wallet2"></i> Reservar dinero
+            </a>
+            <a th:href="@{/gasto-claro/monthly-priority(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm"
+               th:classappend="${plan.hasDeficit()} ? ' btn-light' : ' btn-outline-success'">
+              <i class="bi bi-list-check"></i> Ver orden de pago
+            </a>
+          </div>
         </div>
       </div>
 
@@ -186,7 +192,7 @@
                   <td><strong th:text="${income.title}">Ingreso</strong><br><small class="text-muted" th:text="${income.incomeSource != null ? income.incomeSource.name : 'Manual'}">Fuente</small></td>
                   <td><span class="badge bg-light text-dark js-income-status" th:text="${income.status.label}">Planeado</span></td>
                   <td th:text="${income.expectedDate}">2026-07-01</td>
-                  <td class="text-end"><span th:text="${income.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(income.amount,1,'POINT',2,'POINT')}">0.00</span></td>
+                  <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(income.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(income.amount)}">0.00</span></td>
                   <td class="gasto-note-cell">
                     <button th:if="${income.notes != null and !#strings.isEmpty(income.notes)}"
                             type="button"
@@ -205,7 +211,7 @@
                   </td>
                 </tr>
                 <tr th:if="${#lists.isEmpty(plan.incomes())}"><td colspan="6" class="text-center text-muted py-3">Presiona “Generar / actualizar mes” para crear los ingresos desde tus fuentes recurrentes, o registra un ingreso puntual en la pestaña Ingresos.</td></tr>
-                <tr class="gasto-total-row"><td colspan="4">TOTAL INGRESOS</td><td class="text-end">S/ <span th:text="${#numbers.formatDecimal(plan.expectedIncome(),1,'POINT',2,'POINT')}">0.00</span></td><td></td></tr>
+                <tr class="gasto-total-row"><td colspan="4">TOTAL INGRESOS</td><td class="text-end">S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.expectedIncome())}">0.00</span></td><td></td></tr>
                 </tbody>
               </table>
             </div>
@@ -219,7 +225,7 @@
                 <tbody th:replace="personal_finance/monthly_plan :: itemRows(${plan.basicLivingItems()}, ${selectedYear}, ${selectedMonth})"></tbody>
                 <tbody>
                 <tr th:if="${#lists.isEmpty(plan.basicLivingItems())}"><td colspan="10" class="text-center text-muted py-3">Aún no tienes costo de vida o compromisos básicos para este mes.</td></tr>
-                <tr class="gasto-total-row js-payment-total"><td colspan="5">TOTAL COSTO DE VIDA</td><td class="text-end">PEN <span class="js-group-due">0.00</span></td><td class="text-end">PEN <span class="js-group-paid">0.00</span></td><td class="text-end">PEN <span class="js-group-pending">0.00</span></td><td colspan="2"></td></tr>
+                <tr class="gasto-total-row js-payment-total"><td colspan="5">TOTAL COSTO DE VIDA</td><td class="text-end">S/ <span class="js-group-due">0.00</span></td><td class="text-end">S/ <span class="js-group-paid">0.00</span></td><td class="text-end">S/ <span class="js-group-pending">0.00</span></td><td colspan="2"></td></tr>
                 </tbody>
               </table>
             </div>
@@ -240,32 +246,32 @@
               <div class="col-6 col-lg">
                 <div class="gasto-debt-summary-card is-total">
                   <span>Capital conocido</span>
-                  <strong>S/ <span id="debtKnownPenTotal" th:text="${#numbers.formatDecimal(plan.debtPortfolio().knownPenTotal(),1,'POINT',2,'POINT')}">0.00</span></strong>
-                  <small th:if="${plan.debtPortfolio().hasUsdBalance()}">USD <span id="debtKnownUsdTotal" th:text="${#numbers.formatDecimal(plan.debtPortfolio().knownUsdTotal(),1,'POINT',2,'POINT')}">0.00</span></small>
+                  <strong>S/ <span id="debtKnownPenTotal" th:text="${@personalFinanceMoneyFormatter.amount(plan.debtPortfolio().knownPenTotal())}">0.00</span></strong>
+                  <small th:if="${plan.debtPortfolio().hasUsdBalance()}">US$ <span id="debtKnownUsdTotal" th:text="${@personalFinanceMoneyFormatter.amount(plan.debtPortfolio().knownUsdTotal())}">0.00</span></small>
                 </div>
               </div>
               <div class="col-6 col-lg">
                 <div class="gasto-debt-summary-card">
                   <span>Bancos y tarjetas</span>
-                  <strong>S/ <span id="debtBankPenTotal" th:text="${#numbers.formatDecimal(plan.debtPortfolio().bankPenTotal(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                  <strong>S/ <span id="debtBankPenTotal" th:text="${@personalFinanceMoneyFormatter.amount(plan.debtPortfolio().bankPenTotal())}">0.00</span></strong>
                 </div>
               </div>
               <div class="col-6 col-lg">
                 <div class="gasto-debt-summary-card">
                   <span>Prestamistas</span>
-                  <strong>S/ <span id="debtLenderPenTotal" th:text="${#numbers.formatDecimal(plan.debtPortfolio().lenderPenTotal(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                  <strong>S/ <span id="debtLenderPenTotal" th:text="${@personalFinanceMoneyFormatter.amount(plan.debtPortfolio().lenderPenTotal())}">0.00</span></strong>
                 </div>
               </div>
               <div class="col-6 col-lg">
                 <div class="gasto-debt-summary-card">
                   <span>Familia / directas</span>
-                  <strong>S/ <span id="debtDirectPenTotal" th:text="${#numbers.formatDecimal(plan.debtPortfolio().directPenTotal(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                  <strong>S/ <span id="debtDirectPenTotal" th:text="${@personalFinanceMoneyFormatter.amount(plan.debtPortfolio().directPenTotal())}">0.00</span></strong>
                 </div>
               </div>
               <div class="col-12 col-lg">
                 <div class="gasto-debt-summary-card">
                   <span>Otros compromisos</span>
-                  <strong>S/ <span id="debtCommitmentPenTotal" th:text="${#numbers.formatDecimal(plan.debtPortfolio().commitmentPenTotal().add(plan.debtPortfolio().otherPenTotal()),1,'POINT',2,'POINT')}">0.00</span></strong>
+                  <strong>S/ <span id="debtCommitmentPenTotal" th:text="${@personalFinanceMoneyFormatter.amount(plan.debtPortfolio().commitmentPenTotal().add(plan.debtPortfolio().otherPenTotal()))}">0.00</span></strong>
                   <small><span id="debtSettlementOpportunityCount" th:text="${plan.debtPortfolio().settlementOpportunityCount()}">0</span> cancelables con el pago del mes</small>
                 </div>
               </div>
@@ -301,7 +307,7 @@
                         <span><small>Pago</small><b>S/ <span class="js-group-due">0.00</span></b></span>
                         <span><small>Pagado</small><b>S/ <span class="js-group-paid">0.00</span></b></span>
                         <span><small>Pendiente</small><b>S/ <span class="js-group-pending">0.00</span></b></span>
-                        <span><small>Capital</small><b>S/ <span id="debtKnownPenTotalInline" th:text="${#numbers.formatDecimal(plan.debtPortfolio().knownPenTotal(),1,'POINT',2,'POINT')}">0.00</span></b></span>
+                        <span><small>Capital</small><b>S/ <span id="debtKnownPenTotalInline" th:text="${@personalFinanceMoneyFormatter.amount(plan.debtPortfolio().knownPenTotal())}">0.00</span></b></span>
                       </div>
                     </div>
                   </td>
@@ -335,7 +341,7 @@
                     <span th:unless="${debt.delinquencyStartDate() != null}" class="text-muted">Sin fecha</span>
                   </td>
                   <td th:text="${debt.negotiationStatus().label}">Sin iniciar</td>
-                  <td class="text-end fw-semibold"><span th:text="${debt.currency()}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.currentBalance(),1,'POINT',2,'POINT')}">0.00</span></td>
+                  <td class="text-end fw-semibold"><span th:text="${@personalFinanceMoneyFormatter.symbol(debt.currency())}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(debt.currentBalance())}">0.00</span></td>
                   <td th:text="${debt.lastPaymentDate() != null ? debt.lastPaymentDate() : '-'}">-</td>
                   <td>
                     <span th:text="${debt.nextReviewDate() != null ? debt.nextReviewDate() : '-'}">-</span>
@@ -349,8 +355,8 @@
                 <tr class="gasto-total-row">
                   <td colspan="4">SALDO TOTAL EN SEGUIMIENTO</td>
                   <td class="text-end">
-                    <div>PEN <span th:text="${#numbers.formatDecimal(plan.delinquentDebtPenTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
-                    <div th:if="${plan.delinquentDebtUsdTotal().signum() > 0}">USD <span th:text="${#numbers.formatDecimal(plan.delinquentDebtUsdTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+                    <div>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.delinquentDebtPenTotal())}">0.00</span></div>
+                    <div th:if="${plan.delinquentDebtUsdTotal().signum() > 0}">US$ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.delinquentDebtUsdTotal())}">0.00</span></div>
                   </td>
                   <td colspan="3"><span class="small">Solo panorama total; no es pago obligatorio del mes.</span></td>
                 </tr>
@@ -365,7 +371,7 @@
               <table class="table table-sm gasto-excel-table align-middle mb-0" data-payment-table>
                 <thead><tr><th class="text-center">Hecho</th><th>Concepto</th><th>Prioridad</th><th>Fecha</th><th>Estado</th><th class="text-end">Monto</th><th class="text-end">Pagado</th><th class="text-end">Pendiente</th><th class="gasto-note-cell">Nota</th><th></th></tr></thead>
                 <tbody th:replace="personal_finance/monthly_plan :: itemRows(${plan.otherItems()}, ${selectedYear}, ${selectedMonth})"></tbody>
-                <tbody><tr class="gasto-total-row js-payment-total"><td colspan="5">TOTAL OTROS COMPROMISOS</td><td class="text-end">PEN <span class="js-group-due">0.00</span></td><td class="text-end">PEN <span class="js-group-paid">0.00</span></td><td class="text-end">PEN <span class="js-group-pending">0.00</span></td><td colspan="2"></td></tr></tbody>
+                <tbody><tr class="gasto-total-row js-payment-total"><td colspan="5">TOTAL OTROS COMPROMISOS</td><td class="text-end">S/ <span class="js-group-due">0.00</span></td><td class="text-end">S/ <span class="js-group-paid">0.00</span></td><td class="text-end">S/ <span class="js-group-pending">0.00</span></td><td colspan="2"></td></tr></tbody>
               </table>
             </div>
           </div>
@@ -403,8 +409,8 @@
                 <div class="col-6" th:if="${obligationForm.id != null}">
                   <label class="form-label small">Pagado registrado</label>
                   <div class="form-control form-control-sm bg-light">
-                    <span th:text="${obligationForm.currency == T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceCurrency).PEN ? 'S/' : obligationForm.currency}">S/</span>
-                    <span th:text="${#numbers.formatDecimal(obligationForm.amountPaid,1,'POINT',2,'POINT')}">0.00</span>
+                    <span th:text="${@personalFinanceMoneyFormatter.symbol(obligationForm.currency)}">S/</span>
+                    <span th:text="${@personalFinanceMoneyFormatter.amount(obligationForm.amountPaid)}">0.00</span>
                   </div>
                 </div>
                 <div class="col-6 d-grid align-content-end" th:if="${obligationForm.id != null and obligationForm.status != T(com.ecoamazonas.eco_agua.personalfinance.PersonalFinanceObligationStatus).CANCELLED}">
@@ -416,7 +422,7 @@
                 <div class="col-6">
                   <label class="form-label small">Moneda</label>
                   <select class="form-select form-select-sm" th:field="*{currency}">
-                    <option th:each="currency : ${currencies}" th:value="${currency}" th:text="${currency}">PEN</option>
+                    <option th:each="currency : ${currencies}" th:value="${currency}" th:text="${@personalFinanceMoneyFormatter.shortLabel(currency)}">S/</option>
                   </select>
                 </div>
                 <div class="col-6">
@@ -484,9 +490,9 @@
   <td><span class="badge" th:classappend="${item.priority().name() == 'CRITICAL'} ? ' bg-danger' : (${item.priority().name() == 'HIGH'} ? ' bg-warning text-dark' : ' bg-secondary')" th:text="${item.priority().label}">Media</span></td>
   <td th:text="${item.dueDate() != null ? item.dueDate() : '-'}">-</td>
   <td><span class="badge bg-light text-dark js-payment-status" th:text="${item.status().label}">Pendiente</span></td>
-  <td class="text-end"><span th:text="${item.currency()}">PEN</span> <span class="js-amount-due" th:data-value="${item.amountDue()}" th:text="${#numbers.formatDecimal(item.amountDue(),1,'POINT',2,'POINT')}">0.00</span></td>
-  <td class="text-end"><span th:text="${item.currency()}">PEN</span> <span class="js-amount-paid" th:data-value="${item.amountPaid()}" th:text="${#numbers.formatDecimal(item.amountPaid(),1,'POINT',2,'POINT')}">0.00</span></td>
-  <td class="text-end fw-semibold"><span th:text="${item.currency()}">PEN</span> <span class="js-amount-pending" th:data-value="${item.pendingAmount()}" th:text="${#numbers.formatDecimal(item.pendingAmount(),1,'POINT',2,'POINT')}">0.00</span></td>
+  <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(item.currency())}">S/</span> <span class="js-amount-due" th:data-value="${item.amountDue()}" th:text="${@personalFinanceMoneyFormatter.amount(item.amountDue())}">0.00</span></td>
+  <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(item.currency())}">S/</span> <span class="js-amount-paid" th:data-value="${item.amountPaid()}" th:text="${@personalFinanceMoneyFormatter.amount(item.amountPaid())}">0.00</span></td>
+  <td class="text-end fw-semibold"><span th:text="${@personalFinanceMoneyFormatter.symbol(item.currency())}">S/</span> <span class="js-amount-pending" th:data-value="${item.pendingAmount()}" th:text="${@personalFinanceMoneyFormatter.amount(item.pendingAmount())}">0.00</span></td>
   <td class="gasto-note-cell">
     <button th:if="${item.notes() != null and !#strings.isEmpty(item.notes())}"
             type="button"
@@ -522,7 +528,7 @@
 
 <tbody th:fragment="debtItemRows(items, selectedYear, selectedMonth)" xmlns:th="http://www.thymeleaf.org">
 <tr th:each="item : ${items}"
-    th:with="currencyLabel=${#strings.equals(item.currency(), 'PEN') ? 'S/' : item.currency()}"
+    th:with="currencyLabel=${@personalFinanceMoneyFormatter.symbol(item.currency())}"
     data-payment-row
     th:data-currency="${item.currency()}"
     th:data-debt-id="${item.debtId()}"
@@ -557,21 +563,21 @@
   <td class="text-end gasto-debt-payment" data-label="Pago">
     <div class="gasto-money-value">
       <span class="gasto-currency-label" th:text="${currencyLabel}">S/</span>
-      <strong class="js-amount-due" th:data-value="${item.amountDue()}" th:text="${#numbers.formatDecimal(item.amountDue(),1,'POINT',2,'POINT')}">0.00</strong>
+      <strong class="js-amount-due" th:data-value="${item.amountDue()}" th:text="${@personalFinanceMoneyFormatter.amount(item.amountDue())}">0.00</strong>
     </div>
     <small class="gasto-debt-paid-detail js-debt-paid-detail" th:classappend="${item.amountPaid().signum() == 0} ? ' d-none' : ''">
-      Pagado: <span th:text="${currencyLabel}">S/</span> <span class="js-amount-paid" th:data-value="${item.amountPaid()}" th:text="${#numbers.formatDecimal(item.amountPaid(),1,'POINT',2,'POINT')}">0.00</span>
+      Pagado: <span th:text="${currencyLabel}">S/</span> <span class="js-amount-paid" th:data-value="${item.amountPaid()}" th:text="${@personalFinanceMoneyFormatter.amount(item.amountPaid())}">0.00</span>
     </small>
   </td>
   <td class="text-end fw-semibold gasto-debt-pending" data-label="Pendiente">
     <span class="gasto-currency-label" th:text="${currencyLabel}">S/</span>
-    <span class="js-amount-pending" th:data-value="${item.pendingAmount()}" th:text="${#numbers.formatDecimal(item.pendingAmount(),1,'POINT',2,'POINT')}">0.00</span>
+    <span class="js-amount-pending" th:data-value="${item.pendingAmount()}" th:text="${@personalFinanceMoneyFormatter.amount(item.pendingAmount())}">0.00</span>
   </td>
   <td class="text-end gasto-debt-balance-cell" data-label="Saldo">
     <div class="js-debt-balance-known" th:classappend="${!item.debtBalanceKnown()} ? ' d-none' : ''">
       <div class="gasto-money-value">
         <span class="gasto-currency-label" th:text="${currencyLabel}">S/</span>
-        <strong class="js-debt-balance" th:data-value="${item.debtOutstandingBalance()}" th:text="${#numbers.formatDecimal(item.debtOutstandingBalance(),1,'POINT',2,'POINT')}">0.00</strong>
+        <strong class="js-debt-balance" th:data-value="${item.debtOutstandingBalance()}" th:text="${@personalFinanceMoneyFormatter.amount(item.debtOutstandingBalance())}">0.00</strong>
       </div>
       <small class="text-muted js-bank-balance-reference gasto-balance-reference" th:classappend="${!item.bankBalanceReference()} ? ' d-none' : ''" title="Capital referencial; confirma el monto de cancelación con la entidad">
         <i class="bi bi-info-circle" aria-hidden="true"></i> Referencial

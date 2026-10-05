@@ -40,7 +40,7 @@
                   <option value="">Selecciona una deuda</option>
                   <option th:each="debt : ${debts}"
                           th:value="${debt.id}"
-                          th:text="${debt.name + ' · ' + debt.currency + ' ' + #numbers.formatDecimal(debt.currentBalance,1,'POINT',2,'POINT')}"
+                          th:text="${debt.name + ' · ' + @personalFinanceMoneyFormatter.money(debt.currentBalance, debt.currency)}"
                           th:attr="data-balance=${debt.currentBalance},data-payment=${debt.monthlyPressure()},data-rate=${debt.interestRateMonthly},data-currency=${debt.currency}">Deuda</option>
                 </select>
                 <input th:if="${negotiationForm.id != null}" type="hidden" name="debtId" th:value="${negotiationForm.debtId}">
@@ -139,11 +139,11 @@
               <div class="row g-3 mb-3">
                 <div class="col-6">
                   <div class="text-muted small">Saldo actual registrado</div>
-                  <div class="h5 mb-0"><span id="previewCurrency">S/</span> <span id="previewBalance" th:text="${entry != null ? #numbers.formatDecimal(entry.snapshotCurrentBalance,1,'POINT',2,'POINT') : '0.00'}">0.00</span></div>
+                  <div class="h5 mb-0"><span id="previewCurrency">S/</span> <span id="previewBalance" th:text="${entry != null ? @personalFinanceMoneyFormatter.amount(entry.snapshotCurrentBalance) : '0.00'}">0.00</span></div>
                 </div>
                 <div class="col-6">
                   <div class="text-muted small">Pago mensual actual</div>
-                  <div class="h5 mb-0"><span class="preview-currency">S/</span> <span id="previewCurrentPayment" th:text="${entry != null ? #numbers.formatDecimal(entry.snapshotMonthlyPayment,1,'POINT',2,'POINT') : '0.00'}">0.00</span></div>
+                  <div class="h5 mb-0"><span class="preview-currency">S/</span> <span id="previewCurrentPayment" th:text="${entry != null ? @personalFinanceMoneyFormatter.amount(entry.snapshotMonthlyPayment) : '0.00'}">0.00</span></div>
                 </div>
                 <div class="col-6">
                   <div class="text-muted small">Total de la propuesta</div>
@@ -158,7 +158,7 @@
               <div th:if="${comparison != null}" class="border-top pt-3 small">
                 <div class="d-flex justify-content-between gap-3 mb-2">
                   <span class="text-muted">Interés proyectado actual</span>
-                  <strong th:text="${comparison.currentPlanAmortizes() ? #numbers.formatDecimal(comparison.currentProjectedInterest(),1,'POINT',2,'POINT') : 'El pago no amortiza'}">0.00</strong>
+                  <strong th:text="${comparison.currentPlanAmortizes() ? @personalFinanceMoneyFormatter.amount(comparison.currentProjectedInterest()) : 'El pago no amortiza'}">0.00</strong>
                 </div>
                 <div class="d-flex justify-content-between gap-3 mb-2">
                   <span class="text-muted">Fin estimado actual</span>
@@ -170,11 +170,11 @@
                 </div>
                 <div class="d-flex justify-content-between gap-3 mb-2">
                   <span class="text-muted">Costo de la propuesta sobre el saldo actual</span>
-                  <strong th:classappend="${comparison.differenceAgainstCurrentBalance().signum() > 0} ? ' text-danger' : ' text-success'" th:text="${#numbers.formatDecimal(comparison.differenceAgainstCurrentBalance(),1,'POINT',2,'POINT')}">0.00</strong>
+                  <strong th:classappend="${comparison.differenceAgainstCurrentBalance().signum() > 0} ? ' text-danger' : ' text-success'" th:text="${@personalFinanceMoneyFormatter.amount(comparison.differenceAgainstCurrentBalance())}">0.00</strong>
                 </div>
                 <div class="d-flex justify-content-between gap-3">
                   <span class="text-muted">Ahorro estimado frente al plan actual</span>
-                  <strong class="text-success" th:text="${#numbers.formatDecimal(comparison.estimatedSavingsAgainstCurrentPlan(),1,'POINT',2,'POINT')}">0.00</strong>
+                  <strong class="text-success" th:text="${@personalFinanceMoneyFormatter.amount(comparison.estimatedSavingsAgainstCurrentPlan())}">0.00</strong>
                 </div>
               </div>
 

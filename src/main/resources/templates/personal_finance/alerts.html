@@ -56,6 +56,11 @@
           <small>Compromisos todavía abiertos</small>
         </article>
         <article class="alert-summary-card">
+          <span>Sin cobertura</span>
+          <strong th:classappend="${center.summary().unfundedPayments() > 0} ? ' text-warning' : ' text-success'" th:text="${center.summary().unfundedPayments()}">0</strong>
+          <small>Compromisos sin reserva suficiente</small>
+        </article>
+        <article class="alert-summary-card">
           <span>Ingresos pendientes</span>
           <strong th:text="${center.summary().pendingIncomes()}">0</strong>
           <small>Planeados y no recibidos</small>
@@ -147,7 +152,7 @@
                        th:title="${event.detail()}">
                       <span class="alert-calendar-event-title"><i class="bi" th:classappend="${' ' + event.icon()}"></i> <span th:text="${event.title()}">Evento</span></span>
                       <span class="alert-calendar-event-meta">
-                        <span th:if="${event.amount() != null}"><span th:text="${event.currencySymbol()}">S/</span> <span th:text="${#numbers.formatDecimal(event.amount(),1,'POINT',2,'POINT')}">0.00</span> · </span>
+                        <span th:if="${event.amount() != null}"><span th:text="${event.currencySymbol()}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(event.amount())}">0.00</span> · </span>
                         <span th:text="${event.statusLabel()}">Pendiente</span>
                       </span>
                     </a>
@@ -186,7 +191,7 @@
                       </div>
                       <div class="fw-semibold" th:if="${item.amount() != null}">
                         <span th:text="${item.currencySymbol()}">S/</span>
-                        <span th:text="${#numbers.formatDecimal(item.amount(),1,'POINT',2,'POINT')}">0.00</span>
+                        <span th:text="${@personalFinanceMoneyFormatter.amount(item.amount())}">0.00</span>
                       </div>
                     </div>
                     <a th:href="${item.actionUrl()}" class="btn btn-outline-primary btn-sm" th:text="${item.actionLabel()}">Revisar</a>
@@ -209,8 +214,8 @@
             <div class="small text-muted">Incluye todas las obligaciones abiertas, incluso las que están fuera del mes visible.</div>
           </div>
           <div class="d-flex gap-4">
-            <div><span class="text-muted small d-block">Soles</span><strong>S/ <span th:text="${#numbers.formatDecimal(center.summary().pendingPen(),1,'POINT',2,'POINT')}">0.00</span></strong></div>
-            <div><span class="text-muted small d-block">Dólares</span><strong>US$ <span th:text="${#numbers.formatDecimal(center.summary().pendingUsd(),1,'POINT',2,'POINT')}">0.00</span></strong></div>
+            <div><span class="text-muted small d-block">Soles</span><strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(center.summary().pendingPen())}">0.00</span></strong></div>
+            <div><span class="text-muted small d-block">Dólares</span><strong>US$ <span th:text="${@personalFinanceMoneyFormatter.amount(center.summary().pendingUsd())}">0.00</span></strong></div>
           </div>
         </div>
       </div>

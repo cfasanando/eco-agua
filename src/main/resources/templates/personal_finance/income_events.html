@@ -26,7 +26,7 @@
             <div class="col-12"><label class="form-label">Título</label><input class="form-control" th:field="*{title}" placeholder="Sueldo julio" required></div>
             <div class="col-12"><label class="form-label">Fuente</label><select class="form-select" name="sourceId"><option value="">Sin fuente</option><option th:each="source : ${sources}" th:value="${source.id}" th:selected="${eventForm.incomeSource != null and eventForm.incomeSource.id == source.id}" th:text="${source.name}">Fuente</option></select></div>
             <div class="col-md-6"><label class="form-label">Monto</label><input type="number" step="0.01" class="form-control" th:field="*{amount}"></div>
-            <div class="col-md-6"><label class="form-label">Moneda</label><select class="form-select" th:field="*{currency}"><option th:each="currency : ${currencies}" th:value="${currency}" th:text="${currency}">PEN</option></select></div>
+            <div class="col-md-6"><label class="form-label">Moneda</label><select class="form-select" th:field="*{currency}"><option th:each="currency : ${currencies}" th:value="${currency}" th:text="${@personalFinanceMoneyFormatter.shortLabel(currency)}">S/</option></select></div>
             <div class="col-md-6"><label class="form-label">Fecha esperada</label><input type="date" class="form-control" th:field="*{expectedDate}"></div>
             <div class="col-md-6"><label class="form-label">Fecha recibida</label><input type="date" class="form-control" th:field="*{receivedDate}"></div>
             <div class="col-12"><label class="form-label">Estado</label><select class="form-select" th:field="*{status}"><option th:each="status : ${incomeStatuses}" th:value="${status}" th:text="${status.label}">Estado</option></select></div>
@@ -40,7 +40,7 @@
             <td><div class="fw-semibold" th:text="${event.title}">Ingreso</div><small class="text-muted" th:text="${event.incomeSource != null ? event.incomeSource.name : 'Sin fuente'}">Fuente</small></td>
             <td th:text="${event.expectedDate}">Fecha</td>
             <td><span class="badge" th:classappend="${event.status.name() == 'RECEIVED'} ? ' text-bg-success' : (${event.status.name() == 'MISSED' or event.status.name() == 'CANCELLED'} ? ' text-bg-secondary' : ' text-bg-warning')" th:text="${event.status.label}">Estado</span></td>
-            <td class="text-end"><span th:text="${event.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(event.amount,1,'POINT',2,'POINT')}">0.00</span></td>
+            <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(event.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(event.amount)}">0.00</span></td>
             <td class="text-end"><a th:href="@{/gasto-claro/income-events(year=${selectedYear},month=${selectedMonth},editId=${event.id})}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a> <form th:action="@{/gasto-claro/income-events/{id}/delete(id=${event.id})}" method="post" class="d-inline" onsubmit="return confirm('¿Eliminar este ingreso?')"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/><input type="hidden" name="year" th:value="${selectedYear}"><input type="hidden" name="month" th:value="${selectedMonth}"><button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash"></i></button></form></td>
           </tr>
           <tr th:if="${#lists.isEmpty(events)}"><td colspan="5" class="text-center text-muted py-4">Aún no hay ingresos programados para este mes.</td></tr>

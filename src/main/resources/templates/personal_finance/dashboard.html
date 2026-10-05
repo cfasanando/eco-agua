@@ -37,7 +37,7 @@
           <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
               <div class="text-muted small">Ingreso esperado</div>
-              <div class="h3 mb-0">S/ <span th:text="${#numbers.formatDecimal(dashboard.expectedIncome(),1,'POINT',2,'POINT')}">0.00</span></div>
+              <div class="h3 mb-0">S/ <span th:text="${@personalFinanceMoneyFormatter.amount(dashboard.expectedIncome())}">0.00</span></div>
             </div>
           </div>
         </div>
@@ -45,7 +45,7 @@
           <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
               <div class="text-muted small">Gastos fijos activos</div>
-              <div class="h3 mb-0">S/ <span th:text="${#numbers.formatDecimal(dashboard.fixedExpenseTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+              <div class="h3 mb-0">S/ <span th:text="${@personalFinanceMoneyFormatter.amount(dashboard.fixedExpenseTotal())}">0.00</span></div>
             </div>
           </div>
         </div>
@@ -53,7 +53,7 @@
           <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
               <div class="text-muted small">Presión de deudas</div>
-              <div class="h3 mb-0">S/ <span th:text="${#numbers.formatDecimal(dashboard.debtPressureTotal(),1,'POINT',2,'POINT')}">0.00</span></div>
+              <div class="h3 mb-0">S/ <span th:text="${@personalFinanceMoneyFormatter.amount(dashboard.debtPressureTotal())}">0.00</span></div>
             </div>
           </div>
         </div>
@@ -62,7 +62,7 @@
             <div class="card-body">
               <div class="text-muted small">Saldo proyectado</div>
               <div class="h3 mb-0" th:classappend="${dashboard.projectedBalance().signum() < 0} ? ' text-danger' : ' text-success'">
-                S/ <span th:text="${#numbers.formatDecimal(dashboard.projectedBalance(),1,'POINT',2,'POINT')}">0.00</span>
+                S/ <span th:text="${@personalFinanceMoneyFormatter.amount(dashboard.projectedBalance())}">0.00</span>
               </div>
             </div>
           </div>
@@ -84,7 +84,7 @@
                   <tr th:each="debt : ${debts}">
                     <td><div class="fw-semibold" th:text="${debt.name}">Deuda</div><small class="text-muted" th:text="${debt.debtType.label}">Tipo</small></td>
                     <td th:text="${debt.dueDay != null ? 'Día ' + debt.dueDay : '-'}">Día 1</td>
-                    <td class="text-end"><span th:text="${debt.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(debt.monthlyPressure(),1,'POINT',2,'POINT')}">0.00</span></td>
+                    <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(debt.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(debt.monthlyPressure())}">0.00</span></td>
                   </tr>
                   <tr th:if="${#lists.isEmpty(debts)}"><td colspan="3" class="text-center text-muted py-4">Aún no registraste deudas.</td></tr>
                   </tbody>
@@ -107,7 +107,7 @@
                   <tr th:each="event : ${incomeEvents}">
                     <td><div class="fw-semibold" th:text="${event.title}">Ingreso</div><small class="text-muted" th:text="${event.status.label}">Estado</small></td>
                     <td th:text="${event.expectedDate}">2026-07-01</td>
-                    <td class="text-end"><span th:text="${event.currency}">PEN</span> <span th:text="${#numbers.formatDecimal(event.amount,1,'POINT',2,'POINT')}">0.00</span></td>
+                    <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(event.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(event.amount)}">0.00</span></td>
                   </tr>
                   <tr th:if="${#lists.isEmpty(incomeEvents)}"><td colspan="3" class="text-center text-muted py-4">Aún no registraste ingresos programados para este mes.</td></tr>
                   </tbody>

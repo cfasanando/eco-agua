@@ -104,8 +104,8 @@
                         <strong class="d-block small" th:text="${debt.name()}">Deuda</strong>
                         <span class="text-muted small">
                           <span th:text="${currencySymbol}">S/</span>
-                          <span th:text="${#numbers.formatDecimal(debt.initialBalance(),1,'POINT',2,'POINT')}">0.00</span>
-                          · <span th:text="${#numbers.formatDecimal(debt.monthlyRate(),1,'POINT',2,'POINT')}">0.00</span>% mensual
+                          <span th:text="${@personalFinanceMoneyFormatter.amount(debt.initialBalance())}">0.00</span>
+                          · <span th:text="${@personalFinanceMoneyFormatter.amount(debt.monthlyRate())}">0.00</span>% mensual
                         </span>
                       </span>
                     </label>
@@ -130,7 +130,7 @@
 
       <th:block th:if="${simulation.hasDebts()}">
         <div th:if="${simulation.lumpSumUnused().signum() > 0}" class="alert alert-secondary border-0 shadow-sm">
-          Quedaron sin asignar <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.lumpSumUnused(),1,'POINT',2,'POINT')}">0.00</span></strong>
+          Quedaron sin asignar <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(simulation.lumpSumUnused())}">0.00</span></strong>
           del dinero extraordinario. Esto puede ocurrir si el importe supera las deudas o si la selección manual no incluye suficientes saldos.
         </div>
 
@@ -154,16 +154,16 @@
               </h2>
               <p class="mb-0 opacity-90">
                 Saldo proyectado:
-                <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.strategyEndingBalance(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(simulation.strategyEndingBalance())}">0.00</span></strong>
                 · mejora frente al ritmo actual:
-                <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.balanceAdvantage(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(simulation.balanceAdvantage())}">0.00</span></strong>
               </p>
             </div>
             <div class="col-lg-4 text-lg-end">
               <div class="small opacity-75">Presupuesto mensual simulado</div>
               <div class="display-6 fw-semibold">
                 <span th:text="${currencySymbol}">S/</span>
-                <span th:text="${#numbers.formatDecimal(simulation.totalMonthlyBudget(),1,'POINT',2,'POINT')}">0.00</span>
+                <span th:text="${@personalFinanceMoneyFormatter.amount(simulation.totalMonthlyBudget())}">0.00</span>
               </div>
               <div class="small opacity-75">Cuotas actuales + aporte adicional</div>
             </div>
@@ -174,39 +174,39 @@
           <div class="col-6 col-xl-2">
             <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
               <div class="text-muted small">Deuda actual</div>
-              <div class="h5 mb-0"><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.initialDebt(),1,'POINT',2,'POINT')}">0.00</span></div>
+              <div class="h5 mb-0"><span th:text="${currencySymbol}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(simulation.initialDebt())}">0.00</span></div>
             </div></div>
           </div>
           <div class="col-6 col-xl-2">
             <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
               <div class="text-muted small">Extra inmediato aplicado</div>
-              <div class="h5 mb-0 text-primary"><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.lumpSumApplied(),1,'POINT',2,'POINT')}">0.00</span></div>
+              <div class="h5 mb-0 text-primary"><span th:text="${currencySymbol}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(simulation.lumpSumApplied())}">0.00</span></div>
             </div></div>
           </div>
           <div class="col-6 col-xl-2">
             <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
               <div class="text-muted small">Saldo al horizonte</div>
               <div class="h5 mb-0" th:classappend="${simulation.strategyEndingBalance().signum() > 0} ? ' text-danger' : ' text-success'">
-                <span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.strategyEndingBalance(),1,'POINT',2,'POINT')}">0.00</span>
+                <span th:text="${currencySymbol}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(simulation.strategyEndingBalance())}">0.00</span>
               </div>
             </div></div>
           </div>
           <div class="col-6 col-xl-2">
             <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
               <div class="text-muted small">Interés estimado</div>
-              <div class="h5 mb-0"><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.strategyInterest(),1,'POINT',2,'POINT')}">0.00</span></div>
+              <div class="h5 mb-0"><span th:text="${currencySymbol}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(simulation.strategyInterest())}">0.00</span></div>
             </div></div>
           </div>
           <div class="col-6 col-xl-2">
             <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
               <div class="text-muted small">Interés evitado</div>
-              <div class="h5 mb-0 text-success"><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.estimatedInterestSaved(),1,'POINT',2,'POINT')}">0.00</span></div>
+              <div class="h5 mb-0 text-success"><span th:text="${currencySymbol}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(simulation.estimatedInterestSaved())}">0.00</span></div>
             </div></div>
           </div>
           <div class="col-6 col-xl-2">
             <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
               <div class="text-muted small">Flujo mensual liberado</div>
-              <div class="h5 mb-0 text-success"><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.monthlyPressureFreed(),1,'POINT',2,'POINT')}">0.00</span></div>
+              <div class="h5 mb-0 text-success"><span th:text="${currencySymbol}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(simulation.monthlyPressureFreed())}">0.00</span></div>
             </div></div>
           </div>
         </div>
@@ -231,15 +231,15 @@
                   <tbody>
                   <tr>
                     <td>Saldo al finalizar el horizonte</td>
-                    <td class="text-end" th:text="${#numbers.formatDecimal(simulation.baselineEndingBalance(),1,'POINT',2,'POINT')}">0.00</td>
-                    <td class="text-end fw-semibold" th:text="${#numbers.formatDecimal(simulation.strategyEndingBalance(),1,'POINT',2,'POINT')}">0.00</td>
-                    <td class="text-end text-success fw-semibold" th:text="${#numbers.formatDecimal(simulation.balanceAdvantage(),1,'POINT',2,'POINT')}">0.00</td>
+                    <td class="text-end" th:text="${@personalFinanceMoneyFormatter.amount(simulation.baselineEndingBalance())}">0.00</td>
+                    <td class="text-end fw-semibold" th:text="${@personalFinanceMoneyFormatter.amount(simulation.strategyEndingBalance())}">0.00</td>
+                    <td class="text-end text-success fw-semibold" th:text="${@personalFinanceMoneyFormatter.amount(simulation.balanceAdvantage())}">0.00</td>
                   </tr>
                   <tr>
                     <td>Interés estimado dentro del horizonte</td>
-                    <td class="text-end" th:text="${#numbers.formatDecimal(simulation.baselineInterest(),1,'POINT',2,'POINT')}">0.00</td>
-                    <td class="text-end fw-semibold" th:text="${#numbers.formatDecimal(simulation.strategyInterest(),1,'POINT',2,'POINT')}">0.00</td>
-                    <td class="text-end text-success fw-semibold" th:text="${#numbers.formatDecimal(simulation.estimatedInterestSaved(),1,'POINT',2,'POINT')}">0.00</td>
+                    <td class="text-end" th:text="${@personalFinanceMoneyFormatter.amount(simulation.baselineInterest())}">0.00</td>
+                    <td class="text-end fw-semibold" th:text="${@personalFinanceMoneyFormatter.amount(simulation.strategyInterest())}">0.00</td>
+                    <td class="text-end text-success fw-semibold" th:text="${@personalFinanceMoneyFormatter.amount(simulation.estimatedInterestSaved())}">0.00</td>
                   </tr>
                   <tr>
                     <td>Fecha estimada sin deudas</td>
@@ -258,15 +258,15 @@
               <div class="card-body small">
                 <div class="d-flex justify-content-between gap-3 mb-2">
                   <span class="text-muted">Cuota mensual actual</span>
-                  <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.currentMonthlyPressure(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                  <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(simulation.currentMonthlyPressure())}">0.00</span></strong>
                 </div>
                 <div class="d-flex justify-content-between gap-3 mb-2">
                   <span class="text-muted">Aporte adicional</span>
-                  <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(monthlyExtra,1,'POINT',2,'POINT')}">0.00</span></strong>
+                  <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(monthlyExtra)}">0.00</span></strong>
                 </div>
                 <div class="d-flex justify-content-between gap-3 mb-2">
                   <span class="text-muted">Total proyectado pagado</span>
-                  <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${#numbers.formatDecimal(simulation.strategyTotalPaid(),1,'POINT',2,'POINT')}">0.00</span></strong>
+                  <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(simulation.strategyTotalPaid())}">0.00</span></strong>
                 </div>
                 <div class="d-flex justify-content-between gap-3 mb-2">
                   <span class="text-muted">Deudas abiertas al final</span>
@@ -316,12 +316,12 @@
                   </div>
                 </td>
                 <td class="small" style="min-width: 210px;" th:text="${debt.reason()}">Motivo</td>
-                <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(debt.initialBalance(),1,'POINT',2,'POINT')}">0.00</td>
-                <td class="text-end text-nowrap"><span th:text="${#numbers.formatDecimal(debt.monthlyRate(),1,'POINT',2,'POINT')}">0.00</span>%</td>
-                <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(debt.monthlyPayment(),1,'POINT',2,'POINT')}">0.00</td>
-                <td class="text-end text-nowrap text-primary fw-semibold" th:text="${#numbers.formatDecimal(debt.lumpSumApplied(),1,'POINT',2,'POINT')}">0.00</td>
-                <td class="text-end text-nowrap" th:text="${#numbers.formatDecimal(debt.projectedInterest(),1,'POINT',2,'POINT')}">0.00</td>
-                <td class="text-end text-nowrap fw-semibold" th:classappend="${debt.endingBalance().signum() > 0} ? ' text-danger' : ' text-success'" th:text="${#numbers.formatDecimal(debt.endingBalance(),1,'POINT',2,'POINT')}">0.00</td>
+                <td class="text-end text-nowrap" th:text="${@personalFinanceMoneyFormatter.amount(debt.initialBalance())}">0.00</td>
+                <td class="text-end text-nowrap"><span th:text="${@personalFinanceMoneyFormatter.amount(debt.monthlyRate())}">0.00</span>%</td>
+                <td class="text-end text-nowrap" th:text="${@personalFinanceMoneyFormatter.amount(debt.monthlyPayment())}">0.00</td>
+                <td class="text-end text-nowrap text-primary fw-semibold" th:text="${@personalFinanceMoneyFormatter.amount(debt.lumpSumApplied())}">0.00</td>
+                <td class="text-end text-nowrap" th:text="${@personalFinanceMoneyFormatter.amount(debt.projectedInterest())}">0.00</td>
+                <td class="text-end text-nowrap fw-semibold" th:classappend="${debt.endingBalance().signum() > 0} ? ' text-danger' : ' text-success'" th:text="${@personalFinanceMoneyFormatter.amount(debt.endingBalance())}">0.00</td>
                 <td class="text-nowrap" th:text="${debt.projectedPayoffMonth() != null ? debt.projectedPayoffMonth() : 'No termina'}">-</td>
               </tr>
               </tbody>
@@ -354,13 +354,13 @@
                   <strong th:text="${row.month()}">2026-07</strong>
                   <span th:if="${row.paidOffCount() > 0}" class="badge text-bg-success ms-1" th:text="${row.paidOffCount() + ' cierre(s)'}">1 cierre</span>
                 </td>
-                <td class="text-end" th:text="${#numbers.formatDecimal(row.openingBalance(),1,'POINT',2,'POINT')}">0.00</td>
-                <td class="text-end" th:text="${#numbers.formatDecimal(row.interestAdded(),1,'POINT',2,'POINT')}">0.00</td>
-                <td class="text-end" th:text="${#numbers.formatDecimal(row.scheduledPaid(),1,'POINT',2,'POINT')}">0.00</td>
-                <td class="text-end text-primary fw-semibold" th:text="${#numbers.formatDecimal(row.extraPaid(),1,'POINT',2,'POINT')}">0.00</td>
-                <td class="text-end fw-semibold" th:text="${#numbers.formatDecimal(row.endingBalance(),1,'POINT',2,'POINT')}">0.00</td>
+                <td class="text-end" th:text="${@personalFinanceMoneyFormatter.amount(row.openingBalance())}">0.00</td>
+                <td class="text-end" th:text="${@personalFinanceMoneyFormatter.amount(row.interestAdded())}">0.00</td>
+                <td class="text-end" th:text="${@personalFinanceMoneyFormatter.amount(row.scheduledPaid())}">0.00</td>
+                <td class="text-end text-primary fw-semibold" th:text="${@personalFinanceMoneyFormatter.amount(row.extraPaid())}">0.00</td>
+                <td class="text-end fw-semibold" th:text="${@personalFinanceMoneyFormatter.amount(row.endingBalance())}">0.00</td>
                 <td class="text-end" th:text="${row.activeDebtCount()}">0</td>
-                <td class="text-end text-success" th:text="${#numbers.formatDecimal(row.monthlyPressureFreed(),1,'POINT',2,'POINT')}">0.00</td>
+                <td class="text-end text-success" th:text="${@personalFinanceMoneyFormatter.amount(row.monthlyPressureFreed())}">0.00</td>
               </tr>
               </tbody>
             </table>

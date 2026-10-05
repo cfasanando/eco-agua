@@ -86,7 +86,9 @@ public class PersonalFinanceService {
                 debtsById.put(debt.getId(), debt);
             }
         }
-        List<PersonalFinancePaymentObligation> obligations = paymentObligationRepository.findByUserAndDueDateBetweenOrderByDueDateAscPriorityAscIdAsc(user, start, end);
+        List<PersonalFinancePaymentObligation> obligations = PersonalFinanceObligationVisibility.withoutDuplicateDebtParents(
+                paymentObligationRepository.findByUserAndDueDateBetweenOrderByDueDateAscPriorityAscIdAsc(user, start, end)
+        );
         List<PersonalFinanceDelinquentDebtItem> delinquentDebts = delinquentDebtsForPlan(user);
 
         List<PersonalFinanceMonthlyPlanItem> basicItems = new ArrayList<>();

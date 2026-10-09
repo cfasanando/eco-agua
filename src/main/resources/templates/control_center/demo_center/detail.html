@@ -47,6 +47,9 @@
                     <a class="btn btn-primary" target="_blank" rel="noopener" th:if="${portal.canOpen()}" th:href="${portal.openUrl()}">
                         <i class="bi bi-box-arrow-up-right me-1"></i>Abrir portal
                     </a>
+                    <a class="btn btn-outline-dark" th:if="${portal.canViewLog()}" th:href="@{/control-center/demo-center/{code}/logs(code=${portal.definition().code()})}">
+                        <i class="bi bi-file-earmark-text me-1"></i>Ver log
+                    </a>
                 </div>
             </section>
 
@@ -65,6 +68,8 @@
                         <div><dt>Runtime profile</dt><dd th:text="${portal.definition().runtimeProfile()}">dev</dd></div>
                         <div><dt>Instancia</dt><dd th:text="${portal.definition().instanceCode()}">demo</dd></div>
                         <div><dt>Base</dt><dd th:text="${portal.definition().databaseName()}">database</dd></div>
+                        <div th:if="${portal.localRuntime().applicable()}"><dt>Log local</dt><dd th:text="${portal.localRuntime().logRelativePath()}">logs/demo.log</dd></div>
+                        <div th:if="${portal.localRuntime().pidText() != null && !portal.localRuntime().pidText().isBlank()}"><dt>PID local</dt><dd th:text="${portal.localRuntime().pidText()}">123</dd></div>
                         <div><dt>Usuario demo</dt><dd th:text="${portal.definition().demoUsername()}">usuario</dd></div>
                         <div><dt>Contraseña</dt><dd th:text="${portal.definition().demoPassword()}">password</dd></div>
                     </dl>
@@ -103,16 +108,26 @@
                             <input type="hidden" name="confirmation" th:value="${portal.restartConfirmation()}">
                             <button class="btn btn-outline-primary" type="submit"><i class="bi bi-arrow-repeat me-1"></i>Reiniciar</button>
                         </form>
-                        <a class="btn btn-outline-secondary" th:if="${portal.hasRuntime()}" th:href="${portal.operationDetailUrl()}">
+                        <a class="btn btn-outline-dark" th:if="${portal.canViewLog()}" th:href="@{/control-center/demo-center/{code}/logs(code=${portal.definition().code()})}">
+                            <i class="bi bi-file-earmark-text me-1"></i>Ver log local
+                        </a>
+                        <a class="btn btn-outline-secondary" th:if="${portal.operationDetailUrl() != null && !portal.operationDetailUrl().isBlank()}" th:href="${portal.operationDetailUrl()}">
                             <i class="bi bi-terminal me-1"></i>Ver operación
                         </a>
                     </div>
 
+                    <div class="matrix26-alert-safe mt-3" th:if="${portal.localRuntime().applicable() && portal.localRuntime().configured()}">
+                        <i class="bi bi-info-circle"></i>
+                        <div>
+                            <strong>Control local seguro</strong>
+                            <p>Demo Center puede iniciar este runtime usando su application.properties local. Solo detendrá procesos iniciados desde este panel y registrados con PID propio.</p>
+                        </div>
+                    </div>
                     <div class="matrix26-alert-safe mt-3" th:if="${!portal.hasRuntime() && portal.definition().runtimeManaged()}">
                         <i class="bi bi-info-circle"></i>
                         <div>
-                            <strong>Runtime pendiente de registro</strong>
-                            <p>La ficha comercial está lista, pero el inventario de Matrix26 no encontró este runtime. Revisa la instancia, el perfil o la base demo antes de iniciar.</p>
+                            <strong>Runtime pendiente de configuración</strong>
+                            <p>La ficha comercial está lista, pero no se encontró configuración local ni inventario Matrix26 para este runtime.</p>
                         </div>
                     </div>
                 </section>

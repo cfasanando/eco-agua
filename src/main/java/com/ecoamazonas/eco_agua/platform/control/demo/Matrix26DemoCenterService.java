@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -21,13 +20,16 @@ public class Matrix26DemoCenterService {
 
     private final ObjectProvider<com.ecoamazonas.eco_agua.platform.control.operations.Matrix26OperationsInventoryService> inventoryServiceProvider;
     private final ObjectProvider<Matrix26RuntimeControlService> runtimeControlServiceProvider;
+    private final Matrix26DemoRuntimeService demoRuntimeService;
 
     public Matrix26DemoCenterService(
             ObjectProvider<com.ecoamazonas.eco_agua.platform.control.operations.Matrix26OperationsInventoryService> inventoryServiceProvider,
-            ObjectProvider<Matrix26RuntimeControlService> runtimeControlServiceProvider
+            ObjectProvider<Matrix26RuntimeControlService> runtimeControlServiceProvider,
+            Matrix26DemoRuntimeService demoRuntimeService
     ) {
         this.inventoryServiceProvider = inventoryServiceProvider;
         this.runtimeControlServiceProvider = runtimeControlServiceProvider;
+        this.demoRuntimeService = demoRuntimeService;
     }
 
     public Matrix26DemoCenterDashboard dashboard(boolean refresh) {
@@ -39,7 +41,7 @@ public class Matrix26DemoCenterService {
         List<String> warnings = new ArrayList<>();
 
         if (inventoryService == null) {
-            warnings.add("El inventario de runtimes de Matrix26 no está activo en este perfil. Puedes abrir módulos internos, pero iniciar/detener portales separados requiere el runtime Matrix26 Control Center.");
+            warnings.add("Modo Demo Center local: los módulos internos se abren directo y los runtimes conocidos se administran con control seguro por PID propio.");
         } else {
             Matrix26OperationsSnapshot snapshot = inventoryService.snapshot(refresh);
             runtimes = snapshot.runtimes() == null ? List.of() : snapshot.runtimes();
@@ -87,6 +89,71 @@ public class Matrix26DemoCenterService {
         return service;
     }
 
+    public Matrix26DemoRuntimeActionResult startPortal(String code, String actor) {
+        Matrix26DemoPortalDefinition definition = definition(code);
+        Matrix26DemoRuntimeStatus localRuntime = demoRuntimeService.status(definition);
+        if (localRuntime.applicable() && localRuntime.configured()) {
+            return demoRuntimeService.start(definition, actor);
+        }
+
+        Matrix26RuntimeControlService service = runtimeControlServiceProvider.getIfAvailable();
+        if (service == null) {
+            return Matrix26DemoRuntimeActionResult.failure("No hay runtime local configurado ni control Matrix26 activo para iniciar este portal.");
+        }
+        String runtimeKey = portal(code, true).runtimeKey();
+        if (runtimeKey == null || runtimeKey.isBlank()) {
+            return Matrix26DemoRuntimeActionResult.failure("Este portal demo no tiene runtime administrable registrado.");
+        }
+        return Matrix26DemoRuntimeActionResult.success(service.start(runtimeKey, actor).message());
+    }
+
+    public Matrix26DemoRuntimeActionResult stopPortal(String code, String actor) {
+        Matrix26DemoPortalDefinition definition = definition(code);
+        Matrix26DemoRuntimeStatus localRuntime = demoRuntimeService.status(definition);
+        if (localRuntime.applicable() && localRuntime.configured()) {
+            return demoRuntimeService.stop(definition, actor);
+        }
+
+        Matrix26RuntimeControlService service = runtimeControlServiceProvider.getIfAvailable();
+        if (service == null) {
+            return Matrix26DemoRuntimeActionResult.failure("No hay runtime local configurado ni control Matrix26 activo para detener este portal.");
+        }
+        String runtimeKey = portal(code, true).runtimeKey();
+        if (runtimeKey == null || runtimeKey.isBlank()) {
+            return Matrix26DemoRuntimeActionResult.failure("Este portal demo no tiene runtime administrable registrado.");
+        }
+        return Matrix26DemoRuntimeActionResult.success(service.stop(runtimeKey, actor, "STOP " + definition.code()).message());
+    }
+
+    public Matrix26DemoRuntimeActionResult restartPortal(String code, String actor) {
+        Matrix26DemoPortalDefinition definition = definition(code);
+        Matrix26DemoRuntimeStatus localRuntime = demoRuntimeService.status(definition);
+        if (localRuntime.applicable() && localRuntime.configured()) {
+            return demoRuntimeService.restart(definition, actor);
+        }
+
+        Matrix26RuntimeControlService service = runtimeControlServiceProvider.getIfAvailable();
+        if (service == null) {
+            return Matrix26DemoRuntimeActionResult.failure("No hay runtime local configurado ni control Matrix26 activo para reiniciar este portal.");
+        }
+        String runtimeKey = portal(code, true).runtimeKey();
+        if (runtimeKey == null || runtimeKey.isBlank()) {
+            return Matrix26DemoRuntimeActionResult.failure("Este portal demo no tiene runtime administrable registrado.");
+        }
+        return Matrix26DemoRuntimeActionResult.success(service.restart(runtimeKey, actor, "RESTART " + definition.code()).message());
+    }
+
+    public Matrix26DemoRuntimeLogView logs(String code) {
+        return demoRuntimeService.log(portal(code, true));
+    }
+
+    private Matrix26DemoPortalDefinition definition(String code) {
+        return definitions().stream()
+                .filter(definition -> definition.code().equalsIgnoreCase(code))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("El portal demo solicitado no existe."));
+    }
+
     private Matrix26DemoPortalView view(
             Matrix26DemoPortalDefinition definition,
             List<Matrix26RuntimeInventoryItem> runtimes,
@@ -94,9 +161,10 @@ public class Matrix26DemoCenterService {
     ) {
         Matrix26RuntimeInventoryItem runtime = findRuntime(definition, runtimes).orElse(null);
         Matrix26RuntimeControlView control = runtime == null ? null : controls.get(runtime.target().key());
+        Matrix26DemoRuntimeStatus localRuntime = demoRuntimeService.status(definition);
         boolean online = definition.mode() == Matrix26DemoPortalMode.INTERNAL
                 ? true
-                : runtime != null && runtime.online();
+                : (runtime != null && runtime.online()) || localRuntime.httpReachable() || localRuntime.portListening();
 
         String statusLabel;
         String statusDetail;
@@ -108,9 +176,14 @@ public class Matrix26DemoCenterService {
             statusLabel = "Disponible en el portal actual";
             statusDetail = "No requiere levantar otro puerto.";
             statusBadgeClass = "text-bg-primary";
+        } else if (runtime == null && localRuntime.configured()) {
+            statusLabel = localRuntime.statusLabel();
+            statusDetail = localRuntime.detail();
+            statusBadgeClass = localRuntime.badgeClass();
+            operationDetailUrl = "/control-center/demo-center/" + definition.code() + "/logs";
         } else if (runtime == null) {
-            statusLabel = "Runtime no registrado";
-            statusDetail = "Existe ficha comercial, pero Matrix26 no encontró esta instancia en el inventario activo.";
+            statusLabel = "Runtime no configurado";
+            statusDetail = "Existe ficha comercial, pero no se encontró configuración local ni inventario Matrix26 para este portal.";
             statusBadgeClass = "text-bg-secondary";
         } else {
             runtimeKey = runtime.target().key();
@@ -127,6 +200,7 @@ public class Matrix26DemoCenterService {
                 definition,
                 runtime,
                 control,
+                localRuntime,
                 online,
                 statusLabel,
                 statusDetail,

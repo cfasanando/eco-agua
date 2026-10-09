@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{control_center/fragments/head :: head('Módulo Matrix26 no disponible')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar(${routeLabel}, 'Esta sección pertenece al runtime completo de Matrix26 Control Center')}"></header>
+
+        <main class="matrix26-main">
+            <section class="matrix26-panel">
+                <div class="matrix26-panel-header">
+                    <div>
+                        <span>Modo local de demos</span>
+                        <h2>Esta sección no está activa en el portal principal 8081</h2>
+                    </div>
+                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+                        <i class="bi bi-exclamation-triangle me-1"></i>Ruta de runtime dedicado
+                    </span>
+                </div>
+
+                <div class="matrix26-empty-state text-start">
+                    <div class="matrix26-empty-icon">
+                        <i class="bi bi-window-sidebar"></i>
+                    </div>
+                    <div>
+                        <h3 th:text="${routeLabel}">Módulo Matrix26</h3>
+                        <p>
+                            Estás navegando desde el portal principal <strong>8081</strong>. En este modo se habilitó el
+                            <strong>Centro de demos</strong> y el control local de runtimes, pero esta sección pertenece al
+                            runtime dedicado de <strong>Matrix26 Control Center</strong>.
+                        </p>
+                        <dl class="matrix26-demo-meta mt-3">
+                            <div>
+                                <dt>Ruta solicitada</dt>
+                                <dd th:text="${requestedPath}">/control-center/example</dd>
+                            </div>
+                            <div>
+                                <dt>Runtime recomendado</dt>
+                                <dd>Matrix26 Control Center · puerto 8091</dd>
+                            </div>
+                        </dl>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mt-4">
+                    <a class="btn btn-primary" th:href="@{/control-center/demo-center}">
+                        <i class="bi bi-grid-1x2-fill me-1"></i>Volver al Centro de demos
+                    </a>
+                    <a class="btn btn-outline-primary" th:href="${matrix26RuntimeUrl}" target="_blank" rel="noopener">
+                        <i class="bi bi-box-arrow-up-right me-1"></i>Abrir en Matrix26 8091
+                    </a>
+                    <a class="btn btn-outline-secondary" th:href="@{/control-center/demo-center/matrix26-control-center(refresh=true)}">
+                        <i class="bi bi-hdd-network me-1"></i>Ver runtime Matrix26
+                    </a>
+                </div>
+            </section>
+
+            <section class="matrix26-banner mt-4">
+                <div>
+                    <span class="matrix26-banner-icon"><i class="bi bi-info-circle"></i></span>
+                    <div>
+                        <strong>No es un error de datos ni de compilación</strong>
+                        <p>
+                            El menú muestra el mapa completo de Matrix26, pero el portal actual usa el modo local para demos.
+                            Esta página evita el 404 y te indica qué runtime corresponde abrir.
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

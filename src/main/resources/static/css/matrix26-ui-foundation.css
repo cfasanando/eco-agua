@@ -1,0 +1,418 @@
+/* Matrix26 UI Foundation Phase 1
+   Visual polish and light/dark theme layer for Control Center and Demo Center.
+   This file is intentionally additive: it overrides the existing Matrix26 CSS without changing data flows. */
+:root {
+    --m26-radius-xs: 10px;
+    --m26-radius-sm: 14px;
+    --m26-radius-md: 18px;
+    --m26-radius-lg: 24px;
+    --m26-shadow-sm: 0 10px 28px rgba(15, 23, 42, .06);
+    --m26-shadow-md: 0 18px 52px rgba(15, 23, 42, .10);
+    --m26-shadow-lg: 0 28px 90px rgba(15, 23, 42, .14);
+    --m26-control-focus: 0 0 0 .24rem rgba(37, 99, 235, .16);
+    --m26-gradient-hero: linear-gradient(135deg, #1e3a8a 0%, #3730a3 46%, #0891b2 100%);
+    --m26-glass-border: rgba(148, 163, 184, .24);
+}
+
+html[data-matrix26-theme="light"] {
+    --m26-bg: #f3f6fb;
+    --m26-card: rgba(255, 255, 255, .96);
+    --m26-text: #111827;
+    --m26-muted: #64748b;
+    --m26-border: #dbe4f0;
+    --theme-background: #f3f6fb;
+    --theme-surface: rgba(255, 255, 255, .96);
+    --theme-text: #111827;
+    --theme-text-muted: #64748b;
+    --theme-border: #dbe4f0;
+    --theme-topbar-background: rgba(255, 255, 255, .86);
+    --theme-sidebar-background: #0b1220;
+    --theme-sidebar-background-end: #111a2e;
+    --theme-primary: #2563eb;
+    --theme-secondary: #4f46e5;
+    --theme-accent: #0891b2;
+    --theme-font-body: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html[data-matrix26-theme="dark"] {
+    color-scheme: dark;
+    --m26-bg: #07111f;
+    --m26-card: rgba(15, 23, 42, .92);
+    --m26-text: #e5eefc;
+    --m26-muted: #94a3b8;
+    --m26-border: #213049;
+    --m26-blue: #93c5fd;
+    --m26-indigo: #a5b4fc;
+    --m26-cyan: #67e8f9;
+    --m26-control-focus: 0 0 0 .25rem rgba(96, 165, 250, .20);
+    --m26-glass-border: rgba(148, 163, 184, .18);
+    --theme-background: #07111f;
+    --theme-surface: rgba(15, 23, 42, .92);
+    --theme-text: #e5eefc;
+    --theme-text-muted: #94a3b8;
+    --theme-border: #213049;
+    --theme-topbar-background: rgba(7, 17, 31, .78);
+    --theme-sidebar-background: #040b16;
+    --theme-sidebar-background-end: #0e1728;
+    --theme-primary: #60a5fa;
+    --theme-secondary: #818cf8;
+    --theme-accent: #22d3ee;
+    --theme-font-body: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body.matrix26-body {
+    min-height: 100vh;
+    letter-spacing: -.005em;
+    background:
+        radial-gradient(circle at 15% 0%, rgba(37, 99, 235, .10), transparent 30%),
+        radial-gradient(circle at 90% 12%, rgba(8, 145, 178, .08), transparent 28%),
+        var(--m26-bg);
+    transition: background-color .22s ease, color .22s ease;
+}
+
+html[data-matrix26-theme="dark"] body.matrix26-body {
+    background:
+        radial-gradient(circle at 18% 0%, rgba(96, 165, 250, .12), transparent 28%),
+        radial-gradient(circle at 88% 12%, rgba(34, 211, 238, .08), transparent 26%),
+        linear-gradient(180deg, #07111f 0%, #0b1324 100%);
+}
+
+.matrix26-sidebar {
+    border-right: 1px solid rgba(148, 163, 184, .12);
+    box-shadow: 18px 0 50px rgba(15, 23, 42, .16);
+}
+
+.matrix26-brand img {
+    background: rgba(255, 255, 255, .08);
+    border: 1px solid rgba(255, 255, 255, .16);
+}
+
+.matrix26-nav a {
+    min-height: 44px;
+    font-size: .88rem;
+    letter-spacing: -.01em;
+}
+
+.matrix26-nav a.active {
+    background: linear-gradient(135deg, var(--theme-primary), var(--theme-secondary));
+    box-shadow: 0 14px 32px rgba(37, 99, 235, .28);
+}
+
+.matrix26-content {
+    background: transparent;
+}
+
+.matrix26-topbar {
+    border-bottom-color: var(--m26-glass-border);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, .035);
+}
+
+html[data-matrix26-theme="dark"] .matrix26-topbar {
+    box-shadow: 0 14px 42px rgba(0, 0, 0, .18);
+}
+
+.matrix26-eyebrow,
+.matrix26-section-heading span,
+.matrix26-panel-header span,
+.matrix26-demo-title span {
+    color: var(--theme-primary);
+}
+
+.matrix26-topbar h1 {
+    font-weight: 820;
+    letter-spacing: -.04em;
+}
+
+.matrix26-topbar p {
+    max-width: 760px;
+}
+
+.matrix26-topbar-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.matrix26-theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 39px;
+    padding: 8px 13px;
+    border: 1px solid var(--m26-border);
+    border-radius: 999px;
+    background: var(--m26-card);
+    color: var(--m26-text);
+    font-weight: 760;
+    font-size: .78rem;
+    box-shadow: var(--m26-shadow-sm);
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease;
+}
+
+.matrix26-theme-toggle:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--theme-primary) 35%, var(--m26-border));
+    box-shadow: var(--m26-shadow-md);
+}
+
+.matrix26-theme-toggle:focus-visible {
+    outline: none;
+    box-shadow: var(--m26-control-focus);
+}
+
+.matrix26-theme-toggle i {
+    color: var(--theme-primary);
+}
+
+.matrix26-readonly-badge,
+.matrix26-user-menu-button,
+.matrix26-dropdown-menu {
+    background: var(--m26-card) !important;
+    color: var(--m26-text) !important;
+    border-color: var(--m26-border) !important;
+}
+
+.matrix26-readonly-badge {
+    color: var(--theme-primary) !important;
+    box-shadow: var(--m26-shadow-sm);
+}
+
+.matrix26-dropdown-menu {
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.matrix26-main {
+    padding-top: 34px;
+}
+
+.matrix26-banner {
+    border: 1px solid rgba(255, 255, 255, .18);
+    background: var(--m26-gradient-hero);
+    border-radius: var(--m26-radius-lg);
+    box-shadow: var(--m26-shadow-lg);
+}
+
+.matrix26-panel,
+.matrix26-stat-card,
+.matrix26-instance-card,
+.matrix26-module-catalog article,
+.matrix26-demo-card,
+.matrix26-demo-detail-hero {
+    background: var(--m26-card);
+    border-color: var(--m26-border);
+    box-shadow: var(--m26-shadow-sm);
+    backdrop-filter: blur(16px);
+}
+
+.matrix26-panel,
+.matrix26-instance-card,
+.matrix26-demo-card {
+    border-radius: var(--m26-radius-lg);
+}
+
+.matrix26-stat-card {
+    border-radius: var(--m26-radius-md);
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+
+.matrix26-stat-card:hover,
+.matrix26-demo-card:hover,
+.matrix26-instance-card:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--theme-primary) 24%, var(--m26-border));
+    box-shadow: var(--m26-shadow-md);
+}
+
+.matrix26-stat-card strong,
+.matrix26-instance-card-header h3,
+.matrix26-panel-header h2,
+.matrix26-section-heading h2,
+.matrix26-demo-title h3,
+.matrix26-demo-detail-hero h2 {
+    color: var(--m26-text);
+    letter-spacing: -.03em;
+}
+
+.matrix26-stat-card small,
+.matrix26-table td small,
+.matrix26-demo-pitch,
+.matrix26-demo-detail-hero p,
+.matrix26-panel-header small,
+.matrix26-instance-card-header p {
+    color: var(--m26-muted);
+}
+
+.matrix26-table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--m26-text);
+    --bs-table-border-color: var(--m26-border);
+    margin-bottom: 0;
+}
+
+.matrix26-table thead th {
+    color: var(--m26-muted);
+    background: color-mix(in srgb, var(--m26-card) 70%, var(--m26-bg));
+}
+
+.matrix26-table tbody td {
+    color: var(--m26-text);
+}
+
+.matrix26-table tbody tr {
+    transition: background-color .14s ease;
+}
+
+.matrix26-table tbody tr:hover {
+    background: color-mix(in srgb, var(--theme-primary) 7%, transparent);
+}
+
+.matrix26-settings-list div,
+.matrix26-demo-meta div {
+    border-color: var(--m26-border);
+}
+
+.matrix26-demo-meta {
+    border-color: var(--m26-border);
+    background: color-mix(in srgb, var(--m26-card) 88%, var(--m26-bg));
+}
+
+.matrix26-demo-meta div,
+.matrix26-instance-metrics div,
+.matrix26-isolation-node,
+.matrix26-roadmap-grid article,
+.matrix26-demo-runtime-state,
+.matrix26-demo-script {
+    background: color-mix(in srgb, var(--m26-card) 72%, var(--m26-bg));
+    border-color: var(--m26-border);
+    color: var(--m26-text);
+}
+
+.matrix26-demo-detail-hero {
+    position: relative;
+    overflow: hidden;
+}
+
+.matrix26-demo-detail-hero::before,
+.matrix26-demo-card::before {
+    opacity: .92;
+}
+
+.matrix26-demo-icon,
+.matrix26-demo-detail-icon,
+.matrix26-instance-avatar,
+.matrix26-table-avatar,
+.matrix26-module-icon,
+.matrix26-stat-icon {
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.22), 0 12px 28px rgba(15,23,42,.08);
+}
+
+.matrix26-module-chips span {
+    background: color-mix(in srgb, var(--theme-primary) 12%, var(--m26-card));
+    color: color-mix(in srgb, var(--theme-primary) 78%, var(--m26-text));
+    border-color: color-mix(in srgb, var(--theme-primary) 22%, var(--m26-border));
+}
+
+.badge {
+    letter-spacing: -.005em;
+    border-radius: 999px;
+}
+
+.btn {
+    border-radius: 12px;
+    font-weight: 730;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--theme-primary), var(--theme-secondary));
+    border-color: transparent;
+    box-shadow: 0 12px 28px rgba(37, 99, 235, .20);
+}
+
+.btn-primary:hover {
+    filter: saturate(1.08) brightness(.98);
+    box-shadow: 0 16px 36px rgba(37, 99, 235, .25);
+}
+
+.btn-outline-dark,
+.btn-outline-secondary,
+.btn-outline-primary,
+.btn-light {
+    border-color: var(--m26-border);
+}
+
+html[data-matrix26-theme="dark"] .btn-light,
+html[data-matrix26-theme="dark"] .btn-outline-dark,
+html[data-matrix26-theme="dark"] .btn-outline-secondary {
+    color: var(--m26-text);
+    background: color-mix(in srgb, var(--m26-card) 88%, #020617);
+    border-color: var(--m26-border);
+}
+
+html[data-matrix26-theme="dark"] .btn-light:hover,
+html[data-matrix26-theme="dark"] .btn-outline-dark:hover,
+html[data-matrix26-theme="dark"] .btn-outline-secondary:hover {
+    background: color-mix(in srgb, var(--theme-primary) 16%, var(--m26-card));
+    color: #fff;
+}
+
+.form-control,
+.form-select,
+.input-group-text {
+    border-color: var(--m26-border);
+    border-radius: 12px;
+    background-color: var(--m26-card);
+    color: var(--m26-text);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--theme-primary);
+    box-shadow: var(--m26-control-focus);
+}
+
+.matrix26-alert-safe {
+    background: color-mix(in srgb, #10b981 13%, var(--m26-card));
+    border-color: color-mix(in srgb, #10b981 35%, var(--m26-border));
+    color: color-mix(in srgb, #10b981 58%, var(--m26-text));
+}
+
+.matrix26-demo-warning-list li {
+    background: color-mix(in srgb, #f59e0b 13%, var(--m26-card));
+    border-color: color-mix(in srgb, #f59e0b 32%, var(--m26-border));
+    color: color-mix(in srgb, #b45309 58%, var(--m26-text));
+}
+
+pre,
+code {
+    color: color-mix(in srgb, var(--theme-primary) 68%, var(--m26-text));
+}
+
+.matrix26-log-box,
+pre.matrix26-log-box {
+    background: #020617;
+    color: #dbeafe;
+    border: 1px solid rgba(148, 163, 184, .22);
+    border-radius: 18px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.03), var(--m26-shadow-sm);
+}
+
+html[data-matrix26-theme="dark"] .alert-success,
+html[data-matrix26-theme="dark"] .alert-danger,
+html[data-matrix26-theme="dark"] .alert-warning,
+html[data-matrix26-theme="dark"] .alert-info {
+    color: var(--m26-text);
+    background: color-mix(in srgb, var(--m26-card) 86%, var(--bs-alert-bg));
+    border: 1px solid var(--m26-border) !important;
+}
+
+@media (max-width: 860px) {
+    .matrix26-theme-toggle span,
+    .matrix26-readonly-badge {
+        display: none;
+    }
+    .matrix26-theme-toggle {
+        width: 42px;
+        padding: 8px;
+    }
+}

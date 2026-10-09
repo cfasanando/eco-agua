@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{control_center/fragments/head :: head('Log del demo')}"></head>
+<body class="matrix26-body">
+<div class="matrix26-shell">
+    <aside th:replace="~{control_center/fragments/sidebar :: sidebar(${activePage})}"></aside>
+
+    <div class="matrix26-content">
+        <header th:replace="~{control_center/fragments/topbar :: topbar('Log del demo', ${logView.portal().definition().name()})}"></header>
+
+        <main class="matrix26-main">
+            <section class="matrix26-demo-detail-hero" th:style="'--demo-accent:' + ${logView.portal().definition().accentColor()}">
+                <div>
+                    <span class="matrix26-demo-detail-icon"><i th:class="'bi ' + ${logView.portal().definition().iconClass()}"></i></span>
+                    <div>
+                        <div class="matrix26-eyebrow">Runtime local</div>
+                        <h2 th:text="${logView.portal().definition().name()}">Portal demo</h2>
+                        <p>
+                            <strong th:text="${logView.logPath()}">logs/demo.log</strong><br>
+                            <span th:text="${logView.message()}">Mensaje</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="matrix26-demo-detail-actions">
+                    <a class="btn btn-light" th:href="@{/control-center/demo-center/{code}(code=${logView.portal().definition().code()}, refresh=true)}">
+                        <i class="bi bi-arrow-left me-1"></i>Volver al demo
+                    </a>
+                    <a class="btn btn-primary" th:href="@{/control-center/demo-center/{code}/logs(code=${logView.portal().definition().code()})}">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Actualizar log
+                    </a>
+                    <a class="btn btn-outline-dark" target="_blank" rel="noopener" th:if="${logView.portal().canOpen()}" th:href="${logView.portal().openUrl()}">
+                        <i class="bi bi-box-arrow-up-right me-1"></i>Abrir portal
+                    </a>
+                </div>
+            </section>
+
+            <section class="matrix26-panel mt-4">
+                <div class="matrix26-panel-header">
+                    <div>
+                        <span>Salida de inicio</span>
+                        <h2>Últimas líneas del proceso</h2>
+                    </div>
+                </div>
+                <div class="matrix26-log-box" th:if="${logView.available()}">
+                    <pre><code th:each="line : ${logView.lines()}" th:text="${line + '\n'}">log line</code></pre>
+                </div>
+                <div class="matrix26-alert-safe" th:if="${!logView.available()}">
+                    <i class="bi bi-info-circle"></i>
+                    <div>
+                        <strong>Log no disponible</strong>
+                        <p th:text="${logView.message()}">Todavía no existe log.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

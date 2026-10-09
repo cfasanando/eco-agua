@@ -1,7 +1,5 @@
 package com.ecoamazonas.eco_agua.platform.control.demo;
 
-import com.ecoamazonas.eco_agua.platform.control.operations.Matrix26RuntimeControlException;
-import com.ecoamazonas.eco_agua.platform.control.operations.Matrix26RuntimeControlResult;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -44,6 +42,16 @@ public class Matrix26DemoCenterController {
         return "control_center/demo_center/detail";
     }
 
+    @GetMapping("/{code}/logs")
+    public String logs(
+            @PathVariable String code,
+            Model model
+    ) {
+        model.addAttribute("activePage", "matrix26_demo_center");
+        model.addAttribute("logView", demoCenterService.logs(code));
+        return "control_center/demo_center/logs";
+    }
+
     @PostMapping("/{code}/start")
     public String start(
             @PathVariable String code,
@@ -53,44 +61,36 @@ public class Matrix26DemoCenterController {
         return executeRuntimeAction(
                 code,
                 redirectAttributes,
-                () -> demoCenterService.runtimeControlService().start(runtimeKey(code), actor(principal))
+                () -> demoCenterService.startPortal(code, actor(principal))
         );
     }
 
     @PostMapping("/{code}/stop")
     public String stop(
             @PathVariable String code,
-            @RequestParam("confirmation") String confirmation,
+            @RequestParam(value = "confirmation", required = false) String confirmation,
             Principal principal,
             RedirectAttributes redirectAttributes
     ) {
         return executeRuntimeAction(
                 code,
                 redirectAttributes,
-                () -> demoCenterService.runtimeControlService().stop(runtimeKey(code), actor(principal), confirmation)
+                () -> demoCenterService.stopPortal(code, actor(principal))
         );
     }
 
     @PostMapping("/{code}/restart")
     public String restart(
             @PathVariable String code,
-            @RequestParam("confirmation") String confirmation,
+            @RequestParam(value = "confirmation", required = false) String confirmation,
             Principal principal,
             RedirectAttributes redirectAttributes
     ) {
         return executeRuntimeAction(
                 code,
                 redirectAttributes,
-                () -> demoCenterService.runtimeControlService().restart(runtimeKey(code), actor(principal), confirmation)
+                () -> demoCenterService.restartPortal(code, actor(principal))
         );
-    }
-
-    private String runtimeKey(String code) {
-        Matrix26DemoPortalView portal = demoCenterService.portal(code, true);
-        if (portal.runtimeKey() == null || portal.runtimeKey().isBlank()) {
-            throw new Matrix26RuntimeControlException("Este portal demo no tiene runtime administrable registrado en Matrix26.");
-        }
-        return portal.runtimeKey();
     }
 
     private String executeRuntimeAction(
@@ -99,8 +99,12 @@ public class Matrix26DemoCenterController {
             RuntimeAction action
     ) {
         try {
-            Matrix26RuntimeControlResult result = action.execute();
-            redirectAttributes.addFlashAttribute("demoCenterSuccess", result.message());
+            Matrix26DemoRuntimeActionResult result = action.execute();
+            if (result.success()) {
+                redirectAttributes.addFlashAttribute("demoCenterSuccess", result.message());
+            } else {
+                redirectAttributes.addFlashAttribute("demoCenterError", result.message());
+            }
         } catch (RuntimeException ex) {
             redirectAttributes.addFlashAttribute("demoCenterError", ex.getMessage());
         }
@@ -115,6 +119,6 @@ public class Matrix26DemoCenterController {
 
     @FunctionalInterface
     private interface RuntimeAction {
-        Matrix26RuntimeControlResult execute();
+        Matrix26DemoRuntimeActionResult execute();
     }
 }

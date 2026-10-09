@@ -7,6 +7,7 @@ public record Matrix26DemoPortalView(
         Matrix26DemoPortalDefinition definition,
         Matrix26RuntimeInventoryItem runtime,
         Matrix26RuntimeControlView control,
+        Matrix26DemoRuntimeStatus localRuntime,
         boolean online,
         String statusLabel,
         String statusDetail,
@@ -16,7 +17,7 @@ public record Matrix26DemoPortalView(
         String operationDetailUrl
 ) {
     public boolean hasRuntime() {
-        return runtime != null;
+        return runtime != null || (localRuntime != null && localRuntime.configured());
     }
 
     public boolean canOpen() {
@@ -24,22 +25,32 @@ public record Matrix26DemoPortalView(
     }
 
     public boolean canStart() {
-        return control != null && control.canStart();
+        return (localRuntime != null && localRuntime.canStart()) || (control != null && control.canStart());
     }
 
     public boolean canStop() {
-        return control != null && control.canStop();
+        return (localRuntime != null && localRuntime.canStop()) || (control != null && control.canStop());
     }
 
     public boolean canRestart() {
-        return control != null && control.canRestart();
+        return (localRuntime != null && localRuntime.canRestart()) || (control != null && control.canRestart());
+    }
+
+    public boolean canViewLog() {
+        return localRuntime != null && localRuntime.applicable() && localRuntime.configured();
     }
 
     public String stopConfirmation() {
-        return control == null ? "" : control.stopConfirmation();
+        if (control != null && control.stopConfirmation() != null && !control.stopConfirmation().isBlank()) {
+            return control.stopConfirmation();
+        }
+        return "STOP " + definition.code();
     }
 
     public String restartConfirmation() {
-        return control == null ? "" : control.restartConfirmation();
+        if (control != null && control.restartConfirmation() != null && !control.restartConfirmation().isBlank()) {
+            return control.restartConfirmation();
+        }
+        return "RESTART " + definition.code();
     }
 }

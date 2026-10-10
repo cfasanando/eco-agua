@@ -6,13 +6,13 @@
   <aside th:replace="personal_finance/_sidebar :: sidebar"></aside>
   <div class="main-content">
     <header th:replace="personal_finance/_topbar :: topbar"></header>
-    <main class="content-wrapper gasto-claro-page">
+    <main class="content-wrapper gasto-claro-page pf-monthly-plan-workspace">
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
           <h1 class="h4 mb-1">Plan mensual GastoClaro</h1>
           <p class="text-muted mb-0">Vista operativa tipo Excel: primero genera el mes desde plantillas recurrentes y luego revisa ingresos, costo de vida, deudas, pagado, pendiente y déficit.</p>
         </div>
-        <div class="d-flex flex-wrap gap-2 align-items-end">
+        <div class="d-flex flex-wrap gap-2 align-items-end pf-monthly-header-actions">
           <a th:href="@{/gasto-claro/payments(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-success"><i class="bi bi-cash-coin"></i> Pagos</a>
           <a th:href="@{/gasto-claro/debt-report(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-danger"><i class="bi bi-file-earmark-pdf"></i> Informe de deudas</a>
           <form th:action="@{/gasto-claro/monthly-plan}" method="get" class="d-flex gap-2 align-items-end">
@@ -29,11 +29,34 @@
         </div>
       </div>
 
-      <div th:replace="personal_finance/_nav :: nav('monthly_plan')"></div>
+      <div class="pf-monthly-tabs-wrap" th:replace="personal_finance/_nav :: nav('monthly_plan')"></div>
 
       <div th:if="${message}" class="alert border-0 shadow-sm" th:classappend="${messageType == 'success'} ? ' alert-success' : ' alert-info'" th:text="${message}">Mensaje</div>
 
-      <section class="gasto-month-hero mb-4">
+      <section class="pf-monthly-command-strip" aria-label="Barra de control mensual">
+        <div class="pf-monthly-command-title">
+          <span class="pf-command-eyebrow"><i class="bi bi-grid-3x3-gap"></i> Hoja mensual</span>
+          <strong><span th:text="${selectedMonth}">10</span>/<span th:text="${selectedYear}">2026</span></strong>
+          <small>Controla ingresos, pagos y saldo como en Excel.</small>
+        </div>
+        <div class="pf-monthly-command-actions">
+          <form th:action="@{/gasto-claro/monthly-plan}" method="get" class="pf-monthly-inline-form">
+            <label>Año <input type="number" class="form-control form-control-sm" name="year" th:value="${selectedYear}"></label>
+            <label>Mes <input type="number" class="form-control form-control-sm" min="1" max="12" name="month" th:value="${selectedMonth}"></label>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> Ver</button>
+          </form>
+          <form th:action="@{/gasto-claro/monthly-plan/generate-obligations}" method="post" class="pf-monthly-inline-form">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <input type="hidden" name="year" th:value="${selectedYear}"/>
+            <input type="hidden" name="month" th:value="${selectedMonth}"/>
+            <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-arrow-repeat"></i> Generar mes</button>
+          </form>
+          <a th:href="@{/gasto-claro/payments(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-success"><i class="bi bi-cash-coin"></i> Pagos</a>
+          <a th:href="@{/gasto-claro/debt-report(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-danger"><i class="bi bi-file-earmark-pdf"></i> Informe</a>
+        </div>
+      </section>
+
+      <section class="gasto-month-hero pf-monthly-hero mb-3">
         <div>
           <div class="text-uppercase small fw-bold opacity-75">Mes seleccionado</div>
           <div class="h3 mb-0"><span th:text="${selectedMonth}">7</span>/<span th:text="${selectedYear}">2026</span></div>
@@ -45,7 +68,7 @@
         </div>
       </section>
 
-      <section class="gasto-live-control mb-4" aria-live="polite">
+      <section class="gasto-live-control pf-live-control-grid mb-3" aria-live="polite">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
           <div>
             <div class="text-uppercase small fw-bold text-primary">Control real del mes</div>
@@ -93,7 +116,7 @@
         </div>
       </section>
 
-      <div class="row g-3 mb-4">
+      <div class="row g-2 mb-3 pf-monthly-kpi-strip">
         <div class="col-6 col-xl-2">
           <div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
             <div class="text-muted small">Ingresos</div>
@@ -134,7 +157,7 @@
         </div>
       </div>
 
-      <div class="alert border-0 shadow-sm mb-4" th:classappend="${plan.hasDeficit()} ? ' alert-danger' : ' alert-success'">
+      <div class="alert border-0 shadow-sm mb-3 pf-monthly-signal" th:classappend="${plan.hasDeficit()} ? ' alert-danger' : ' alert-success'">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
           <div>
             <div class="fw-semibold" th:if="${plan.hasDeficit()}">Este mes está en rojo.</div>
@@ -158,7 +181,7 @@
         </div>
       </div>
 
-      <div class="card border-0 shadow-sm mb-4">
+      <div class="card border-0 shadow-sm mb-3 pf-monthly-generate-card">
         <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
           <div>
             <div class="fw-semibold">Generar / actualizar mes</div>
@@ -173,12 +196,28 @@
         </div>
       </div>
 
-      <div class="row g-3">
-        <div class="col-xl-8">
+      <section class="pf-excel-workbar" aria-label="Herramientas de la hoja mensual">
+        <div class="pf-excel-workbar-title">
+          <i class="bi bi-table"></i>
+          <div>
+            <strong>Hoja de control del mes</strong>
+            <small>Marca recibido/pagado y revisa pendiente sin salir de la vista.</small>
+          </div>
+        </div>
+        <div class="pf-excel-workbar-legend" aria-label="Leyenda de estados">
+          <span><i class="pf-dot is-paid"></i> pagado</span>
+          <span><i class="pf-dot is-partial"></i> parcial</span>
+          <span><i class="pf-dot is-pending"></i> pendiente</span>
+          <span><i class="pf-dot is-risk"></i> urgente</span>
+        </div>
+      </section>
+
+      <div class="row g-3 pf-monthly-split">
+        <div class="col-xl-8 pf-monthly-grid-pane">
           <div class="gasto-excel-card mb-3">
-            <div class="gasto-excel-title">Ingresos</div>
+            <div class="gasto-excel-title" id="pfIngresosGrid"><span><i class="bi bi-arrow-down-circle"></i> Ingresos</span><small>recibido / pendiente</small></div>
             <div class="table-responsive">
-              <table class="table table-sm gasto-excel-table align-middle mb-0">
+              <table class="table table-sm gasto-excel-table pf-data-grid align-middle mb-0">
                 <thead><tr><th class="text-center">Recibido</th><th>Fuente</th><th>Estado</th><th>Fecha</th><th class="text-end">Monto</th><th class="gasto-note-cell">Nota</th></tr></thead>
                 <tbody>
                 <tr th:each="income : ${plan.incomes()}" data-income-row>
@@ -218,9 +257,9 @@
           </div>
 
           <div class="gasto-excel-card mb-3">
-            <div class="gasto-excel-title">Costo de vida básico</div>
+            <div class="gasto-excel-title" id="pfBasicoGrid"><span><i class="bi bi-house-check"></i> Costo de vida básico</span><small>primero para mantenerte operativo</small></div>
             <div class="table-responsive">
-              <table class="table table-sm gasto-excel-table align-middle mb-0" data-payment-table>
+              <table class="table table-sm gasto-excel-table pf-data-grid align-middle mb-0" data-payment-table>
                 <thead><tr><th class="text-center">Hecho</th><th>Concepto</th><th>Prioridad</th><th>Fecha</th><th>Estado</th><th class="text-end">Monto</th><th class="text-end">Pagado</th><th class="text-end">Pendiente</th><th class="gasto-note-cell">Nota</th><th></th></tr></thead>
                 <tbody th:replace="personal_finance/monthly_plan :: itemRows(${plan.basicLivingItems()}, ${selectedYear}, ${selectedMonth})"></tbody>
                 <tbody>
@@ -280,11 +319,11 @@
 
           <div class="gasto-excel-card mb-3">
             <div class="gasto-excel-title gasto-debt-table-title">
-              <span>Deudas x pagar</span>
+              <span><i class="bi bi-credit-card-2-front"></i> Deudas x pagar</span>
               <span class="small fw-normal">Montos en S/. · pago del mes ≠ saldo total</span>
             </div>
             <div class="gasto-debt-table-wrap">
-              <table class="table table-sm gasto-excel-table gasto-debt-table align-middle mb-0" data-payment-table>
+              <table class="table table-sm gasto-excel-table gasto-debt-table pf-data-grid align-middle mb-0" data-payment-table>
                 <thead>
                 <tr>
                   <th class="text-center gasto-debt-check">✓</th>
@@ -323,7 +362,7 @@
               <span class="small fw-normal">No se suman al pago exigible ni al déficit del mes</span>
             </div>
             <div class="table-responsive">
-              <table class="table table-sm gasto-excel-table align-middle mb-0">
+              <table class="table table-sm gasto-excel-table pf-data-grid align-middle mb-0">
                 <thead><tr><th>Deuda</th><th>Situación</th><th>Atraso</th><th>Negociación</th><th class="text-end">Saldo</th><th>Último pago</th><th>Próxima revisión</th><th></th></tr></thead>
                 <tbody>
                 <tr th:each="debt : ${plan.delinquentDebts()}" th:classappend="${debt.reviewDue()} ? ' table-warning' : ''">
@@ -366,9 +405,9 @@
           </div>
 
           <div class="gasto-excel-card" th:if="${!#lists.isEmpty(plan.otherItems())}">
-            <div class="gasto-excel-title">Otros compromisos</div>
+            <div class="gasto-excel-title"><span><i class="bi bi-list-check"></i> Otros compromisos</span><small>pagos del mes no recurrentes</small></div>
             <div class="table-responsive">
-              <table class="table table-sm gasto-excel-table align-middle mb-0" data-payment-table>
+              <table class="table table-sm gasto-excel-table pf-data-grid align-middle mb-0" data-payment-table>
                 <thead><tr><th class="text-center">Hecho</th><th>Concepto</th><th>Prioridad</th><th>Fecha</th><th>Estado</th><th class="text-end">Monto</th><th class="text-end">Pagado</th><th class="text-end">Pendiente</th><th class="gasto-note-cell">Nota</th><th></th></tr></thead>
                 <tbody th:replace="personal_finance/monthly_plan :: itemRows(${plan.otherItems()}, ${selectedYear}, ${selectedMonth})"></tbody>
                 <tbody><tr class="gasto-total-row js-payment-total"><td colspan="5">TOTAL OTROS COMPROMISOS</td><td class="text-end">S/ <span class="js-group-due">0.00</span></td><td class="text-end">S/ <span class="js-group-paid">0.00</span></td><td class="text-end">S/ <span class="js-group-pending">0.00</span></td><td colspan="2"></td></tr></tbody>
@@ -377,8 +416,25 @@
           </div>
         </div>
 
-        <div class="col-xl-4">
-          <div class="card border-0 shadow-sm mb-3">
+        <div class="col-xl-4 pf-monthly-side-pane">
+          <aside class="pf-monthly-summary-rail" aria-label="Resumen fijo del plan mensual">
+            <div class="pf-summary-rail-header">
+              <span>Resumen del mes</span>
+              <strong th:classappend="${plan.projectedBalance().signum() < 0} ? ' text-danger' : ' text-success'">S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.projectedBalance())}">0.00</span></strong>
+            </div>
+            <div class="pf-summary-rail-grid">
+              <div><small>Ingreso</small><b>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.expectedIncome())}">0.00</span></b></div>
+              <div><small>Pagado</small><b>S/ <span id="pfRailPaidTotal" th:text="${@personalFinanceMoneyFormatter.amount(liveSummary.paidTotal())}">0.00</span></b></div>
+              <div><small>Pendiente</small><b>S/ <span id="pfRailPendingTotal" th:text="${@personalFinanceMoneyFormatter.amount(liveSummary.pendingTotal())}">0.00</span></b></div>
+              <div><small>Saldo real</small><b>S/ <span id="pfRailRealBalance" th:text="${@personalFinanceMoneyFormatter.amount(liveSummary.realBalance())}">0.00</span></b></div>
+            </div>
+            <div class="pf-summary-rail-actions">
+              <a th:href="@{/gasto-claro/reserved-funds(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-success"><i class="bi bi-wallet2"></i> Reservar</a>
+              <a th:href="@{/gasto-claro/monthly-priority(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-primary"><i class="bi bi-list-check"></i> Prioridad</a>
+            </div>
+          </aside>
+
+          <div class="card border-0 shadow-sm mb-3 pf-side-form-card">
             <div class="card-header bg-white"><strong th:text="${obligationForm.id == null ? 'Agregar compromiso manual' : 'Editar compromiso'}">Agregar compromiso</strong></div>
             <div class="card-body">
               <form th:action="@{/gasto-claro/monthly-plan/obligations}" method="post" th:object="${obligationForm}" class="row g-2">
@@ -705,6 +761,9 @@
         setText('livePaidTotal', money(data.paidTotal));
         setText('liveRealBalance', money(data.realBalance));
         setText('livePendingTotal', money(data.pendingTotal));
+        setText('pfRailPaidTotal', money(data.paidTotal));
+        setText('pfRailPendingTotal', money(data.pendingTotal));
+        setText('pfRailRealBalance', money(data.realBalance));
         setText('livePaidPayments', data.paidPayments);
         setText('liveTotalPayments', data.totalPayments);
         setText('livePendingPayments', data.pendingPayments);

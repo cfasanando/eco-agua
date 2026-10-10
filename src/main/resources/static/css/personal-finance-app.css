@@ -539,3 +539,910 @@ body.sidebar-collapsed .pf-sidebar .pf-tree-item { margin-left: 8px; justify-con
   .pf-app-layout .gasto-month-hero { grid-template-columns: 1fr; gap: 10px; }
   .pf-app-layout .gasto-hero-number { text-align: left; min-width: 0; }
 }
+
+/* GastoClaro Desktop Phase 2: monthly plan as an Excel-like workbench. */
+.pf-monthly-plan-workspace {
+  --pf-grid-header: #eef4fb;
+  --pf-grid-line: #cdd8e8;
+  --pf-grid-line-soft: #e4ebf4;
+  --pf-row-hover: #f1f7ff;
+  --pf-cell-focus: rgba(35, 103, 216, .16);
+}
+
+.pf-monthly-plan-workspace .pf-monthly-header-actions {
+  display: none !important;
+}
+
+.pf-monthly-plan-workspace > .d-flex:first-child {
+  margin-bottom: .55rem !important;
+}
+
+.pf-monthly-command-strip {
+  position: sticky;
+  top: 64px;
+  z-index: 1020;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 .7rem;
+  padding: 9px 10px;
+  border: 1px solid var(--pf-desktop-border-soft);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(239,245,253,.94));
+  box-shadow: 0 10px 26px rgba(15, 23, 42, .10);
+  backdrop-filter: blur(12px);
+}
+
+.pf-monthly-command-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 220px;
+}
+
+.pf-command-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #eaf2ff;
+  color: #164fae;
+  font-size: .72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.pf-monthly-command-title strong {
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.pf-monthly-command-title small {
+  color: var(--pf-desktop-muted);
+  font-size: .75rem;
+}
+
+.pf-monthly-command-actions,
+.pf-monthly-inline-form {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.pf-monthly-inline-form label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: .72rem;
+  color: #52657d;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.pf-monthly-inline-form .form-control {
+  width: 76px;
+  min-height: 30px;
+  padding-block: 4px;
+  font-weight: 800;
+}
+
+.pf-monthly-tabs-wrap,
+.pf-monthly-plan-workspace .pf-desktop-tabs {
+  margin-bottom: .65rem;
+}
+
+.pf-monthly-hero {
+  min-height: 84px;
+  margin-bottom: .65rem !important;
+}
+
+.pf-monthly-hero .h3 {
+  font-size: 1.55rem;
+}
+
+.pf-monthly-plan-workspace .gasto-hero-number {
+  min-width: 150px;
+  padding: 8px 12px;
+}
+
+.pf-live-control-grid {
+  padding: 11px 12px;
+  margin-bottom: .7rem !important;
+}
+
+.pf-live-control-grid > .d-flex:first-child {
+  margin-bottom: 8px !important;
+}
+
+.pf-live-control-grid h2 {
+  font-size: 1rem;
+}
+
+.pf-live-control-grid p.small {
+  max-width: 880px;
+}
+
+.pf-live-control-grid .gasto-live-stat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: baseline;
+  padding: 8px 10px;
+  min-height: 42px;
+}
+
+.pf-live-control-grid .gasto-live-stat span {
+  font-size: .74rem;
+  font-weight: 760;
+}
+
+.pf-live-control-grid .gasto-live-stat strong {
+  justify-self: end;
+  font-size: .93rem;
+}
+
+.pf-live-control-grid .gasto-live-stat small {
+  grid-column: 1 / -1;
+  font-size: .7rem;
+}
+
+.pf-monthly-kpi-strip .card-body {
+  padding: 9px 11px !important;
+}
+
+.pf-monthly-kpi-strip .h5 {
+  font-size: 1rem;
+}
+
+.pf-monthly-signal {
+  padding: 10px 12px;
+}
+
+.pf-monthly-generate-card .card-body {
+  padding-block: 9px !important;
+}
+
+.pf-excel-workbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: .55rem;
+  padding: 8px 10px;
+  border: 1px solid var(--pf-grid-line);
+  border-radius: 9px 9px 0 0;
+  background: linear-gradient(180deg, #ffffff 0%, #edf3fb 100%);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, .06);
+}
+
+.pf-excel-workbar-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.pf-excel-workbar-title > i {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #ffffff;
+  background: #2367d8;
+}
+
+.pf-excel-workbar-title strong {
+  display: block;
+  font-size: .9rem;
+}
+
+.pf-excel-workbar-title small {
+  display: block;
+  color: var(--pf-desktop-muted);
+  font-size: .73rem;
+}
+
+.pf-excel-workbar-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #53657c;
+  font-size: .74rem;
+  font-weight: 760;
+}
+
+.pf-dot {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  border-radius: 50%;
+  margin-right: 4px;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, .04);
+}
+
+.pf-dot.is-paid { background: #059669; }
+.pf-dot.is-partial { background: #f59e0b; }
+.pf-dot.is-pending { background: #2563eb; }
+.pf-dot.is-risk { background: #dc3545; }
+
+.pf-monthly-split {
+  align-items: flex-start;
+}
+
+.pf-monthly-side-pane {
+  position: sticky;
+  top: 122px;
+  align-self: flex-start;
+  max-height: calc(100vh - 132px);
+  overflow: auto;
+  padding-bottom: 10px;
+}
+
+.pf-monthly-summary-rail {
+  margin-bottom: .75rem;
+  border: 1px solid var(--pf-desktop-border-soft);
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, .92);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, .08);
+}
+
+.pf-summary-rail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #142a48 0%, #1f5fca 100%);
+  color: #ffffff;
+}
+
+.pf-summary-rail-header span {
+  color: rgba(255,255,255,.80);
+  font-size: .78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.pf-summary-rail-header strong,
+.pf-summary-rail-header .text-success,
+.pf-summary-rail-header .text-danger {
+  color: #ffffff !important;
+  font-size: 1.08rem;
+}
+
+.pf-summary-rail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+
+.pf-summary-rail-grid > div {
+  padding: 10px 12px;
+  border-right: 1px solid var(--pf-grid-line-soft);
+  border-bottom: 1px solid var(--pf-grid-line-soft);
+}
+
+.pf-summary-rail-grid > div:nth-child(2n) { border-right: 0; }
+
+.pf-summary-rail-grid small {
+  display: block;
+  color: var(--pf-desktop-muted);
+  font-size: .72rem;
+  font-weight: 760;
+}
+
+.pf-summary-rail-grid b {
+  display: block;
+  margin-top: 2px;
+  font-size: .95rem;
+}
+
+.pf-summary-rail-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  padding: 10px;
+}
+
+.pf-side-form-card .card-header,
+.pf-side-form-card .card-body {
+  padding-inline: 12px;
+}
+
+.pf-monthly-grid-pane .gasto-excel-card {
+  margin-bottom: .75rem !important;
+}
+
+.pf-monthly-grid-pane .gasto-excel-title {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background: linear-gradient(180deg, #f8fbff 0%, #e6edf7 100%);
+}
+
+.pf-monthly-grid-pane .gasto-excel-title span:first-child,
+.pf-monthly-grid-pane .gasto-excel-title > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pf-monthly-grid-pane .gasto-excel-title small,
+.pf-monthly-grid-pane .gasto-excel-title .small {
+  color: #5d6d81;
+  font-weight: 720;
+}
+
+.pf-data-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.pf-data-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  border-top: 0;
+  background: var(--pf-grid-header) !important;
+}
+
+.pf-data-grid tbody td {
+  border-right: 1px solid var(--pf-grid-line-soft);
+}
+
+.pf-data-grid tbody td:last-child,
+.pf-data-grid thead th:last-child {
+  border-right: 0;
+}
+
+.pf-data-grid tbody tr:nth-child(even) {
+  background: rgba(248, 251, 255, .68);
+}
+
+.pf-data-grid tbody tr:hover {
+  background: var(--pf-row-hover) !important;
+  box-shadow: inset 3px 0 0 #2367d8;
+}
+
+.pf-data-grid .form-check-input {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.pf-data-grid .form-check-input:checked {
+  background-color: #059669;
+  border-color: #059669;
+}
+
+.pf-data-grid .btn-sm {
+  --bs-btn-padding-y: .18rem;
+  --bs-btn-padding-x: .38rem;
+  border-radius: 6px;
+}
+
+.pf-data-grid .gasto-total-row td {
+  background: #eef4fb;
+  border-top: 2px solid #bfd0e5;
+  font-weight: 850;
+}
+
+.pf-monthly-grid-pane .gasto-debt-portfolio {
+  padding: 10px 11px;
+  border: 1px solid var(--pf-desktop-border-soft);
+  border-radius: 10px;
+  background: rgba(255,255,255,.86);
+  box-shadow: 0 10px 22px rgba(15,23,42,.06);
+}
+
+.pf-monthly-grid-pane .gasto-debt-summary-card {
+  min-height: 68px;
+  padding: 9px 10px;
+  border-radius: 9px;
+}
+
+.pf-monthly-grid-pane .gasto-debt-summary-card span {
+  font-size: .74rem;
+}
+
+.pf-monthly-grid-pane .gasto-debt-summary-card strong {
+  font-size: .98rem;
+}
+
+@media (max-width: 1199.98px) {
+  .pf-monthly-command-strip,
+  .pf-excel-workbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .pf-monthly-side-pane {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .pf-monthly-command-strip {
+    top: 0;
+  }
+  .pf-monthly-command-title,
+  .pf-monthly-command-actions,
+  .pf-monthly-inline-form {
+    width: 100%;
+  }
+  .pf-monthly-inline-form .form-control {
+    width: 100%;
+  }
+  .pf-monthly-inline-form label {
+    flex: 1 1 86px;
+  }
+  .pf-live-control-grid .gasto-live-stat {
+    grid-template-columns: 1fr;
+  }
+  .pf-live-control-grid .gasto-live-stat strong {
+    justify-self: start;
+  }
+  .pf-summary-rail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* GastoClaro Desktop Phase 2.1: single-scroll responsive refinement.
+   Keep the page with one natural vertical scroll. Avoid inner scroll panes in
+   the monthly plan while preserving horizontal overflow only for wide grids. */
+.pf-monthly-plan-workspace {
+  overflow: visible;
+}
+
+.pf-monthly-plan-workspace .pf-monthly-command-strip {
+  position: static;
+  top: auto;
+  z-index: auto;
+}
+
+.pf-monthly-plan-workspace .pf-monthly-side-pane {
+  position: static;
+  top: auto;
+  max-height: none;
+  overflow: visible;
+  padding-bottom: 0;
+}
+
+.pf-monthly-plan-workspace .pf-monthly-summary-rail {
+  position: sticky;
+  top: 78px;
+  z-index: 20;
+}
+
+.pf-monthly-plan-workspace .table-responsive {
+  overflow-x: auto;
+  overflow-y: visible;
+  max-height: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pf-monthly-plan-workspace .gasto-excel-card,
+.pf-monthly-plan-workspace .card,
+.pf-monthly-plan-workspace .pf-panel {
+  overflow: visible;
+}
+
+.pf-monthly-plan-workspace .pf-data-grid thead th {
+  position: static;
+  top: auto;
+}
+
+.pf-monthly-plan-workspace .pf-data-grid {
+  min-width: max-content;
+}
+
+.pf-monthly-plan-workspace .gasto-note-cell {
+  max-width: 260px;
+}
+
+.pf-monthly-plan-workspace .pf-live-control-grid,
+.pf-monthly-plan-workspace .pf-monthly-kpi-strip,
+.pf-monthly-plan-workspace .pf-monthly-signal,
+.pf-monthly-plan-workspace .pf-monthly-generate-card,
+.pf-monthly-plan-workspace .pf-excel-workbar {
+  overflow: visible;
+}
+
+@media (min-width: 1200px) {
+  .pf-monthly-plan-workspace .pf-monthly-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+    gap: 14px;
+  }
+
+  .pf-monthly-plan-workspace .pf-monthly-grid-pane,
+  .pf-monthly-plan-workspace .pf-monthly-side-pane {
+    width: auto;
+    max-width: none;
+    flex: initial;
+  }
+}
+
+@media (max-width: 1199.98px) {
+  .pf-monthly-plan-workspace .pf-monthly-summary-rail {
+    position: static;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .pf-monthly-plan-workspace .content-wrapper,
+  .pf-app-layout .content-wrapper.pf-monthly-plan-workspace {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .pf-monthly-plan-workspace .pf-monthly-command-strip,
+  .pf-monthly-plan-workspace .pf-excel-workbar,
+  .pf-monthly-plan-workspace .gasto-month-hero,
+  .pf-monthly-plan-workspace .gasto-live-control,
+  .pf-monthly-plan-workspace .card,
+  .pf-monthly-plan-workspace .gasto-excel-card {
+    border-radius: 9px !important;
+  }
+
+  .pf-monthly-plan-workspace .pf-data-grid {
+    min-width: 760px;
+  }
+
+  .pf-monthly-plan-workspace .pf-monthly-command-actions .btn,
+  .pf-monthly-plan-workspace .pf-summary-rail-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+/* GastoClaro Desktop Phase 3: debts, payments and reserves as work grids. */
+.pf-grid-workspace {
+  --pf-grid-header: #eef4fb;
+  --pf-grid-line: #cdd8e8;
+  --pf-grid-line-soft: #e4ebf4;
+  --pf-row-hover: #f1f7ff;
+  --pf-cell-focus: rgba(35, 103, 216, .16);
+}
+
+.pf-grid-workspace .pf-desktop-note {
+  padding: 9px 11px;
+  font-size: .84rem;
+  margin-bottom: .75rem;
+}
+
+.pf-grid-workspace .pf-workbench-toolbar {
+  margin-bottom: .75rem !important;
+}
+
+.pf-grid-workspace .pf-workbench-toolbar .card-body {
+  padding: 9px 11px;
+}
+
+.pf-compact-filter-form .form-label,
+.pf-compact-editor-form .form-label {
+  margin-bottom: 3px;
+  font-size: .74rem;
+  text-transform: uppercase;
+  letter-spacing: .035em;
+  color: #566a84;
+}
+
+.pf-compact-filter-form .form-control,
+.pf-compact-filter-form .form-select,
+.pf-compact-editor-form .form-control,
+.pf-compact-editor-form .form-select {
+  min-height: 30px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  font-size: .84rem;
+}
+
+.pf-compact-editor-form textarea.form-control {
+  min-height: 74px;
+}
+
+.pf-master-detail-grid {
+  align-items: flex-start;
+}
+
+.pf-master-detail-grid .pf-master-pane,
+.pf-master-detail-grid .pf-detail-pane {
+  min-width: 0;
+}
+
+.pf-grid-panel,
+.pf-editor-card {
+  border-radius: 10px !important;
+  overflow: visible !important;
+}
+
+.pf-grid-panel > .card-header,
+.pf-editor-card > .card-header {
+  min-height: 38px;
+  padding: 8px 11px !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: linear-gradient(180deg, #f8fbff 0%, #e6edf7 100%) !important;
+}
+
+.pf-grid-panel .card-body,
+.pf-editor-card .card-body {
+  padding: 10px 11px;
+}
+
+.pf-grid-workspace .table-responsive {
+  overflow-x: auto;
+  overflow-y: visible;
+  max-height: none;
+  border-radius: 0 0 10px 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pf-grid-workspace .pf-data-grid {
+  min-width: 940px;
+  border-collapse: separate;
+  border-spacing: 0;
+  --bs-table-bg: transparent;
+}
+
+.pf-grid-workspace .pf-data-grid thead th {
+  position: static;
+  top: auto;
+  z-index: auto;
+  padding: 7px 9px;
+  white-space: nowrap;
+  color: #26384f;
+  font-size: .7rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .045em;
+  border-right: 1px solid var(--pf-grid-line-soft);
+  border-bottom: 1px solid var(--pf-grid-line);
+  background: var(--pf-grid-header) !important;
+}
+
+.pf-grid-workspace .pf-data-grid thead th:last-child,
+.pf-grid-workspace .pf-data-grid tbody td:last-child {
+  border-right: 0;
+}
+
+.pf-grid-workspace .pf-data-grid tbody td {
+  padding: 7px 9px;
+  vertical-align: middle;
+  border-right: 1px solid var(--pf-grid-line-soft);
+  border-bottom: 1px solid var(--pf-grid-line-soft);
+}
+
+.pf-grid-workspace .pf-data-grid tbody tr:nth-child(even) {
+  background: rgba(248, 251, 255, .72);
+}
+
+.pf-grid-workspace .pf-data-grid tbody tr:hover {
+  background: var(--pf-row-hover) !important;
+  box-shadow: inset 3px 0 0 #2367d8;
+}
+
+.pf-grid-workspace .pf-data-grid small {
+  display: block;
+  line-height: 1.32;
+}
+
+.pf-grid-workspace .pf-data-grid .badge {
+  border-radius: 999px;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+
+.pf-grid-workspace .pf-data-grid .btn-sm {
+  --bs-btn-padding-y: .17rem;
+  --bs-btn-padding-x: .36rem;
+  min-width: 28px;
+  border-radius: 6px;
+}
+
+.pf-grid-workspace .pf-data-grid .text-end {
+  white-space: nowrap;
+}
+
+.pf-debts-grid-workspace .pf-debt-grid {
+  min-width: 1120px;
+}
+
+.pf-debts-grid-workspace .pf-detail-pane .pf-editor-card {
+  position: relative;
+}
+
+.pf-debts-grid-workspace .pf-master-pane .pf-grid-panel {
+  min-height: 420px;
+}
+
+.pf-payments-grid-workspace .pf-payment-grid {
+  min-width: 1060px;
+}
+
+.pf-payments-grid-workspace .payment-summary-grid.pf-compact-summary-grid,
+.pf-reserved-grid-workspace .reserved-summary-grid.pf-compact-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  margin-bottom: .75rem !important;
+}
+
+.pf-payments-grid-workspace .payment-summary-grid.pf-compact-summary-grid > div,
+.pf-reserved-grid-workspace .reserved-summary-grid.pf-compact-summary-grid > article {
+  min-height: 72px;
+  padding: 10px 11px;
+  border: 1px solid var(--pf-desktop-border-soft);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .90);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, .055);
+}
+
+.pf-payments-grid-workspace .payment-summary-grid.pf-compact-summary-grid span,
+.pf-reserved-grid-workspace .reserved-summary-grid.pf-compact-summary-grid span {
+  display: block;
+  color: #52657d;
+  font-size: .72rem;
+  font-weight: 840;
+  text-transform: uppercase;
+  letter-spacing: .035em;
+}
+
+.pf-payments-grid-workspace .payment-summary-grid.pf-compact-summary-grid strong,
+.pf-reserved-grid-workspace .reserved-summary-grid.pf-compact-summary-grid strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 1.02rem;
+}
+
+.pf-payments-grid-workspace .payment-summary-grid.pf-compact-summary-grid small,
+.pf-reserved-grid-workspace .reserved-summary-grid.pf-compact-summary-grid small {
+  color: var(--pf-desktop-muted);
+  font-size: .72rem;
+}
+
+.pf-reserved-grid-workspace .reserved-fund-list {
+  display: grid;
+  gap: 8px;
+}
+
+.pf-reserved-grid-workspace .reserved-fund-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 11px;
+  border: 1px solid var(--pf-grid-line-soft);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .92);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, .045);
+}
+
+.pf-reserved-grid-workspace .reserved-fund-card:hover {
+  background: var(--pf-row-hover);
+  box-shadow: inset 3px 0 0 #2367d8, 0 8px 18px rgba(15, 23, 42, .06);
+}
+
+.pf-reserved-grid-workspace .reserved-fund-card.is-closed {
+  opacity: .76;
+}
+
+.pf-reserved-grid-workspace .reserved-fund-main h3 {
+  font-weight: 850;
+}
+
+.pf-reserved-grid-workspace .reserved-fund-amount-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.pf-reserved-grid-workspace .reserved-fund-amount-row > div {
+  padding: 7px 8px;
+  border: 1px solid var(--pf-grid-line-soft);
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.pf-reserved-grid-workspace .reserved-fund-actions {
+  min-width: 170px;
+  display: grid;
+  gap: 6px;
+}
+
+.pf-reserved-grid-workspace .reserved-fund-actions .btn,
+.pf-reserved-grid-workspace .reserved-fund-actions form,
+.pf-reserved-grid-workspace .reserved-fund-actions form .btn {
+  width: 100%;
+}
+
+.pf-reserved-grid-workspace .reserved-progress {
+  height: 7px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: #e6edf7;
+}
+
+.pf-reserved-grid-workspace .pf-movement-grid {
+  min-width: 860px;
+}
+
+@media (min-width: 1400px) {
+  .pf-debts-grid-workspace .pf-master-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
+    gap: 14px;
+  }
+
+  .pf-debts-grid-workspace .pf-master-pane {
+    order: 1;
+    width: auto;
+  }
+
+  .pf-debts-grid-workspace .pf-detail-pane {
+    order: 2;
+    width: auto;
+  }
+}
+
+@media (max-width: 1399.98px) {
+  .pf-debts-grid-workspace .pf-master-pane,
+  .pf-debts-grid-workspace .pf-detail-pane {
+    width: 100%;
+  }
+}
+
+@media (max-width: 1199.98px) {
+  .pf-grid-workspace .pf-data-grid {
+    min-width: 900px;
+  }
+
+  .pf-reserved-grid-workspace .reserved-fund-card {
+    grid-template-columns: 1fr;
+  }
+
+  .pf-reserved-grid-workspace .reserved-fund-actions {
+    min-width: 0;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 767.98px) {
+  .pf-grid-workspace .content-wrapper,
+  .pf-app-layout .content-wrapper.pf-grid-workspace {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .pf-grid-workspace .pf-data-grid {
+    min-width: 820px;
+  }
+
+  .pf-grid-panel > .card-header,
+  .pf-editor-card > .card-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pf-reserved-grid-workspace .reserved-fund-amount-row {
+    grid-template-columns: 1fr;
+  }
+}

@@ -6,7 +6,7 @@
   <aside th:replace="personal_finance/_sidebar :: sidebar"></aside>
   <div class="main-content">
     <header th:replace="personal_finance/_topbar :: topbar"></header>
-    <main class="content-wrapper">
+    <main class="content-wrapper pf-grid-workspace pf-payments-grid-workspace">
       <link rel="stylesheet" th:href="@{/css/personal-finance-payments.css}">
 
       <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
@@ -22,9 +22,9 @@
       <div th:replace="personal_finance/_nav :: nav('payments')"></div>
       <div th:if="${message}" class="alert" th:classappend="${messageType == 'success'} ? ' alert-success' : (${messageType == 'danger'} ? ' alert-danger' : ' alert-info')" th:text="${message}">Mensaje</div>
 
-      <div class="card border-0 shadow-sm mb-3">
+      <div class="card border-0 shadow-sm mb-3 pf-workbench-toolbar">
         <div class="card-body">
-          <form th:action="@{/gasto-claro/payments}" method="get" class="row g-2 align-items-end">
+          <form th:action="@{/gasto-claro/payments}" method="get" class="row g-2 align-items-end pf-compact-filter-form">
             <div class="col-sm-4 col-lg-2">
               <label class="form-label small">Año</label>
               <input type="number" name="year" class="form-control form-control-sm" th:value="${selectedYear}" min="2000" max="2100">
@@ -55,7 +55,7 @@
         </div>
       </div>
 
-      <section class="payment-summary-grid mb-3">
+      <section class="payment-summary-grid pf-compact-summary-grid mb-3">
         <div><span>Pagado vigente</span><strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(summary.totalPaid())}">0.00</span></strong><small th:text="${summary.activeCount() + ' operaciones'}">0 operaciones</small></div>
         <div><span>Capital amortizado</span><strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(summary.principalPaid())}">0.00</span></strong><small>Reduce saldo de deuda</small></div>
         <div><span>Intereses</span><strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(summary.interestPaid())}">0.00</span></strong><small>Costo financiero pagado</small></div>
@@ -64,13 +64,13 @@
       </section>
       <div class="form-text mb-3">Resumen monetario en soles. Los pagos registrados en USD permanecen visibles en el detalle sin mezclarse con los totales PEN.</div>
 
-      <div class="card border-0 shadow-sm">
+      <div class="card border-0 shadow-sm pf-grid-panel">
         <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
           <strong>Historial</strong>
           <span class="badge text-bg-light" th:text="${payments.size() + ' registros'}">0 registros</span>
         </div>
         <div class="table-responsive">
-          <table class="table align-middle mb-0 payment-history-table">
+          <table class="table align-middle mb-0 payment-history-table pf-data-grid pf-payment-grid">
             <thead>
             <tr>
               <th>Fecha</th>

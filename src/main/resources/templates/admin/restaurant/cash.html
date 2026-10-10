@@ -10,7 +10,7 @@
             <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
                 <div>
                     <h1 class="h4 mb-1">Caja diaria</h1>
-                    <p class="text-muted small mb-0">Resumen de comandas cobradas, pagos y mesas pendientes.</p>
+                    <p class="text-muted small mb-0">Resumen de pedidos cobradas, pagos y mesas pendientes.</p>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
                     <a th:href="@{/admin/restaurant/reports/daily(date=${businessDate})}" target="_blank" class="btn btn-sm btn-outline-secondary">
@@ -74,19 +74,19 @@
                     <div class="card border-0 shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Total cobrado</div>
                         <div class="h3 mb-1"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(summary.safePaidTotal())}">0.00</span></div>
-                        <div class="small text-muted"><span th:text="${summary.paidOrders()}">0</span> comandas pagadas</div>
+                        <div class="small text-muted"><span th:text="${summary.paidOrders()}">0</span> pedidos pagadas</div>
                     </div></div>
                 </div>
                 <div class="col-6 col-xl-3">
                     <div class="card border-0 shadow-sm h-100"><div class="card-body">
                         <div class="small text-muted">Ticket promedio</div>
                         <div class="h3 mb-1"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(summary.safeAverageTicket())}">0.00</span></div>
-                        <div class="small text-muted">promedio por comanda</div>
+                        <div class="small text-muted">promedio por pedido</div>
                     </div></div>
                 </div>
                 <div class="col-6 col-xl-3">
                     <div class="card border-0 shadow-sm h-100"><div class="card-body">
-                        <div class="small text-muted">Comandas abiertas</div>
+                        <div class="small text-muted">Pedidos abiertas</div>
                         <div class="h3 mb-1" th:text="${summary.openOrders()}">0</div>
                         <div class="small text-muted"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(summary.safeOpenTotal())}">0.00</span> por cobrar</div>
                     </div></div>
@@ -123,10 +123,10 @@
                         <div class="card-header bg-white"><strong>Detalle agrupado</strong></div>
                         <div class="list-group list-group-flush">
                             <div class="list-group-item d-flex justify-content-between align-items-center" th:each="row : ${paymentBreakdown}">
-                                <div><span class="badge me-2" th:classappend="${row.badgeClass()}" th:text="${row.paymentLabel()}">Pago</span><span class="small text-muted"><span th:text="${row.orderCount()}">0</span> comandas</span></div>
+                                <div><span class="badge me-2" th:classappend="${row.badgeClass()}" th:text="${row.paymentLabel()}">Pago</span><span class="small text-muted"><span th:text="${row.orderCount()}">0</span> pedidos</span></div>
                                 <strong><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(row.safeTotalAmount())}">0.00</span></strong>
                             </div>
-                            <div class="list-group-item text-muted small" th:if="${paymentBreakdown.isEmpty()}">Todavía no hay comandas cobradas para esta fecha.</div>
+                            <div class="list-group-item text-muted small" th:if="${paymentBreakdown.isEmpty()}">Todavía no hay pedidos cobradas para esta fecha.</div>
                         </div>
                     </div>
                 </div>
@@ -134,12 +134,12 @@
 
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <strong>Comandas cobradas</strong>
+                    <strong>Pedidos cobrados</strong>
                     <span class="badge text-bg-success" th:text="${paidOrders.size()} + ' pagadas'">0 pagadas</span>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light"><tr><th>Comanda</th><th>Referencia</th><th>Pago</th><th>Hora cobro</th><th class="text-end">Total</th><th></th></tr></thead>
+                        <thead class="table-light"><tr><th>Pedido</th><th>Referencia</th><th>Pago</th><th>Hora cobro</th><th class="text-end">Total</th><th></th></tr></thead>
                         <tbody>
                         <tr th:each="order : ${paidOrders}">
                             <td><a th:href="@{/admin/restaurant/orders/{id}(id=${order.id()})}" th:text="${order.orderCode()}">CMD</a><div class="small text-muted" th:text="${order.serviceLabel()}">Servicio</div></td>
@@ -154,7 +154,7 @@
                                 </div>
                             </td>
                         </tr>
-                        <tr th:if="${paidOrders.isEmpty()}"><td colspan="6" class="text-muted text-center py-4">No hay comandas cobradas en esta fecha.</td></tr>
+                        <tr th:if="${paidOrders.isEmpty()}"><td colspan="6" class="text-muted text-center py-4">No hay pedidos cobradas en esta fecha.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -162,12 +162,12 @@
 
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <strong>Comandas abiertas por cobrar</strong>
+                    <strong>Pedidos abiertas por cobrar</strong>
                     <span class="badge text-bg-warning" th:text="${openOrders.size()} + ' abiertas'">0 abiertas</span>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light"><tr><th>Comanda</th><th>Referencia</th><th>Estado</th><th class="text-end">Total</th><th></th></tr></thead>
+                        <thead class="table-light"><tr><th>Pedido</th><th>Referencia</th><th>Estado</th><th class="text-end">Total</th><th></th></tr></thead>
                         <tbody>
                         <tr th:each="order : ${openOrders}">
                             <td><a th:href="@{/admin/restaurant/orders/{id}(id=${order.id()})}" th:text="${order.orderCode()}">CMD</a><div class="small text-muted" th:text="${#temporals.format(order.createdAt(), 'dd/MM HH:mm')}">fecha</div></td>
@@ -176,7 +176,7 @@
                             <td class="text-end fw-semibold"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(order.safeSubtotal())}">0.00</span></td>
                             <td class="text-end"><a class="btn btn-sm btn-outline-success" th:href="@{/admin/restaurant/orders/{id}(id=${order.id()})}">Cobrar</a></td>
                         </tr>
-                        <tr th:if="${openOrders.isEmpty()}"><td colspan="5" class="text-muted text-center py-4">No hay comandas abiertas.</td></tr>
+                        <tr th:if="${openOrders.isEmpty()}"><td colspan="5" class="text-muted text-center py-4">No hay pedidos abiertas.</td></tr>
                         </tbody>
                     </table>
                 </div>

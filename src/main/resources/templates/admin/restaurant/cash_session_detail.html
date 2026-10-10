@@ -69,7 +69,7 @@
             </div>
 
             <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white"><strong>Comandas cobradas</strong></div>
+                <div class="card-header bg-white"><strong>Pedidos cobrados</strong></div>
                 <div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Código</th><th>Referencia</th><th>Pago</th><th>Hora</th><th class="text-end">Total</th></tr></thead><tbody>
                 <tr th:each="order : ${paidOrders}"><td><a th:href="@{/admin/restaurant/orders/{id}(id=${order.id()})}" th:text="${order.orderCode()}">CMD</a></td><td th:text="${order.serviceReference()}">Mesa</td><td th:text="${order.paymentLabel()}">Pago</td><td th:text="${order.paidAt() == null ? '-' : #temporals.format(order.paidAt(), 'HH:mm')}">hora</td><td class="text-end"><span th:text="${currencySymbol}">S/</span> <span th:text="${@restaurantFormat.money(order.safeSubtotal())}">0.00</span></td></tr>
                 <tr th:if="${paidOrders.isEmpty()}"><td colspan="5" class="text-center text-muted py-3">No hay cobros registrados.</td></tr>

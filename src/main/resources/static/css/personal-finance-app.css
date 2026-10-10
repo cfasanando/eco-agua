@@ -1,0 +1,541 @@
+/* Matrix26 Desktop Shell for GastoClaro Personal.
+   Scoped to .pf-app-layout to avoid touching Eco Agua modules. */
+:root {
+  --pf-desktop-bg: #dfe7f1;
+  --pf-desktop-panel: #f8fbff;
+  --pf-desktop-panel-2: #edf3fb;
+  --pf-desktop-border: #b9c7d8;
+  --pf-desktop-border-soft: rgba(116, 135, 163, 0.24);
+  --pf-desktop-text: #102033;
+  --pf-desktop-muted: #5d6d81;
+  --pf-desktop-blue: #2367d8;
+  --pf-desktop-blue-2: #164fae;
+  --pf-desktop-green: #068661;
+  --pf-desktop-red: #dc3545;
+  --pf-desktop-sidebar: #132438;
+  --pf-desktop-sidebar-2: #0d1a2a;
+  --pf-desktop-shadow: 0 18px 46px rgba(15, 23, 42, 0.12);
+}
+
+.pf-app-layout {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.38), transparent 13rem),
+    radial-gradient(circle at 15% 0%, rgba(35,103,216,.13), transparent 22rem),
+    linear-gradient(180deg, #edf3fb 0%, #dfe7f1 100%);
+  color: var(--pf-desktop-text);
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.pf-app-layout .main-content {
+  background: transparent;
+}
+
+.pf-app-layout .content-wrapper {
+  max-width: none;
+  padding: 18px 20px 28px;
+}
+
+/* Sidebar: desktop/tree feel */
+.pf-sidebar {
+  background:
+    radial-gradient(circle at 40% -5%, rgba(71, 146, 255, 0.22), transparent 14rem),
+    linear-gradient(180deg, var(--pf-desktop-sidebar) 0%, var(--pf-desktop-sidebar-2) 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 8px 0 28px rgba(8, 15, 25, 0.22);
+}
+
+.pf-desktop-brand {
+  min-height: 76px;
+  padding-inline: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+}
+
+.pf-brand-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, #2367d8 0%, #21a1f2 100%);
+  box-shadow: 0 12px 22px rgba(35, 103, 216, 0.34);
+  flex: 0 0 auto;
+}
+
+.pf-brand-mark i { font-size: 1.15rem; }
+.pf-sidebar .sidebar-brand-name { font-size: 0.98rem; letter-spacing: 0.01em; text-transform: none; }
+.pf-sidebar .sidebar-brand-subtitle { color: rgba(225, 238, 255, 0.82); font-size: .76rem; }
+
+.pf-desktop-status {
+  margin: 12px 12px 9px;
+  padding: 12px 13px;
+  border: 1px solid rgba(142, 189, 255, 0.20);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.035));
+  color: #dceafe;
+}
+
+.pf-status-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #9dc7ff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.pf-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, .14);
+}
+
+.pf-status-title {
+  margin-top: 7px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.pf-status-help {
+  margin-top: 5px;
+  font-size: .75rem;
+  color: rgba(220, 234, 254, .70);
+  line-height: 1.32;
+}
+
+.pf-tree-nav { padding: 4px 0 12px; }
+.pf-tree-group { position: relative; margin: 0 8px 7px; }
+.pf-tree-group::before {
+  content: "";
+  position: absolute;
+  left: 19px;
+  top: 28px;
+  bottom: 4px;
+  width: 1px;
+  background: rgba(159, 187, 225, .16);
+}
+
+.pf-sidebar .pf-tree-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 13px 7px;
+  color: #a8c8f5;
+  opacity: 1;
+  font-size: .68rem;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.pf-sidebar .pf-tree-item {
+  position: relative;
+  margin: 0 5px 4px 22px;
+  padding: 8px 10px;
+  min-height: 36px;
+  color: rgba(231, 239, 250, 0.84);
+  border-radius: 9px;
+  border: 1px solid transparent;
+  font-size: .86rem;
+  font-weight: 720;
+}
+
+.pf-sidebar .pf-tree-item::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 17px;
+  width: 12px;
+  height: 1px;
+  background: rgba(159, 187, 225, .16);
+}
+
+.pf-sidebar .pf-tree-item .icon {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 7px;
+  color: #bfd8fa;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.pf-sidebar .pf-tree-item:hover {
+  color: #ffffff;
+  background: rgba(255,255,255,.09);
+  border-color: rgba(141, 189, 255, .16);
+}
+
+.pf-sidebar .pf-tree-item.active {
+  color: #ffffff;
+  background: linear-gradient(180deg, #2f78e6 0%, #1f5fca 100%);
+  border-color: rgba(255,255,255,.17);
+  box-shadow: 0 8px 18px rgba(35, 103, 216, 0.24), inset 0 1px 0 rgba(255,255,255,.18);
+}
+
+.pf-sidebar .pf-tree-item.active .icon {
+  color: #ffffff;
+  background: rgba(255,255,255,.18);
+}
+
+.pf-sidebar-footer {
+  margin: 14px 13px 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,.10);
+}
+
+.pf-back-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  color: #dbeafe;
+  text-decoration: none;
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.07);
+  font-weight: 750;
+  font-size: .84rem;
+}
+
+.pf-back-link:hover { color:#fff; background: rgba(255,255,255,.11); }
+
+/* Topbar / desktop chrome */
+.pf-desktop-topbar {
+  min-height: 64px;
+  padding-inline: 18px;
+  border-bottom: 1px solid var(--pf-desktop-border-soft);
+  background: rgba(249, 252, 255, 0.92);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07);
+  z-index: 1040;
+}
+
+.pf-desktop-chrome-title {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pf-window-caption {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #334155;
+  font-size: .83rem;
+}
+
+.pf-window-caption strong { color: #0f172a; font-weight: 850; }
+.pf-window-separator { color: #94a3b8; }
+.pf-window-dot { width:10px; height:10px; border-radius:50%; display:inline-block; box-shadow: inset 0 0 0 1px rgba(0,0,0,.10); }
+.pf-window-dot.is-red { background:#ff5f56; }
+.pf-window-dot.is-yellow { background:#ffbd2e; }
+.pf-window-dot.is-green { background:#27c93f; }
+.pf-topbar-date { color: var(--pf-desktop-muted); font-size:.76rem; }
+
+.pf-desktop-commandbar .btn,
+.pf-topbar-action {
+  border-radius: 8px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 760;
+  box-shadow: none !important;
+}
+
+.pf-desktop-user-button,
+.pf-app-layout .topbar-user-button {
+  border-radius: 999px;
+  border: 1px solid rgba(116, 135, 163, .22);
+  box-shadow: 0 8px 18px rgba(15,23,42,.07);
+}
+
+.pf-user-menu,
+.pf-desktop-user-menu {
+  z-index: 1120;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(116, 135, 163, .18) !important;
+  box-shadow: 0 22px 50px rgba(15, 23, 42, .20) !important;
+}
+
+.pf-menu-session { background: #f8fbff; }
+
+/* Workspace tabs */
+.pf-desktop-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  margin: 0 0 0.95rem;
+  padding: 6px 8px 0;
+  border: 1px solid var(--pf-desktop-border-soft);
+  border-radius: 12px 12px 0 0;
+  background: linear-gradient(180deg, #f7faff 0%, #e6edf6 100%);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+  overflow-x: auto;
+}
+
+.pf-desktop-tab,
+.pf-quick-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 8px 14px;
+  margin-bottom: -1px;
+  border: 1px solid transparent;
+  border-radius: 10px 10px 0 0;
+  color: #355a89;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: .84rem;
+  white-space: nowrap;
+  transition: background .14s ease, color .14s ease, border-color .14s ease;
+}
+
+.pf-desktop-tab:hover,
+.pf-quick-link:hover {
+  color: #164fae;
+  background: rgba(255,255,255,.72);
+  border-color: rgba(116, 135, 163, .14);
+}
+
+.pf-desktop-tab.active,
+.pf-quick-link.active {
+  color: #0f172a;
+  background: #ffffff;
+  border-color: rgba(116, 135, 163, .22);
+  border-bottom-color: #ffffff;
+  box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.05);
+}
+
+/* Compact desktop panels */
+.pf-app-layout h1,
+.pf-app-layout .h1,
+.pf-app-layout .h2,
+.pf-app-layout .h3,
+.pf-app-layout .h4,
+.pf-app-layout h2,
+.pf-app-layout h3,
+.pf-app-layout h4,
+.pf-app-layout strong,
+.pf-app-layout .fw-semibold {
+  color: var(--pf-desktop-text);
+}
+
+.pf-app-layout .content-wrapper > .d-flex:first-child,
+.pf-app-layout .content-wrapper > .d-flex.flex-wrap.justify-content-between:first-child {
+  margin-bottom: .85rem !important;
+  padding: 12px 14px;
+  border: 1px solid var(--pf-desktop-border-soft);
+  border-radius: 12px;
+  background: rgba(255,255,255,.70);
+  box-shadow: 0 10px 24px rgba(15,23,42,.06);
+}
+
+.pf-app-layout .content-wrapper h1,
+.pf-app-layout .content-wrapper .h4 {
+  font-size: 1.24rem;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.pf-app-layout .content-wrapper p.text-muted {
+  font-size: .85rem;
+}
+
+.pf-app-layout .card,
+.pf-app-layout .gasto-excel-card,
+.pf-app-layout .gasto-live-control,
+.pf-app-layout .gasto-month-hero,
+.pf-app-layout .alert,
+.pf-app-layout .pf-panel {
+  border-radius: 10px !important;
+  border: 1px solid var(--pf-desktop-border-soft) !important;
+  background: rgba(255,255,255,.88) !important;
+  box-shadow: 0 12px 24px rgba(15,23,42,.07) !important;
+  overflow: hidden;
+}
+
+.pf-app-layout .card-header,
+.pf-app-layout .gasto-excel-title,
+.pf-app-layout .table thead th {
+  background: linear-gradient(180deg, #f8fbff 0%, #e9eff7 100%);
+  border-bottom: 1px solid var(--pf-desktop-border-soft) !important;
+}
+
+.pf-app-layout .gasto-excel-title,
+.pf-app-layout .card-header {
+  padding: 9px 12px;
+  color: #1f334d;
+  font-weight: 850;
+}
+
+.pf-app-layout .card-body { padding: 12px 14px; }
+
+.pf-app-layout .row.g-3,
+.pf-app-layout .row.g-2 { --bs-gutter-x: .8rem; --bs-gutter-y: .8rem; }
+
+/* Hero panels become desktop summary panes */
+.pf-app-layout .gasto-month-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 14px 18px;
+  color: #eaf3ff;
+  background: linear-gradient(135deg, #142a48 0%, #1f5fca 100%) !important;
+  border-color: rgba(255,255,255,.10) !important;
+}
+
+.pf-app-layout .gasto-month-hero * { color: inherit; }
+.pf-app-layout .gasto-month-hero .text-success { color: #74f3b3 !important; }
+.pf-app-layout .gasto-month-hero .text-danger { color: #ffb4bf !important; }
+
+.pf-app-layout .gasto-hero-number {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.16);
+  min-width: 180px;
+  text-align: right;
+}
+
+/* Forms and buttons */
+.pf-app-layout .btn {
+  border-radius: 7px;
+  font-weight: 760;
+  box-shadow: none !important;
+}
+
+.pf-app-layout .btn-primary { background: #2367d8; border-color:#2367d8; }
+.pf-app-layout .btn-primary:hover { background:#164fae; border-color:#164fae; color:#fff; }
+.pf-app-layout .btn-success { background:#068661; border-color:#068661; }
+.pf-app-layout .btn-success:hover { background:#046b4d; border-color:#046b4d; color:#fff; }
+.pf-app-layout .btn-outline-primary:hover,
+.pf-app-layout .btn-outline-success:hover,
+.pf-app-layout .btn-outline-secondary:hover,
+.pf-app-layout .btn-outline-danger:hover { color:#fff !important; }
+
+.pf-app-layout .form-control,
+.pf-app-layout .form-select {
+  border-radius: 7px;
+  border-color: #c6d1df;
+  min-height: 34px;
+  font-size: .88rem;
+  background-color: #fbfdff;
+}
+
+.pf-app-layout .form-control:focus,
+.pf-app-layout .form-select:focus {
+  border-color: #2367d8;
+  box-shadow: 0 0 0 3px rgba(35,103,216,.14);
+}
+
+.pf-app-layout .form-label,
+.pf-app-layout label {
+  color: #334155;
+  font-weight: 720;
+  font-size: .82rem;
+}
+
+/* Grid/table style, inspired by desktop admin grids */
+.pf-app-layout .table-responsive {
+  border-radius: 0;
+}
+
+.pf-app-layout .table {
+  --bs-table-bg: transparent;
+  margin-bottom: 0;
+  font-size: .86rem;
+}
+
+.pf-app-layout .table thead th {
+  color: #26384f;
+  font-size: .72rem;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.pf-app-layout .table tbody td {
+  padding: 8px 10px;
+  border-color: #dbe4ef;
+  vertical-align: middle;
+}
+
+.pf-app-layout .table tbody tr:hover {
+  background: #f4f8fe;
+}
+
+.pf-app-layout .badge {
+  border-radius: 999px;
+  padding: .34em .58em;
+  font-weight: 800;
+}
+
+.pf-app-layout .progress {
+  height: 12px;
+  border-radius: 999px;
+  background: #dbe5f1;
+}
+
+/* Stat cards compact */
+.pf-app-layout .gasto-live-stat,
+.pf-app-layout .card .card-body {
+  min-height: auto;
+}
+
+.pf-app-layout .gasto-live-stat {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid var(--pf-desktop-border-soft);
+}
+
+.pf-app-layout .gasto-live-stat span,
+.pf-app-layout .gasto-live-stat small,
+.pf-app-layout .text-muted { color: var(--pf-desktop-muted) !important; }
+
+.pf-app-layout .gasto-live-stat strong,
+.pf-app-layout .h5,
+.pf-app-layout .h4,
+.pf-app-layout .h3 {
+  font-weight: 850;
+}
+
+/* Dashboard widgets should not look like marketing cards */
+.pf-app-layout .shadow-sm { box-shadow: 0 10px 22px rgba(15,23,42,.07) !important; }
+.pf-app-layout .border-0 { border: 1px solid var(--pf-desktop-border-soft) !important; }
+.pf-app-layout .bg-light { background-color: #f5f8fc !important; }
+
+/* Dropdown safety */
+.pf-app-layout .dropdown-menu { z-index: 1120; }
+.pf-app-layout .topbar { overflow: visible; }
+
+/* Collapsed sidebar compatibility */
+body.sidebar-collapsed .pf-sidebar .pf-desktop-status,
+body.sidebar-collapsed .pf-sidebar .menu-section-title,
+body.sidebar-collapsed .pf-sidebar .sidebar-brand-copy,
+body.sidebar-collapsed .pf-sidebar .pf-back-link span,
+body.sidebar-collapsed .pf-sidebar .menu-link span:not(.icon) {
+  display: none !important;
+}
+
+body.sidebar-collapsed .pf-sidebar .pf-tree-group::before,
+body.sidebar-collapsed .pf-sidebar .pf-tree-item::before { display:none; }
+body.sidebar-collapsed .pf-sidebar .pf-tree-item { margin-left: 8px; justify-content: center; }
+
+@media (max-width: 991.98px) {
+  .pf-desktop-topbar { flex-wrap: wrap; gap: 10px; min-height: auto; padding-block: 10px; }
+  .pf-desktop-status { display: none; }
+  .pf-app-layout .content-wrapper { padding: 14px; }
+  .pf-app-layout .gasto-month-hero { grid-template-columns: 1fr; gap: 10px; }
+  .pf-app-layout .gasto-hero-number { text-align: left; min-width: 0; }
+}

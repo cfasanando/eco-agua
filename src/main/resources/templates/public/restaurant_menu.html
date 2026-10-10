@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/head_public :: publicHead('Carta digital')}"></head>
-<body class="public-catalog-body"
+<body class="public-catalog-body restaurant-menu-public"
       th:with="
           effectivePublicName=${appearanceBrandDisplayName != null and !#strings.isEmpty(appearanceBrandDisplayName) ? appearanceBrandDisplayName : businessName},
           effectivePublicTagline=${appearanceBrandTagline != null and !#strings.isEmpty(appearanceBrandTagline) ? appearanceBrandTagline : businessTagline},
@@ -12,14 +12,14 @@
       "
       th:style="|--eco-primary:${publicPrimaryColor ?: '#dc3545'}; --eco-secondary:${publicSecondaryColor ?: '#f97316'};|">
 
-<div class="top-bar text-white py-1">
+<div class="top-bar restaurant-public-topbar text-white py-1">
     <div class="container d-flex flex-wrap justify-content-between align-items-center small">
         <span><i class="bi bi-geo-alt-fill me-1"></i><span th:text="${effectiveLocation}">Iquitos</span></span>
         <span><i class="bi bi-whatsapp me-1"></i><a class="text-white text-decoration-none fw-semibold" th:href="|https://wa.me/${effectiveWhatsapp}|" target="_blank">Pedidos y reservas por WhatsApp</a></span>
     </div>
 </div>
 
-<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top restaurant-public-navbar">
     <div class="container">
         <a class="navbar-brand fw-bold d-flex align-items-center" th:href="@{/portal}">
             <img th:src="${effectivePublicLogo}" th:alt="${effectivePublicName}" height="36" class="me-2">
@@ -29,7 +29,7 @@
             </span>
         </a>
         <div class="ms-auto d-flex gap-2 align-items-center">
-            <a class="btn btn-sm btn-outline-secondary" th:href="@{/portal}">Inicio</a>
+            <a class="btn btn-sm btn-outline-secondary restaurant-public-panel-link" th:href="@{/admin/restaurant/dashboard}"><i class="bi bi-speedometer2"></i> Panel</a>
             <a class="btn btn-sm btn-success" href="#table-request-panel" th:if="${tableContext != null and restaurantTableRequestsEnabled}">
                 <i class="bi bi-bell"></i> Solicitar atención
             </a>
@@ -43,7 +43,7 @@
     </div>
 </nav>
 
-<main class="py-4 bg-light">
+<main class="restaurant-public-main py-4">
     <div class="container">
         <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
             <span th:text="${successMessage}">Solicitud enviada.</span>
@@ -54,10 +54,10 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
         </div>
 
-        <section class="restaurant-menu-hero p-4 p-lg-5 rounded-4 shadow-sm mb-4 text-white" th:style="|--appearance-hero-image: url('${effectiveHeroBackground}');|">
+        <section class="restaurant-menu-hero restaurant-public-hero p-4 p-lg-5 rounded-4 shadow-sm mb-4 text-white" th:style="|--appearance-hero-image: url('${effectiveHeroBackground}');|">
             <div class="row g-4 align-items-center">
                 <div class="col-lg-7">
-                    <span class="badge text-bg-light mb-3"><i class="bi bi-qr-code"></i> Carta digital QR</span>
+                    <span class="badge text-bg-light mb-3 restaurant-hero-kicker"><i class="bi bi-qr-code"></i> Carta digital QR</span>
                     <h1 class="display-6 fw-bold mb-3">Carta digital de <span th:text="${effectivePublicName}">Restaurante</span></h1>
                     <p class="lead mb-3" th:text="${publicWelcomeMessage}">Explora platos, bebidas y combos.</p>
                     <div class="d-flex flex-wrap gap-2 mb-3">
@@ -77,10 +77,10 @@
                     </div>
                 </div>
                 <div class="col-lg-5">
-                    <div class="restaurant-menu-summary bg-white text-dark rounded-4 p-4 shadow-sm">
+                    <div class="restaurant-menu-summary restaurant-public-summary bg-white text-dark rounded-4 p-4 shadow-sm">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div>
-                                <div class="small text-muted">Productos en carta</div>
+                                <div class="small text-muted">Platos disponibles</div>
                                 <div class="h2 mb-0" th:text="${menuItemCount}">0</div>
                             </div>
                             <i class="bi bi-journal-richtext display-5 text-success"></i>
@@ -146,13 +146,13 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
                     <h2 class="h4 mb-1">Recomendados de la casa</h2>
-                    <p class="text-muted mb-0">Platos y combos destacados para vender rápido.</p>
+                    <p class="text-muted mb-0">Los favoritos para pedir rápido.</p>
                 </div>
             </div>
             <div class="row g-3">
                 <div class="col-md-6 col-xl-3" th:each="item : ${featuredMenuItems}">
-                    <div class="restaurant-featured-card card h-100 shadow-sm border-0">
-                        <img th:src="${item.imagePath() != null and !#strings.isEmpty(item.imagePath()) ? item.imagePath() : (appearanceProductPlaceholderUrl != null and !#strings.isEmpty(appearanceProductPlaceholderUrl) ? appearanceProductPlaceholderUrl : item.imageOrFallback())}" class="card-img-top" style="height:150px; object-fit:cover;" alt="Plato">
+                    <div class="restaurant-featured-card restaurant-public-card card h-100 shadow-sm border-0">
+                        <img th:src="${item.imagePath() != null and !#strings.isEmpty(item.imagePath()) ? item.imagePath() : (appearanceProductPlaceholderUrl != null and !#strings.isEmpty(appearanceProductPlaceholderUrl) ? appearanceProductPlaceholderUrl : item.imageOrFallback())}" class="card-img-top restaurant-public-product-image" style="height:150px; object-fit:cover;" alt="Plato" onerror="this.onerror=null;this.src='/demo/branding/restaurant-lab/product-placeholder.png';this.classList.add('restaurant-public-image-fallback');">
                         <div class="card-body">
                             <span class="badge text-bg-success mb-2">Destacado</span>
                             <h3 class="h6" th:text="${item.name()}">Plato</h3>
@@ -170,13 +170,13 @@
                     <h2 class="h4 mb-1">Carta completa</h2>
                     <p class="text-muted mb-0" th:if="${tableContext != null and restaurantQrOrdersEnabled}">Elige cantidades y envía el pedido. El mozo lo revisará antes de enviarlo a cocina.</p>
                     <p class="text-muted mb-0" th:if="${tableContext != null and !restaurantQrOrdersEnabled}">Consulta platos, bebidas y promociones disponibles.</p>
-                    <p class="text-muted mb-0" th:if="${tableContext == null}">Productos agrupados para encontrar rápido platos, bebidas y combos.</p>
+                    <p class="text-muted mb-0" th:if="${tableContext == null}">Encuentra rápido platos, bebidas y combos.</p>
                 </div>
                 <a class="btn btn-outline-success" href="#table-request-panel" th:if="${tableContext != null and restaurantTableRequestsEnabled}">
-                    <i class="bi bi-bell"></i> Pedir al mozo
+                    <i class="bi bi-bell"></i> Llamar al mozo
                 </a>
                 <a class="btn btn-outline-success" th:href="${attentionWhatsappLink}" target="_blank" th:if="${tableContext == null}">
-                    <i class="bi bi-whatsapp"></i> Pedir al mozo
+                    <i class="bi bi-whatsapp"></i> Llamar al mozo
                 </a>
             </div>
 
@@ -199,9 +199,9 @@
                     </div>
                     <div class="row g-3">
                         <div class="col-md-6 col-xl-4" th:each="item : ${group.items()}">
-                            <div class="restaurant-menu-item-card card h-100 shadow-sm border-0">
+                            <div class="restaurant-menu-item-card restaurant-public-card card h-100 shadow-sm border-0">
                                 <div class="card-body d-flex gap-3">
-                                    <img th:src="${item.imagePath() != null and !#strings.isEmpty(item.imagePath()) ? item.imagePath() : (appearanceProductPlaceholderUrl != null and !#strings.isEmpty(appearanceProductPlaceholderUrl) ? appearanceProductPlaceholderUrl : item.imageOrFallback())}" alt="Producto" class="restaurant-menu-item-image rounded-3 flex-shrink-0" style="width:96px;height:96px;object-fit:cover;">
+                                    <img th:src="${item.imagePath() != null and !#strings.isEmpty(item.imagePath()) ? item.imagePath() : (appearanceProductPlaceholderUrl != null and !#strings.isEmpty(appearanceProductPlaceholderUrl) ? appearanceProductPlaceholderUrl : item.imageOrFallback())}" alt="Producto" class="restaurant-menu-item-image restaurant-public-product-thumb rounded-3 flex-shrink-0" onerror="this.onerror=null;this.src='/demo/branding/restaurant-lab/product-placeholder.png';this.classList.add('restaurant-public-image-fallback');" style="width:96px;height:96px;object-fit:cover;">
                                     <div class="flex-grow-1">
                                         <div class="small text-muted mb-1" th:text="${item.categoryLabel()}">Categoría</div>
                                         <h4 class="h6 mb-1" th:text="${item.name()}">Plato</h4>

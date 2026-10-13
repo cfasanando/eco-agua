@@ -1,122 +1,205 @@
 <!DOCTYPE html>
 <html lang="es" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="fragments/head_admin :: adminHead('GastoClaro - Dashboard')"></head>
+<head th:replace="fragments/head_admin :: adminHead('GastoClaro - Panel personal')"></head>
 <body>
 <div class="app-layout pf-app-layout" th:with="activePage='gasto_claro_dashboard'">
   <aside th:replace="personal_finance/_sidebar :: sidebar"></aside>
   <div class="main-content">
     <header th:replace="personal_finance/_topbar :: topbar"></header>
-    <main class="content-wrapper">
+    <main class="content-wrapper pf-dashboard-control-center">
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
-          <h1 class="h4 mb-1">GastoClaro personal</h1>
-          <p class="text-muted mb-0">Control privado de flujo mensual, deudas, gastos fijos e ingresos programados.</p>
+          <h1 class="h4 mb-1">Centro de control personal</h1>
+          <p class="text-muted mb-0">Tu mes en una sola pantalla: ingreso, pagos, deudas urgentes y saldo libre.</p>
         </div>
-        <form th:action="@{/gasto-claro/dashboard}" method="get" class="d-flex gap-2 align-items-end">
-          <div>
-            <label class="form-label small mb-1">Año</label>
-            <input type="number" class="form-control form-control-sm" name="year" th:value="${selectedYear}" style="max-width: 95px;">
-          </div>
-          <div>
-            <label class="form-label small mb-1">Mes</label>
-            <input type="number" class="form-control form-control-sm" min="1" max="12" name="month" th:value="${selectedMonth}" style="max-width: 85px;">
-          </div>
-          <button type="submit" class="btn btn-sm btn-primary">Ver mes</button>
+        <form th:action="@{/gasto-claro/dashboard}" method="get" class="pf-dashboard-month-form">
+          <label>Año <input type="number" class="form-control form-control-sm" name="year" th:value="${selectedYear}"></label>
+          <label>Mes <input type="number" class="form-control form-control-sm" min="1" max="12" name="month" th:value="${selectedMonth}"></label>
+          <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> Ver</button>
         </form>
       </div>
 
-      <div th:replace="personal_finance/_nav :: nav('dashboard')"></div>
+      <div class="pf-dashboard-tabs-wrap" th:replace="personal_finance/_nav :: nav('dashboard')"></div>
 
-      <div class="alert alert-info border-0 shadow-sm d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <div><strong>Plan mensual:</strong> usa la vista tipo Excel para decidir qué cubrir primero con el dinero disponible.</div>
-        <a th:href="@{/gasto-claro/monthly-plan(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-primary">Abrir plan mensual</a>
-      </div>
+      <section class="pf-dashboard-commandbar" aria-label="Acciones principales de GastoClaro">
+        <div class="pf-dashboard-command-title">
+          <span class="pf-command-eyebrow"><i class="bi bi-display"></i> Workspace</span>
+          <div>
+            <strong>Mes <span th:text="${selectedMonth}">10</span>/<span th:text="${selectedYear}">2026</span></strong>
+            <small>Control rápido sin perderte entre pantallas.</small>
+          </div>
+        </div>
+        <div class="pf-dashboard-command-actions">
+          <a th:href="@{/gasto-claro/monthly-plan(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-primary"><i class="bi bi-grid-3x3-gap"></i> Plan mensual</a>
+          <a th:href="@{/gasto-claro/payments(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-success"><i class="bi bi-cash-coin"></i> Registrar pago</a>
+          <a th:href="@{/gasto-claro/income-events(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-down-circle"></i> Ingresos</a>
+          <a th:href="@{/gasto-claro/alerts(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-danger"><i class="bi bi-bell"></i> Alertas</a>
+        </div>
+      </section>
 
-      <div class="row g-3 mb-4">
-        <div class="col-12 col-md-6 col-xl-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-              <div class="text-muted small">Ingreso esperado</div>
-              <div class="h3 mb-0">S/ <span th:text="${@personalFinanceMoneyFormatter.amount(dashboard.expectedIncome())}">0.00</span></div>
-            </div>
+      <section class="pf-dashboard-hero" th:classappend="${plan.hasDeficit()} ? ' is-danger' : ' is-ok'">
+        <div class="pf-dashboard-hero-main">
+          <span class="pf-dashboard-eyebrow">Saldo proyectado del mes</span>
+          <strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.projectedBalance())}">0.00</span></strong>
+          <p th:if="${plan.hasDeficit()}">Este mes está en rojo. Prioriza pagos críticos y evita compromisos opcionales.</p>
+          <p th:unless="${plan.hasDeficit()}">El mes tiene saldo positivo proyectado. Mantén reservas antes de gastar el excedente.</p>
+        </div>
+        <div class="pf-dashboard-hero-side">
+          <div>
+            <small>Saldo real disponible</small>
+            <b>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(liveSummary.realBalance())}">0.00</span></b>
+          </div>
+          <div>
+            <small>Avance de pagos</small>
+            <b><span th:text="${liveSummary.paidPayments()}">0</span>/<span th:text="${liveSummary.totalPayments()}">0</span></b>
           </div>
         </div>
-        <div class="col-12 col-md-6 col-xl-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-              <div class="text-muted small">Gastos fijos activos</div>
-              <div class="h3 mb-0">S/ <span th:text="${@personalFinanceMoneyFormatter.amount(dashboard.fixedExpenseTotal())}">0.00</span></div>
+      </section>
+
+      <section class="pf-dashboard-kpi-grid" aria-label="Resumen financiero del mes">
+        <article class="pf-dashboard-kpi">
+          <span>Ingreso esperado</span>
+          <strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.expectedIncome())}">0.00</span></strong>
+          <small><span th:text="${plan.incomes().size()}">0</span> ingresos programados</small>
+        </article>
+        <article class="pf-dashboard-kpi is-success">
+          <span>Ingreso recibido</span>
+          <strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.receivedIncome())}">0.00</span></strong>
+          <small><span th:text="${liveSummary.receivedIncomes()}">0</span>/<span th:text="${liveSummary.totalIncomes()}">0</span> recibidos</small>
+        </article>
+        <article class="pf-dashboard-kpi">
+          <span>Pagado</span>
+          <strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.paidTotal())}">0.00</span></strong>
+          <small>Pagos confirmados del mes</small>
+        </article>
+        <article class="pf-dashboard-kpi is-warning">
+          <span>Pendiente</span>
+          <strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.pendingTotal())}">0.00</span></strong>
+          <small><span th:text="${liveSummary.pendingPayments()}">0</span> pendientes por resolver</small>
+        </article>
+        <article class="pf-dashboard-kpi is-danger">
+          <span>Deudas exigibles</span>
+          <strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.debtTotal())}">0.00</span></strong>
+          <small><span th:text="${plan.overdueCount()}">0</span> vencidos · <span th:text="${plan.highInterestDebtCount()}">0</span> alto interés</small>
+        </article>
+        <article class="pf-dashboard-kpi" th:classappend="${plan.cashAfterBasicLiving().signum() < 0} ? ' is-danger' : ' is-success'">
+          <span>Después de gastos básicos</span>
+          <strong>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(plan.cashAfterBasicLiving())}">0.00</span></strong>
+          <small>Disponible luego de costo de vida</small>
+        </article>
+      </section>
+
+      <section class="pf-dashboard-workbench">
+        <div class="pf-dashboard-main-pane">
+          <section class="pf-panel pf-dashboard-panel">
+            <div class="pf-dashboard-panel-header">
+              <div>
+                <strong><i class="bi bi-list-check"></i> Qué debes revisar primero</strong>
+                <small>Pagos de deuda del mes, ordenados por tu plan.</small>
+              </div>
+              <a th:href="@{/gasto-claro/monthly-priority(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-primary">Ver prioridad</a>
             </div>
+            <div class="table-responsive">
+              <table class="table table-sm pf-data-grid pf-dashboard-grid align-middle mb-0">
+                <thead>
+                <tr><th>Pago</th><th>Estado</th><th>Vence</th><th class="text-end">Monto</th><th class="text-end">Pendiente</th><th></th></tr>
+                </thead>
+                <tbody>
+                <tr th:each="item : ${debtItemsPreview}" th:classappend="${item.status().name() == 'OVERDUE' ? ' pf-row-risk' : (item.isPaid() ? ' pf-row-paid' : '')}">
+                  <td>
+                    <strong th:text="${item.title()}">Pago</strong>
+                    <small class="text-muted" th:text="${item.sourceLabel()}">Origen</small>
+                  </td>
+                  <td><span class="badge bg-light text-dark" th:text="${item.status().label}">Pendiente</span></td>
+                  <td th:text="${item.dueDate() != null ? item.dueDate() : '-'}">-</td>
+                  <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(item.currency())}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(item.amountDue())}">0.00</span></td>
+                  <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(item.currency())}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(item.pendingAmount())}">0.00</span></td>
+                  <td class="text-end"><a th:href="@{/gasto-claro/monthly-plan(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-primary">Abrir</a></td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(debtItemsPreview)}"><td colspan="6" class="text-center text-muted py-3">No hay pagos de deuda generados para este mes.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <div class="pf-dashboard-mini-grid">
+            <section class="pf-panel pf-dashboard-panel">
+              <div class="pf-dashboard-panel-header compact">
+                <div>
+                  <strong><i class="bi bi-house-check"></i> Gastos básicos</strong>
+                  <small>Lo necesario para mantenerte operativo.</small>
+                </div>
+              </div>
+              <div class="pf-dashboard-list">
+                <div class="pf-dashboard-list-item" th:each="item : ${basicItemsPreview}">
+                  <div><strong th:text="${item.title()}">Gasto</strong><small th:text="${item.dueDate() != null ? 'Vence ' + item.dueDate() : 'Sin vencimiento'}">Vence</small></div>
+                  <span>S/ <span th:text="${@personalFinanceMoneyFormatter.amount(item.pendingAmount())}">0.00</span></span>
+                </div>
+                <div th:if="${#lists.isEmpty(basicItemsPreview)}" class="pf-dashboard-empty">No hay gastos básicos generados.</div>
+              </div>
+            </section>
+
+            <section class="pf-panel pf-dashboard-panel">
+              <div class="pf-dashboard-panel-header compact">
+                <div>
+                  <strong><i class="bi bi-arrow-down-circle"></i> Ingresos del mes</strong>
+                  <small>Controla lo esperado y recibido.</small>
+                </div>
+                <a th:href="@{/gasto-claro/income-events(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-primary">Ver</a>
+              </div>
+              <div class="pf-dashboard-list">
+                <div class="pf-dashboard-list-item" th:each="event : ${incomeEvents}">
+                  <div><strong th:text="${event.title}">Ingreso</strong><small th:text="${event.status.label}">Estado</small></div>
+                  <span><span th:text="${@personalFinanceMoneyFormatter.symbol(event.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(event.amount)}">0.00</span></span>
+                </div>
+                <div th:if="${#lists.isEmpty(incomeEvents)}" class="pf-dashboard-empty">No hay ingresos programados para este mes.</div>
+              </div>
+            </section>
           </div>
         </div>
-        <div class="col-12 col-md-6 col-xl-3">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-              <div class="text-muted small">Presión de deudas</div>
-              <div class="h3 mb-0">S/ <span th:text="${@personalFinanceMoneyFormatter.amount(dashboard.debtPressureTotal())}">0.00</span></div>
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-md-6 col-xl-3">
-          <div class="card border-0 shadow-sm h-100" th:classappend="${dashboard.projectedBalance().signum() < 0} ? ' border-danger' : ' border-success'">
-            <div class="card-body">
-              <div class="text-muted small">Saldo proyectado</div>
-              <div class="h3 mb-0" th:classappend="${dashboard.projectedBalance().signum() < 0} ? ' text-danger' : ' text-success'">
-                S/ <span th:text="${@personalFinanceMoneyFormatter.amount(dashboard.projectedBalance())}">0.00</span>
+
+        <aside class="pf-dashboard-side-pane">
+          <section class="pf-dashboard-health" th:classappend="${plan.hasDeficit()} ? ' is-danger' : ' is-ok'">
+            <span>Lectura rápida</span>
+            <strong th:if="${plan.hasDeficit()}">Mes en déficit</strong>
+            <strong th:unless="${plan.hasDeficit()}">Mes controlado</strong>
+            <p th:if="${plan.hasDeficit()}">Reduce gastos opcionales, negocia vencimientos y prioriza deudas con interés alto.</p>
+            <p th:unless="${plan.hasDeficit()}">Puedes reservar dinero y mantener el orden de pagos antes de gastar el saldo.</p>
+          </section>
+
+          <section class="pf-panel pf-dashboard-panel">
+            <div class="pf-dashboard-panel-header compact">
+              <div>
+                <strong><i class="bi bi-lightning-charge"></i> Acciones rápidas</strong>
+                <small>Lo más usado durante el mes.</small>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
+            <div class="pf-dashboard-actions-grid">
+              <a th:href="@{/gasto-claro/monthly-plan(year=${selectedYear},month=${selectedMonth})}" class="btn btn-primary btn-sm"><i class="bi bi-grid-3x3-gap"></i> Hoja mensual</a>
+              <a th:href="@{/gasto-claro/payments(year=${selectedYear},month=${selectedMonth})}" class="btn btn-outline-success btn-sm"><i class="bi bi-cash-coin"></i> Pago</a>
+              <a th:href="@{/gasto-claro/reserved-funds(year=${selectedYear},month=${selectedMonth})}" class="btn btn-outline-primary btn-sm"><i class="bi bi-wallet2"></i> Reservas</a>
+              <a th:href="@{/gasto-claro/debt-report(year=${selectedYear},month=${selectedMonth})}" class="btn btn-outline-danger btn-sm"><i class="bi bi-file-earmark-pdf"></i> Informe</a>
+            </div>
+          </section>
 
-      <div class="row g-3">
-        <div class="col-lg-6">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-              <strong>Deudas activas</strong>
+          <section class="pf-panel pf-dashboard-panel">
+            <div class="pf-dashboard-panel-header compact">
+              <div>
+                <strong><i class="bi bi-credit-card-2-front"></i> Deudas activas</strong>
+                <small>Vista rápida de presión mensual.</small>
+              </div>
               <a th:href="@{/gasto-claro/debts}" class="btn btn-sm btn-outline-primary">Gestionar</a>
             </div>
-            <div class="card-body p-0">
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                  <thead class="table-light"><tr><th>Deuda</th><th>Vence</th><th class="text-end">Pago mes</th></tr></thead>
-                  <tbody>
-                  <tr th:each="debt : ${debts}">
-                    <td><div class="fw-semibold" th:text="${debt.name}">Deuda</div><small class="text-muted" th:text="${debt.debtType.label}">Tipo</small></td>
-                    <td th:text="${debt.dueDay != null ? 'Día ' + debt.dueDay : '-'}">Día 1</td>
-                    <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(debt.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(debt.monthlyPressure())}">0.00</span></td>
-                  </tr>
-                  <tr th:if="${#lists.isEmpty(debts)}"><td colspan="3" class="text-center text-muted py-4">Aún no registraste deudas.</td></tr>
-                  </tbody>
-                </table>
+            <div class="pf-dashboard-list compact-list">
+              <div class="pf-dashboard-list-item" th:each="debt : ${debts}">
+                <div><strong th:text="${debt.name}">Deuda</strong><small th:text="${debt.debtType.label}">Tipo</small></div>
+                <span><span th:text="${@personalFinanceMoneyFormatter.symbol(debt.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(debt.monthlyPressure())}">0.00</span></span>
               </div>
+              <div th:if="${#lists.isEmpty(debts)}" class="pf-dashboard-empty">Aún no registraste deudas.</div>
             </div>
-          </div>
-        </div>
-        <div class="col-lg-6">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-              <strong>Ingresos del mes</strong>
-              <a th:href="@{/gasto-claro/income-events(year=${selectedYear},month=${selectedMonth})}" class="btn btn-sm btn-outline-primary">Gestionar</a>
-            </div>
-            <div class="card-body p-0">
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                  <thead class="table-light"><tr><th>Ingreso</th><th>Fecha</th><th class="text-end">Monto</th></tr></thead>
-                  <tbody>
-                  <tr th:each="event : ${incomeEvents}">
-                    <td><div class="fw-semibold" th:text="${event.title}">Ingreso</div><small class="text-muted" th:text="${event.status.label}">Estado</small></td>
-                    <td th:text="${event.expectedDate}">2026-07-01</td>
-                    <td class="text-end"><span th:text="${@personalFinanceMoneyFormatter.symbol(event.currency)}">S/</span> <span th:text="${@personalFinanceMoneyFormatter.amount(event.amount)}">0.00</span></td>
-                  </tr>
-                  <tr th:if="${#lists.isEmpty(incomeEvents)}"><td colspan="3" class="text-center text-muted py-4">Aún no registraste ingresos programados para este mes.</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+          </section>
+        </aside>
+      </section>
     </main>
   </div>
 </div>
